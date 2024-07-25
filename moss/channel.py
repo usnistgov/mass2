@@ -56,8 +56,8 @@ class Channel:
     
     def good_series(self, col, use_expr):
         return moss.good_series(self.df, col, self.good_expr, use_expr)
-
-    def rough_cal_gain(
+    
+    def rough_gain_cal(
         self, line_names, uncalibrated_col, calibrated_col, ph_smoothing_fwhm,
         use_expr=True
     ):
@@ -74,26 +74,26 @@ class Channel:
         gain = opt_assignments / energies_out
         gain_pfit = np.polynomial.Polynomial.fit(opt_assignments, gain, deg=2)
 
-        def rough_cal_f(uncalibrated):
+        def ph2energy(uncalibrated):
             calibrated = uncalibrated / gain_pfit(uncalibrated)
             return calibrated
 
-        predicted_energies = rough_cal_f(np.array(opt_assignments))
+        predicted_energies = ph2energy(np.array(opt_assignments))
         # energy_residuals = predicted_energies - energies_out
         # if any(np.abs(energy_residuals) > max_residual_ev):
         #     raise Exception(f"too large residuals: {energy_residuals=} eV")
         step = moss.RoughCalibrationGainStep(
             [uncalibrated_col],
-            calibrated_col,
+            [calibrated_col],
             self.good_expr,
-            rough_cal_f,
+            use_expr=use_expr,
             line_names=name_e,
             line_energies=energies_out,
             predicted_energies=predicted_energies,
-            gain_pfit = gain_pfit
+            ph2energy = ph2energy
         )
         return self.with_step(step)
-    
+
     def rough_cal(
         self, line_names, uncalibrated_col, calibrated_col, ph_smoothing_fwhm,
         use_expr=True
@@ -336,6 +336,7 @@ class Channel:
         previous_cal_step = self.steps[previous_cal_step_index]
         rough_energy_col = previous_cal_step.output[0]
         uncalibrated_col = previous_cal_step.inputs[0]
+
         fits_with_results = multifit.fit_ch(self, col=rough_energy_col)
         multifit_df = fits_with_results.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
