@@ -13,6 +13,7 @@ dependencies = [
     "tornado",# for matplotlib plots in marimo
     "numba",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
+    "mass @ git+https://github.com/usnistgov/mass#egg=mass",
     "pytest",
     "dill"
 ]
