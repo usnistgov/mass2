@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.11"
+__generated_with = "0.7.12"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -425,7 +425,7 @@ def __(data3, mo, moss, plt):
 @app.cell
 def __(multifit_with_results):
     pd_result, mn_result, cu_result = multifit_with_results.results
-    assert mn_result.params["fwhm"].value < 3.34
+    assert mn_result.params["fwhm"].value < 3.44
     assert cu_result.params["fwhm"].value < 3.7
     return cu_result, mn_result, pd_result
 

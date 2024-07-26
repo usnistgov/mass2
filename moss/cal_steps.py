@@ -69,10 +69,9 @@ class RoughCalibrationGainStep(CalStep):
     
 @dataclass(frozen=True)
 class RoughCalibrationStep(CalStep):
-    line_names: list[str]
-    line_energies: np.ndarray
-    predicted_energies: np.ndarray
-    ph2energy: np.polynomial.Polynomial
+    pfresult: moss.rough_cal.SmoothedLocalMaximaResult
+    assignment_result: moss.rough_cal.BestAssignmentPfitGainResult
+    ph2energy: callable
 
     def calc_from_df(self, df):
         # only works with in memory data, but just takes it as numpy data and calls function
@@ -82,7 +81,7 @@ class RoughCalibrationStep(CalStep):
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
 
-    def dbg_plot(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
+    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
         series = moss.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
         axis = moss.misc.plot_hist_of_series(series, bin_edges)
         axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
@@ -93,8 +92,14 @@ class RoughCalibrationStep(CalStep):
         axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
         return axis
     
+    def dbg_plot(self, df, axs=None):
+        if axs is None:
+            fig, axs = plt.subplots(2, 1, figsize=(8,6))
+        self.assignment_result.plot(ax=axs[0])
+        self.pfresult.plot(self.assignment_result, ax=axs[1])
+    
     def energy2ph(self, energy):
-        return moss.misc.smallest_positive_real((self.ph2energy-energy).roots())
+        return self.assignment_result.energy2ph(energy)
 
 
 @dataclass(frozen=True)

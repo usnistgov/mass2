@@ -95,35 +95,27 @@ class Channel:
         return self.with_step(step)
 
     def rough_cal(
-        self, line_names, uncalibrated_col, calibrated_col, ph_smoothing_fwhm,
+        self, line_names, uncalibrated_col, calibrated_col, 
+        ph_smoothing_fwhm, n_extra=3,
         use_expr=True
     ):
-        # this is meant to filter the data, then select down to the columsn we need, then materialize them, all without copying our pulse records again
-        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        peak_ph_vals, _peak_heights = mass.algorithms.find_local_maxima(
-            uncalibrated, gaussian_fwhm=ph_smoothing_fwhm
-        )
-        name_e, energies_out, opt_assignments = mass.algorithms.find_opt_assignment(
-            peak_ph_vals,
-            line_names=line_names,
-            maxacc=0.1,
-        )
-        ph2energy = np.polynomial.Polynomial.fit(opt_assignments, energies_out, deg=2)
 
-        predicted_energies = ph2energy(np.array(opt_assignments))
-        # energy_residuals = predicted_energies - energies_out
-        # if any(np.abs(energy_residuals) > max_residual_ev):
-        #     raise Exception(f"too large residuals: {energy_residuals=} eV")
+        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
+                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
+            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
+
+
         step = moss.RoughCalibrationStep(
             [uncalibrated_col],
             [calibrated_col],
             self.good_expr,
             use_expr=use_expr,
-            line_names=name_e,
-            line_energies=energies_out,
-            predicted_energies=predicted_energies,
-            ph2energy = ph2energy
-        )
+            pfresult=pfresult,
+            assignment_result=assignment_result, 
+            ph2energy=assignment_result.ph2energy)
         return self.with_step(step)
 
     def with_step(self, step):

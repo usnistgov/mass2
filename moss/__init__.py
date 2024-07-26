@@ -9,6 +9,7 @@ from .filters import fourier_filter, Filter
 from .drift_correction import drift_correct
 from .noise_channel import NoiseChannel
 from .multifit import FitSpec, MultiFit
+from . import rough_cal
 from .cal_steps import (CalSteps, CalStep, DriftCorrectStep, RoughCalibrationStep,
                         RoughCalibrationGainStep, SummarizeStep, Filter5LagStep,
                         MultiFitSplineStep)
