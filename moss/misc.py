@@ -48,7 +48,7 @@ def outlier_resistant_nsigma_above_mid(x, nsigma=5):
 def midpoints_and_step_size(x):
     d = np.diff(x)
     step_size = d[0]
-    assert np.allclose(d, step_size, atol=1e-7)
+    assert np.allclose(d, step_size, atol=1e-7), f"{d=}"
     return x[:-1] + step_size, step_size
 
 def hist_of_series(series, bin_edges):
@@ -84,12 +84,14 @@ def launch_examples():
     import sys
     import pathlib
 
-    folder = pathlib.Path(__file__).parent.parent/"examples"
+    examples_folder = pathlib.Path(__file__).parent.parent/"examples"
+    # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
+    examples_folder_relative = examples_folder.relative_to(pathlib.Path.cwd())
     # Prepare the command
-    command = ["marimo", "edit", folder] + sys.argv[1:]
+    command = ["marimo", "edit", examples_folder_relative] + sys.argv[1:]
     
     # Execute the command
-    print(f"launching marimo edit in {folder}")
+    print(f"launching marimo edit in {examples_folder_relative}")
     try:
         # Execute the command and directly forward stdout and stderr
         process = subprocess.Popen(command, stdout=sys.stdout, stderr=sys.stderr)
