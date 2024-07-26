@@ -48,7 +48,7 @@ def outlier_resistant_nsigma_above_mid(x, nsigma=5):
 def midpoints_and_step_size(x):
     d = np.diff(x)
     step_size = d[0]
-    assert np.allclose(d, step_size, atol=1e-7), f"{d=}"
+    assert np.allclose(d, step_size, atol=1e-9), f"{d=}"
     return x[:-1] + step_size, step_size
 
 def hist_of_series(series, bin_edges):

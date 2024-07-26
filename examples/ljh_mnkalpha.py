@@ -71,7 +71,7 @@ def __(mo):
 
 
 @app.cell
-def __(data):
+def __(data, pl):
     data2 = data.transform_channels(
         lambda channel: channel.summarize_pulses()
         .with_good_expr_pretrig_mean_and_postpeak_deriv()
@@ -88,7 +88,7 @@ def __(data):
             calibrated_col="energy_5lagy",
             ph_smoothing_fwhm=50,
         )
-        .driftcorrect()
+        .driftcorrect(use_expr=(pl.col("energy_5lagy").is_between(3000, 9000))) # drift correct near MnKAlpha
         .rough_cal(
             ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
             uncalibrated_col="5lagy_dc",
@@ -425,8 +425,9 @@ def __(data3, mo, moss, plt):
 @app.cell
 def __(multifit_with_results):
     pd_result, mn_result, cu_result = multifit_with_results.results
-    assert mn_result.params["fwhm"].value < 3.44
-    assert cu_result.params["fwhm"].value < 3.7
+    assert mn_result.params["fwhm"].value < 3.6
+    assert cu_result.params["fwhm"].value < 3.25
+    # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_result, pd_result
 
 
@@ -512,11 +513,6 @@ def __(data4, mo, plt):
 def __(data2):
     ch6 = data2.channels[4102]
     return ch6,
-
-
-@app.cell
-def __():
-    return
 
 
 if __name__ == "__main__":
