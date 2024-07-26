@@ -18,6 +18,9 @@ dependencies = [
     "dill"
 ]
 
+[project.scripts]
+moss_examples = "moss.misc:launch_examples"
+
 [project.optional-dependencies]
 dev = [
     "tox",

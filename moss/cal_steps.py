@@ -94,9 +94,10 @@ class RoughCalibrationStep(CalStep):
     
     def dbg_plot(self, df, axs=None):
         if axs is None:
-            fig, axs = plt.subplots(2, 1, figsize=(8,6))
+            fig, axs = plt.subplots(2, 1, figsize=(11,6))
         self.assignment_result.plot(ax=axs[0])
         self.pfresult.plot(self.assignment_result, ax=axs[1])
+        plt.tight_layout()
     
     def energy2ph(self, energy):
         return self.assignment_result.energy2ph(energy)

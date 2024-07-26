@@ -78,3 +78,32 @@ def plot_a_vs_b_series(a, b, axis=None, **plotkwarg):
     axis.plot(a, b, ".", label=b.name, **plotkwarg)
     axis.set_xlabel(a.name)
     axis.set_ylabel(b.name)
+
+def launch_examples():
+    import subprocess
+    import sys
+    import pathlib
+
+    folder = pathlib.Path(__file__).parent.parent/"examples"
+    # Prepare the command
+    command = ["marimo", "edit", folder] + sys.argv[1:]
+    
+    # Execute the command
+    print(f"launching marimo edit in {folder}")
+    try:
+        # Execute the command and directly forward stdout and stderr
+        process = subprocess.Popen(command, stdout=sys.stdout, stderr=sys.stderr)
+        process.communicate()
+
+    except KeyboardInterrupt:
+        # Handle cleanup on Ctrl-C
+        try:
+            process.terminate()
+        except OSError:
+            pass
+        process.wait()
+        sys.exit(1)
+
+    # Check if the command was successful
+    if process.returncode != 0:
+        sys.exit(process.returncode)

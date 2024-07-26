@@ -30,7 +30,8 @@ def __(mo):
 
 @app.cell
 def __(moss, pl):
-    pulse_folder = "C:\\Users\\oneilg\\Desktop\\python\\src\\mass\\tests\\ljh_files\\20230626\\0001"
+    import pulsedata
+    pulse_folder = pulsedata.pulse_noise_ljh_pairs["20230626"].pulse_folder
     data = moss.Channels.from_ljh_folder(
         pulse_folder=pulse_folder)
     steps_dict = moss.misc.unpickle_object("example_steps_dict.pkl")
