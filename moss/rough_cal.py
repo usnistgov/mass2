@@ -85,7 +85,11 @@ def hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges=None):
         n = 128 * 1024
         lo = np.min(pulse_heights) - 3 * fwhm_pulse_height_units
         hi = np.max(pulse_heights) + 3 * fwhm_pulse_height_units
+        print(f"{lo=} {hi=} {n=}")
         bin_edges =  np.linspace(lo, hi, n + 1)
+        firstdifs= np.diff(bin_edges)[:10]
+        print(f"{firstdifs=}")
+
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bin_edges)    
     counts,_ = np.histogram(pulse_heights, bin_edges)
     fwhm_in_bin_number_units = fwhm_pulse_height_units/step_size
