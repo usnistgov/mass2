@@ -83,8 +83,8 @@ def smooth_hist_with_gauassian_by_fft(hist, fwhm_in_bin_number_units):
 def hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges=None):
     if bin_edges is None:
         n = 128 * 1024
-        lo = np.float64(np.min(pulse_heights) - 3 * fwhm_pulse_height_units)
-        hi = np.float64(np.max(pulse_heights) + 3 * fwhm_pulse_height_units)
+        lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
+        hi = (np.max(pulse_heights) + 3 * fwhm_pulse_height_units).astype(np.float64)
         print(f"{lo=} {hi=} {n=}")
         bin_edges =  np.linspace(lo, hi, n + 1)
         firstdifs= np.diff(bin_edges)[:10]
