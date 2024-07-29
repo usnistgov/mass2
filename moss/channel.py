@@ -213,6 +213,14 @@ class Channel:
         )
         return self.with_step(step)
 
+    def good_serieses(self, cols, use_expr):
+        df2 = (            self.df.lazy()
+            .filter(self.good_expr)
+            .filter(use_expr)
+            .select(cols)
+            .collect())
+        return [df2[col] for col in cols]
+
     def driftcorrect(
         self,
         indicator="pretrig_mean",
@@ -222,16 +230,10 @@ class Channel:
     ):
         if corrected is None:
             corrected = uncorrected + "_dc"
-        df_dc = (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select([indicator, uncorrected])
-            .collect()
-        )
+        indicator_s, uncorrected_s = self.good_serieses([indicator, uncorrected], use_expr)
         dc = moss.drift_correct(
-            indicator=df_dc[indicator].to_numpy(),
-            uncorrected=df_dc[uncorrected].to_numpy(),
+            indicator=indicator_s.to_numpy(),
+            uncorrected=uncorrected_s.to_numpy(),
         )
         step = DriftCorrectStep(
             inputs=[indicator, uncorrected],
@@ -307,9 +309,9 @@ class Channel:
     
     def with_experiment_state_df(self, df_es):
         df2 = self.df.join_asof(df_es, on="timestamp", strategy="backward")
-        return self.with_df2(df2)
+        return self.with_replacement_df(df2)
 
-    def with_df2(self, df2):
+    def with_replacement_df(self, df2):
         return Channel(
                 df=df2,
                 header=self.header,
@@ -319,6 +321,11 @@ class Channel:
                 steps=self.steps,
             ) 
     
+    def with_columns(self, df2):
+        df3 = df2.with_columns(self.df)
+        return self.with_replacement_df(df3)
+    
+
     def multifit_spline_cal(
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True

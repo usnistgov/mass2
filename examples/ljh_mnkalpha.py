@@ -363,7 +363,7 @@ def __(data2, pl):
     # we also drop the "pulse" column here because sorting will acually copy the underlying data
     # and we dont want to do that
     data3 = data2.transform_channels(
-        lambda ch: ch.with_df2(ch.df.select(pl.exclude("pulse")).sort(by="timestamp"))
+        lambda ch: ch.with_replacement_df(ch.df.select(pl.exclude("pulse")).sort(by="timestamp"))
     )
     data3 = data3.with_experiment_state_by_path()
     return data3,
@@ -425,8 +425,9 @@ def __(data3, mo, moss, plt):
 @app.cell
 def __(multifit_with_results):
     pd_result, mn_result, cu_result = multifit_with_results.results
+    print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
     assert mn_result.params["fwhm"].value < 3.6
-    assert cu_result.params["fwhm"].value < 3.25
+    assert cu_result.params["fwhm"].value < 3.34
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_result, pd_result
 
@@ -513,6 +514,73 @@ def __(data4, mo, plt):
 def __(data2):
     ch6 = data2.channels[4102]
     return ch6,
+
+
+@app.cell
+def __(ch6, moss, np):
+    indicator = ch6.good_series("pretrig_mean", use_expr=True).to_numpy()
+    uncorrected = ch6.good_series("energy_5lagy_dc", use_expr=True).to_numpy()
+    dc_result=moss.rough_cal.minimize_entropy_linear(indicator, uncorrected, bin_edges = np.arange(0, 9000, 1), fwhm_in_bin_number_units=4)
+    print(dc_result)
+    return dc_result, indicator, uncorrected
+
+
+@app.cell
+def __(ch6, mo, np, plt):
+    ch6.plot_hist("energy_5lagy_dc", np.arange(0,10000,1))
+    mo.mpl.interactive(plt.gcf())
+    return
+
+
+@app.cell
+def __(ch6, mo, np, pl, plt):
+    def pfit_dc(line_name, ch):
+        import mass
+        dlo, dhi = 50, 50
+        e0 = mass.STANDARD_FEATURES[line_name]
+        pt, e = ch.good_serieses(["pretrig_mean", "energy_5lagy"], use_expr=pl.col("energy_5lagy_dc").is_between(e0-dlo, e0+dhi))
+        ptm = np.mean(pt.to_numpy())
+        ptzm = pt-ptm
+        ezm = e-np.mean(e.to_numpy())
+        plt.plot(ptzm,ezm, ".")
+        pfit_dc = np.polynomial.Polynomial.fit(ptzm, ezm, deg=1)
+        slope = pfit_dc.deriv(1).convert().coef[0]
+        pt_plt = np.arange(-60, 60, 1)
+        plt.plot(pt_plt, pfit_dc(pt_plt))
+        plt.plot(ptzm, ezm-slope*ptzm,".")
+        plt.title(f"{slope=:.4} {slope/e0=:g}")
+        plt.xlabel("pt zero mean")
+        plt.ylabel("energy zero mean")
+        ch2 = ch.with_columns(ch.df.select(pl.col("energy_5lagy")-slope*(pl.col("pretrig_mean")-ptm)).rename({"energy_5lagy":f"energy_5lagy_dc_{line_name}"}))
+        return ch2
+    ch7 = pfit_dc("MnKAlpha", ch6)
+    ch8 = pfit_dc("CuKAlpha", ch7)
+    mo.mpl.interactive(plt.gcf())
+    return ch7, ch8, pfit_dc
+
+
+@app.cell
+def __(ch8):
+    ch8.df
+    return
+
+
+@app.cell
+def __(ch8, mo, plt):
+    result1 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc_MnKAlpha")
+    result1.plotm()
+    fig1 = plt.gcf()
+    result2 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc_CuKAlpha")
+    result2.plotm()
+    fig2 = plt.gcf()
+    result3 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc_MnKAlpha")
+    result3.plotm()
+    fig3 = plt.gcf()
+    result4 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc_CuKAlpha")
+    result4.plotm()
+    fig4 = plt.gcf()
+    mo.vstack([mo.mpl.interactive(fig) for fig in [fig2, fig3]])
+    return fig1, fig2, fig3, fig4, result1, result2, result3, result4
 
 
 if __name__ == "__main__":

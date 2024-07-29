@@ -73,12 +73,16 @@ class SmoothedLocalMaximaResult:
         return ax
 
 def smooth_hist_with_gauassian_by_fft(hist, fwhm_in_bin_number_units):
+    kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
+    y = np.fft.irfft(np.fft.rfft(hist) * kernel)
+    return y
+
+def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins, fwhm_in_bin_number_units):
     sigma = fwhm_in_bin_number_units / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
-    tx = np.fft.rfftfreq(len(hist))
-    ty = np.exp(-tx**2 / 2 / tbw**2)
-    y = np.fft.irfft(np.fft.rfft(hist) * ty)
-    return y
+    tx = np.fft.rfftfreq(nbins)
+    kernel = np.exp(-tx**2 / 2 / tbw**2)
+    return kernel
 
 def hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges=None):
     if bin_edges is None:
@@ -220,3 +224,20 @@ def find_best_residual_among_all_possible_assignments(ph, e):
             best_pfit = pfit_gain
     return best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit
 
+
+def drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units):
+    corrected = uncorrected * (1 + indicator_zero_mean * slope)
+    smoothed_counts, bin_edges, counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
+    w = smoothed_counts > 0
+    return -(np.log(smoothed_counts[w]) * smoothed_counts[w]).sum()
+
+def minimize_entropy_linear(indicator, uncorrected, bin_edges, fwhm_in_bin_number_units):
+    import scipy.optimize
+    indicator_mean = np.mean(indicator)
+    indicator_zero_mean = indicator-indicator_mean
+
+    def entropy_fun(slope):
+        return drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units)
+
+    result = scipy.optimize.minimize_scalar(entropy_fun, bracket=[0,0.1])
+    return result, indicator_mean
