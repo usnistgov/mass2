@@ -1,12 +1,14 @@
 import numpy as np
 import pylab as plt
 from dataclasses import dataclass
+import moss
+import polars as pl
 
 def fourier_filter(avg_signal, noise_psd, dt, fmax=None, f_3db=None, peak_signal=1.0):
     filter, variance = calc_fourier_filter(avg_signal, noise_psd, dt, fmax, f_3db, peak_signal)
     return Filter(filter, variance, dt, filter_type="fourier")    
 
-@dataclass
+@dataclass(frozen=True)
 class Filter:
     filter: np.ndarray
     variance: float
@@ -104,3 +106,23 @@ def filter_data_5lag(filter_values, pulses):
     peak_x = -0.5 * param[1, :] / param[2, :]
     peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
     return peak_x, peak_y
+
+
+@dataclass(frozen=True)
+class Filter5LagStep(moss.CalStep):
+    filter: Filter
+    spectrum: moss.NoisePSD
+
+    def calc_from_df(self, df):
+        dfs = []
+        for df_iter in df.iter_slices(10000):
+            peak_x, peak_y = moss.filters.filter_data_5lag(
+                self.filter.filter, df_iter[self.inputs[0]].to_numpy()
+            )
+            dfs.append(pl.DataFrame({"peak_x": peak_x, "peak_y": peak_y}))
+        df2 = pl.concat(dfs).with_columns(df)
+        df2 = df2.rename({"peak_x": self.output[0], "peak_y": self.output[1]})
+        return df2
+
+    def dbg_plot(self, df):
+        return self.filter.plot()
