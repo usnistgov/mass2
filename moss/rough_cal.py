@@ -245,8 +245,8 @@ def minimize_entropy_linear(indicator, uncorrected, bin_edges, fwhm_in_bin_numbe
 
 @dataclass(frozen=True)
 class RoughCalibrationStep(moss.CalStep):
-    pfresult: moss.rough_cal.SmoothedLocalMaximaResult
-    assignment_result: moss.rough_cal.BestAssignmentPfitGainResult
+    pfresult: SmoothedLocalMaximaResult
+    assignment_result: BestAssignmentPfitGainResult
     ph2energy: callable
 
     def calc_from_df(self, df):

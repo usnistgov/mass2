@@ -72,7 +72,7 @@ def __(mo):
 
 @app.cell
 def __(data, pl):
-    data2 = data.transform_channels(
+    data2 = data.map(
         lambda channel: channel.summarize_pulses()
         .with_good_expr_pretrig_mean_and_postpeak_deriv()
         .rough_cal(
@@ -362,7 +362,7 @@ def __(data2, pl):
     # due to the way timestamps were define in ljh files, we actually have a non-monotonic timestamp in channel 4109, so lets fix that, then apply the experiment state
     # we also drop the "pulse" column here because sorting will acually copy the underlying data
     # and we dont want to do that
-    data3 = data2.transform_channels(
+    data3 = data2.map(
         lambda ch: ch.with_replacement_df(ch.df.select(pl.exclude("pulse")).sort(by="timestamp"))
     )
     data3 = data3.with_experiment_state_by_path()
@@ -434,7 +434,7 @@ def __(multifit_with_results):
 
 @app.cell
 def __(data3, multifit):
-    data4 = data3.transform_channels(
+    data4 = data3.map(
         lambda ch: ch.multifit_spline_cal(
             multifit, previous_cal_step_index=5, calibrated_col="energy2_5lagy_dc"
         )
@@ -553,7 +553,7 @@ def __(ch6, mo, np, pl, plt):
         plt.ylabel("energy zero mean")
         ch2 = ch.with_columns(ch.df.select(pl.col("energy_5lagy")-slope*(pl.col("pretrig_mean")-ptm)).rename({"energy_5lagy":f"energy_5lagy_dc_{line_name}"}))
         return ch2
-        
+
     ch7 = pfit_dc("MnKAlpha", ch6)
     fig11 = plt.gcf()
     plt.figure()

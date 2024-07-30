@@ -61,7 +61,7 @@ class Channels:
         )
         return result
 
-    def transform_channels(self, f, allow_throw=True):
+    def map(self, f, allow_throw=True):
         new_channels = collections.OrderedDict()
         for key, channel in self.channels.items():
             try:
