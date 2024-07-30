@@ -127,6 +127,17 @@ class Channel:
             ch2 = ch2.with_step(step)
         return ch2
 
+    def with_good_expr(self, good_expr):
+        return Channel(
+            df=self.df,
+            header=self.header,
+            noise=self.noise,
+            good_expr=good_expr,
+            df_history=self.df_history,
+            steps=self.steps,
+            steps_elapsed_s=self.steps_elapsed_s,
+        )
+
     def with_good_expr_pretrig_mean_and_postpeak_deriv(self):
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=20
@@ -137,15 +148,27 @@ class Channel:
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(
             pl.col("pretrig_rms") < max_pretrig_rms
         )
-        return Channel(
-            df=self.df,
-            header=self.header,
-            noise=self.noise,
-            good_expr=good_expr,
-            df_history=self.df_history,
-            steps=self.steps,
-            steps_elapsed_s=self.steps_elapsed_s,
-        )
+        return self.with_good_expr(good_expr)
+    
+    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, and_ = None, and_prev_good_expr=False, use_prev_good_expr=True):
+        if use_prev_good_expr:
+            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+        else:
+            df = self.df
+        for i, (col, nsigma) in enumerate(col_nsigma_pairs):
+            max_for_col = moss.misc.outlier_resistant_nsigma_above_mid(
+                df[col].to_numpy(), nsigma=nsigma
+            )
+            this_iter_good_expr = pl.col(col).is_between(0, max_for_col)
+            if i == 0:
+                good_expr = this_iter_good_expr
+            else:
+                good_expr = good_expr.and_(this_iter_good_expr)
+        if and_ is not None:
+            good_expr = good_expr.and_(and_)
+        if and_prev_good_expr:
+            good_expr = self.good_expr.and_(good_expr)
+        return self.with_good_expr(good_expr)
 
     @functools.cache
     def typical_peak_ind(self, col="pulse"):
@@ -201,12 +224,15 @@ class Channel:
         )
         return self.with_step(step)
 
-    def good_serieses(self, cols, use_expr):
-        df2 = (            self.df.lazy()
+    def good_df(self, cols=pl.all(), use_expr=True):
+        return (self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(cols)
             .collect())
+
+    def good_serieses(self, cols, use_expr):
+        df2 = self.good_df(cols, use_expr)
         return [df2[col] for col in cols]
 
     def driftcorrect(
@@ -275,6 +301,7 @@ class Channel:
         # and we may get nonsense results
         # only checks if the ids match, does not try to be equal if all contents are equal
         return id(self) == id(other)
+
 
     @classmethod
     def from_ljh(cls, path, noise_path=None, keep_posix_usec=False):

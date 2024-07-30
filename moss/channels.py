@@ -13,6 +13,12 @@ class Channels:
     channels: collections.OrderedDict[int, moss.Channel]
     description: str
 
+    @property
+    def ch0(self):
+        assert len(self.channels) > 0, "channels must be non-empty"
+        for v in self.channels.values():
+            return v
+
     @functools.cache
     def dfg(self, exclude="pulse"):
         # return a dataframe containing good pulses from each channel,

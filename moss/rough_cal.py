@@ -163,7 +163,8 @@ class BestAssignmentPfitGainResult:
             ax=plt.gca()
         gain = self.ph_assigned/self.energy_target
         ax.plot(self.ph_assigned, self.ph_assigned/self.energy_target, "o")
-        ax.plot(self.ph_assigned, self.pfit_gain(self.ph_assigned))
+        ph_large_range = np.linspace(0, self.ph_assigned[-1]*1.1,51)
+        ax.plot(ph_large_range, self.pfit_gain(ph_large_range))
         ax.set_xlabel("pulse_height")
         ax.set_ylabel("gain")
         ax.set_title(f"BestAssignmentPfitGainResult rms_residual={self.rms_residual:.2f} eV")
