@@ -55,17 +55,17 @@ class DriftCorrectStep(CalStep):
         return plt.gca()
     
     @classmethod
-    def learn(cls, ch, indicator, uncorrected, corrected, use_expr):
-        if corrected is None:
-            corrected = uncorrected + "_dc"
-        indicator_s, uncorrected_s = ch.good_serieses([indicator, uncorrected], use_expr)
+    def learn(cls, ch, indicator_col, uncorrected_col, corrected_col, use_expr):
+        if corrected_col is None:
+            corrected_col = uncorrected_col + "_dc"
+        indicator_s, uncorrected_s = ch.good_serieses([indicator_col, uncorrected_col], use_expr)
         dc = moss.drift_correct(
             indicator=indicator_s.to_numpy(),
             uncorrected=uncorrected_s.to_numpy(),
         )
         step = cls(
-            inputs=[indicator, uncorrected],
-            output=[corrected],
+            inputs=[indicator_col, uncorrected_col],
+            output=[corrected_col],
             good_expr=ch.good_expr,
             use_expr=use_expr,
             dc=dc,

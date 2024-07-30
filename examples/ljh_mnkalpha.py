@@ -321,8 +321,8 @@ def __(ch2):
 def __(ch2, pl):
     # here we use a good_expr to drift correct over a smaller energy range
     ch3 = ch2.driftcorrect(
-        indicator="pretrig_mean",
-        uncorrected="energy_5lagy_dc",
+        indicator_col="pretrig_mean",
+        uncorrected_col="energy_5lagy_dc",
         use_expr=(pl.col("energy_5lagy_dc").is_between(2800, 2850)),
     )
     return ch3,

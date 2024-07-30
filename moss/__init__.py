@@ -5,9 +5,8 @@ from . import misc
 from .misc import good_series
 from .noise_algorithms import noise_psd, autocorrelation, NoisePSD
 from .noise_channel import NoiseChannel
-from .multifit import FitSpec, MultiFit
-from .cal_steps import (CalSteps, CalStep, SummarizeStep,
-                        MultiFitSplineStep)
+from .cal_steps import (CalSteps, CalStep, SummarizeStep)
+from .multifit import FitSpec, MultiFit, MultiFitSplineStep
 from . import filters
 from .filters import fourier_filter, Filter, Filter5LagStep
 from .drift_correction import drift_correct, DriftCorrectStep

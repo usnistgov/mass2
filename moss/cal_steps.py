@@ -83,21 +83,3 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
     
-@dataclass(frozen=True)
-class MultiFitSplineStep(CalStep):
-    ph2energy: callable
-    multifit: moss.MultiFit
-
-    def calc_from_df(self, df):
-        # only works with in memory data, but just takes it as numpy data and calls function
-        # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
-        inputs_np = [df[input].to_numpy() for input in self.inputs]
-        out = self.ph2energy(inputs_np[0])
-        df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
-        return df2
-
-    def dbg_plot(self, df):
-        self.multifit.plot_results()
-
-    def energy2ph(self, e):
-        return self.ph2energy.solve(e)[0]

@@ -212,17 +212,17 @@ class Channel:
 
     def driftcorrect(
         self,
-        indicator="pretrig_mean",
-        uncorrected="5lagy",
-        corrected=None,
+        indicator_col="pretrig_mean",
+        uncorrected_col="5lagy",
+        corrected_col=None,
         use_expr=True,
     ):
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
         step = DriftCorrectStep.learn(ch=self,
-                                      indicator=indicator,
-                                      uncorrected=uncorrected,
-                                      corrected=corrected,
+                                      indicator_col=indicator_col,
+                                      uncorrected_col=uncorrected_col,
+                                      corrected_col=corrected_col,
                                       use_expr=use_expr)
         return self.with_step(step)
 
@@ -312,26 +312,10 @@ class Channel:
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True
     ):
-        import scipy.interpolate
-        from scipy.interpolate import CubicSpline
-        previous_cal_step = self.steps[previous_cal_step_index]
-        rough_energy_col = previous_cal_step.output[0]
-        uncalibrated_col = previous_cal_step.inputs[0]
-
-        fits_with_results = multifit.fit_ch(self, col=rough_energy_col)
-        multifit_df = fits_with_results.results_params_as_df()
-        peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
-        peaks_uncalibrated = [previous_cal_step.energy2ph(e) for e in peaks_in_energy_rough_cal]
-        peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
-        spline = CubicSpline(peaks_uncalibrated, peaks_in_energy_reference, bc_type="natural")
-        step = moss.MultiFitSplineStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr,
-            spline,
-            fits_with_results,
-        )
+        step = moss.MultiFitSplineStep.learn(self, multifit=multifit,
+                                             previous_cal_step_index=previous_cal_step_index,
+                                             calibrated_col=calibrated_col,
+                                             use_expr=use_expr)
         return self.with_step(step)
     
     def concat_df(self, df):
