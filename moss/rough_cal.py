@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 import pylab as plt
 import moss
+import polars as pl
 
 @dataclass(frozen=True)
 class SmoothedLocalMaximaResult:
@@ -241,3 +242,63 @@ def minimize_entropy_linear(indicator, uncorrected, bin_edges, fwhm_in_bin_numbe
 
     result = scipy.optimize.minimize_scalar(entropy_fun, bracket=[0,0.1])
     return result, indicator_mean
+
+@dataclass(frozen=True)
+class RoughCalibrationStep(moss.CalStep):
+    pfresult: moss.rough_cal.SmoothedLocalMaximaResult
+    assignment_result: moss.rough_cal.BestAssignmentPfitGainResult
+    ph2energy: callable
+
+    def calc_from_df(self, df):
+        # only works with in memory data, but just takes it as numpy data and calls function
+        # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
+        inputs_np = [df[input].to_numpy() for input in self.inputs]
+        out = self.ph2energy(inputs_np[0])
+        df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
+        return df2
+
+    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
+        series = moss.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
+        axis = moss.misc.plot_hist_of_series(series, bin_edges)
+        axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
+        for line_name, energy in zip(self.line_names, self.line_energies):
+            axis.annotate(line_name, (energy, 0), rotation=90)
+        np.set_printoptions(precision=2)
+        energy_residuals = self.predicted_energies-self.line_energies
+        axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
+        return axis
+    
+    def dbg_plot(self, df, axs=None):
+        if axs is None:
+            fig, axs = plt.subplots(2, 1, figsize=(11,6))
+        self.assignment_result.plot(ax=axs[0])
+        self.pfresult.plot(self.assignment_result, ax=axs[1])
+        plt.tight_layout()
+    
+    def energy2ph(self, energy):
+        return self.assignment_result.energy2ph(energy)
+    
+    @classmethod
+    def learn(cls, ch, line_names, uncalibrated_col, calibrated_col, 
+        ph_smoothing_fwhm, n_extra=3,
+        use_expr=True
+    ):
+        import mass
+
+        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
+                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
+            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
+
+
+        step = cls(
+            [uncalibrated_col],
+            [calibrated_col],
+            ch.good_expr,
+            use_expr=use_expr,
+            pfresult=pfresult,
+            assignment_result=assignment_result, 
+            ph2energy=assignment_result.ph2energy)
+        return step

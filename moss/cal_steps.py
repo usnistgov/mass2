@@ -70,6 +70,31 @@ class RoughCalibrationStep(CalStep):
     
     def energy2ph(self, energy):
         return self.assignment_result.energy2ph(energy)
+    
+    @classmethod
+    def learn(cls, ch, line_names, uncalibrated_col, calibrated_col, 
+        ph_smoothing_fwhm, n_extra=3,
+        use_expr=True
+    ):
+        import mass
+
+        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
+                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
+            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
+
+
+        step = cls(
+            [uncalibrated_col],
+            [calibrated_col],
+            ch.good_expr,
+            use_expr=use_expr,
+            pfresult=pfresult,
+            assignment_result=assignment_result, 
+            ph2energy=assignment_result.ph2energy)
+        return step
 
 
 @dataclass(frozen=True)

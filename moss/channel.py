@@ -99,23 +99,12 @@ class Channel:
         ph_smoothing_fwhm, n_extra=3,
         use_expr=True
     ):
-
-        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
-        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
-                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
-            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
-
-
-        step = moss.RoughCalibrationStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr=use_expr,
-            pfresult=pfresult,
-            assignment_result=assignment_result, 
-            ph2energy=assignment_result.ph2energy)
+        step = moss.RoughCalibrationStep.learn(self, line_names, 
+                                             uncalibrated_col=uncalibrated_col,
+                                             calibrated_col=calibrated_col,
+                                             ph_smoothing_fwhm=ph_smoothing_fwhm,
+                                             n_extra=n_extra,
+                                             use_expr=use_expr)
         return self.with_step(step)
 
     def with_step(self, step):

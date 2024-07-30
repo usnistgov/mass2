@@ -8,10 +8,10 @@ from .noise_algorithms import noise_psd, autocorrelation, NoisePSD
 from .filters import fourier_filter, Filter
 from .noise_channel import NoiseChannel
 from .multifit import FitSpec, MultiFit
-from . import rough_cal
-from .cal_steps import (CalSteps, CalStep, RoughCalibrationStep,
-                        RoughCalibrationGainStep, SummarizeStep, Filter5LagStep,
+from .cal_steps import (CalSteps, CalStep, SummarizeStep, Filter5LagStep,
                         MultiFitSplineStep)
 from .drift_correction import drift_correct, DriftCorrectStep
+from . import rough_cal
+from .rough_cal import RoughCalibrationStep
 from .channel import Channel, ChannelHeader
 from .channels import Channels
