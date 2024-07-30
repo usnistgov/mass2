@@ -54,7 +54,7 @@ class LJHFile():
                     a = a.decode()
                     b = b.decode()
                     if a in header_dict and a != "Dummy":
-                        print("repeated header entry {}".format(a))
+                        print("LJHFile.__read_header: repeated header entry {}".format(a))
                     header_dict[a] = b
                 else:
                     continue  # ignore lines without ":"

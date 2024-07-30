@@ -44,7 +44,6 @@ class Channel:
 
     def step_plot(self, step_ind, **kwargs):
         step = self.steps[step_ind]
-        print(step)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
         else:

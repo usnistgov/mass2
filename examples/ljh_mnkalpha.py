@@ -71,7 +71,7 @@ def __(mo):
 
 
 @app.cell
-def __(data, pl):
+def __(data):
     data2 = data.map(
         lambda channel: channel.summarize_pulses()
         .with_good_expr_pretrig_mean_and_postpeak_deriv()
@@ -88,7 +88,7 @@ def __(data, pl):
             calibrated_col="energy_5lagy",
             ph_smoothing_fwhm=50,
         )
-        .driftcorrect(use_expr=(pl.col("energy_5lagy").is_between(3000, 9000))) # drift correct near MnKAlpha
+        .driftcorrect() 
         .rough_cal(
             ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
             uncalibrated_col="5lagy_dc",
@@ -426,8 +426,8 @@ def __(data3, mo, moss, plt):
 def __(multifit_with_results):
     pd_result, mn_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
-    assert mn_result.params["fwhm"].value < 3.6
-    assert cu_result.params["fwhm"].value < 3.34
+    assert mn_result.params["fwhm"].value < 3.39
+    assert cu_result.params["fwhm"].value < 3.42
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_result, pd_result
 
@@ -571,7 +571,7 @@ def __(ch8):
 
 @app.cell
 def __(ch8, mo, plt):
-    result1 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc_MnKAlpha")
+    result1 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc")
     result1.plotm()
     fig1 = plt.gcf()
     result2 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc_CuKAlpha")
@@ -580,7 +580,7 @@ def __(ch8, mo, plt):
     result3 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc_MnKAlpha")
     result3.plotm()
     fig3 = plt.gcf()
-    result4 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc_CuKAlpha")
+    result4 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc")
     result4.plotm()
     fig4 = plt.gcf()
     mo.vstack([mo.mpl.interactive(fig) for fig in [fig2, fig3]])

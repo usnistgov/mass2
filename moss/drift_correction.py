@@ -16,26 +16,27 @@ def drift_correct_mass(indicator, uncorrected):
     offset = dc_info["median_pretrig_mean"]
     return DriftCorrection(slope=slope, offset=offset)
 
-def drift_correct(indicator, uncorrected):
+def drift_correct_wip(indicator, uncorrected):
     opt_result, offset=moss.rough_cal.minimize_entropy_linear(indicator, uncorrected, 
                     bin_edges = np.arange(0, 60000, 1), fwhm_in_bin_number_units=5)
-    print(f"{opt_result=}")
     return DriftCorrection(offset=offset.astype(np.float64), slope=opt_result.x.astype(np.float64))
+
+drift_correct = drift_correct_mass
 
 @dataclass(frozen=True)
 class DriftCorrectStep(CalStep):
     dc: typing.Any
 
     def calc_from_df(self, df):
-        indicator, uncorrected = self.inputs
+        indicator_col, uncorrected_col = self.inputs
         slope, offset = self.dc.slope, self.dc.offset
         df2 = df.select(
-            (pl.col(uncorrected) * (1 + slope * (pl.col(indicator) - offset))).alias(self.output[0])
+            (pl.col(uncorrected_col) * (1 + slope * (pl.col(indicator_col) - offset))).alias(self.output[0])
         ).with_columns(df)
         return df2
 
     def dbg_plot(self, df):
-        indicator, uncorrected = self.inputs
+        indicator_col, uncorrected_col = self.inputs
         # breakpoint()
         df_small = (
             df.lazy()
@@ -44,9 +45,9 @@ class DriftCorrectStep(CalStep):
             .select(self.inputs + self.output)
             .collect()
         )
-        moss.misc.plot_a_vs_b_series(df_small[indicator], df_small[uncorrected])
+        moss.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
         moss.misc.plot_a_vs_b_series(
-            df_small[indicator],
+            df_small[indicator_col],
             df_small[self.output[0]],
             plt.gca(),
         )
