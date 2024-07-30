@@ -228,20 +228,13 @@ class Channel:
         corrected=None,
         use_expr=True,
     ):
-        if corrected is None:
-            corrected = uncorrected + "_dc"
-        indicator_s, uncorrected_s = self.good_serieses([indicator, uncorrected], use_expr)
-        dc = moss.drift_correct(
-            indicator=indicator_s.to_numpy(),
-            uncorrected=uncorrected_s.to_numpy(),
-        )
-        step = DriftCorrectStep(
-            inputs=[indicator, uncorrected],
-            output=[corrected],
-            good_expr=self.good_expr,
-            use_expr=use_expr,
-            dc=dc,
-        )
+        # by defining a seperate learn method that takes ch as an argument,
+        # we can move all the code for the step outside of Channel
+        step = DriftCorrectStep.learn(ch=self,
+                                      indicator=indicator,
+                                      uncorrected=uncorrected,
+                                      corrected=corrected,
+                                      use_expr=use_expr)
         return self.with_step(step)
 
     def linefit(

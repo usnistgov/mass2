@@ -548,15 +548,19 @@ def __(ch6, mo, np, pl, plt):
         pt_plt = np.arange(-60, 60, 1)
         plt.plot(pt_plt, pfit_dc(pt_plt))
         plt.plot(ptzm, ezm-slope*ptzm,".")
-        plt.title(f"{slope=:.4} {slope/e0=:g}")
+        plt.title(f"{slope=:.4} {slope/e0=:g} {line_name=}")
         plt.xlabel("pt zero mean")
         plt.ylabel("energy zero mean")
         ch2 = ch.with_columns(ch.df.select(pl.col("energy_5lagy")-slope*(pl.col("pretrig_mean")-ptm)).rename({"energy_5lagy":f"energy_5lagy_dc_{line_name}"}))
         return ch2
+        
     ch7 = pfit_dc("MnKAlpha", ch6)
+    fig11 = plt.gcf()
+    plt.figure()
     ch8 = pfit_dc("CuKAlpha", ch7)
-    mo.mpl.interactive(plt.gcf())
-    return ch7, ch8, pfit_dc
+    fig12 = plt.gcf()
+    mo.vstack([mo.mpl.interactive(fig11), mo.mpl.interactive(fig12)])
+    return ch7, ch8, fig11, fig12, pfit_dc
 
 
 @app.cell

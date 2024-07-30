@@ -16,37 +16,6 @@ class CalStep:
     use_expr: pl.Expr
 
 
-@dataclass(frozen=True)
-class DriftCorrectStep(CalStep):
-    dc: typing.Any
-
-    def calc_from_df(self, df):
-        indicator, uncorrected = self.inputs
-        slope, offset = self.dc.slope, self.dc.offset
-        df2 = df.select(
-            (pl.col(uncorrected) * (1 + slope * (pl.col(indicator) - offset))).alias(self.output[0])
-        ).with_columns(df)
-        return df2
-
-    def dbg_plot(self, df):
-        indicator, uncorrected = self.inputs
-        # breakpoint()
-        df_small = (
-            df.lazy()
-            .filter(self.good_expr)
-            .filter(self.use_expr)
-            .select(self.inputs + self.output)
-            .collect()
-        )
-        moss.misc.plot_a_vs_b_series(df_small[indicator], df_small[uncorrected])
-        moss.misc.plot_a_vs_b_series(
-            df_small[indicator],
-            df_small[self.output[0]],
-            plt.gca(),
-        )
-        plt.legend()
-        plt.tight_layout()
-        return plt.gca()
 
 
 @dataclass(frozen=True)
