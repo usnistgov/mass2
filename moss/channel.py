@@ -44,7 +44,6 @@ class Channel:
 
     def step_plot(self, step_ind, **kwargs):
         step = self.steps[step_ind]
-        print(step)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
         else:
@@ -99,23 +98,12 @@ class Channel:
         ph_smoothing_fwhm, n_extra=3,
         use_expr=True
     ):
-
-        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
-        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
-                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
-            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
-
-
-        step = moss.RoughCalibrationStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr=use_expr,
-            pfresult=pfresult,
-            assignment_result=assignment_result, 
-            ph2energy=assignment_result.ph2energy)
+        step = moss.RoughCalibrationStep.learn(self, line_names, 
+                                             uncalibrated_col=uncalibrated_col,
+                                             calibrated_col=calibrated_col,
+                                             ph_smoothing_fwhm=ph_smoothing_fwhm,
+                                             n_extra=n_extra,
+                                             use_expr=use_expr)
         return self.with_step(step)
 
     def with_step(self, step):
@@ -213,33 +201,28 @@ class Channel:
         )
         return self.with_step(step)
 
-    def driftcorrect(
-        self,
-        indicator="pretrig_mean",
-        uncorrected="5lagy",
-        corrected=None,
-        use_expr=True,
-    ):
-        if corrected is None:
-            corrected = uncorrected + "_dc"
-        df_dc = (
-            self.df.lazy()
+    def good_serieses(self, cols, use_expr):
+        df2 = (            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
-            .select([indicator, uncorrected])
-            .collect()
-        )
-        dc = moss.drift_correct(
-            indicator=df_dc[indicator].to_numpy(),
-            uncorrected=df_dc[uncorrected].to_numpy(),
-        )
-        step = DriftCorrectStep(
-            inputs=[indicator, uncorrected],
-            output=[corrected],
-            good_expr=self.good_expr,
-            use_expr=use_expr,
-            dc=dc,
-        )
+            .select(cols)
+            .collect())
+        return [df2[col] for col in cols]
+
+    def driftcorrect(
+        self,
+        indicator_col="pretrig_mean",
+        uncorrected_col="5lagy",
+        corrected_col=None,
+        use_expr=True,
+    ):
+        # by defining a seperate learn method that takes ch as an argument,
+        # we can move all the code for the step outside of Channel
+        step = DriftCorrectStep.learn(ch=self,
+                                      indicator_col=indicator_col,
+                                      uncorrected_col=uncorrected_col,
+                                      corrected_col=corrected_col,
+                                      use_expr=use_expr)
         return self.with_step(step)
 
     def linefit(
@@ -307,9 +290,9 @@ class Channel:
     
     def with_experiment_state_df(self, df_es):
         df2 = self.df.join_asof(df_es, on="timestamp", strategy="backward")
-        return self.with_df2(df2)
+        return self.with_replacement_df(df2)
 
-    def with_df2(self, df2):
+    def with_replacement_df(self, df2):
         return Channel(
                 df=df2,
                 header=self.header,
@@ -319,30 +302,19 @@ class Channel:
                 steps=self.steps,
             ) 
     
+    def with_columns(self, df2):
+        df3 = df2.with_columns(self.df)
+        return self.with_replacement_df(df3)
+    
+
     def multifit_spline_cal(
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True
     ):
-        import scipy.interpolate
-        from scipy.interpolate import CubicSpline
-        previous_cal_step = self.steps[previous_cal_step_index]
-        rough_energy_col = previous_cal_step.output[0]
-        uncalibrated_col = previous_cal_step.inputs[0]
-
-        fits_with_results = multifit.fit_ch(self, col=rough_energy_col)
-        multifit_df = fits_with_results.results_params_as_df()
-        peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
-        peaks_uncalibrated = [previous_cal_step.energy2ph(e) for e in peaks_in_energy_rough_cal]
-        peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
-        spline = CubicSpline(peaks_uncalibrated, peaks_in_energy_reference, bc_type="natural")
-        step = moss.MultiFitSplineStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr,
-            spline,
-            fits_with_results,
-        )
+        step = moss.MultiFitSplineStep.learn(self, multifit=multifit,
+                                             previous_cal_step_index=previous_cal_step_index,
+                                             calibrated_col=calibrated_col,
+                                             use_expr=use_expr)
         return self.with_step(step)
     
     def concat_df(self, df):

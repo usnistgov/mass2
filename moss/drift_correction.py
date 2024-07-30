@@ -4,85 +4,81 @@ import scipy as sp
 import scipy.optimize
 from dataclasses import dataclass, field
 import mass
+import moss
+from moss import CalStep
+import polars as pl
+import typing
+import pylab as plt
 
-def drift_correct(indicator, uncorrected):
+def drift_correct_mass(indicator, uncorrected):
     slope, dc_info = \
             mass.core.analysis_algorithms.drift_correct(indicator, uncorrected)
     offset = dc_info["median_pretrig_mean"]
     return DriftCorrection(slope=slope, offset=offset)
 
-# def compute_kernel_ft(nbins, stepsize, smooth_sigma):
-#     kernel = np.exp(-0.5 * (np.arange(nbins) * stepsize / smooth_sigma) ** 2)
-#     kernel[1:] += kernel[-1:0:-1]  # Handle the negative frequencies
-#     kernel /= kernel.sum()
-#     return np.fft.rfft(kernel)
+def drift_correct_wip(indicator, uncorrected):
+    opt_result, offset=moss.rough_cal.minimize_entropy_linear(indicator, uncorrected, 
+                    bin_edges = np.arange(0, 60000, 1), fwhm_in_bin_number_units=5)
+    return DriftCorrection(offset=offset.astype(np.float64), slope=opt_result.x.astype(np.float64))
 
-# def compute_smooth_histogram(values, nbins, limits, kernel_ft):
-#     contents, _ = np.histogram(values, nbins, limits)
-#     ftc = np.fft.rfft(contents)
-#     csmooth = np.fft.irfft(kernel_ft * ftc)
-#     csmooth[csmooth < 0] = 0
-#     return csmooth
+drift_correct = drift_correct_mass
 
-# @dataclass
-# class HistogramSmoother:
-#     smooth_sigma: float
-#     limits: np.ndarray
-#     nbins: int = field(init=False)
-#     stepsize: float = field(init=False)
-#     kernel_ft: np.ndarray = field(init=False)
+@dataclass(frozen=True)
+class DriftCorrectStep(CalStep):
+    dc: typing.Any
 
-#     def __post_init__(self):
-#         self.limits = np.asarray(self.limits, dtype=float)
+    def calc_from_df(self, df):
+        indicator_col, uncorrected_col = self.inputs
+        slope, offset = self.dc.slope, self.dc.offset
+        df2 = df.select(
+            (pl.col(uncorrected_col) * (1 + slope * (pl.col(indicator_col) - offset))).alias(self.output[0])
+        ).with_columns(df)
+        return df2
 
-#         stepsize = 0.4 * self.smooth_sigma
-#         dlimits = self.limits[1] - self.limits[0]
-#         nbins = int(dlimits / stepsize + 0.5)
-#         pow2 = 1024
-#         while pow2 < nbins:
-#             pow2 *= 2
-#         self.nbins = pow2
-#         self.stepsize = dlimits / self.nbins
+    def dbg_plot(self, df):
+        indicator_col, uncorrected_col = self.inputs
+        # breakpoint()
+        df_small = (
+            df.lazy()
+            .filter(self.good_expr)
+            .filter(self.use_expr)
+            .select(self.inputs + self.output)
+            .collect()
+        )
+        moss.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
+        moss.misc.plot_a_vs_b_series(
+            df_small[indicator_col],
+            df_small[self.output[0]],
+            plt.gca(),
+        )
+        plt.legend()
+        plt.tight_layout()
+        return plt.gca()
+    
+    @classmethod
+    def learn(cls, ch, indicator_col, uncorrected_col, corrected_col, use_expr):
+        if corrected_col is None:
+            corrected_col = uncorrected_col + "_dc"
+        indicator_s, uncorrected_s = ch.good_serieses([indicator_col, uncorrected_col], use_expr)
+        dc = moss.drift_correct(
+            indicator=indicator_s.to_numpy(),
+            uncorrected=uncorrected_s.to_numpy(),
+        )
+        step = cls(
+            inputs=[indicator_col, uncorrected_col],
+            output=[corrected_col],
+            good_expr=ch.good_expr,
+            use_expr=use_expr,
+            dc=dc,
+        )
+        return step
 
-#         self.kernel_ft = compute_kernel_ft(self.nbins, self.stepsize, self.smooth_sigma)
-
-#     def __call__(self, values):
-#         return compute_smooth_histogram(values, self.nbins, self.limits, self.kernel_ft)
-
-# def make_smooth_histogram(values, smooth_sigma, limit, upper_limit=None):
-#     if upper_limit is None:
-#         limit, upper_limit = 0, limit
-#     smoother = HistogramSmoother(smooth_sigma, [limit, upper_limit])
-#     return smoother(values)
-
-# def drift_correct_entropy(param, indicator, uncorrected, smoother):
-#     corrected = uncorrected * (1 + indicator * param)
-#     hsmooth = smoother(corrected)
-#     w = hsmooth > 0
-#     return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
-
-# def drift_correct(indicator, uncorrected, limit=None):
-#     offset = np.median(indicator)
-#     indicator = np.array(indicator) - offset
-
-#     if limit is None:
-#         pct99 = np.percentile(uncorrected, 99)
-#         limit = 1.25 * pct99
-
-#     smoother = HistogramSmoother(0.5, [0, limit])
-
-#     def entropy(param):
-#         return drift_correct_entropy(param, indicator, uncorrected, smoother)
-
-#     slope = sp.optimize.brent(entropy, brack=[0, .001])
-
-#     return DriftCorrection(slope=slope, offset=offset)
 
 @dataclass
 class DriftCorrection:
     offset: float
     slope: float
 
-    def __call__(self, uncorrected):
+    def __call__(self, indicator, uncorrected):
         return uncorrected*(1+(indicator-self.offset)*self.slope)
 

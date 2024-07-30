@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 import pylab as plt
 import moss
+import polars as pl
 
 @dataclass(frozen=True)
 class SmoothedLocalMaximaResult:
@@ -73,12 +74,16 @@ class SmoothedLocalMaximaResult:
         return ax
 
 def smooth_hist_with_gauassian_by_fft(hist, fwhm_in_bin_number_units):
+    kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
+    y = np.fft.irfft(np.fft.rfft(hist) * kernel)
+    return y
+
+def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins, fwhm_in_bin_number_units):
     sigma = fwhm_in_bin_number_units / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
-    tx = np.fft.rfftfreq(len(hist))
-    ty = np.exp(-tx**2 / 2 / tbw**2)
-    y = np.fft.irfft(np.fft.rfft(hist) * ty)
-    return y
+    tx = np.fft.rfftfreq(nbins)
+    kernel = np.exp(-tx**2 / 2 / tbw**2)
+    return kernel
 
 def hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges=None):
     if bin_edges is None:
@@ -220,3 +225,80 @@ def find_best_residual_among_all_possible_assignments(ph, e):
             best_pfit = pfit_gain
     return best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit
 
+
+def drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units):
+    corrected = uncorrected * (1 + indicator_zero_mean * slope)
+    smoothed_counts, bin_edges, counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
+    w = smoothed_counts > 0
+    return -(np.log(smoothed_counts[w]) * smoothed_counts[w]).sum()
+
+def minimize_entropy_linear(indicator, uncorrected, bin_edges, fwhm_in_bin_number_units):
+    import scipy.optimize
+    indicator_mean = np.mean(indicator)
+    indicator_zero_mean = indicator-indicator_mean
+
+    def entropy_fun(slope):
+        return drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units)
+
+    result = scipy.optimize.minimize_scalar(entropy_fun, bracket=[0,0.1])
+    return result, indicator_mean
+
+@dataclass(frozen=True)
+class RoughCalibrationStep(moss.CalStep):
+    pfresult: SmoothedLocalMaximaResult
+    assignment_result: BestAssignmentPfitGainResult
+    ph2energy: callable
+
+    def calc_from_df(self, df):
+        # only works with in memory data, but just takes it as numpy data and calls function
+        # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
+        inputs_np = [df[input].to_numpy() for input in self.inputs]
+        out = self.ph2energy(inputs_np[0])
+        df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
+        return df2
+
+    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
+        series = moss.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
+        axis = moss.misc.plot_hist_of_series(series, bin_edges)
+        axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
+        for line_name, energy in zip(self.line_names, self.line_energies):
+            axis.annotate(line_name, (energy, 0), rotation=90)
+        np.set_printoptions(precision=2)
+        energy_residuals = self.predicted_energies-self.line_energies
+        axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
+        return axis
+    
+    def dbg_plot(self, df, axs=None):
+        if axs is None:
+            fig, axs = plt.subplots(2, 1, figsize=(11,6))
+        self.assignment_result.plot(ax=axs[0])
+        self.pfresult.plot(self.assignment_result, ax=axs[1])
+        plt.tight_layout()
+    
+    def energy2ph(self, energy):
+        return self.assignment_result.energy2ph(energy)
+    
+    @classmethod
+    def learn(cls, ch, line_names, uncalibrated_col, calibrated_col, 
+        ph_smoothing_fwhm, n_extra=3,
+        use_expr=True
+    ):
+        import mass
+
+        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
+                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
+            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
+
+
+        step = cls(
+            [uncalibrated_col],
+            [calibrated_col],
+            ch.good_expr,
+            use_expr=use_expr,
+            pfresult=pfresult,
+            assignment_result=assignment_result, 
+            ph2energy=assignment_result.ph2energy)
+        return step
