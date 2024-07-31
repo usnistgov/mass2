@@ -1,0 +1,963 @@
+[
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\dataclasses.py",
+        "line": 1301,
+        "func_name": "is_dataclass",
+        "type_comments": [
+            "(int) -> bool",
+            "(str) -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\importlib\\__init__.py",
+        "line": 73,
+        "func_name": "import_module",
+        "type_comments": [
+            "(str, None) -> module"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\json\\__init__.py",
+        "line": 299,
+        "func_name": "loads",
+        "type_comments": [
+            "(str, None, None, None, None, None, None) -> Dict[str, Union[int, str]]"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\json\\decoder.py",
+        "line": 332,
+        "func_name": "JSONDecoder.decode",
+        "type_comments": [
+            "(str, builtin_method) -> Dict[str, Union[int, str]]"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\json\\decoder.py",
+        "line": 343,
+        "func_name": "JSONDecoder.raw_decode",
+        "type_comments": [
+            "(str, int) -> Tuple[Dict[str, Union[int, str]], int]"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 387,
+        "func_name": "_parse_path",
+        "type_comments": [
+            "(str) -> Tuple[str, str, List[str]]"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 407,
+        "func_name": "PurePath._load_parts",
+        "type_comments": [
+            "() -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 429,
+        "func_name": "_format_parsed_parts",
+        "type_comments": [
+            "(str, str, List[str]) -> str"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 437,
+        "func_name": "PurePath.__str__",
+        "type_comments": [
+            "() -> str"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 551,
+        "func_name": "drive",
+        "type_comments": [
+            "() -> str"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 560,
+        "func_name": "root",
+        "type_comments": [
+            "() -> str"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\pathlib.py",
+        "line": 569,
+        "func_name": "_tail",
+        "type_comments": [
+            "() -> List[str]"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\_distutils_hack\\__init__.py",
+        "line": 82,
+        "func_name": "DistutilsMetaFinder.find_spec",
+        "type_comments": [
+            "(str, List[str], None) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 20,
+        "func_name": "recordDtype",
+        "type_comments": [
+            "(str, int, bool) -> numpy.dtypes.VoidDType"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 47,
+        "func_name": "readJsonString",
+        "type_comments": [
+            "(_io.BufferedReader) -> str"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 72,
+        "func_name": "OffFile.__init__",
+        "type_comments": [
+            "(str) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 95,
+        "func_name": "OffFile.validateHeader",
+        "type_comments": [
+            "() -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 104,
+        "func_name": "OffFile._updateMmap",
+        "type_comments": [
+            "(None) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 128,
+        "func_name": "OffFile._decodeModelInfo",
+        "type_comments": [
+            "() -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 155,
+        "func_name": "OffFile._decodeModelInfoMmap",
+        "type_comments": [
+            "() -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\mass\\off\\off.py",
+        "line": 174,
+        "func_name": "OffFile.__repr__",
+        "type_comments": [
+            "() -> str"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\_dtype.py",
+        "line": 24,
+        "func_name": "_kind_name",
+        "type_comments": [
+            "(numpy.dtypes.Int32DType) -> str",
+            "(numpy.dtypes.Int64DType) -> str",
+            "(numpy.dtypes.Float32DType) -> str"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\_dtype.py",
+        "line": 336,
+        "func_name": "_name_includes_bit_suffix",
+        "type_comments": [
+            "(numpy.dtypes.Float32DType) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(numpy.dtypes.Int32DType) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(numpy.dtypes.Int64DType) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\_dtype.py",
+        "line": 352,
+        "func_name": "_name_get",
+        "type_comments": [
+            "(numpy.dtypes.Int32DType) -> str",
+            "(numpy.dtypes.Int64DType) -> str",
+            "(numpy.dtypes.Float32DType) -> str"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\_internal.py",
+        "line": 937,
+        "func_name": "npy_ctypes_check",
+        "type_comments": [
+            "() -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\memmap.py",
+        "line": 213,
+        "func_name": "__new__",
+        "type_comments": [
+            "(type, str, numpy.dtypes.VoidDType, str, int, Tuple[int], str) -> numpy.memmap",
+            "(type, str, type, str, int, Tuple[int, int], str) -> numpy.memmap"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\memmap.py",
+        "line": 300,
+        "func_name": "memmap.__array_finalize__",
+        "type_comments": [
+            "(None) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(numpy.memmap) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\memmap.py",
+        "line": 347,
+        "func_name": "memmap.__getitem__",
+        "type_comments": [
+            "(str) -> numpy.memmap"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\multiarray.py",
+        "line": 1404,
+        "func_name": "may_share_memory",
+        "type_comments": [
+            "(numpy.memmap, numpy.memmap, None) -> Tuple[numpy.memmap, numpy.memmap]"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\numerictypes.py",
+        "line": 288,
+        "func_name": "issubclass_",
+        "type_comments": [
+            "(type, type) -> bool",
+            "(numpy.dtypes.Int32DType, type) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(numpy.dtypes.Int64DType, type) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(numpy.dtypes.Float32DType, type) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\numpy\\_core\\numerictypes.py",
+        "line": 470,
+        "func_name": "issubdtype",
+        "type_comments": [
+            "(numpy.dtypes.Int32DType, type) -> bool",
+            "(numpy.dtypes.Float32DType, type) -> bool",
+            "(numpy.dtypes.Int64DType, type) -> bool"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 77,
+        "func_name": "dict_to_pydf",
+        "type_comments": [
+            "(Dict[str, Union[int, str]], None, None, bool, bool, bool) -> PyDataFrame"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 177,
+        "func_name": "_unpack_schema",
+        "type_comments": [
+            "(None, None, None, dict_keys) -> Tuple[List, Dict]",
+            "(List[str], None, int, None) -> Tuple[List[str], Dict]"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 198,
+        "func_name": "_parse_schema_overrides",
+        "type_comments": [
+            "(None) -> Dict"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 267,
+        "func_name": "_handle_columns_arg",
+        "type_comments": [
+            "(List[PySeries], List[str], bool) -> List[PySeries]"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 339,
+        "func_name": "_expand_dict_values",
+        "type_comments": [
+            "(Dict[str, Union[int, str]], Dict, bool, None, bool) -> Dict[str, polars.series.series.Series]"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 425,
+        "func_name": "_expand_dict_data",
+        "type_comments": [
+            "(Dict[str, Union[int, str]], Dict, bool) -> Dict[str, Union[int, str]]"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\dataframe.py",
+        "line": 1226,
+        "func_name": "numpy_to_pydf",
+        "type_comments": [
+            "(numpy.memmap, None, None, None, bool, bool) -> PyDataFrame"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\series.py",
+        "line": 73,
+        "func_name": "sequence_to_pyseries",
+        "type_comments": [
+            "(str, List[str], None, bool, bool) -> PySeries",
+            "(str, List[int], None, bool, bool) -> PySeries"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\series.py",
+        "line": 299,
+        "func_name": "_construct_series_with_fallbacks",
+        "type_comments": [
+            "(builtin_function_or_method, str, List[str], None, bool) -> PySeries",
+            "(builtin_function_or_method, str, List[int], None, bool) -> PySeries"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\series.py",
+        "line": 442,
+        "func_name": "numpy_to_pyseries",
+        "type_comments": [
+            "(str, numpy.memmap, bool, bool) -> PySeries"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\utils.py",
+        "line": 53,
+        "func_name": "is_namedtuple",
+        "type_comments": [
+            "(bool) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\utils.py",
+        "line": 63,
+        "func_name": "is_pydantic_model",
+        "type_comments": [
+            "(int) -> bool",
+            "(str) -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\construction\\utils.py",
+        "line": 68,
+        "func_name": "get_first_non_none",
+        "type_comments": [
+            "(List[str]) -> str",
+            "(List[int]) -> int"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\parse\\expr.py",
+        "line": 19,
+        "func_name": "parse_into_expression",
+        "type_comments": [
+            "(polars.expr.expr.Expr, bool, bool, bool, None) -> PyExpr",
+            "(polars.series.series.Series, bool, bool, bool, None) -> PyExpr"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\parse\\expr.py",
+        "line": 77,
+        "func_name": "parse_into_list_of_expressions",
+        "type_comments": [
+            "(bool, *polars.dataframe.frame.DataFrame) -> List[PyExpr]",
+            "(bool, *polars.expr.expr.Expr) -> List[PyExpr]"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\parse\\expr.py",
+        "line": 107,
+        "func_name": "_parse_positional_inputs",
+        "type_comments": [
+            "(Tuple[polars.dataframe.frame.DataFrame], bool) -> List[PyExpr]",
+            "(Tuple[polars.expr.expr.Expr], bool) -> List[PyExpr]"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\parse\\expr.py",
+        "line": 116,
+        "func_name": "_parse_inputs_as_iterable",
+        "type_comments": [
+            "(Tuple[polars.dataframe.frame.DataFrame]) -> polars.dataframe.frame.DataFrame",
+            "(Tuple[polars.expr.expr.Expr]) -> Tuple[polars.expr.expr.Expr]"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\parse\\expr.py",
+        "line": 129,
+        "func_name": "_is_iterable",
+        "type_comments": [
+            "(polars.expr.expr.Expr) -> bool",
+            "(polars.dataframe.frame.DataFrame) -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\various.py",
+        "line": 73,
+        "func_name": "_is_generator",
+        "type_comments": [
+            "(int) -> bool",
+            "(Dict[str, int]) -> bool",
+            "(str) -> bool"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\various.py",
+        "line": 188,
+        "func_name": "arrlen",
+        "type_comments": [
+            "(int) -> pyannotate_runtime.collect_types.NoReturnType",
+            "(str) -> None",
+            "(Dict[str, Union[Dict[str, Union[int, str]], str]]) -> None"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\wrap.py",
+        "line": 12,
+        "func_name": "wrap_df",
+        "type_comments": [
+            "(PyDataFrame) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\wrap.py",
+        "line": 16,
+        "func_name": "wrap_ldf",
+        "type_comments": [
+            "(PyLazyFrame) -> polars.lazyframe.frame.LazyFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\wrap.py",
+        "line": 20,
+        "func_name": "wrap_s",
+        "type_comments": [
+            "(PySeries) -> polars.series.series.Series"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\_utils\\wrap.py",
+        "line": 24,
+        "func_name": "wrap_expr",
+        "type_comments": [
+            "(PyExpr) -> polars.expr.expr.Expr"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\convert\\general.py",
+        "line": 290,
+        "func_name": "from_numpy",
+        "type_comments": [
+            "(numpy.memmap, None, None, None) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 343,
+        "func_name": "DataFrame.__init__",
+        "type_comments": [
+            "(Dict[str, Union[int, str]], None, None, bool, None, int, bool) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 484,
+        "func_name": "_from_pydf",
+        "type_comments": [
+            "(PyDataFrame) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 1139,
+        "func_name": "DataFrame.__iter__",
+        "type_comments": [
+            "() -> generator"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 8479,
+        "func_name": "DataFrame.lazy",
+        "type_comments": [
+            "() -> polars.lazyframe.frame.LazyFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 8518,
+        "func_name": "DataFrame.select",
+        "type_comments": [
+            "(*polars.expr.expr.Expr) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 8645,
+        "func_name": "DataFrame.with_columns",
+        "type_comments": [
+            "(*polars.dataframe.frame.DataFrame) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dataframe\\frame.py",
+        "line": 10184,
+        "func_name": "DataFrame.iter_columns",
+        "type_comments": [
+            "() -> Iterator[polars.series.series.Series]"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\_parse.py",
+        "line": 41,
+        "func_name": "parse_into_dtype",
+        "type_comments": [
+            "(polars.datatypes.classes.Datetime) -> polars.datatypes.classes.Datetime"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\classes.py",
+        "line": 372,
+        "func_name": "Datetime.__init__",
+        "type_comments": [
+            "(str, None) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\classes.py",
+        "line": 388,
+        "func_name": "Datetime.__eq__",
+        "type_comments": [
+            "(polars.datatypes.classes.DataTypeClass) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\constructor.py",
+        "line": 69,
+        "func_name": "_set_numpy_to_constructor",
+        "type_comments": [
+            "() -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\constructor.py",
+        "line": 90,
+        "func_name": "_normalise_numpy_dtype",
+        "type_comments": [
+            "(numpy.dtypes.Int64DType) -> Tuple[type, None]",
+            "(numpy.dtypes.Int32DType) -> Tuple[type, None]",
+            "(numpy.dtypes.Float32DType) -> Tuple[type, None]"
+        ],
+        "samples": 3
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\constructor.py",
+        "line": 114,
+        "func_name": "numpy_values_and_dtype",
+        "type_comments": [
+            "(numpy.ndarray) -> Tuple[numpy.ndarray, type]"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\constructor.py",
+        "line": 127,
+        "func_name": "numpy_type_to_constructor",
+        "type_comments": [
+            "(numpy.ndarray, type) -> builtin_function_or_method"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\constructor.py",
+        "line": 160,
+        "func_name": "py_type_to_constructor",
+        "type_comments": [
+            "(type) -> builtin_function_or_method"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\datatypes\\convert.py",
+        "line": 65,
+        "func_name": "is_polars_dtype",
+        "type_comments": [
+            "(polars.datatypes.classes.Datetime, bool) -> bool"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dependencies.py",
+        "line": 67,
+        "func_name": "_LazyModule._import",
+        "type_comments": [
+            "() -> module"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dependencies.py",
+        "line": 74,
+        "func_name": "_LazyModule.__getattr__",
+        "type_comments": [
+            "(str) -> type",
+            "(str) -> function"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dependencies.py",
+        "line": 196,
+        "func_name": "_might_be",
+        "type_comments": [
+            "(str) -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dependencies.py",
+        "line": 207,
+        "func_name": "_check_for_numpy",
+        "type_comments": [
+            "(numpy.memmap, bool) -> bool"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\dependencies.py",
+        "line": 225,
+        "func_name": "_check_for_pydantic",
+        "type_comments": [
+            "(int, bool) -> bool",
+            "(str, bool) -> bool"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\datetime.py",
+        "line": 33,
+        "func_name": "ExprDateTimeNameSpace.__init__",
+        "type_comments": [
+            "(polars.expr.expr.Expr) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\datetime.py",
+        "line": 1541,
+        "func_name": "ExprDateTimeNameSpace.cast_time_unit",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\expr.py",
+        "line": 124,
+        "func_name": "_from_pyexpr",
+        "type_comments": [
+            "(PyExpr) -> polars.expr.expr.Expr"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\expr.py",
+        "line": 668,
+        "func_name": "Expr.alias",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\expr.py",
+        "line": 728,
+        "func_name": "Expr.exclude",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\expr.py",
+        "line": 1734,
+        "func_name": "Expr.cast",
+        "type_comments": [
+            "(polars.datatypes.classes.Datetime, bool, bool) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\expr\\expr.py",
+        "line": 10564,
+        "func_name": "dt",
+        "type_comments": [
+            "() -> polars.expr.datetime.ExprDateTimeNameSpace"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\functions\\col.py",
+        "line": 19,
+        "func_name": "_create_col",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\functions\\col.py",
+        "line": 126,
+        "func_name": "Col.__call__",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\functions\\lazy.py",
+        "line": 1417,
+        "func_name": "exclude",
+        "type_comments": [
+            "(str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\functions\\lazy.py",
+        "line": 2018,
+        "func_name": "from_epoch",
+        "type_comments": [
+            "(str, str) -> polars.expr.expr.Expr"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\functions\\lit.py",
+        "line": 29,
+        "func_name": "lit",
+        "type_comments": [
+            "(polars.series.series.Series, None, bool) -> polars.expr.expr.Expr"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\lazyframe\\frame.py",
+        "line": 318,
+        "func_name": "_from_pyldf",
+        "type_comments": [
+            "(PyLazyFrame) -> polars.lazyframe.frame.LazyFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\lazyframe\\frame.py",
+        "line": 1796,
+        "func_name": "LazyFrame.collect",
+        "type_comments": [
+            "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) -> polars.dataframe.frame.DataFrame"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\lazyframe\\frame.py",
+        "line": 3127,
+        "func_name": "LazyFrame.select",
+        "type_comments": [
+            "(*polars.expr.expr.Expr) -> polars.lazyframe.frame.LazyFrame"
+        ],
+        "samples": 4
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\lazyframe\\frame.py",
+        "line": 4260,
+        "func_name": "LazyFrame.with_columns",
+        "type_comments": [
+            "(*polars.dataframe.frame.DataFrame) -> polars.lazyframe.frame.LazyFrame"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\series\\series.py",
+        "line": 258,
+        "func_name": "Series.__init__",
+        "type_comments": [
+            "(str, numpy.memmap, None, bool, bool) -> pyannotate_runtime.collect_types.NoReturnType"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\series\\series.py",
+        "line": 351,
+        "func_name": "_from_pyseries",
+        "type_comments": [
+            "(PySeries) -> polars.series.series.Series"
+        ],
+        "samples": 5
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\site-packages\\polars\\series\\series.py",
+        "line": 6773,
+        "func_name": "Series.reshape",
+        "type_comments": [
+            "(Tuple[int, int]) -> polars.series.series.Series"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\typing.py",
+        "line": 1212,
+        "func_name": "_BaseGenericAlias.__instancecheck__",
+        "type_comments": [
+            "(List[str]) -> bool",
+            "(int) -> bool",
+            "(numpy.memmap) -> bool"
+        ],
+        "samples": 8
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\typing.py",
+        "line": 1483,
+        "func_name": "_SpecialGenericAlias.__subclasscheck__",
+        "type_comments": [
+            "(type) -> bool"
+        ],
+        "samples": 8
+    },
+    {
+        "path": "C:\\Users\\jsh7\\AppData\\Local\\anaconda3\\envs\\moss\\Lib\\typing.py",
+        "line": 2173,
+        "func_name": "cast",
+        "type_comments": [
+            "(typing._SpecialGenericAlias, type) -> type"
+        ],
+        "samples": 6
+    },
+    {
+        "path": "c:\\Users\\jsh7\\Documents\\GitHub\\moss\\moss\\testPyAnnotate.py",
+        "line": 16,
+        "func_name": "from_off_paths",
+        "type_comments": [
+            "(List[str]) -> moss.channels.Channels"
+        ],
+        "samples": 1
+    },
+    {
+        "path": "c:\\Users\\jsh7\\Documents\\GitHub\\moss\\moss\\testPyAnnotate.py",
+        "line": 23,
+        "func_name": "from_off",
+        "type_comments": [
+            "(mass.off.off.OffFile) -> moss.channel.Channel"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "cal_steps.py",
+        "line": 172,
+        "func_name": "new_empty",
+        "type_comments": [
+            "() -> moss.cal_steps.CalSteps"
+        ],
+        "samples": 2
+    },
+    {
+        "path": "ljhutil.py",
+        "line": 32,
+        "func_name": "find_ljh_files",
+        "type_comments": [
+            "(str, str) -> List[str]"
+        ],
+        "samples": 1
+    }
+]

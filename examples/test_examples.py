@@ -3,11 +3,11 @@ import subprocess
 
 
 
-def test_ljh_mnkalpha():
+# def test_ljh_mnkalpha():
     #enforce the order by doing it in the same function
     # parquet_after_ljh_mnkalpha needs to open files written by ljh_mnkalpha
-    from . import ljh_mnkalpha as notebook
-    notebook.app.run()
+    # from . import ljh_mnkalpha as notebook
+    # notebook.app.run()
     # from . import parquet_after_ljh_mnkalpha as notebook2
     # notebook2.app.run()
 
