@@ -14,6 +14,12 @@ class Channels:
     channels: collections.OrderedDict[int, moss.Channel]
     description: str
 
+    @property
+    def ch0(self):
+        assert len(self.channels) > 0, "channels must be non-empty"
+        for v in self.channels.values():
+            return v
+
     @functools.cache
     def dfg(self, exclude="pulse"):
         # return a dataframe containing good pulses from each channel,
@@ -62,7 +68,7 @@ class Channels:
         )
         return result
 
-    def transform_channels(self, f, allow_throw=True):
+    def map(self, f, allow_throw=True):
         new_channels = collections.OrderedDict()
         for key, channel in self.channels.items():
             try:
