@@ -218,17 +218,19 @@ def __(mass, np):
         )
     )
 
-    line_names, _ = mass.algorithms.line_names_and_energies([
-                "AlKAlpha",
-                "MgKAlpha",
-                "ClKAlpha",
-                "ScKAlpha",
-                "CoKAlpha",
-                "MnKAlpha",
-                "VKAlpha",
-                "CuKAlpha",
-                "KKAlpha",
-            ])
+    line_names, _ = mass.algorithms.line_names_and_energies(
+        [
+            "AlKAlpha",
+            "MgKAlpha",
+            "ClKAlpha",
+            "ScKAlpha",
+            "CoKAlpha",
+            "MnKAlpha",
+            "VKAlpha",
+            "CuKAlpha",
+            "KKAlpha",
+        ]
+    )
 
     # start with the first peak, try assigning it to the first energy
     # then assume constant gain
@@ -264,21 +266,178 @@ def __(mass, np):
 
 
 @app.cell
+def __(expected_gain, np, pl):
+    def rank_3peak_assignments(
+        ph,
+        e,
+        line_names,
+        exepcted_gain=6,
+        max_fractional_energy_error_3rd_assignment=0.1,
+        minimum_gain_fraction_at_ph_30k=0.25,
+    ):
+        # we explore possible line assignments, and down select based on knowledge of gain curve shape
+        # gain = ph/e, and we assume gain starts at zero, decreases with pulse height, and
+        # that a 2nd order polynomial is a reasonably good approximation
+        # with one assignment we model the gain as constant, and use that to find the most likely
+        # 2nd assignments, then we model the gain as linear, and use that to rank 3rd assignments
+        dfe = pl.DataFrame({"e0_ind": np.arange(len(e)), "e0": e, "name": line_names})
+        dfph = pl.DataFrame({"ph0_ind": np.arange(len(ph)), "ph0": ph})
+
+        #### 1st assignments ####
+        # e0 and ph0 are the first assignment
+        # 1) exclude assignments when the gain is too far from the input `expected_gain`
+        df0 = (
+            dfe.join(dfph, how="cross")
+            .with_columns(gain0=pl.col("ph0") / pl.col("e0"))
+            .filter(np.abs(pl.col("gain0") - expected_gain) / expected_gain < 0.3)
+        )
+        #### 2nd assignments ####
+        # e1 and ph1 are the 2nd assignment
+        df1 = (
+            df0.join(df0, how="cross")
+            .rename({"e0_right": "e1", "ph0_right": "ph1"})
+            .drop("e0_ind_right", "ph0_ind_right", "gain0_right")
+        )
+        # 1) keep only assignments with e0<e1 and ph0<ph1 to avoid looking at the same pair in reverse
+        df1 = df1.filter(pl.col("e0") < pl.col("e1")).filter(pl.col("ph0") < pl.col("ph1"))
+        # 2) the gain slope must be negative
+        df1 = (
+            df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
+            .with_columns(
+                gain_slope=(pl.col("gain1") - pl.col("gain0"))
+                / (pl.col("ph1") - pl.col("ph0"))
+            )
+            .filter(pl.col("gain_slope") < 0)
+        )
+        # 3) the gain slope should not have too large a magnitude
+        df1 = df1.with_columns(
+            gain_at_0=pl.col("gain0") - pl.col("ph0") * pl.col("gain_slope")
+        )
+        df1 = df1.with_columns(
+            gain_frac_at_ph30k=(1 + 30000 * pl.col("gain_slope") / pl.col("gain_at_0"))
+        )
+        df1 = df1.filter(pl.col("gain_frac_at_ph30k") > minimum_gain_fraction_at_ph_30k)
+
+        #### 3rd assignments ####
+        # e2 and ph2 are the 3rd assignment
+        df2 = df1.join(df0.select(e2="e0", ph2="ph0"), how="cross")
+        df2 = df2.with_columns(
+            gain_at_ph2=pl.col("gain_at_0") + pl.col("gain_slope") * pl.col("ph2")
+        )
+        df2 = df2.with_columns(e_at_ph2=pl.col("ph2") / pl.col("gain_at_ph2")).filter(
+            pl.col("e1") < pl.col("e2")
+        )
+        # 1) rank 3rd assignments by energy error at ph2 assuming gain = gain_slope*ph+gain_at_0
+        # where gain_slope and gain are calculated from assignments 1 and 2
+        df2 = df2.with_columns(e_err_at_ph2=pl.col("e_at_ph2") - pl.col("e2")).sort(
+            by=np.abs(pl.col("e_err_at_ph2"))
+        )
+        # 2) return a dataframe downselected to the assignments and the ranking criteria
+        # 3) throw away assignments with large (default 10%) energy errors
+        df3peak = df2.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").filter(
+            np.abs(pl.col("e_err_at_ph2") / pl.col("e2"))
+            < max_fractional_energy_error_3rd_assignment
+        )
+        return df3peak, dfe
+    return rank_3peak_assignments,
+
+
+@app.cell
+def __(e, line_names, ph, rank_3peak_assignments):
+    df3peak, _dfe = rank_3peak_assignments(ph, e, line_names)
+    df3peak
+    return df3peak,
+
+
+@app.cell
+def __(
+    assign_pfit_gain,
+    df3peak,
+    e,
+    line_names,
+    mo,
+    moss,
+    np,
+    ph,
+    pl,
+    plt,
+):
+    def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_energies, line_names):
+        gain_assigned = np.array(ph_assigned)/np.array(e_assigned)
+        pfit_gain = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
+        def ph2energy(ph):
+            gain = assign_pfit_gain(ph)
+            return ph / gain
+        def energy2ph(energy):
+            import scipy.optimize
+        
+            sol = scipy.optimize.root_scalar(
+                lambda ph: ph2energy(ph) - energy, bracket=[1, 1e5]
+            )
+            assert sol.converged
+            return sol.root   
+        predicted_ph = [energy2ph(_e) for _e in line_energies]
+        df = pl.DataFrame({"line_energy": line_energies, "line_name": line_names, "predicted_ph": predicted_ph}).sort(by="predicted_ph")
+        dfph = pl.DataFrame({"possible_ph":possible_phs, "ph_ind":np.arange(len(possible_phs))}).sort(by="possible_ph")
+        # for each e find the closest possible_ph to the calculaed predicted_ph
+        # we started with assignments for 3 energies
+        # now we have assignments for all energies
+        df = df.join_asof(dfph, left_on="predicted_ph", right_on="possible_ph", strategy="nearest")
+
+        # now we evaluate the assignment and create a result object
+        residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
+            df["possible_ph"].to_numpy(), df["line_energy"].to_numpy()
+        )
+        result = moss.rough_cal.BestAssignmentPfitGainResult(
+            np.std(residual_e),
+            ph_assigned=df["possible_ph"].to_numpy(),
+            residual_e=residual_e,
+            assignment_inds=df["ph_ind"].to_numpy(),
+            pfit_gain=pfit_gain,
+            energy_target=df["line_energy"].to_numpy(),
+            names_target=df["line_name"].to_list(),
+            ph_target=possible_phs)
+        return result
+        
+    eval_3peak_assignment_pfit_gain([df3peak[0]["ph0"][0], df3peak[0]["ph1"][0], df3peak[0]["ph2"][0]],
+                                   [df3peak[0]["e0"][0], df3peak[0]["e1"][0], df3peak[0]["e2"][0]], ph, e, line_names).plot()
+    mo.mpl.interactive(plt.gcf())
+    return eval_3peak_assignment_pfit_gain,
+
+
+@app.cell
 def __(e, line_names, np, ph, pl):
-    dfe = pl.DataFrame({"e0_ind": np.arange(len(e)), "e0": e, "name":line_names})
+    dfe = pl.DataFrame({"e0_ind": np.arange(len(e)), "e0": e, "name": line_names})
     dfph = pl.DataFrame({"ph0_ind": np.arange(len(ph)), "ph0": ph})
     expected_gain = 6
+    max_fractional_energy_error_3rd_assignment = 0.1
+    minimum_gain_fraction_at_ph_30k = 0.25
+    # we explore possible line assignments, and down select as we god
+    # gain = ph/e, and we assume gain starts at zero, decreases with pulse height, and
+    # that a 2nd order polynomial is a reasonably good approximation
+    # with one assignment we model the gain as constant, and use that to find the most likely
+    # 2nd assignments, then we model the gain as linear, and use that to find the most likely
+    # 3rd assignments, then try to assign all peaks and do a polynomial fit, and check the residuals
+    # to judge the quality of assignment
+
+    #### 1st assignments ####
+    # e0 and ph0 are the first assignment
+    # 1) exclude assignments when the gain is too far from the input `expected_gain`
     dfgain = (
         dfe.join(dfph, how="cross")
         .with_columns(gain0=pl.col("ph0") / pl.col("e0"))
         .filter(np.abs(pl.col("gain0") - expected_gain) / expected_gain < 0.3)
     )
+    #### 2nd assignments ####
+    # e1 and ph1 are the 2nd assignment
     dfg = (
         dfgain.join(dfgain, how="cross")
         .rename({"e0_right": "e1", "ph0_right": "ph1"})
         .drop("e0_ind_right", "ph0_ind_right", "gain0_right")
     )
-    dfg = dfg.filter(pl.col("e0") < pl.col("e1")).filter(pl.col("ph0") != pl.col("ph1"))
+    # 1) keep only assignments with e0<e1 and ph0<ph1 to avoid looking at the same pair in reverse
+    dfg = dfg.filter(pl.col("e0") < pl.col("e1")).filter(pl.col("ph0") < pl.col("ph1"))
+    # 2) the gain slope must be negative
     dfg = (
         dfg.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
         .with_columns(
@@ -286,11 +445,15 @@ def __(e, line_names, np, ph, pl):
         )
         .filter(pl.col("gain_slope") < 0)
     )
+    # 3) the gain slope should not have too large a magnitude
     dfg = dfg.with_columns(gain_at_0=pl.col("gain0") - pl.col("ph0") * pl.col("gain_slope"))
     dfg = dfg.with_columns(
         gain_frac_at_ph30k=(1 + 30000 * pl.col("gain_slope") / pl.col("gain_at_0"))
     )
-    dfg = dfg.filter(pl.col("gain_frac_at_ph30k") > 0.25)
+    dfg = dfg.filter(pl.col("gain_frac_at_ph30k") > minimum_gain_fraction_at_ph_30k)
+
+    #### 3rd assignments ####
+    # e2 and ph2 are the 3rd assignment
     dfg = dfg.join(dfgain.select(e2="e0", ph2="ph0"), how="cross")
     dfg = dfg.with_columns(
         gain_at_ph2=pl.col("gain_at_0") + pl.col("gain_slope") * pl.col("ph2")
@@ -298,13 +461,26 @@ def __(e, line_names, np, ph, pl):
     dfg = dfg.with_columns(e_at_ph2=pl.col("ph2") / pl.col("gain_at_ph2")).filter(
         pl.col("e1") < pl.col("e2")
     )
+    # 1) rank 3rd assignments by energy error at ph2 assuming gain = gain_slope*ph+gain_at_0
+    # where gain_slope and gain are calculated from assignments 1 and 2
     dfg = dfg.with_columns(e_err_at_ph2=pl.col("e_at_ph2") - pl.col("e2")).sort(
         by=np.abs(pl.col("e_err_at_ph2"))
     )
+    # 2) return a dataframe downselected to the assignments and the ranking criteria
+    # 3) throw away assignments with large (default 10%) energy errors
     dfg.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").filter(
-        np.abs(pl.col("e_err_at_ph2") / pl.col("e2")) < 0.1
+        np.abs(pl.col("e_err_at_ph2") / pl.col("e2"))
+        < max_fractional_energy_error_3rd_assignment
     )
-    return dfe, dfg, dfgain, dfph, expected_gain
+    return (
+        dfe,
+        dfg,
+        dfgain,
+        dfph,
+        expected_gain,
+        max_fractional_energy_error_3rd_assignment,
+        minimum_gain_fraction_at_ph_30k,
+    )
 
 
 @app.cell
@@ -316,24 +492,34 @@ def __(dfg, dfph, e, line_names, np, pl):
     # calcualte residuals
     assign_e = np.array((dfg[0]["e0"][0], dfg[0]["e1"][0], dfg[0]["e2"][0]))
     assign_ph = np.array((dfg[0]["ph0"][0], dfg[0]["ph1"][0], dfg[0]["ph2"][0]))
-    assign_gain = assign_ph/assign_e
+    assign_gain = assign_ph / assign_e
     assign_pfit_gain = np.polynomial.Polynomial.fit(assign_ph, assign_gain, deg=2)
+
+
     def ph2energy(ph):
         gain = assign_pfit_gain(ph)
-        return ph/gain
+        return ph / gain
+
+
     def energy2ph(energy):
         import scipy.optimize
-        sol = scipy.optimize.root_scalar(lambda ph: ph2energy(ph)-energy, 
-                                   bracket=[1,1e5])
+
+        sol = scipy.optimize.root_scalar(
+            lambda ph: ph2energy(ph) - energy, bracket=[1, 1e5]
+        )
         assert sol.converged
         return sol.root
+
+
     # pred_e = energy2ph(np.array(ph))
     # dfa = pl.DataFrame({"ph":ph, "pred_e":pred_e})
     # dfa = dfa.sort(by="pred_e").join_asof(dfe.sort(by="e0"), left_on="pred_e", right_on="e0", strategy="nearest")
     # dfa
     pred_ph = [energy2ph(_e) for _e in e]
-    dfa = pl.DataFrame({"e":e, "name":line_names, "pred_ph":pred_ph})
-    dfa = dfa.sort(by="pred_ph").join_asof(dfph.sort(by="ph0"), left_on="pred_ph", right_on="ph0", strategy="nearest")
+    dfa = pl.DataFrame({"e": e, "name": line_names, "pred_ph": pred_ph})
+    dfa = dfa.sort(by="pred_ph").join_asof(
+        dfph.sort(by="ph0"), left_on="pred_ph", right_on="ph0", strategy="nearest"
+    )
     dfa
     return (
         assign_e,
@@ -350,7 +536,9 @@ def __(dfg, dfph, e, line_names, np, pl):
 @app.cell
 def __(dfa, dfph, mo, moss, np, plt):
     # now I have a df with an assignment, lets evaluate it further
-    residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(dfa["ph0"].to_numpy(), dfa["e"].to_numpy())
+    residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
+        dfa["ph0"].to_numpy(), dfa["e"].to_numpy()
+    )
     residual_e, pfit_gain
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         np.std(residual_e),
@@ -360,7 +548,7 @@ def __(dfa, dfph, mo, moss, np, plt):
         pfit_gain=pfit_gain,
         energy_target=dfa["e"].to_numpy(),
         names_target=dfa["name"].to_list(),
-        ph_target=dfph["ph0"].to_numpy()
+        ph_target=dfph["ph0"].to_numpy(),
     )
     result.plot()
     mo.mpl.interactive(plt.gcf())
