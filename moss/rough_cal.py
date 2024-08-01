@@ -9,7 +9,8 @@ from numpy import float32, float64, ndarray
 from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult #type: ignore
-from typing import List, Optional, Tuple, Union
+import typing
+from typing import List, Optional, Tuple, Union, Callable
 
 @dataclass(frozen=True)
 class BestAssignmentPfitGainResult:
@@ -162,7 +163,7 @@ def local_maxima(y: ndarray) -> ndarray:
     local_maxima_inds = np.nonzero(flag)[0]
     return local_maxima_inds
 
-def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: None=None) -> SmoothedLocalMaximaResult:
+def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: Optional[ndarray]=None) -> SmoothedLocalMaximaResult:
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bin_edges)    
     local_maxima_inds = local_maxima(smoothed_counts)
@@ -210,9 +211,9 @@ def find_pfit_gain_residual(ph: ndarray, e: Tuple[float, float, float, float, fl
     residual_e = e-predicted_e
     return residual_e, pfit_gain
 
-def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: Tuple[float, float, float, float, float, float], names: Tuple[str, str, str, str, str, str]) -> BestAssignmentPfitGainResult:
+def find_best_residual_among_all_possible_assignments2(ph: ndarray, e:ndarray, names: list[str]) -> BestAssignmentPfitGainResult:
     best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit = find_best_residual_among_all_possible_assignments(ph,e)
-    return BestAssignmentPfitGainResult(best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit, e, names, ph)
+    return BestAssignmentPfitGainResult(float(best_rms_residual), best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit, e, names, ph)
 
 def find_best_residual_among_all_possible_assignments(ph: ndarray, e: Tuple[float, float, float, float, float, float]) -> Tuple[float64, ndarray, ndarray, ndarray, Polynomial]:
     assert len(ph) >= len(e)
@@ -257,7 +258,7 @@ def minimize_entropy_linear(indicator: ndarray, uncorrected: ndarray, bin_edges:
 class RoughCalibrationStep(moss.CalStep):
     pfresult: SmoothedLocalMaximaResult
     assignment_result: BestAssignmentPfitGainResult
-    ph2energy: callable
+    ph2energy: typing.Callable
 
     def calc_from_df(self, df: DataFrame) -> DataFrame:
         # only works with in memory data, but just takes it as numpy data and calls function
@@ -278,7 +279,7 @@ class RoughCalibrationStep(moss.CalStep):
         axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
         return axis
     
-    def dbg_plot(self, df: DataFrame, axs: None=None):
+    def dbg_plot(self, df: DataFrame, axs: Union[None,ndarray]=None):
         if axs is None:
             fig, axs = plt.subplots(2, 1, figsize=(11,6))
         self.assignment_result.plot(ax=axs[0])
