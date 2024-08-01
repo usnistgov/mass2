@@ -1,8 +1,9 @@
 import numpy as np
-import pylab as plt
+import pylab as plt #type: ignore
 from dataclasses import dataclass, field
 from numpy import ndarray
-from typing import Tuple
+from typing import Tuple, Optional
+import matplotlib.pyplot as plt
 
 def calc_autocorrelation(data):
     ntraces, nsamples = data.shape
@@ -85,7 +86,7 @@ class NoisePSD:
     frequencies: np.ndarray
     
 
-    def plot(self, axis: None=None, arb_to_unit_scale_and_label: Tuple[int, str]=(1, "arb"), sqrt_psd: bool=True, loglog: bool=True, **plotkwarg):
+    def plot(self, axis: Optional[plt.axis]=None, arb_to_unit_scale_and_label: Tuple[int, str]=(1, "arb"), sqrt_psd: bool=True, loglog: bool=True, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()
