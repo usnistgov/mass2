@@ -1,6 +1,9 @@
 import numpy as np
-import pylab as plt
+import pylab as plt #type: ignore
 from dataclasses import dataclass, field
+from numpy import ndarray
+from typing import Tuple, Optional
+import matplotlib.pyplot as plt
 
 def calc_autocorrelation(data):
     ntraces, nsamples = data.shape
@@ -38,7 +41,7 @@ class AutoCorrelation:
         axis.set_xlabel("Lag Time (s)")
         axis.figure.tight_layout()
 
-def calc_psd(data, dt, window=None):
+def calc_psd(data: ndarray, dt: float, window: None=None) -> ndarray:
         """Process a data segment of length 2m using the window function
         given.  window can be None (square window), a callable taking the
         length and returning a sequence, or a sequence."""
@@ -67,10 +70,10 @@ def calc_psd(data, dt, window=None):
         return specsum / ntraces
 
 
-def calc_psd_frequencies(nbins, dt):
+def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
-def noise_psd(data, dt, window=None):
+def noise_psd(data: ndarray, dt: float, window: None=None) -> "NoisePSD":
     psd = calc_psd(data, dt, window) 
     nbins = len(psd)
     frequencies = calc_psd_frequencies(nbins, dt)
@@ -83,7 +86,7 @@ class NoisePSD:
     frequencies: np.ndarray
     
 
-    def plot(self, axis=None, arb_to_unit_scale_and_label=(1, "arb"), sqrt_psd=True, loglog=True, **plotkwarg):
+    def plot(self, axis: Optional[plt.axis]=None, arb_to_unit_scale_and_label: Tuple[int, str]=(1, "arb"), sqrt_psd: bool=True, loglog: bool=True, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()
