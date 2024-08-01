@@ -11,6 +11,80 @@ from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult #type: ignore
 import typing
 from typing import List, Optional, Tuple, Union, Callable
+import itertools
+
+def rank_3peak_assignments(
+    ph,
+    e,
+    line_names,
+    expected_gain=6,
+    max_fractional_energy_error_3rd_assignment=0.1,
+    min_gain_fraction_at_ph_30k=0.25,
+):
+    # we explore possible line assignments, and down select based on knowledge of gain curve shape
+    # gain = ph/e, and we assume gain starts at zero, decreases with pulse height, and
+    # that a 2nd order polynomial is a reasonably good approximation
+    # with one assignment we model the gain as constant, and use that to find the most likely
+    # 2nd assignments, then we model the gain as linear, and use that to rank 3rd assignments
+    dfe = pl.DataFrame({"e0_ind": np.arange(len(e)), "e0": e, "name": line_names})
+    dfph = pl.DataFrame({"ph0_ind": np.arange(len(ph)), "ph0": ph})
+
+    #### 1st assignments ####
+    # e0 and ph0 are the first assignment
+    # 1) exclude assignments when the gain is too far from the input `expected_gain`
+    df0 = (
+        dfe.join(dfph, how="cross")
+        .with_columns(gain0=pl.col("ph0") / pl.col("e0"))
+        .filter(np.abs(pl.col("gain0") - expected_gain) / expected_gain < 0.3)
+    )
+    #### 2nd assignments ####
+    # e1 and ph1 are the 2nd assignment
+    df1 = (
+        df0.join(df0, how="cross")
+        .rename({"e0_right": "e1", "ph0_right": "ph1"})
+        .drop("e0_ind_right", "ph0_ind_right", "gain0_right")
+    )
+    # 1) keep only assignments with e0<e1 and ph0<ph1 to avoid looking at the same pair in reverse
+    df1 = df1.filter(pl.col("e0") < pl.col("e1")).filter(pl.col("ph0") < pl.col("ph1"))
+    # 2) the gain slope must be negative
+    df1 = (
+        df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
+        .with_columns(
+            gain_slope=(pl.col("gain1") - pl.col("gain0"))
+            / (pl.col("ph1") - pl.col("ph0"))
+        )
+        .filter(pl.col("gain_slope") < 0)
+    )
+    # 3) the gain slope should not have too large a magnitude
+    df1 = df1.with_columns(
+        gain_at_0=pl.col("gain0") - pl.col("ph0") * pl.col("gain_slope")
+    )
+    df1 = df1.with_columns(
+        gain_frac_at_ph30k=(1 + 30000 * pl.col("gain_slope") / pl.col("gain_at_0"))
+    )
+    df1 = df1.filter(pl.col("gain_frac_at_ph30k") > min_gain_fraction_at_ph_30k)
+
+    #### 3rd assignments ####
+    # e2 and ph2 are the 3rd assignment
+    df2 = df1.join(df0.select(e2="e0", ph2="ph0"), how="cross")
+    df2 = df2.with_columns(
+        gain_at_ph2=pl.col("gain_at_0") + pl.col("gain_slope") * pl.col("ph2")
+    )
+    df2 = df2.with_columns(e_at_ph2=pl.col("ph2") / pl.col("gain_at_ph2")).filter(
+        pl.col("e1") < pl.col("e2")
+    )
+    # 1) rank 3rd assignments by energy error at ph2 assuming gain = gain_slope*ph+gain_at_0
+    # where gain_slope and gain are calculated from assignments 1 and 2
+    df2 = df2.with_columns(e_err_at_ph2=pl.col("e_at_ph2") - pl.col("e2")).sort(
+        by=np.abs(pl.col("e_err_at_ph2"))
+    )
+    # 2) return a dataframe downselected to the assignments and the ranking criteria
+    # 3) throw away assignments with large (default 10%) energy errors
+    df3peak = df2.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").filter(
+        np.abs(pl.col("e_err_at_ph2") / pl.col("e2"))
+        < max_fractional_energy_error_3rd_assignment
+    )
+    return df3peak, dfe
 
 @dataclass(frozen=True)
 class BestAssignmentPfitGainResult:
@@ -198,7 +272,6 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bins)
     return np.array(x[lm]), np.array(y[lm]), (hist, bin_centers, y)
 
-import itertools
 
 
 def find_pfit_gain_residual(ph: ndarray, e: Tuple[float, float, float, float, float, float]) -> Tuple[ndarray, Polynomial]:
@@ -254,6 +327,70 @@ def minimize_entropy_linear(indicator: ndarray, uncorrected: ndarray, bin_edges:
     result = scipy.optimize.minimize_scalar(entropy_fun, bracket=[0,0.1])
     return result, indicator_mean
 
+def eval_3peak_assignment_pfit_gain(
+    ph_assigned, e_assigned, possible_phs, line_energies, line_names
+):
+    gain_assigned = np.array(ph_assigned) / np.array(e_assigned)
+    pfit_gain = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
+    if pfit_gain.deriv(1)(0)>1:
+        # well formed calibration have negative derivative at zero pulse height
+        return np.inf, None
+    if pfit_gain(1e5) < 0:
+        # well formed calibration have positive gain at 1e5
+        return np.inf, None
+
+    def ph2energy(ph):
+        gain = pfit_gain(ph)
+        return ph / gain
+
+    cba = pfit_gain.convert().coef
+    def energy2ph(energy):
+        # ph2energy is equivalent to this with y=energy, x=ph
+        # y = x/(c + b*x + a*x^2)
+        # so
+        # y*c + (y*b-1)*x + a*x^2 = 0
+        # and given that we've selected for well formed calibrations,
+        # we know which root we want
+        c,bb,a = cba*energy
+        b=bb-1
+        ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
+        return ph
+
+    predicted_ph = [energy2ph(_e) for _e in line_energies]
+    df = pl.DataFrame(
+        {
+            "line_energy": line_energies,
+            "line_name": line_names,
+            "predicted_ph": predicted_ph,
+        }
+    ).sort(by="predicted_ph")
+    dfph = pl.DataFrame(
+        {"possible_ph": possible_phs, "ph_ind": np.arange(len(possible_phs))}
+    ).sort(by="possible_ph")
+    # for each e find the closest possible_ph to the calculaed predicted_ph
+    # we started with assignments for 3 energies
+    # now we have assignments for all energies
+    df = df.join_asof(
+        dfph, left_on="predicted_ph", right_on="possible_ph", strategy="nearest"
+    )
+
+    # now we evaluate the assignment and create a result object
+    residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
+        df["possible_ph"].to_numpy(), df["line_energy"].to_numpy()
+    )
+    rms_residual_e = np.std(residual_e)
+    result = moss.rough_cal.BestAssignmentPfitGainResult(
+        rms_residual_e,
+        ph_assigned=df["possible_ph"].to_numpy(),
+        residual_e=residual_e,
+        assignment_inds=df["ph_ind"].to_numpy(),
+        pfit_gain=pfit_gain,
+        energy_target=df["line_energy"].to_numpy(),
+        names_target=df["line_name"].to_list(),
+        ph_target=possible_phs,
+    )
+    return rms_residual_e, result
+
 @dataclass(frozen=True)
 class RoughCalibrationStep(moss.CalStep):
     pfresult: SmoothedLocalMaximaResult
@@ -290,7 +427,7 @@ class RoughCalibrationStep(moss.CalStep):
         return self.assignment_result.energy2ph(energy)
     
     @classmethod
-    def learn(cls, ch: Channel, line_names: List[str], uncalibrated_col: str, calibrated_col: str, 
+    def learn_combinatoric(cls, ch: Channel, line_names: List[str], uncalibrated_col: str, calibrated_col: str, 
         ph_smoothing_fwhm: int, n_extra: int=3,
         use_expr: bool=True
     ) -> "RoughCalibrationStep":
@@ -312,6 +449,58 @@ class RoughCalibrationStep(moss.CalStep):
             pfresult=pfresult,
             assignment_result=assignment_result, 
             ph2energy=assignment_result.ph2energy)
+        return step
+    
+    @classmethod
+    def learn_3peak(cls, ch: Channel,
+    line_names: list[str | float64],
+    uncalibrated_col: str="filtValue",
+    calibrated_col: Optional[str]=None,
+    use_expr: bool | pl.Expr =True,
+    expected_gain: float | int =6,
+    max_fractional_energy_error_3rd_assignment: float=0.1,
+    min_gain_fraction_at_ph_30k: float=0.25,
+    fwhm_pulse_height_units: float=75,
+    n_extra_peaks: int=10,
+    acceptable_rms_residual_e: float=10) -> "RoughCalibrationStep":
+        import mass #type: ignore
+        
+        if calibrated_col is None:
+            calibrated_col = f"energy_{uncalibrated_col}"
+        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+            uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
+        )
+        possible_phs = pfresult.ph_sorted_by_prominence()[:len(line_names)+n_extra_peaks]
+        df3peak, dfe = rank_3peak_assignments(
+            possible_phs,
+            line_energies,
+            line_names,
+            expected_gain,
+            max_fractional_energy_error_3rd_assignment,
+            min_gain_fraction_at_ph_30k,
+        )
+        best_rms_residual = np.inf
+        best_assignment_result = None
+        for assignment_row in df3peak.limit(20).iter_rows():
+            e0, ph0, e1, ph1, e2, ph2, e_err_at_ph2 = assignment_row
+            rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
+                    [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
+                )
+            if rms_residual < best_rms_residual:
+                best_rms_residual = rms_residual
+                best_assignment_result = assignment_result
+                if rms_residual < acceptable_rms_residual_e:
+                    break
+        step = cls(
+                [uncalibrated_col],
+                [calibrated_col],
+                ch.good_expr,
+                use_expr=use_expr,
+                pfresult=pfresult,
+                assignment_result=best_assignment_result, 
+                ph2energy=best_assignment_result.ph2energy)
         return step
     
 

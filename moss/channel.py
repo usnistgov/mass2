@@ -5,7 +5,7 @@ import pylab as plt
 import functools
 import moss
 from moss import NoiseChannel, CalSteps, DriftCorrectStep, SummarizeStep, Filter5LagStep
-import typing
+from typing import Optional
 import numpy as np
 import time
 import mass
@@ -34,7 +34,7 @@ class ChannelHeader:
 class Channel:
     df: pl.DataFrame | pl.LazyFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
-    noise: typing.Optional[NoiseChannel] = field(default=None, repr=False)
+    noise: Optional[NoiseChannel] = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
     df_history: list[pl.DataFrame | pl.LazyFrame] = field(
         default_factory=list, repr=False
@@ -93,17 +93,33 @@ class Channel:
         )
         return self.with_step(step)
 
-    def rough_cal(
+    def rough_cal_combinatoric(
         self, line_names, uncalibrated_col, calibrated_col, 
         ph_smoothing_fwhm, n_extra=3,
         use_expr=True
     ):
-        step = moss.RoughCalibrationStep.learn(self, line_names, 
+        step = moss.RoughCalibrationStep.learn_combinatoric(self, line_names, 
                                              uncalibrated_col=uncalibrated_col,
                                              calibrated_col=calibrated_col,
                                              ph_smoothing_fwhm=ph_smoothing_fwhm,
                                              n_extra=n_extra,
                                              use_expr=use_expr)
+        return self.with_step(step)
+    
+    def rough_cal(self, line_names: list[str | float],
+    uncalibrated_col: str="filtValue",
+    calibrated_col: Optional[str]=None,
+    use_expr: bool | pl.Expr =True,
+    expected_gain: float | int =6,
+    max_fractional_energy_error_3rd_assignment: float=0.1,
+    min_gain_fraction_at_ph_30k: float=0.25,
+    fwhm_pulse_height_units: float=75,
+    n_extra_peaks: int=10,
+    acceptable_rms_residual_e: float=10):
+        step = moss.RoughCalibrationStep.learn_3peak(self, line_names, uncalibrated_col, calibrated_col,
+                                                     use_expr, expected_gain, max_fractional_energy_error_3rd_assignment,
+                                                     min_gain_fraction_at_ph_30k, fwhm_pulse_height_units, n_extra_peaks, 
+                                                     acceptable_rms_residual_e)
         return self.with_step(step)
 
     def with_step(self, step):
