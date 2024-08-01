@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.12"
+__generated_with = "0.7.14"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -345,8 +345,16 @@ def __(np, pl):
 @app.cell
 def __(e, line_names, ph, rank_3peak_assignments):
     df3peak, _dfe = rank_3peak_assignments(ph, e, line_names)
-    df3peak
     return df3peak,
+
+
+@app.cell
+def __(df3peak, mo):
+    mo.ui.table(df3peak, format_mapping={"ph0":"{:.1f}".format,
+                                        "ph1":"{:.1f}".format,
+                                        "ph2":"{:.1f}".format,
+                                        "e_err_at_ph2":"{:.1f}".format})
+    return
 
 
 @app.cell
