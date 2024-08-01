@@ -7,7 +7,6 @@ import collections
 import mass
 import moss
 import joblib
-from typing import Optional
 
 @dataclass(frozen=True)
 class Channels:
@@ -110,7 +109,7 @@ class Channels:
         return cls(_channels, description)
 
     @classmethod
-    def from_ljh_folder(cls, pulse_folder: str, noise_folder: Optional[str]=None, limit: None=None):
+    def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None):
         import os
         assert os.path.isdir(pulse_folder),f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
