@@ -266,12 +266,12 @@ def __(mass, np):
 
 
 @app.cell
-def __(expected_gain, np, pl):
+def __(np, pl):
     def rank_3peak_assignments(
         ph,
         e,
         line_names,
-        exepcted_gain=6,
+        expected_gain=6,
         max_fractional_energy_error_3rd_assignment=0.1,
         minimum_gain_fraction_at_ph_30k=0.25,
     ):
@@ -351,6 +351,76 @@ def __(e, line_names, ph, rank_3peak_assignments):
 
 @app.cell
 def __(
+    data,
+    data2,
+    eval_3peak_assignment_pfit_gain,
+    line_names,
+    mass,
+    mo,
+    moss,
+    np,
+    pl,
+    plt,
+    rank_3peak_assignments,
+):
+    def rough_cal_3peak(
+        ch: moss.Channel,
+        line_names,
+        uncalibrated_col="filtValue",
+        calibrated_col=None,
+        use_expr=True,
+        expected_gain=6,
+        max_fractional_energy_error_3rd_assignment=0.1,
+        min_gain_fraction_at_ph_30k=0.25,
+        fwhm_pulse_height_units=75,
+        n_extra_peaks=10,
+    ):
+        if calibrated_col is None:
+            calibrated_col = f"energy_{uncalibrated_col}"
+        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+            uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
+        )
+        possible_phs = pfresult.ph_sorted_by_prominence()[:len(line_names)+n_extra_peaks]
+        df3peak, dfe = rank_3peak_assignments(
+            possible_phs,
+            line_energies,
+            line_names,
+            expected_gain,
+            max_fractional_energy_error_3rd_assignment,
+            min_gain_fraction_at_ph_30k,
+        )
+        best_rms_residual = np.inf
+        best_assignment_result = None
+        # for assignment_row in df3peak.limit(10).iter_rows():
+        e0, ph0, e1, ph1, e2, ph2, e_err_at_ph2 = next(df3peak.iter_rows())
+        assignment_result = eval_3peak_assignment_pfit_gain(
+            [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
+        )
+            # if assignment_result.rms_residual < best_rms_residual:
+            #     best_rms_residual = assignment_result.rms_residual
+            #     best_assignment_result = assignment_result
+        step = moss.RoughCalibrationStep(
+                [uncalibrated_col],
+                [calibrated_col],
+                ch.good_expr,
+                use_expr=use_expr,
+                pfresult=pfresult,
+                assignment_result=assignment_result, 
+                ph2energy=assignment_result.ph2energy)
+        return step
+
+
+
+    step=rough_cal_3peak(data2.ch0, line_names, use_expr=pl.col("state_label") == "START")
+    step.dbg_plot(data.ch0)
+    mo.mpl.interactive(plt.gcf())
+    return rough_cal_3peak, step
+
+
+@app.cell
+def __(
     assign_pfit_gain,
     df3peak,
     e,
@@ -362,27 +432,42 @@ def __(
     pl,
     plt,
 ):
-    def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_energies, line_names):
-        gain_assigned = np.array(ph_assigned)/np.array(e_assigned)
+    def eval_3peak_assignment_pfit_gain(
+        ph_assigned, e_assigned, possible_phs, line_energies, line_names
+    ):
+        gain_assigned = np.array(ph_assigned) / np.array(e_assigned)
         pfit_gain = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
+
         def ph2energy(ph):
             gain = assign_pfit_gain(ph)
             return ph / gain
+
         def energy2ph(energy):
             import scipy.optimize
-        
+
             sol = scipy.optimize.root_scalar(
                 lambda ph: ph2energy(ph) - energy, bracket=[1, 1e5]
             )
             assert sol.converged
-            return sol.root   
+            return sol.root
+
         predicted_ph = [energy2ph(_e) for _e in line_energies]
-        df = pl.DataFrame({"line_energy": line_energies, "line_name": line_names, "predicted_ph": predicted_ph}).sort(by="predicted_ph")
-        dfph = pl.DataFrame({"possible_ph":possible_phs, "ph_ind":np.arange(len(possible_phs))}).sort(by="possible_ph")
+        df = pl.DataFrame(
+            {
+                "line_energy": line_energies,
+                "line_name": line_names,
+                "predicted_ph": predicted_ph,
+            }
+        ).sort(by="predicted_ph")
+        dfph = pl.DataFrame(
+            {"possible_ph": possible_phs, "ph_ind": np.arange(len(possible_phs))}
+        ).sort(by="possible_ph")
         # for each e find the closest possible_ph to the calculaed predicted_ph
         # we started with assignments for 3 energies
         # now we have assignments for all energies
-        df = df.join_asof(dfph, left_on="predicted_ph", right_on="possible_ph", strategy="nearest")
+        df = df.join_asof(
+            dfph, left_on="predicted_ph", right_on="possible_ph", strategy="nearest"
+        )
 
         # now we evaluate the assignment and create a result object
         residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
@@ -396,11 +481,18 @@ def __(
             pfit_gain=pfit_gain,
             energy_target=df["line_energy"].to_numpy(),
             names_target=df["line_name"].to_list(),
-            ph_target=possible_phs)
+            ph_target=possible_phs,
+        )
         return result
-        
-    eval_3peak_assignment_pfit_gain([df3peak[0]["ph0"][0], df3peak[0]["ph1"][0], df3peak[0]["ph2"][0]],
-                                   [df3peak[0]["e0"][0], df3peak[0]["e1"][0], df3peak[0]["e2"][0]], ph, e, line_names).plot()
+
+
+    eval_3peak_assignment_pfit_gain(
+        [df3peak[0]["ph0"][0], df3peak[0]["ph1"][0], df3peak[0]["ph2"][0]],
+        [df3peak[0]["e0"][0], df3peak[0]["e1"][0], df3peak[0]["e2"][0]],
+        ph,
+        e,
+        line_names,
+    ).plot()
     mo.mpl.interactive(plt.gcf())
     return eval_3peak_assignment_pfit_gain,
 
