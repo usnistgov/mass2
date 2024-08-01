@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
-import pylab as plt
+import pylab as plt #type: ignore
 import moss
 import polars as pl
 from matplotlib.axes._axes import Axes
@@ -8,7 +8,7 @@ from moss.channel import Channel
 from numpy import float32, float64, ndarray
 from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
-from scipy.optimize._optimize import OptimizeResult
+from scipy.optimize._optimize import OptimizeResult #type: ignore
 from typing import List, Optional, Tuple, Union
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class BestAssignmentPfitGainResult:
         return ph/self.pfit_gain(ph)
     
     def energy2ph(self, energy: float64) -> float:
-        import scipy.optimize
+        import scipy.optimize #type: ignore
         sol = scipy.optimize.root_scalar(lambda ph: self.ph2energy(ph)-energy, 
                                    bracket=[1,self.phzerogain()*0.9])
         assert sol.converged
@@ -293,7 +293,7 @@ class RoughCalibrationStep(moss.CalStep):
         ph_smoothing_fwhm: int, n_extra: int=3,
         use_expr: bool=True
     ) -> "RoughCalibrationStep":
-        import mass
+        import mass #type: ignore
 
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
