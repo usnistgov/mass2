@@ -149,5 +149,14 @@ def __(moss):
     return multifit,
 
 
+@app.cell
+def __(np, pl):
+    df1 = pl.DataFrame({"a":np.arange(3)})
+    df2 = pl.DataFrame({"b":np.arange(3)})
+    want=df1.join(df2, how="cross").filter(pl.col("a")<pl.col("b"))
+    print(want)
+    return df1, df2, want
+
+
 if __name__ == "__main__":
     app.run()

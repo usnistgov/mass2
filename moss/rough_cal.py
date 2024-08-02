@@ -42,7 +42,7 @@ def rank_3peak_assignments(
         .drop("e0_ind_right", "ph0_ind_right", "gain0_right")
     )
     # 1) keep only assignments with e0<e1 and ph0<ph1 to avoid looking at the same pair in reverse
-    df1 = df1.filter(pl.col("e0") < pl.col("e1")).filter(pl.col("ph0") < pl.col("ph1"))
+    df1 = df1.filter((pl.col("e0") < pl.col("e1")).and_(pl.col("ph0") < pl.col("ph1")))
     # 2) the gain slope must be negative
     df1 = (
         df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
@@ -67,9 +67,8 @@ def rank_3peak_assignments(
     df2 = df2.with_columns(
         gain_at_ph2=pl.col("gain_at_0") + pl.col("gain_slope") * pl.col("ph2")
     )
-    df2 = df2.with_columns(e_at_ph2=pl.col("ph2") / pl.col("gain_at_ph2")).filter(
-        pl.col("e1") < pl.col("e2")
-    )
+    df2 = df2.with_columns(e_at_ph2=pl.col("ph2") / pl.col("gain_at_ph2"))
+    df2 = df2.filter((pl.col("e1") < pl.col("e2")).and_(pl.col("ph1")<pl.col("ph2")))
     # 1) rank 3rd assignments by energy error at ph2 assuming gain = gain_slope*ph+gain_at_0
     # where gain_slope and gain are calculated from assignments 1 and 2
     df2 = df2.with_columns(e_err_at_ph2=pl.col("e_at_ph2") - pl.col("e2")).sort(
@@ -327,6 +326,10 @@ def minimize_entropy_linear(indicator: ndarray, uncorrected: ndarray, bin_edges:
 def eval_3peak_assignment_pfit_gain(
     ph_assigned, e_assigned, possible_phs, line_energies, line_names
 ):
+    assert len(np.unique(ph_assigned)) == len(ph_assigned), "assignments must be unique"
+    assert len(np.unique(e_assigned)) == len(e_assigned), "assignments must be unique"
+    assert all(np.diff(ph_assigned)>0), "assignments must be sorted"
+    assert all(np.diff(e_assigned)>0), "assignments must be sorted"
     gain_assigned = np.array(ph_assigned) / np.array(e_assigned)
     pfit_gain = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
     if pfit_gain.deriv(1)(0)>1:
@@ -334,6 +337,9 @@ def eval_3peak_assignment_pfit_gain(
         return np.inf, None
     if pfit_gain(1e5) < 0:
         # well formed calibration have positive gain at 1e5
+        return np.inf, None
+    if any(np.iscomplex(pfit_gain.roots())):
+        # well formed calibrations have real roots
         return np.inf, None
 
     def ph2energy(ph):
@@ -353,7 +359,7 @@ def eval_3peak_assignment_pfit_gain(
         ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
         return ph
 
-    predicted_ph = [energy2ph(_e) for _e in line_energies]
+    predicted_ph = predicted_ph = [energy2ph(_e) for _e in line_energies]
     df = pl.DataFrame(
         {
             "line_energy": line_energies,
@@ -515,7 +521,7 @@ class RoughCalibrationStep(moss.CalStep):
             df3peak_on_failure = None
         else:
             success=False
-            ph2energy=(lambda ph: np.full_like(ph, np.nan))
+            ph2energy=(lambda ph: ph*np.nan)
             df3peak_on_failure = df3peak
 
 
