@@ -34,7 +34,7 @@ requires = ["flit_core >=3.2,<4"]
 
 # pyproject.toml
 [tool.pytest.ini_options]
-addopts = "-W error"
+addopts = "-W error" # error on warnings
 testpaths = [
     "moss",
     "examples",
