@@ -119,6 +119,21 @@ def __(data2, mo, plt):
 
 
 @app.cell
+def __(data2, mo, pl, plt):
+    result = data2.ch0.linefit("AlKAlpha", "energy_filtValue_dc", use_expr=pl.col("state_label") == "START")
+    result.plotm()
+    mo.mpl.interactive(plt.gcf())
+    return result,
+
+
+@app.cell
+def __():
+    def plot_a_vs_b(ch, a_col, b_col, color_by_col):
+        pass
+    return plot_a_vs_b,
+
+
+@app.cell
 def __(moss):
     multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
     multifit = (

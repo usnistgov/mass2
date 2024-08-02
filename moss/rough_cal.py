@@ -17,7 +17,6 @@ def rank_3peak_assignments(
     ph,
     e,
     line_names,
-    expected_gain=6,
     max_fractional_energy_error_3rd_assignment=0.1,
     min_gain_fraction_at_ph_30k=0.25,
 ):
@@ -31,11 +30,9 @@ def rank_3peak_assignments(
 
     #### 1st assignments ####
     # e0 and ph0 are the first assignment
-    # 1) exclude assignments when the gain is too far from the input `expected_gain`
     df0 = (
         dfe.join(dfph, how="cross")
         .with_columns(gain0=pl.col("ph0") / pl.col("e0"))
-        .filter(np.abs(pl.col("gain0") - expected_gain) / expected_gain < 0.3)
     )
     #### 2nd assignments ####
     # e1 and ph1 are the 2nd assignment
@@ -373,6 +370,10 @@ def eval_3peak_assignment_pfit_gain(
     df = df.join_asof(
         dfph, left_on="predicted_ph", right_on="possible_ph", strategy="nearest"
     )
+    n_unique = len(df["possible_ph"].unique())
+    if n_unique < len(df):
+        # assigned multiple energies to same pulseheight, not a good cal
+        return np.inf, None
 
     # now we evaluate the assignment and create a result object
     residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
@@ -396,6 +397,8 @@ class RoughCalibrationStep(moss.CalStep):
     pfresult: SmoothedLocalMaximaResult
     assignment_result: BestAssignmentPfitGainResult
     ph2energy: typing.Callable
+    success: bool
+    df3peak_on_failure: Optional[pl.DataFrame]
 
     def calc_from_df(self, df: DataFrame) -> DataFrame:
         # only works with in memory data, but just takes it as numpy data and calls function
@@ -416,10 +419,24 @@ class RoughCalibrationStep(moss.CalStep):
         axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
         return axis
     
-    def dbg_plot(self, df: DataFrame, axs: Union[None,ndarray]=None):
+    def dbg_plot(self, df, axs=None):
+        if self.success:
+            self.dbg_plot_success(df, axs)
+        else:
+            self.dbg_plot_failure(df, axs)
+
+
+    def dbg_plot_success(self, df: DataFrame, axs: Union[None,ndarray]=None):
         if axs is None:
             fig, axs = plt.subplots(2, 1, figsize=(11,6))
         self.assignment_result.plot(ax=axs[0])
+        self.pfresult.plot(self.assignment_result, ax=axs[1])
+        plt.tight_layout()
+
+    def dbg_plot_failure(self, df: DataFrame, axs: Union[None,ndarray]=None):
+        if axs is None:
+            fig, axs = plt.subplots(2, 1, figsize=(11,6))
+        print(f"{self.df3peak_on_failure=}")
         self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
     
@@ -448,7 +465,8 @@ class RoughCalibrationStep(moss.CalStep):
             use_expr=use_expr,
             pfresult=pfresult,
             assignment_result=assignment_result, 
-            ph2energy=assignment_result.ph2energy)
+            ph2energy=assignment_result.ph2energy,
+            success=True)
         return step
     
     @classmethod
@@ -457,7 +475,6 @@ class RoughCalibrationStep(moss.CalStep):
     uncalibrated_col: str="filtValue",
     calibrated_col: Optional[str]=None,
     use_expr: bool | pl.Expr =True,
-    expected_gain: float | int =6,
     max_fractional_energy_error_3rd_assignment: float=0.1,
     min_gain_fraction_at_ph_30k: float=0.25,
     fwhm_pulse_height_units: float=75,
@@ -477,13 +494,12 @@ class RoughCalibrationStep(moss.CalStep):
             possible_phs,
             line_energies,
             line_names,
-            expected_gain,
             max_fractional_energy_error_3rd_assignment,
             min_gain_fraction_at_ph_30k,
         )
         best_rms_residual = np.inf
         best_assignment_result = None
-        for assignment_row in df3peak.limit(20).iter_rows():
+        for assignment_row in df3peak.iter_rows():
             e0, ph0, e1, ph1, e2, ph2, e_err_at_ph2 = assignment_row
             rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
                     [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
@@ -493,6 +509,16 @@ class RoughCalibrationStep(moss.CalStep):
                 best_assignment_result = assignment_result
                 if rms_residual < acceptable_rms_residual_e:
                     break
+        if not np.isinf(best_rms_residual):
+            success = True
+            ph2energy=best_assignment_result.ph2energy
+            df3peak_on_failure = None
+        else:
+            success=False
+            ph2energy=(lambda ph: np.full_like(ph, np.nan))
+            df3peak_on_failure = df3peak
+
+
         step = cls(
                 [uncalibrated_col],
                 [calibrated_col],
@@ -500,7 +526,9 @@ class RoughCalibrationStep(moss.CalStep):
                 use_expr=use_expr,
                 pfresult=pfresult,
                 assignment_result=best_assignment_result, 
-                ph2energy=best_assignment_result.ph2energy)
+                ph2energy=ph2energy, 
+                success=success,
+                df3peak_on_failure=df3peak_on_failure)
         return step
     
 

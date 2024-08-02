@@ -126,14 +126,12 @@ class Channels:
             first_ch = next(iter(self.channels.values()))
             ljh_path = first_ch.header.df["Filename"][0]
             experiment_state_path = moss.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
-        _df = pl.read_csv(experiment_state_path)
-        _col0, _col1 = _df.columns
-        df_es = _df.select(pl.from_epoch(_col0, time_unit="ns").dt.cast_time_unit("us").alias("timestamp")).with_columns(
-            _df.select(pl.col(_col1).alias("state_label"))
-        )
+        df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
+        # _col0, _col1 = df.columns
+        df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
         # strip whitespace from state_label column
-        df_es = (df_es.select(pl.col("state_label").str.strip_chars())
-        .with_columns(df_es.select(pl.exclude("state_label"))))
+        sl_series = df.select(pl.col("state_label").str.strip_chars()).to_series()
+        df_es = df_es.with_columns(state_label = pl.Series(values=sl_series, dtype=pl.Categorical))
         return df_es
     
     def with_experiment_state_by_path(self, experiment_state_path=None):

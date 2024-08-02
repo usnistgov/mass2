@@ -110,14 +110,13 @@ class Channel:
     uncalibrated_col: str="filtValue",
     calibrated_col: Optional[str]=None,
     use_expr: bool | pl.Expr =True,
-    expected_gain: float | int =6,
     max_fractional_energy_error_3rd_assignment: float=0.1,
     min_gain_fraction_at_ph_30k: float=0.25,
     fwhm_pulse_height_units: float=75,
     n_extra_peaks: int=10,
     acceptable_rms_residual_e: float=10):
         step = moss.RoughCalibrationStep.learn_3peak(self, line_names, uncalibrated_col, calibrated_col,
-                                                     use_expr, expected_gain, max_fractional_energy_error_3rd_assignment,
+                                                     use_expr, max_fractional_energy_error_3rd_assignment,
                                                      min_gain_fraction_at_ph_30k, fwhm_pulse_height_units, n_extra_peaks, 
                                                      acceptable_rms_residual_e)
         return self.with_step(step)
