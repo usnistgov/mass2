@@ -213,11 +213,11 @@ def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_num
     return kernel
 
 def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: Optional[ndarray]=None) -> Tuple[ndarray, ndarray, ndarray]:
+    pulse_heights = pulse_heights.astype(np.float64)
+    # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
+    # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
     if bin_edges is None:
         n = 128 * 1024
-        # force the use of float64 here, otherwise the bin spacings from
-        # linspace can be uneven. seems platform dependent. windows doesn't need the forces float64
-        # but linux, at least github CI, does
         lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
         hi = (np.max(pulse_heights) + 3 * fwhm_pulse_height_units).astype(np.float64)
         bin_edges =  np.linspace(lo, hi, n + 1)
