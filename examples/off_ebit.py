@@ -53,6 +53,7 @@ def __(mass, moss, pl):
 
 
     def from_off(cls, off):
+        import os
         df = pl.from_numpy(off._mmap)
         df = (
             df.select(
@@ -64,7 +65,7 @@ def __(mass, moss, pl):
             .select(pl.exclude("unixnano"))
         )
         header = moss.ChannelHeader(
-            f"{off}",
+            f"{os.path.split(off.filename)[1]}",
             off.header["ChannelNumberMatchingName"],
             off.framePeriodSeconds,
             off._mmap["recordPreSamples"][0],
@@ -89,9 +90,10 @@ def __(from_off_paths, moss, off_paths, pathlib):
 def __(data, pl):
     data2 = data.map(
         lambda ch: ch.with_good_expr_below_nsigma_outlier_resistant(
-            [("pretriggerDelta", 5), ("residualStdDev", 10)], and_=pl.col("filtValue") > 0)
-        .driftcorrect(indicator_col="pretriggerMean", uncorrected_col="filtValue").
-        rough_cal(
+            [("pretriggerDelta", 5), ("residualStdDev", 10)], and_=pl.col("filtValue") > 0
+        )
+        .driftcorrect(indicator_col="pretriggerMean", uncorrected_col="filtValue")
+        .rough_cal(
             [
                 "AlKAlpha",
                 "MgKAlpha",
@@ -120,21 +122,27 @@ def __(data2, mo, plt):
 
 @app.cell
 def __(data2, mo, pl, plt):
-    result = data2.ch0.linefit("AlKAlpha", "energy_filtValue_dc", use_expr=pl.col("state_label") == "START")
+    result = data2.ch0.linefit(
+        "AlKAlpha", "energy_filtValue_dc", use_expr=pl.col("state_label") == "START"
+    )
     result.plotm()
     mo.mpl.interactive(plt.gcf())
     return result,
 
 
 @app.cell
-def __():
-    def plot_a_vs_b(ch, a_col, b_col, color_by_col):
-        pass
-    return plot_a_vs_b,
+def __(data2, mo, plt):
+    data2.ch0.plot_scatter(
+        x_col="derivativeLike",
+        y_col="energy_filtValue_dc",
+        color_col="state_label",
+    )
+    mo.mpl.interactive(plt.gcf())
+    return
 
 
 @app.cell
-def __(moss):
+def __(data2, mo, moss, plt):
     multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
     multifit = (
         multifit.with_line("MgKAlpha")
@@ -146,16 +154,10 @@ def __(moss):
         .with_line("CoKAlpha")
         .with_line("CuKAlpha")
     )
-    return multifit,
-
-
-@app.cell
-def __(np, pl):
-    df1 = pl.DataFrame({"a":np.arange(3)})
-    df2 = pl.DataFrame({"b":np.arange(3)})
-    want=df1.join(df2, how="cross").filter(pl.col("a")<pl.col("b"))
-    print(want)
-    return df1, df2, want
+    mf_result = multifit.fit_ch(data2.ch0, "energy_filtValue_dc")
+    mf_result.plot_results()
+    mo.mpl.interactive(plt.gcf())
+    return mf_result, multifit
 
 
 if __name__ == "__main__":

@@ -53,6 +53,19 @@ class Channel:
     def plot_hist(self, col, bin_edges, axis=None):
         return moss.misc.plot_hist_of_series(self.df[col], bin_edges, axis)
     
+    def plot_scatter(self, x_col, y_col, color_col=None, ax=None):
+        if ax is None:
+            fig = plt.figure()
+            ax = plt.gca()
+        plt.sca(ax)
+        for (name,), data in self.df.filter(self.good_expr).group_by(color_col):
+            plt.plot(data[x_col], data[y_col],".", label=name)
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.title(self.header.description)
+        if color_col is not None:
+            plt.legend(title=color_col)
+    
     def good_series(self, col, use_expr):
         return moss.good_series(self.df, col, self.good_expr, use_expr)
     

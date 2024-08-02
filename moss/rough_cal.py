@@ -331,22 +331,22 @@ def eval_3peak_assignment_pfit_gain(
     assert all(np.diff(ph_assigned)>0), "assignments must be sorted"
     assert all(np.diff(e_assigned)>0), "assignments must be sorted"
     gain_assigned = np.array(ph_assigned) / np.array(e_assigned)
-    pfit_gain = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
-    if pfit_gain.deriv(1)(0)>1:
+    pfit_gain_3peak = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
+    if pfit_gain_3peak.deriv(1)(0)>1:
         # well formed calibration have negative derivative at zero pulse height
         return np.inf, None
-    if pfit_gain(1e5) < 0:
+    if pfit_gain_3peak(1e5) < 0:
         # well formed calibration have positive gain at 1e5
         return np.inf, None
-    if any(np.iscomplex(pfit_gain.roots())):
+    if any(np.iscomplex(pfit_gain_3peak.roots())):
         # well formed calibrations have real roots
         return np.inf, None
 
     def ph2energy(ph):
-        gain = pfit_gain(ph)
+        gain = pfit_gain_3peak(ph)
         return ph / gain
 
-    cba = pfit_gain.convert().coef
+    cba = pfit_gain_3peak.convert().coef
     def energy2ph(energy):
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
@@ -385,6 +385,15 @@ def eval_3peak_assignment_pfit_gain(
     residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
         df["possible_ph"].to_numpy(), df["line_energy"].to_numpy()
     )
+    if pfit_gain.deriv(1)(0)>1:
+        # well formed calibration have negative derivative at zero pulse height
+        return np.inf, None
+    if pfit_gain(1e5) < 0:
+        # well formed calibration have positive gain at 1e5
+        return np.inf, None
+    if any(np.iscomplex(pfit_gain.roots())):
+        # well formed calibrations have real roots
+        return np.inf, None
     rms_residual_e = np.std(residual_e)
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_residual_e,
@@ -505,7 +514,7 @@ class RoughCalibrationStep(moss.CalStep):
         )
         best_rms_residual = np.inf
         best_assignment_result = None
-        for assignment_row in df3peak.iter_rows():
+        for assignment_row in df3peak.limit(100).iter_rows():
             e0, ph0, e1, ph1, e2, ph2, e_err_at_ph2 = assignment_row
             rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
                     [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
