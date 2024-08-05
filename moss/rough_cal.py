@@ -120,12 +120,18 @@ class BestAssignmentPfitGainResult:
     def ph2energy(self, ph: Union[ndarray, float]) -> Union[float64, ndarray]:
         return ph/self.pfit_gain(ph)
     
-    def energy2ph(self, energy: float64) -> float:
-        import scipy.optimize #type: ignore
-        sol = scipy.optimize.root_scalar(lambda ph: self.ph2energy(ph)-energy, 
-                                   bracket=[1,self.phzerogain()*0.9])
-        assert sol.converged
-        return sol.root
+    def energy2ph(self, energy):
+        # ph2energy is equivalent to this with y=energy, x=ph
+        # y = x/(c + b*x + a*x^2)
+        # so
+        # y*c + (y*b-1)*x + a*x^2 = 0
+        # and given that we've selected for well formed calibrations,
+        # we know which root we want
+        cba = self.pfit_gain.convert().coef
+        c,bb,a = cba*energy
+        b=bb-1
+        ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
+        return ph
     
     def predicted_energies(self):
         return self.ph2energy(self.ph_assigned)

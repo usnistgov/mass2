@@ -95,7 +95,6 @@ def experiment_state_path_from_ljh_path(ljh_path):
     
     # Split the filename into parts based on '_chan' and '.ljh'
     base_name, _ = file_name.split('_chan')
-    
     # Create the new filename
     new_file_name = f"{base_name}_experiment_state.txt"
     

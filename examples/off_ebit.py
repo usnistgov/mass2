@@ -43,46 +43,8 @@ def __(mass, moss, pulsedata):
 
 
 @app.cell
-def __(mass, moss, pl):
-    def from_off_paths(cls, off_paths):
-        channels = {}
-        for path in off_paths:
-            ch = from_off(moss.Channel, mass.off.OffFile(path))
-            channels[ch.header.ch_num] = ch
-        return moss.Channels(channels, "from_off_paths")
-
-
-    def from_off(cls, off):
-        import os
-
-        df = pl.from_numpy(off._mmap)
-        df = (
-            df.select(
-                pl.from_epoch("unixnano", time_unit="ns")
-                .dt.cast_time_unit("us")
-                .alias("timestamp")
-            )
-            .with_columns(df)
-            .select(pl.exclude("unixnano"))
-        )
-        header = moss.ChannelHeader(
-            f"{os.path.split(off.filename)[1]}",
-            off.header["ChannelNumberMatchingName"],
-            off.framePeriodSeconds,
-            off._mmap["recordPreSamples"][0],
-            off._mmap["recordSamples"][0],
-            pl.DataFrame(off.header),
-        )
-        ch = cls(df, header)
-        return ch
-    return from_off, from_off_paths
-
-
-@app.cell
-def __(from_off_paths, moss, off_paths, pathlib):
-    data = from_off_paths(moss.Channels, off_paths).with_experiment_state_by_path(
-        pathlib.Path(off_paths[0]).parent / "20240722_run0006_experiment_state.txt"
-    )
+def __(moss, off_paths):
+    data = moss.Channels.from_off_paths(off_paths, "ebit_20240722_0006").with_experiment_state_by_path()
     data
     return data,
 
@@ -95,9 +57,9 @@ def __(data, pl):
         )
         .with_good_expr_below_nsigma_outlier_resistant(
             [("pretriggerDelta", 5), ("residualStdDev", 10)],
-            and_=pl.col("filtValue") > 0,
         )
-        .with_good_expr_nsigma_range_outlier_resistant([("filtPhase",10)])
+        .with_good_expr(pl.col("filtValue")>0)
+        .with_good_expr_nsigma_range_outlier_resistant([("filtPhase", 10)])
         .driftcorrect(indicator_col="pretriggerMean", uncorrected_col="filtValue")
         .rough_cal(
             [
@@ -153,7 +115,7 @@ def __(data2, pl):
             use_expr=pl.col("state_label") == "START",
         )
     )
-    # we need to have mass stop print all this output
+    # we should have mass stop print all this output
     return data3,
 
 
@@ -164,12 +126,25 @@ def __(data3, mass, pl):
         if line_names is None:
             line_names = previous_step.assignment_result.names_target
         (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
-        df_close = pl.DataFrame({"line_name":line_names, "line_energy":line_energies}).sort(by="line_energy")
+        df_close = pl.DataFrame(
+            {"line_name": line_names, "line_energy": line_energies}
+        ).sort(by="line_energy")
         assert ch.df["timestamp"].is_sorted()
-        df2 = ch.df.select(previous_step.output[0],"timestamp").sort(by=previous_step.output[0]).join_asof(df_close, left_on=previous_step.output[0], right_on="line_energy", strategy="nearest",
-                             tolerance=line_width).sort(by="timestamp")
+        df2 = (
+            ch.df.select(previous_step.output[0], "timestamp")
+            .sort(by=previous_step.output[0])
+            .join_asof(
+                df_close,
+                left_on=previous_step.output[0],
+                right_on="line_energy",
+                strategy="nearest",
+                tolerance=line_width,
+            )
+            .sort(by="timestamp")
+        )
         return ch.with_columns(df2.select("line_name"))
-            
+
+
     ch3 = label_lines(data3.ch0, -1)
     return ch3, label_lines
 
@@ -197,16 +172,10 @@ def __(ch3, mo, pl, plt):
         x_col=pl.col("filtPhase"),
         y_col="energy_filtValue_dc_pc",
         color_col="line_name",
-        use_expr=pl.col("state_label")=="START"
+        use_expr=pl.col("state_label") == "START",
     )
     plt.grid()
     mo.mpl.interactive(plt.gcf())
-    return
-
-
-@app.cell
-def __(data3):
-    data3.ch0.good_expr
     return
 
 
@@ -222,8 +191,8 @@ def __(data2, mo, plt):
 
 
 @app.cell
-def __(data2, mo, moss, plt):
-    multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
+def __(data2, mo, moss, pl, plt):
+    multifit = moss.MultiFit(default_fit_width=80, default_use_expr=pl.col("state_label")=="START",default_bin_size=0.6)
     multifit = (
         multifit.with_line("MgKAlpha")
         .with_line("AlKAlpha")

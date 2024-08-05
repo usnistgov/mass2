@@ -72,9 +72,13 @@ class Channel:
             plt.plot(data.select(x_col).to_series(), data.select(y_col).to_series(),".", label=name)
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
-        plt.title(self.header.description)
+        title_str = f"""{self.header.description}
+        use_expr={str(use_expr)}
+        good_expr={str(self.good_expr)}"""
+        plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
+        plt.tight_layout()
     
     def good_series(self, col, use_expr):
         return moss.good_series(self.df, col, self.good_expr, use_expr)
@@ -165,7 +169,14 @@ class Channel:
             ch2 = ch2.with_step(step)
         return ch2
 
-    def replace_good_expr(self, good_expr):
+    def with_good_expr(self, good_expr, replace=False):
+        if replace:
+            good_expr = good_expr
+        else:
+            # the default value of self.good_expr is True
+            # and_(True) will just add visual noise when looking at good_expr and not affect behavior
+            if good_expr is not True:
+                good_expr = good_expr.and_(self.good_expr)
         return Channel(
             df=self.df,
             header=self.header,
@@ -176,7 +187,7 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
-    def with_good_expr_pretrig_mean_and_postpeak_deriv(self):
+    def with_good_expr_pretrig_mean_and_postpeak_deriv(self, replace=False):
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=20
         )
@@ -186,9 +197,9 @@ class Channel:
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(
             pl.col("pretrig_rms") < max_pretrig_rms
         )
-        return self.replace_good_expr(good_expr)
+        return self.with_good_expr(good_expr, replace)
     
-    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, and_ = None, and_prev_good_expr=False, use_prev_good_expr=True):
+    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True):
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -205,13 +216,9 @@ class Channel:
                 good_expr = this_iter_good_expr
             else:
                 good_expr = good_expr.and_(this_iter_good_expr)
-        if and_ is not None:
-            good_expr = good_expr.and_(and_)
-        if and_prev_good_expr:
-            good_expr = self.good_expr.and_(good_expr)
-        return self.replace_good_expr(good_expr)
+        return self.with_good_expr(good_expr, replace)
     
-    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, and_ = None, and_prev_good_expr=False, use_prev_good_expr=True):
+    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True):
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -228,11 +235,7 @@ class Channel:
                 good_expr = this_iter_good_expr
             else:
                 good_expr = good_expr.and_(this_iter_good_expr)
-        if and_ is not None:
-            good_expr = good_expr.and_(and_)
-        if and_prev_good_expr:
-            good_expr = self.good_expr.and_(good_expr)
-        return self.replace_good_expr(good_expr)
+        return self.with_good_expr(good_expr, replace)
 
     @functools.cache
     def typical_peak_ind(self, col="pulse"):
@@ -379,6 +382,33 @@ class Channel:
         channel = moss.Channel(df, header=header, noise=noise_channel)
         return channel
     
+    @classmethod
+    def from_off(cls, off):
+        import os
+
+        df = pl.from_numpy(off._mmap)
+        df = (
+            df.select(
+                pl.from_epoch("unixnano", time_unit="ns")
+                .dt.cast_time_unit("us")
+                .alias("timestamp")
+            )
+            .with_columns(df)
+            .select(pl.exclude("unixnano"))
+        )
+        df_header = pl.DataFrame(off.header)
+        df_header = df_header.with_columns(pl.Series("Filename",[off.filename]))
+        header = moss.ChannelHeader(
+            f"{os.path.split(off.filename)[1]}",
+            off.header["ChannelNumberMatchingName"],
+            off.framePeriodSeconds,
+            off._mmap["recordPreSamples"][0],
+            off._mmap["recordSamples"][0],
+            df_header,
+        )
+        channel = cls(df, header)
+        return channel
+    
     def with_experiment_state_df(self, df_es):
         df2 = self.df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
@@ -402,7 +432,7 @@ class Channel:
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True
     ):
-        step = moss.MultiFitSplineStep.learn(self, multifit=multifit,
+        step = moss.MultiFitQuadraticGainCalStep.learn(self, multifit_spec=multifit,
                                              previous_cal_step_index=previous_cal_step_index,
                                              calibrated_col=calibrated_col,
                                              use_expr=use_expr)

@@ -107,6 +107,14 @@ class Channels:
             channel = moss.Channel.from_ljh(pulse_path, noise_path)
             _channels[channel.header.ch_num] = channel
         return cls(_channels, description)
+    
+    @classmethod
+    def from_off_paths(cls, off_paths, description):
+        channels = {}
+        for path in off_paths:
+            ch = moss.Channel.from_off(mass.off.OffFile(path))
+            channels[ch.header.ch_num] = ch
+        return cls(channels, description)
 
     @classmethod
     def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None):

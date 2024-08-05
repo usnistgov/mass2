@@ -101,7 +101,6 @@ def __(data, mo, moss, plt):
         min_gain_fraction_at_ph_30k,
     )
     mo.mpl.interactive(plt.gcf())
-
     return (
         acceptable_rms_residual_e,
         calibrated_col,
@@ -470,7 +469,7 @@ def __(mo):
 @app.cell
 def __(data3, mo, moss, plt):
     multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
-    multifit = multifit.with_line("MnKAlpha").with_line("CuKAlpha").with_line("PdLAlpha")
+    multifit = multifit.with_line("MnKAlpha").with_line("CuKAlpha").with_line("PdLAlpha").with_line("MnKBeta")
     multifit_with_results = multifit.fit_ch(data3.channels[4102], "energy_5lagy_dc")
     multifit_with_results.plot_results()
     mo.mpl.interactive(plt.gcf())
@@ -479,12 +478,12 @@ def __(data3, mo, moss, plt):
 
 @app.cell
 def __(multifit_with_results):
-    pd_result, mn_result, cu_result = multifit_with_results.results
+    pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
     assert mn_result.params["fwhm"].value < 3.39
     assert cu_result.params["fwhm"].value < 3.42
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
-    return cu_result, mn_result, pd_result
+    return cu_result, mn_kbeta_result, mn_result, pd_result
 
 
 @app.cell
