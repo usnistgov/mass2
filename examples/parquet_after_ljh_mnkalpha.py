@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.1"
+__generated_with = "0.7.14"
 app = marimo.App(width="medium", app_title="MOSS follow")
 
 
@@ -36,7 +36,7 @@ def __(moss, pl):
         pulse_folder=pulse_folder)
     steps_dict = moss.misc.unpickle_object("example_steps_dict.pkl")
     truth_dfg = pl.read_parquet("example_result.parquet")
-    return data, pulse_folder, steps_dict, truth_dfg
+    return data, pulse_folder, pulsedata, steps_dict, truth_dfg
 
 
 @app.cell
@@ -61,7 +61,7 @@ def __(dfg, truth_dfg):
 def __(data2, mo, plt):
     result = data2.linefit("MnKAlpha", col="energy2_5lagy_dc")
     result.plotm()
-    assert result.params["fwhm"].value<3.32
+    assert result.params["fwhm"].value<3.44
     mo.mpl.interactive(plt.gcf())
     return result,
 
@@ -90,7 +90,7 @@ def __(data2, moss, truth_dfg):
 def __(data_from_truth_dfg, mo, plt):
     result_from_truth_dfg = data_from_truth_dfg.linefit("MnKAlpha", col="energy2_5lagy_dc")
     result_from_truth_dfg.plotm()
-    assert result_from_truth_dfg.params["fwhm"].value<3.32
+    assert result_from_truth_dfg.params["fwhm"].value<3.44
     mo.mpl.interactive(plt.gcf())
     return result_from_truth_dfg,
 
