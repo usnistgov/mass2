@@ -45,6 +45,12 @@ def outlier_resistant_nsigma_above_mid(x, nsigma=5):
     sigma_mad = mad * 1.4826
     return mid + nsigma * sigma_mad
 
+def outlier_resistant_nsigma_range_from_mid(x, nsigma=5):
+    mid = np.median(x)
+    mad = np.median(np.abs(x - mid))
+    sigma_mad = mad * 1.4826
+    return mid-nsigma*sigma_mad, mid + nsigma * sigma_mad    
+
 def midpoints_and_step_size(x):
     d = np.diff(x)
     step_size = d[0]

@@ -42,8 +42,15 @@ class Channel:
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
 
+    def get_step(self, index):
+        if index < 0:
+            # normalize the index to a positive index
+            index = len(self.steps) + index
+        step = self.steps[index]
+        return step, index
+
     def step_plot(self, step_ind, **kwargs):
-        step = self.steps[step_ind]
+        step, step_ind = self.get_step(step_ind)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
         else:
@@ -53,15 +60,18 @@ class Channel:
     def plot_hist(self, col, bin_edges, axis=None):
         return moss.misc.plot_hist_of_series(self.df[col], bin_edges, axis)
     
-    def plot_scatter(self, x_col, y_col, color_col=None, ax=None):
+    def plot_scatter(self, x_col, y_col, color_col=None, use_expr=True, skip_none=True, ax=None):
         if ax is None:
             fig = plt.figure()
             ax = plt.gca()
-        plt.sca(ax)
-        for (name,), data in self.df.filter(self.good_expr).group_by(color_col):
-            plt.plot(data[x_col], data[y_col],".", label=name)
-        plt.xlabel(x_col)
-        plt.ylabel(y_col)
+        plt.sca(ax) # set current axis so I can use plt api
+        df_small = (self.df.lazy().filter(self.good_expr).filter(use_expr).select(x_col, y_col, color_col).collect())
+        for (name,), data in df_small.group_by(color_col, maintain_order=True):
+            if name is None and skip_none:
+                continue
+            plt.plot(data.select(x_col).to_series(), data.select(y_col).to_series(),".", label=name)
+        plt.xlabel(str(x_col))
+        plt.ylabel(str(y_col))
         plt.title(self.header.description)
         if color_col is not None:
             plt.legend(title=color_col)
@@ -155,7 +165,7 @@ class Channel:
             ch2 = ch2.with_step(step)
         return ch2
 
-    def with_good_expr(self, good_expr):
+    def replace_good_expr(self, good_expr):
         return Channel(
             df=self.df,
             header=self.header,
@@ -176,9 +186,12 @@ class Channel:
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(
             pl.col("pretrig_rms") < max_pretrig_rms
         )
-        return self.with_good_expr(good_expr)
+        return self.replace_good_expr(good_expr)
     
     def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, and_ = None, and_prev_good_expr=False, use_prev_good_expr=True):
+        """
+        always sets lower limit at 0, don't use for values that can be negative
+        """
         if use_prev_good_expr:
             df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
         else:
@@ -196,7 +209,30 @@ class Channel:
             good_expr = good_expr.and_(and_)
         if and_prev_good_expr:
             good_expr = self.good_expr.and_(good_expr)
-        return self.with_good_expr(good_expr)
+        return self.replace_good_expr(good_expr)
+    
+    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, and_ = None, and_prev_good_expr=False, use_prev_good_expr=True):
+        """
+        always sets lower limit at 0, don't use for values that can be negative
+        """
+        if use_prev_good_expr:
+            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+        else:
+            df = self.df
+        for i, (col, nsigma) in enumerate(col_nsigma_pairs):
+            min_for_col, max_for_col = moss.misc.outlier_resistant_nsigma_range_from_mid(
+                df[col].to_numpy(), nsigma=nsigma
+            )
+            this_iter_good_expr = pl.col(col).is_between(min_for_col, max_for_col)
+            if i == 0:
+                good_expr = this_iter_good_expr
+            else:
+                good_expr = good_expr.and_(this_iter_good_expr)
+        if and_ is not None:
+            good_expr = good_expr.and_(and_)
+        if and_prev_good_expr:
+            good_expr = self.good_expr.and_(good_expr)
+        return self.replace_good_expr(good_expr)
 
     @functools.cache
     def typical_peak_ind(self, col="pulse"):
@@ -384,3 +420,12 @@ class Channel:
     def concat_ch(self, ch):
         ch2 = self.concat_df(ch.df)
         return ch2
+    
+    def phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col, line_names,
+                                          previous_step_index, corrected_col=None,
+                                          use_expr=True):
+        if corrected_col is None:
+            corrected_col=uncorrected_col+"_pc"
+        step = moss.phase_correct.phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col,
+                                        corrected_col, previous_step_index, line_names, use_expr)
+        return self.with_step(step)

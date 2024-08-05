@@ -14,3 +14,4 @@ from . import rough_cal
 from .channel import Channel, ChannelHeader
 from .channels import Channels
 from .rough_cal import RoughCalibrationStep
+from . import phase_correct
