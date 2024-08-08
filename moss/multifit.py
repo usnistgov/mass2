@@ -274,7 +274,6 @@ class MultiFitMassCalibrationStep(moss.CalStep):
                                             previous_energy2ph=self.energy2ph,
                                             n_extra_axes=1)
         ax = axes[-1]
-        plt.sca(ax)
         multifit_df = self.multifit.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
         peaks_uncalibrated = np.array([self.energy2ph(e) for e in peaks_in_energy_rough_cal])

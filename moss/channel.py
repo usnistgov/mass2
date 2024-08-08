@@ -438,7 +438,7 @@ class Channel:
                                              use_expr=use_expr)
         return self.with_step(step)
     
-    def multifit_spline_cal(self, multifit: moss.MultiFit, 
+    def multifit_mass_cal(self, multifit: moss.MultiFit, 
                             previous_cal_step_index, calibrated_col, use_expr=True):
         step = moss.MultiFitMassCalibrationStep.learn(self, multifit_spec=multifit,
                                             previous_cal_step_index=previous_cal_step_index,

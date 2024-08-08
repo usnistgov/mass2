@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.14"
+__generated_with = "0.7.17"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -489,7 +489,7 @@ def __(multifit_with_results):
 @app.cell
 def __(data3, multifit):
     data4 = data3.map(
-        lambda ch: ch.multifit_spline_cal(
+        lambda ch: ch.multifit_mass_cal(
             multifit, previous_cal_step_index=5, calibrated_col="energy2_5lagy_dc"
         )
     )

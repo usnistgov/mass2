@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.7.17"
-app = marimo.App(width="medium", app_title="MOSS intro")
+app = marimo.App(width="medium", app_title="ebit moss example")
 
 
 @app.cell
@@ -58,10 +58,10 @@ def __(off_paths, pl):
 @app.cell
 def __(Path, mo, np, off_paths, plt):
     external_trigger_file_path = Path(off_paths[0]).parent/"20240723_run0000_external_trigger.bin"
-    _f = open(external_trigger_file_path,"rb")
-    _header_line = _f.readline() # read the one header line before opening the binary data
-    external_trigger_subframe_count = np.fromfile(_f, "int64")
-    plt.plot(np.diff(external_trigger_subframe_count),".")
+    with open(external_trigger_file_path,"rb") as _f:
+        _header_line = _f.readline() # read the one header line before opening the binary data
+        external_trigger_subframe_count = np.fromfile(_f, "int64")
+    plt.plot(np.diff(external_trigger_subframe_count)[:10000],".")
     plt.title(f"{external_trigger_file_path.stem} is messed up unfortunatley\nthere should only be one value of difference")
     plt.xlabel("external trigger index")
     plt.ylabel("different in subframe counts between external triggers")
@@ -85,16 +85,6 @@ def __(data, pl, timing_df):
 
     with_timing_df(data.ch0).df
     return with_timing_df,
-
-
-app._unparsable_cell(
-    r"""
-            f = open(filename, \"rb\")
-            f.readline()  # discard comment line
-            external_trigger_subframe_count = np.fromfile(f, \"int64\")
-    """,
-    name="__"
-)
 
 
 @app.cell
@@ -147,8 +137,9 @@ def __(data2, pl, with_timing_df):
 
 
 @app.cell
-def __(data3, line_names, pl):
-    data4 = data3.map(lambda ch: ch.rough_cal_combinatoric(
+def __(data3, label_lines, line_names, pl):
+    data4 = data3.map(lambda ch: label_lines(ch, -2))
+    data4 = data4.map(lambda ch: ch.rough_cal_combinatoric(
                 line_names,
                 uncalibrated_col="filtValue_dc_pc",
                 calibrated_col="energy_filtValue_dc_pc",
@@ -159,7 +150,7 @@ def __(data3, line_names, pl):
     return data4,
 
 
-@app.cell(hide_code=True)
+@app.cell
 def __(data3, mo):
     _ch_nums = list(str(_ch_num) for _ch_num in data3.channels.keys())
     dropdown_ch = mo.ui.dropdown(
@@ -182,7 +173,7 @@ def __(data3, mo):
 def __(data3, dropdown_ch, mo, plt):
     data3.channels[int(dropdown_ch.value)].step_plot(-2)
     plt.gcf().suptitle(f"ch{int(dropdown_ch.value)}")
-    plt.tight_layout()
+    # plt.tight_layout()
     mo.mpl.interactive(plt.gcf())
     return
 
@@ -191,7 +182,7 @@ def __(data3, dropdown_ch, mo, plt):
 def __(data3, dropdown_ch, mo, plt):
     data3.channels[int(dropdown_ch.value)].step_plot(-1)
     plt.gcf().suptitle(f"ch{int(dropdown_ch.value)}")
-    plt.tight_layout()
+    plt.grid(True)
     mo.mpl.interactive(plt.gcf())
     return
 
@@ -244,10 +235,10 @@ def __(data4, mo, pl, plt):
 
 
 @app.cell
-def __(ch3, mo, pl, plt):
-    ch3.plot_scatter(
+def __(data4, mo, pl, plt):
+    data4.ch0.plot_scatter(
         x_col=pl.col("filtPhase"),
-        y_col="energy_filtValue_dc",
+        y_col="energy_filtValue_dc_pc",
         color_col="line_name",
         use_expr=pl.col("state_label") == "START",
     )
@@ -257,10 +248,10 @@ def __(ch3, mo, pl, plt):
 
 
 @app.cell
-def __(ch3, mo, pl, plt):
-    ch3.plot_scatter(
+def __(data4, mo, pl, plt):
+    data4.ch0.plot_scatter(
         x_col=pl.col("timestamp"),
-        y_col="energy_filtValue_dc",
+        y_col="energy_filtValue_dc_pc",
         color_col="state_label2",
         use_expr=True,
     )
@@ -270,7 +261,7 @@ def __(ch3, mo, pl, plt):
 
 
 @app.cell
-def __(data4, dropdown_ch, mo, moss, pl, plt):
+def __(moss, pl):
     multifit = moss.MultiFit(
         default_fit_width=80,
         default_use_expr=pl.col("state_label") == "START",
@@ -287,34 +278,25 @@ def __(data4, dropdown_ch, mo, moss, pl, plt):
         .with_line("ZnKAlpha")
         .with_line("GeKAlpha", dlo=60)
     )
-    mf_result = multifit.fit_ch(data4.channels[int(dropdown_ch.value)], "energy_filtValue_dc_pc")
-    mf_result.plot_results()
-    mo.mpl.interactive(plt.gcf())
-    return mf_result, multifit
-
-
-@app.cell
-def __(data4, dropdown_ch, mf_result):
-    _ch = data4.channels[int(dropdown_ch.value)]
-    _prev_step, _ = _ch.get_step(-1)
-    cal = mf_result.to_mass_cal(_prev_step.energy2ph)
-    cal
-    return cal,
+    # mf_result = multifit.fit_ch(data4.channels[int(dropdown_ch.value)], "energy_filtValue_dc_pc")
+    # mf_result.plot_results()
+    # mo.mpl.interactive(plt.gcf())
+    return multifit,
 
 
 @app.cell
 def __(data4, multifit):
     data5 = data4.map(
-        lambda ch: ch.multifit_quadratic_gain_cal(
-            multifit, previous_cal_step_index=-1, calibrated_col="energy2_filtValue_dc"
+        lambda ch: ch.multifit_mass_cal(
+            multifit, previous_cal_step_index=-1, calibrated_col="energy2_filtValue_dc_pc"
         )
     )
     return data5,
 
 
 @app.cell
-def __(data4, dropdown_ch, mo, plt):
-    data4.channels[int(dropdown_ch.value)].step_plot(-1)
+def __(data5, dropdown_ch, mo, plt):
+    data5.channels[int(dropdown_ch.value)].step_plot(-1)
     mo.mpl.interactive(plt.gcf())
     return
 
