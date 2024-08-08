@@ -182,6 +182,15 @@ class MultiFit:
         e_predicted = ph2energy(peaks_uncalibrated)
         rms_residual_energy = np.std(e_predicted-peaks_in_energy_reference)
         return pfit_gain, rms_residual_energy
+    
+    def to_mass_cal(self, previous_energy2ph, curvetype="gain", approximate=False):
+        cal = mass.calibration.EnergyCalibration(curvetype=curvetype, approximate=approximate)
+        df = self.results_params_as_df()
+        for peak_in_energy_rough_cal, e, name in zip(df["peak_ph"].to_numpy(), df["peak_energy_ref"].to_numpy(), 
+                            df["line"]):
+            ph_uncalibrated = previous_energy2ph(peak_in_energy_rough_cal)
+            cal.add_cal_point(ph_uncalibrated, e, name=str(name))
+        return cal
 
     
 @dataclass(frozen=True)
