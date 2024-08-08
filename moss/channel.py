@@ -428,7 +428,7 @@ class Channel:
         return self.with_replacement_df(df3)
     
 
-    def multifit_quadratic_gain_cal(
+    def multifit_spline_cal(
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True
     ):
