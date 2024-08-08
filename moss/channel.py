@@ -438,6 +438,15 @@ class Channel:
                                              use_expr=use_expr)
         return self.with_step(step)
     
+    def multifit_spline_cal(self, multifit: moss.MultiFit, 
+                            previous_cal_step_index, calibrated_col, use_expr=True):
+        step = moss.MultiFitMassCalibrationStep.learn(self, multifit_spec=multifit,
+                                            previous_cal_step_index=previous_cal_step_index,
+                                             calibrated_col=calibrated_col,
+                                             use_expr=use_expr)
+        return self.with_step(step)
+
+    
     def concat_df(self, df):
         ch2 = moss.Channel(pl.concat([self.df, df]),
                         self.header,

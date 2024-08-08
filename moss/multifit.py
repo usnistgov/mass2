@@ -149,8 +149,8 @@ class MultiFit:
         plt.tight_layout()
         return fig, axes
     
-    def plot_results_and_pfit(self, uncalibrated_name, previous_energy2ph):
-        fig, axes = self.plot_results(n_extra_axes=1)
+    def plot_results_and_pfit(self, uncalibrated_name, previous_energy2ph, n_extra_axes=0):
+        fig, axes = self.plot_results(n_extra_axes=1+n_extra_axes)
         ax = axes[len(self.results)]
         multifit_df = self.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
@@ -167,6 +167,7 @@ class MultiFit:
         plt.title(f"{rms_residual_energy=:.3f}")
         for name, x, y in zip(multifit_df["line"], peaks_uncalibrated, gain):
             ax.annotate(str(name), (x,y))
+        return axes
 
     def to_pfit_gain(self, previous_energy2ph):
         multifit_df = self.results_params_as_df()
@@ -200,6 +201,8 @@ class MultiFitQuadraticGainCalStep(moss.CalStep):
     def dbg_plot(self, df):
         self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0],
                                             previous_energy2ph=self.energy2ph)
+
+
     
     def ph2energy(self, ph):
         gain = self.pfit_gain(ph)
@@ -239,5 +242,71 @@ class MultiFitQuadraticGainCalStep(moss.CalStep):
             pfit_gain,
             multifit_with_results,
             rms_residual_energy
+        )
+        return step
+    
+  
+@dataclass(frozen=True)
+class MultiFitMassCalibrationStep(moss.CalStep):
+    cal: mass.EnergyCalibration
+    multifit: MultiFit
+
+    def calc_from_df(self, df):
+        # only works with in memory data, but just takes it as numpy data and calls function
+        # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
+        inputs_np = [df[input].to_numpy() for input in self.inputs]
+        out = self.ph2energy(inputs_np[0])
+        df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
+        return df2
+
+    def dbg_plot(self, df):
+        axes = self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0],
+                                            previous_energy2ph=self.energy2ph,
+                                            n_extra_axes=1)
+        ax = axes[-1]
+        plt.sca(ax)
+        multifit_df = self.multifit.results_params_as_df()
+        peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
+        peaks_uncalibrated = np.array([self.energy2ph(e) for e in peaks_in_energy_rough_cal])
+        peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
+        plt.sca(ax)
+        x = np.linspace(1, np.amax(peaks_uncalibrated))
+        gain_from_cal = x/self.cal(x)
+        plt.plot(x, gain_from_cal, label="mass cal")
+        gain = peaks_uncalibrated/peaks_in_energy_reference
+        plt.plot(peaks_uncalibrated, gain, "o")
+        plt.xlabel(self.inputs[0])
+        plt.ylabel("gain")
+        plt.title("actual mass cal")
+        for name, x, y in zip(multifit_df["line"], peaks_uncalibrated, gain):
+            ax.annotate(str(name), (x,y))
+        plt.legend()
+
+    
+    def ph2energy(self, ph):
+        return self.cal.ph2energy(ph)
+
+    def energy2ph(self, energy):
+        return self.cal.energy2ph(energy)
+    
+    @classmethod
+    def learn(cls, ch, multifit_spec: MultiFit, previous_cal_step_index, 
+        calibrated_col, use_expr=True
+    ):
+        """multifit then make a mass calibration object with curve_type="gain" and approx=False
+        TODO: support more options"""
+        previous_cal_step = ch.steps[previous_cal_step_index]
+        rough_energy_col = previous_cal_step.output[0]
+        uncalibrated_col = previous_cal_step.inputs[0]
+
+        multifit_with_results = multifit_spec.fit_ch(ch, col=rough_energy_col)
+        cal = multifit_with_results.to_mass_cal(previous_cal_step.energy2ph)
+        step = cls(
+            [uncalibrated_col],
+            [calibrated_col],
+            ch.good_expr,
+            use_expr,
+            cal,
+            multifit_with_results,
         )
         return step
