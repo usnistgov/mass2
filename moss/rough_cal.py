@@ -13,6 +13,8 @@ import typing
 from typing import List, Optional, Tuple, Union, Callable
 import itertools
 
+
+
 def rank_3peak_assignments(
     ph,
     e,
@@ -274,6 +276,52 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bins)
     return np.array(x[lm]), np.array(y[lm]), (hist, bin_centers, y)
 
+def rank_assignments(ph, e):
+    # ph is a list of peak heights longer than e
+    # e is a list of known peak energies
+    # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
+    e = np.array(sorted(list(e)))
+    ph = np.array(sorted(list(ph)))
+    pha = np.array(list(itertools.combinations(ph, len(e))))
+    # pha[i,:] is one choice of len(e) values from ph to assign to e
+    # we use linear interpolation of the form y = y0 + (y1-y0)*(x-x0)/(x1-x0)
+    # on each set of 3 values
+    # with y = e and x = ph
+    # x is pha[:,1:-1], x0 is pha[:,:-2], x1 is pha[:,2:]
+    x = pha[:,1:-1]
+    x0 = pha[:,:-2]
+    x1 = pha[:,2:]
+    y0 = e[:-2]
+    y1 = e[2:]
+    x_m_x0_over_x1_m_x0 = (x-x0)/(x1-x0)
+    y = y0+(y1-y0)*x_m_x0_over_x1_m_x0
+    y_expected = e[1:-1]
+    rms_e_residual = np.std(y-y_expected, axis=1)
+    return rms_e_residual, pha
+
+def find_optimal_assignment(ph, e):
+    # ph is a list of peak heights longer than e
+    # e is a list of known peak energies
+    # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
+    rms_e_residual, pha = rank_assignments(ph, e)
+    ind = np.argmin(rms_e_residual)
+    return rms_e_residual[ind], pha[ind]
+
+def find_optimal_asignment2(ph, e, line_names):
+    rms_e_residual, pha = find_optimal_assignment(ph, e)
+    gain = pha/e
+    pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=2)
+    result = moss.rough_cal.BestAssignmentPfitGainResult(
+        rms_e_residual,
+        ph_assigned=pha,
+        residual_e=None,
+        assignment_inds=None,
+        pfit_gain=pfit_gain,
+        energy_target=e,
+        names_target=line_names,
+        ph_target=ph,
+    )
+    return result
 
 
 def find_pfit_gain_residual(ph: ndarray, e: Tuple[float, float, float, float, float, float]) -> Tuple[ndarray, Polynomial]:
@@ -285,6 +333,8 @@ def find_pfit_gain_residual(ph: ndarray, e: Tuple[float, float, float, float, fl
     predicted_e = ph2energy(ph)
     residual_e = e-predicted_e
     return residual_e, pfit_gain
+
+
 
 def find_best_residual_among_all_possible_assignments2(ph: ndarray, e:ndarray, names: list[str]) -> BestAssignmentPfitGainResult:
     best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit = find_best_residual_among_all_possible_assignments(ph,e)
@@ -338,15 +388,15 @@ def eval_3peak_assignment_pfit_gain(
     assert all(np.diff(e_assigned)>0), "assignments must be sorted"
     gain_assigned = np.array(ph_assigned) / np.array(e_assigned)
     pfit_gain_3peak = np.polynomial.Polynomial.fit(ph_assigned, gain_assigned, deg=2)
-    if pfit_gain_3peak.deriv(1)(0)>1:
+    if pfit_gain_3peak.deriv(1)(0)>0:
         # well formed calibration have negative derivative at zero pulse height
-        return np.inf, None
+        return np.inf, "pfit_gain_3peak deriv at 0 should be <0"
     if pfit_gain_3peak(1e5) < 0:
         # well formed calibration have positive gain at 1e5
-        return np.inf, None
+        return np.inf, "pfit_gain_3peak should be above zero at 100k ph"
     if any(np.iscomplex(pfit_gain_3peak.roots())):
         # well formed calibrations have real roots
-        return np.inf, None
+        return np.inf, "pfit_gain_3peak must have real roots"
 
     def ph2energy(ph):
         gain = pfit_gain_3peak(ph)
@@ -385,21 +435,18 @@ def eval_3peak_assignment_pfit_gain(
     n_unique = len(df["possible_ph"].unique())
     if n_unique < len(df):
         # assigned multiple energies to same pulseheight, not a good cal
-        return np.inf, None
+        return np.inf, "assignments should be unique"
 
     # now we evaluate the assignment and create a result object
     residual_e, pfit_gain = moss.rough_cal.find_pfit_gain_residual(
         df["possible_ph"].to_numpy(), df["line_energy"].to_numpy()
     )
-    if pfit_gain.deriv(1)(0)>1:
-        # well formed calibration have negative derivative at zero pulse height
-        return np.inf, None
     if pfit_gain(1e5) < 0:
         # well formed calibration have positive gain at 1e5
-        return np.inf, None
+        return np.inf, "pfit_gain should be above zero at 100k ph"
     if any(np.iscomplex(pfit_gain.roots())):
         # well formed calibrations have real roots
-        return np.inf, None
+        return np.inf, "pfit_gain should not have complex roots"
     rms_residual_e = np.std(residual_e)
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_residual_e,
@@ -419,7 +466,6 @@ class RoughCalibrationStep(moss.CalStep):
     assignment_result: BestAssignmentPfitGainResult
     ph2energy: typing.Callable
     success: bool
-    df3peak_on_failure: Optional[pl.DataFrame]
 
     def calc_from_df(self, df: DataFrame) -> DataFrame:
         # only works with in memory data, but just takes it as numpy data and calls function
@@ -466,7 +512,7 @@ class RoughCalibrationStep(moss.CalStep):
     
     @classmethod
     def learn_combinatoric(cls, ch: Channel, line_names: List[str], uncalibrated_col: str, calibrated_col: str, 
-        ph_smoothing_fwhm: int, n_extra: int=3,
+        ph_smoothing_fwhm: int, n_extra: int,
         use_expr: bool=True
     ) -> "RoughCalibrationStep":
         import mass #type: ignore
@@ -475,7 +521,7 @@ class RoughCalibrationStep(moss.CalStep):
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
                                                                          fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = moss.rough_cal.find_best_residual_among_all_possible_assignments2(
+        assignment_result = moss.rough_cal.find_optimal_asignment2(
             pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
 
 
@@ -520,7 +566,7 @@ class RoughCalibrationStep(moss.CalStep):
         )
         best_rms_residual = np.inf
         best_assignment_result = None
-        for assignment_row in df3peak.limit(100).iter_rows():
+        for assignment_row in df3peak.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").iter_rows():
             e0, ph0, e1, ph1, e2, ph2, e_err_at_ph2 = assignment_row
             rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
                     [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
@@ -538,6 +584,9 @@ class RoughCalibrationStep(moss.CalStep):
             success=False
             ph2energy=(lambda ph: ph*np.nan)
             df3peak_on_failure = df3peak
+        df3peak_on_failure = df3peak
+    
+    
 
 
         step = cls(
@@ -548,8 +597,7 @@ class RoughCalibrationStep(moss.CalStep):
                 pfresult=pfresult,
                 assignment_result=best_assignment_result, 
                 ph2energy=ph2energy, 
-                success=success,
-                df3peak_on_failure=df3peak_on_failure)
+                success=success)
         return step
     
 
