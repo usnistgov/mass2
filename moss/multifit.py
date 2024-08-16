@@ -180,7 +180,7 @@ class MultiFit:
             gain = pfit_gain(ph)
             return ph/gain
         e_predicted = ph2energy(peaks_uncalibrated)
-        rms_residual_energy = np.std(e_predicted-peaks_in_energy_reference)
+        rms_residual_energy = moss.misc.root_mean_squared(e_predicted-peaks_in_energy_reference)
         return pfit_gain, rms_residual_energy
     
     def to_mass_cal(self, previous_energy2ph, curvetype="gain", approximate=False):

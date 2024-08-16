@@ -22,7 +22,7 @@ class NoiseChannel:
         max_excursion = moss.misc.outlier_resistant_nsigma_above_mid(
             excursion, nsigma=excursion_nsigma
         )
-        df_noise2 = self.df.with_columns(excursion=excursion)
+        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
     @functools.cache
@@ -38,8 +38,7 @@ class NoiseChannel:
             trace_col_name, n_limit, excursion_nsigma
         )
         noise_traces_clean = (
-            df_noise2.filter(pl.col("excursion") < max_excursion)
-            .limit(10000)["pulse"]
+            df_noise2.filter(pl.col("excursion") < max_excursion)["pulse"]
             .to_numpy()
         )
         if trunc_back == 0:

@@ -132,7 +132,7 @@ def __(data2, pl, with_timing_df):
             )
         )
     )
-    data3 = data3.map(lambda ch: ch.phase_correct_mass_specific_lines(indicator_col="filtPhase", uncorrected_col="filtValue_dc",line_names=line_names, previous_step_index=-1))
+    data3 = data3.map(lambda ch: ch.phase_correct_mass_specific_lines(indicator_col="filtPhase", uncorrected_col="filtValue_dc",line_names=line_names, previous_cal_step_index=-1))
     return data3, line_names
 
 

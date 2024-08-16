@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.14"
+__generated_with = "0.7.19"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -44,7 +44,9 @@ def __(mass, moss, pulsedata):
 
 @app.cell
 def __(moss, off_paths):
-    data = moss.Channels.from_off_paths(off_paths, "ebit_20240722_0006").with_experiment_state_by_path()
+    data = moss.Channels.from_off_paths(
+        off_paths, "ebit_20240722_0006"
+    ).with_experiment_state_by_path()
     data
     return data,
 
@@ -58,7 +60,7 @@ def __(data, pl):
         .with_good_expr_below_nsigma_outlier_resistant(
             [("pretriggerDelta", 5), ("residualStdDev", 10)],
         )
-        .with_good_expr(pl.col("filtValue")>0)
+        .with_good_expr(pl.col("filtValue") > 0)
         .with_good_expr_nsigma_range_outlier_resistant([("filtPhase", 10)])
         .driftcorrect(indicator_col="pretriggerMean", uncorrected_col="filtValue")
         .rough_cal(
@@ -82,6 +84,38 @@ def __(data, pl):
 
 
 @app.cell
+def __(data3, moss, pl):
+    # test that calibration with 1-3 peaks works, it just uses the brightest peaks for now
+    _ch = (
+        data3.ch0.rough_cal_combinatoric(
+            line_names=["AlKAlpha"],
+            uncalibrated_col="filtValue_dc_pc",
+            calibrated_col="dummy1",
+            use_expr=pl.col("state_label") == "START",
+            ph_smoothing_fwhm=50,
+        )
+        .rough_cal_combinatoric(
+            line_names=["AlKAlpha", "ClKAlpha"],
+            uncalibrated_col="filtValue_dc_pc",
+            calibrated_col="dummy2",
+            use_expr=pl.col("state_label") == "START",
+            ph_smoothing_fwhm=50,
+        )
+        .rough_cal_combinatoric(
+            line_names=["AlKAlpha", "ClKAlpha", "MgKAlpha"],
+            uncalibrated_col="filtValue_dc_pc",
+            calibrated_col="dummy3",
+            use_expr=pl.col("state_label") == "START",
+            ph_smoothing_fwhm=50,
+        )
+    )
+    _ch.step_plot(-1)
+    moss.show()
+
+    return
+
+
+@app.cell
 def __(data2, pl):
     data3 = data2.map(
         lambda ch: ch.phase_correct_mass_specific_lines(
@@ -98,7 +132,7 @@ def __(data2, pl):
                 "CuKAlpha",
                 "KKAlpha",
             ],
-            previous_step_index=-1,
+            previous_cal_step_index=-1,
         ).rough_cal(
             [
                 "AlKAlpha",
@@ -192,7 +226,11 @@ def __(data2, mo, plt):
 
 @app.cell
 def __(data2, mo, moss, pl, plt):
-    multifit = moss.MultiFit(default_fit_width=80, default_use_expr=pl.col("state_label")=="START",default_bin_size=0.6)
+    multifit = moss.MultiFit(
+        default_fit_width=80,
+        default_use_expr=pl.col("state_label") == "START",
+        default_bin_size=0.6,
+    )
     multifit = (
         multifit.with_line("MgKAlpha")
         .with_line("AlKAlpha")

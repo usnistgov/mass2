@@ -29,6 +29,7 @@ def rank_3peak_assignments(
     # 2nd assignments, then we model the gain as linear, and use that to rank 3rd assignments
     dfe = pl.DataFrame({"e0_ind": np.arange(len(e)), "e0": e, "name": line_names})
     dfph = pl.DataFrame({"ph0_ind": np.arange(len(ph)), "ph0": ph})
+    # dfph should know about peak_area and use it to weight choices somehow
 
     #### 1st assignments ####
     # e0 and ph0 are the first assignment
@@ -123,6 +124,16 @@ class BestAssignmentPfitGainResult:
         return ph/self.pfit_gain(ph)
     
     def energy2ph(self, energy):
+        if self.pfit_gain.degree()==2:
+            return self._energy2ph_deg2(energy)
+        elif self.pfit_gain.degree()==1:
+            return self._energy2ph_deg1(energy)
+        elif self.pfit_gain.degree()==0:
+            return self._energy2ph_deg0(energy)
+        else:
+            raise Exception("degree out of range")
+
+    def _energy2ph_deg2(self, energy):
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
@@ -133,6 +144,28 @@ class BestAssignmentPfitGainResult:
         c,bb,a = cba*energy
         b=bb-1
         ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
+        return ph
+    
+    def _energy2ph_deg1(self, energy):
+        # ph2energy is equivalent to this with y=energy, x=ph
+        # y = x/(b + a*x)
+        # so
+        # x = y*b/(1-y*a)
+        # and given that we've selected for well formed calibrations,
+        # we know which root we want
+        b, a = self.pfit_gain.convert().coef
+        y=energy
+        ph = y*b/(1-y*a)
+        return ph
+    
+    def _energy2ph_deg0(self, energy):
+        # ph2energy is equivalent to this with y=energy, x=ph
+        # y = x/(a)
+        # so
+        # x = y*a
+        a, = self.pfit_gain.convert().coef
+        y=energy
+        ph = y*a
         return ph
     
     def predicted_energies(self):
@@ -296,21 +329,33 @@ def rank_assignments(ph, e):
     x_m_x0_over_x1_m_x0 = (x-x0)/(x1-x0)
     y = y0+(y1-y0)*x_m_x0_over_x1_m_x0
     y_expected = e[1:-1]
-    rms_e_residual = np.std(y-y_expected, axis=1)
+    rms_e_residual = moss.misc.root_mean_squared(y-y_expected, axis=1)
     return rms_e_residual, pha
 
 def find_optimal_assignment(ph, e):
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
+    
+    # when given 3 or less energies to match, use the largest peaks in peak order
+    assert len(e) >= 1
+    if len(e) <= 2:
+        return 0, np.array(sorted(ph[:len(e)]))
+    
     rms_e_residual, pha = rank_assignments(ph, e)
     ind = np.argmin(rms_e_residual)
     return rms_e_residual[ind], pha[ind]
 
-def find_optimal_asignment2(ph, e, line_names):
+def find_optimal_assignment2(ph, e, line_names):
     rms_e_residual, pha = find_optimal_assignment(ph, e)
     gain = pha/e
-    pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=2)
+    deg = min(len(e)-1,2)
+    if deg == 0:
+        pfit_gain = np.polynomial.Polynomial(gain)
+    else:
+        pfit_gain = np.polynomial.Polynomial.fit(pha, 
+                                                gain, 
+                                                deg=min(len(e)-1,2))
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
@@ -352,7 +397,7 @@ def find_best_residual_among_all_possible_assignments(ph: ndarray, e: Tuple[floa
         assignment_inds = np.array(assignment_inds)
         ph_assigned = np.array(ph[assignment_inds])
         residual_e, pfit_gain = find_pfit_gain_residual(ph_assigned,e)
-        rms_residual = np.std(residual_e)
+        rms_residual = moss.misc.root_mean_squared(residual_e)
         if rms_residual < best_rms_residual:
             best_rms_residual=rms_residual
             best_ph_assigned = ph_assigned
@@ -447,7 +492,7 @@ def eval_3peak_assignment_pfit_gain(
     if any(np.iscomplex(pfit_gain.roots())):
         # well formed calibrations have real roots
         return np.inf, "pfit_gain should not have complex roots"
-    rms_residual_e = np.std(residual_e)
+    rms_residual_e = moss.misc.root_mean_squared(residual_e)
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_residual_e,
         ph_assigned=df["possible_ph"].to_numpy(),
@@ -503,7 +548,6 @@ class RoughCalibrationStep(moss.CalStep):
     def dbg_plot_failure(self, df: DataFrame, axs: Union[None,ndarray]=None):
         if axs is None:
             fig, axs = plt.subplots(2, 1, figsize=(11,6))
-        print(f"{self.df3peak_on_failure=}")
         self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
     
@@ -521,7 +565,7 @@ class RoughCalibrationStep(moss.CalStep):
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
                                                                          fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = moss.rough_cal.find_optimal_asignment2(
+        assignment_result = moss.rough_cal.find_optimal_assignment2(
             pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
 
 
@@ -548,7 +592,6 @@ class RoughCalibrationStep(moss.CalStep):
     n_extra_peaks: int=10,
     acceptable_rms_residual_e: float=10) -> "RoughCalibrationStep":
         import mass #type: ignore
-        
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
         (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)

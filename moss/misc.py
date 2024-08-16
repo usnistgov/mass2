@@ -2,7 +2,10 @@ import numpy as np
 import pylab as plt
 import polars as pl
 import dill
+import marimo as mo
 
+def show():
+    return mo.mpl.interactive(plt.gcf())
 
 def pickle_object(obj, filename):
     with open(filename, 'wb') as file:
@@ -115,3 +118,6 @@ def launch_examples():
     # Check if the command was successful
     if process.returncode != 0:
         sys.exit(process.returncode)
+
+def root_mean_squared(x, axis=None):
+    return np.sqrt(np.mean(x**2,axis))

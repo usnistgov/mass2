@@ -67,7 +67,7 @@ class Channel:
         plt.sca(ax) # set current axis so I can use plt api
         df_small = (self.df.lazy().filter(self.good_expr).filter(use_expr).select(x_col, y_col, color_col).collect())
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
-            if name is None and skip_none:
+            if name is None and skip_none and color_col is not None:
                 continue
             plt.plot(data.select(x_col).to_series(), data.select(y_col).to_series(),".", label=name)
         plt.xlabel(str(x_col))
@@ -424,7 +424,7 @@ class Channel:
             ) 
     
     def with_columns(self, df2):
-        df3 = df2.with_columns(self.df)
+        df3 = self.df.with_columns(df2)
         return self.with_replacement_df(df3)
     
 
@@ -461,10 +461,10 @@ class Channel:
         return ch2
     
     def phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col, line_names,
-                                          previous_step_index, corrected_col=None,
+                                          previous_cal_step_index, corrected_col=None,
                                           use_expr=True):
         if corrected_col is None:
             corrected_col=uncorrected_col+"_pc"
         step = moss.phase_correct.phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col,
-                                        corrected_col, previous_step_index, line_names, use_expr)
+                                        corrected_col, previous_cal_step_index, line_names, use_expr)
         return self.with_step(step)
