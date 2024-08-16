@@ -81,11 +81,18 @@ def test_find_optimal_assignment_3():
     # from all peaks (ph) find the one corresponding to energies e
     result = moss.rough_cal.find_optimal_assignment2(ph, e, map(str, e))
     # test that assigned peaks match known peaks of energy e
-    print(f"{result.ph_assigned=}")
-    print(f"{ph_truth_with_err=}")
-    print(f"{ph=}")
     assert np.allclose(result.ph_assigned, ph_truth_with_err, rtol=0.001)
     assert np.allclose([result.ph2energy(result.energy2ph(ee)) for ee in e], e)
+
+def test_rank_3peak_assignments():
+    e = np.array([1000, 3000, 5000]) # energies of "real" peaks
+    e_spurious = [2900, 3700, 4500] # energies of spurious or fake peaks
+    ph, ph_truth_with_err = make_truth_ph(e=e, 
+                                            e_spurious=e_spurious, 
+                                            e_err_scale=10) 
+    df3peak, dfe = moss.rough_cal.rank_3peak_assignments(ph, e, map(str, e))
+    ph_assigned_top_rank = np.array([df3peak["ph0"][0], df3peak["ph1"][0], df3peak["ph2"][0]])
+    assert np.allclose(ph_truth_with_err, ph_assigned_top_rank)
 
 
 
