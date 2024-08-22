@@ -102,6 +102,7 @@ class NoisePSD:
         if loglog: plt.loglog()
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
+        plt.title(f"noise from records of length {len(self.frequencies)*2-2}")
         axis.figure.tight_layout()
 
 

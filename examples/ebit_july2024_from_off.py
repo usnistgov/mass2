@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.17"
+__generated_with = "0.8.0"
 app = marimo.App(width="medium", app_title="ebit moss example")
 
 
@@ -225,12 +225,12 @@ def __(data3, dropdown_ch, mass, pl):
 
 
 @app.cell
-def __(data4, mo, pl, plt):
+def __(data4, moss, pl):
     result = data4.ch0.linefit(
         "AlKAlpha", "energy_filtValue_dc_pc", use_expr=pl.col("state_label") == "START"
     )
     result.plotm()
-    mo.mpl.interactive(plt.gcf())
+    moss.show()
     return result,
 
 
@@ -295,9 +295,9 @@ def __(data4, multifit):
 
 
 @app.cell
-def __(data5, dropdown_ch, mo, plt):
+def __(data5, dropdown_ch, moss):
     data5.channels[int(dropdown_ch.value)].step_plot(-1)
-    mo.mpl.interactive(plt.gcf())
+    moss.show()
     return
 
 

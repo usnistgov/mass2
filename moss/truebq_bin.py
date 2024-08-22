@@ -50,6 +50,7 @@ class TriggerResult:
         df = pl.DataFrame({"trig_inds":self.trig_inds})
         trig_inds_plot = df.filter(pl.col("trig_inds").is_between(Noffset, N)).to_series().to_numpy()
         plt.plot(((trig_inds_plot-Noffset)/decimate)*x_axis_scale, filter_out[trig_inds_plot-Noffset], "o", label="trig_inds")
+        plt.title(f"{self.data_source.description}, trigger result debug plot")
         plt.legend()
         if x_axis_time_s:
             plt.xlabel(f"time with arb offset / s")
@@ -77,9 +78,9 @@ class TriggerResult:
                                         nsamples=npre+npost,
                                         inds = self.trig_inds)
         if invert:
-            df = pl.DataFrame({"pulse":pulses*-1})
+            df = pl.DataFrame({"pulse":pulses*-1, "framecount":self.trig_inds})
         else:
-            df = pl.DataFrame({"pulse":pulses})
+            df = pl.DataFrame({"pulse":pulses, "framecount":self.trig_inds})
         ch_header = moss.ChannelHeader(self.data_source.description,
                                        self.data_source.channel_number,
                                        self.data_source.frametime_s,
@@ -105,7 +106,7 @@ class TrueBqBin:
     def load(cls, bin_path):
         bin_path = Path(bin_path)
         channel_number = int(str(bin_path.parent)[-1])
-        desc = str(bin_path.parent.parent)
+        desc = str(bin_path.parent.parent.stem)
         header_np = np.memmap(bin_path, dtype=header_dtype, mode="r", offset=0, shape=1)
         sample_rate_hz = header_np["sample_rate_hz"][0]
         header_df = pl.from_numpy(header_np)
@@ -227,7 +228,8 @@ def get_noise_trigger_inds(pulse_trigger_inds, n_dead_samples_after_previous_pul
 def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_samples, bin_path, verbose=True):
     import hashlib
     bin_full_path = Path(bin_path).absolute()
-    to_hash_str = str(filter_in)+str(threshold)+str(limit_samples)+str(bin_full_path) 
+    file_size = bin_full_path.stat().st_size
+    to_hash_str = str(filter_in)+str(threshold)+str(limit_samples)+str(bin_full_path)+str(file_size)
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_trigger_cache.npy"
     cache_dir_path = bin_full_path.parent/"_truebq_bin_cache"

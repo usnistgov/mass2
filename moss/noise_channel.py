@@ -11,7 +11,7 @@ class NoiseChannel:
     header_df: pl.DataFrame | pl.LazyFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
 
-    @functools.cache
+    # @functools.cache
     def calc_max_excursion(
         self, trace_col_name="pulse", n_limit=10000, excursion_nsigma=5
     ):
@@ -25,7 +25,7 @@ class NoiseChannel:
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
-    @functools.cache
+    # @functools.cache
     def spectrum(
         self,
         trace_col_name="pulse",
