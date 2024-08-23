@@ -4,8 +4,10 @@ import polars as pl
 import dill
 import marimo as mo
 
-def show():
-    return mo.mpl.interactive(plt.gcf())
+def show(fig=None):
+    if fig is None:
+        fig = plt.gcf()
+    return mo.mpl.interactive(fig)
 
 def pickle_object(obj, filename):
     with open(filename, 'wb') as file:

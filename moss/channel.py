@@ -42,6 +42,35 @@ class Channel:
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
 
+    def mo_stepplots(self):
+        import marimo as mo
+        desc_ind = {step.description:i for i, step in enumerate(self.steps)}
+        first_non_summarize_step = self.steps[0]
+        for step in self.steps:
+            if isinstance(step, moss.SummarizeStep):
+                continue
+            first_non_summarize_step = step
+            break
+        mo_ui = mo.ui.dropdown(desc_ind, 
+                               value=first_non_summarize_step.description,
+                               label=f"choose step for ch {self.header.ch_num}")
+        def show():
+            return self._mo_stepplots_explicit(mo_ui)
+        def step_ind():
+            return mo_ui.value
+        mo_ui.show = show
+        mo_ui.step_ind = step_ind
+        return mo_ui
+    
+    def _mo_stepplots_explicit(self, mo_ui):
+        import marimo as mo
+        step_ind = mo_ui.step_ind()
+        self.step_plot(step_ind)
+        fig = plt.gcf()
+        return mo.vstack([mo_ui,
+                          moss.show(fig)])
+
+
     def get_step(self, index):
         if index < 0:
             # normalize the index to a positive index

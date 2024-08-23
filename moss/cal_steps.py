@@ -15,7 +15,9 @@ class CalStep:
     good_expr: pl.Expr
     use_expr: pl.Expr
 
-
+    @property
+    def description(self):
+        return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
 
 @dataclass(frozen=True)
