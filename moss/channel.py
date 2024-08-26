@@ -89,12 +89,16 @@ class Channel:
     def plot_hist(self, col, bin_edges, axis=None):
         return moss.misc.plot_hist_of_series(self.df[col], bin_edges, axis)
     
-    def plot_scatter(self, x_col, y_col, color_col=None, use_expr=True, skip_none=True, ax=None):
+    def plot_scatter(self, x_col, y_col, color_col=None, use_expr=True, use_good_expr=True, skip_none=True, ax=None):
         if ax is None:
             fig = plt.figure()
             ax = plt.gca()
         plt.sca(ax) # set current axis so I can use plt api
-        df_small = (self.df.lazy().filter(self.good_expr).filter(use_expr).select(x_col, y_col, color_col).collect())
+        if use_good_expr:
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr=use_expr
+        df_small = (self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect())
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
                 continue
@@ -358,7 +362,9 @@ class Channel:
         dhi=50,
         binsize=0.5,
     ):
-        model = mass.get_model(line, has_linear_background=False, has_tails=False)
+        model = mass.get_model(line, 
+                               has_linear_background=has_linear_background, 
+                               has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = (

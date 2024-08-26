@@ -62,10 +62,9 @@ class TriggerResult:
                            n_record_samples, max_noise_triggers=200):
         noise_trigger_inds = get_noise_trigger_inds(self.trig_inds, n_dead_samples_after_pulse_trigger, 
                            n_record_samples, max_noise_triggers)
-        pulses = gather_pulse_from_inds(self.data_source.data, npre=0, 
+        pulses, _ = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=0, 
                                         nsamples=n_record_samples, 
                                         inds=noise_trigger_inds)
-        assert pulses.shape[1] == n_record_samples
         df = pl.DataFrame({"pulse":pulses})
         noise = moss.NoiseChannel(df, 
                                   header_df=self.data_source.header_df,
@@ -74,13 +73,13 @@ class TriggerResult:
     
     def to_channel(self, noise_n_dead_samples_after_pulse_trigger, npre, npost, invert=False):
         noise = self.get_noise(noise_n_dead_samples_after_pulse_trigger, npre+npost, max_noise_triggers=1000)
-        pulses = gather_pulse_from_inds(self.data_source.data, npre=npre,
+        pulses, used_pulse_inds = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre,
                                         nsamples=npre+npost,
                                         inds = self.trig_inds)
         if invert:
-            df = pl.DataFrame({"pulse":pulses*-1, "framecount":self.trig_inds})
+            df = pl.DataFrame({"pulse":pulses*-1, "framecount":used_pulse_inds})
         else:
-            df = pl.DataFrame({"pulse":pulses, "framecount":self.trig_inds})
+            df = pl.DataFrame({"pulse":pulses, "framecount":used_pulse_inds})
         ch_header = moss.ChannelHeader(self.data_source.description,
                                        self.data_source.channel_number,
                                        self.data_source.frametime_s,
@@ -173,11 +172,37 @@ def fasttrig_filter_trigger(data, filter_in, threshold):
         j+=1
     return np.array(inds)
 
-def gather_pulse_from_inds(data, npre, nsamples, inds):
-    pulses = np.zeros((len(inds), nsamples))
-    for i, ind in enumerate(inds):
-        pulses[i,:] = data[ind-npre:ind+nsamples-npre]
-    return pulses
+def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
+    inds = inds[inds>nsamples] # ensure all inds inbounds
+    inds = inds[inds<(len(data)-nsamples)] # ensure all inds inbounds
+    offsets = inds - npre # shift by npre to start at correct offset
+    pulses = np.zeros((len(offsets), nsamples),dtype=np.int16)
+    for i, offset in enumerate(offsets):
+        pulses[i,:] = data[offset:offset+nsamples]
+    return pulses, offsets
+
+def gather_pulses_from_inds_pyarrow_share_memory(data, npre, nsamples, inds):
+    import pyarrow as pa
+    inds = inds[inds>nsamples] # ensure all inds inbounds
+    inds = inds[inds<(len(data)-nsamples)] # ensure all inds inbounds
+    offsets = inds - npre # shift by npre to start at correct offset
+    pool = pa.default_memory_pool()
+    allocated_before = pool.bytes_allocated()
+    # LargeListViewArray uses 64bit offets
+    pulses = pa.LargeListViewArray(offsets = inds-inds, 
+                                   sizes = [nsamples]*len(inds), # i can't find a constructor that takes offsets and a fixed size
+                                   values = data,
+                                   pool = pool)
+    allocation_increase = pool.bytes_allocated()-allocated_before
+    # ensure memory is shared
+    # 1. address to pyarrow buffer is the same as address to the numpy array
+    assert(pulses.buffers()[4].address==data.ctypes.data)
+    # 2. offsets in the pyarrow ListArray match our offsets
+    assert all(pulses.offsets == inds)
+    # 3. not many bytes allocated
+    # could be made more precise by knowing size of data type in bytes
+    assert allocation_increase<(len(data)/2)
+    return pulses, offsets
 
 def filter_and_residual_rms(data, chosen_filter, avg_pulse, trig_inds, npre, nsamples, polarity):
     filt_value = np.zeros(len(trig_inds))
@@ -228,8 +253,8 @@ def get_noise_trigger_inds(pulse_trigger_inds, n_dead_samples_after_previous_pul
 def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_samples, bin_path, verbose=True):
     import hashlib
     bin_full_path = Path(bin_path).absolute()
-    file_size = bin_full_path.stat().st_size
-    to_hash_str = str(filter_in)+str(threshold)+str(limit_samples)+str(bin_full_path)+str(file_size)
+    actual_n_samples = min(len(data), limit_samples)
+    to_hash_str = str(filter_in)+str(threshold)+str(actual_n_samples)+str(bin_full_path)
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_trigger_cache.npy"
     cache_dir_path = bin_full_path.parent/"_truebq_bin_cache"
@@ -242,7 +267,7 @@ def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_sample
     except FileNotFoundError:
         if verbose:
             print(f"cache miss for {file_path}")
-        data_trunc = data[:limit_samples]
+        data_trunc = data[:actual_n_samples]
         trig_inds = fasttrig_filter_trigger(data_trunc, filter_in, threshold)
         np.save(file_path, trig_inds)        
     return trig_inds
