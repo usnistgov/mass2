@@ -119,7 +119,7 @@ class Channel:
     def rough_gain_cal(
         self, line_names, uncalibrated_col, calibrated_col, ph_smoothing_fwhm,
         use_expr=True
-    ):
+    ) -> "Channel":
         # this is meant to filter the data, then select down to the columsn we need, then materialize them, all without copying our pulse records again
         uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         peak_ph_vals, _peak_heights = mass.algorithms.find_local_maxima(
@@ -157,7 +157,7 @@ class Channel:
         self, line_names, uncalibrated_col, calibrated_col, 
         ph_smoothing_fwhm, n_extra=3,
         use_expr=True
-    ):
+    ) -> "Channel":
         step = moss.RoughCalibrationStep.learn_combinatoric(self, line_names, 
                                              uncalibrated_col=uncalibrated_col,
                                              calibrated_col=calibrated_col,
@@ -174,14 +174,14 @@ class Channel:
     min_gain_fraction_at_ph_30k: float=0.25,
     fwhm_pulse_height_units: float=75,
     n_extra_peaks: int=10,
-    acceptable_rms_residual_e: float=10):
+    acceptable_rms_residual_e: float=10) -> "Channel":
         step = moss.RoughCalibrationStep.learn_3peak(self, line_names, uncalibrated_col, calibrated_col,
                                                      use_expr, max_fractional_energy_error_3rd_assignment,
                                                      min_gain_fraction_at_ph_30k, fwhm_pulse_height_units, n_extra_peaks, 
                                                      acceptable_rms_residual_e)
         return self.with_step(step)
 
-    def with_step(self, step):
+    def with_step(self, step) -> "Channel":
         t_start = time.time()
         df2 = step.calc_from_df(self.df)
         elapsed_s = time.time() - t_start
@@ -196,13 +196,13 @@ class Channel:
         )
         return ch2
     
-    def with_steps(self, steps):
+    def with_steps(self, steps) -> "Channel":
         ch2 = self
         for step in steps:
             ch2 = ch2.with_step(step)
         return ch2
 
-    def with_good_expr(self, good_expr, replace=False):
+    def with_good_expr(self, good_expr, replace=False) -> "Channel":
         if replace:
             good_expr = good_expr
         else:
@@ -220,7 +220,7 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
-    def with_good_expr_pretrig_mean_and_postpeak_deriv(self, replace=False):
+    def with_good_expr_pretrig_mean_and_postpeak_deriv(self, replace=False) -> "Channel":
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=20
         )
@@ -232,7 +232,7 @@ class Channel:
         )
         return self.with_good_expr(good_expr, replace)
     
-    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True):
+    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -251,7 +251,7 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
     
-    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True):
+    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -274,7 +274,7 @@ class Channel:
     def typical_peak_ind(self, col="pulse"):
         return int(np.median(self.df.limit(100)[col].to_numpy().argmax(axis=1)))
 
-    def summarize_pulses(self, col="pulse"):
+    def summarize_pulses(self, col="pulse") -> "Channel":
         step = SummarizeStep(
             inputs=[col],
             output="many",
@@ -295,7 +295,7 @@ class Channel:
         peak_x_col="5lagx",
         f_3db=25e3,
         use_expr=True,
-    ):
+    ) -> "Channel":
         avg_pulse = (
             self.df.lazy()
             .filter(self.good_expr)
@@ -341,7 +341,7 @@ class Channel:
         uncorrected_col="5lagy",
         corrected_col=None,
         use_expr=True,
-    ):
+    ) -> "Channel":
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
         step = DriftCorrectStep.learn(ch=self,
@@ -406,7 +406,7 @@ class Channel:
 
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False):
+    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False) -> "Channel":
         if noise_path is None:
             noise_channel = None
         else:
@@ -418,7 +418,7 @@ class Channel:
         return channel
     
     @classmethod
-    def from_off(cls, off):
+    def from_off(cls, off) -> "Channel":
         import os
 
         df = pl.from_numpy(off._mmap)
@@ -444,11 +444,17 @@ class Channel:
         channel = cls(df, header)
         return channel
     
-    def with_experiment_state_df(self, df_es):
-        df2 = self.df.join_asof(df_es, on="timestamp", strategy="backward")
+    def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel": 
+        if not self.df["timestamp"].is_sorted():
+            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
+            print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
+            print("This is likely a BUG in DASTARD.")
+        else:    
+            df = self.df
+        df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_replacement_df(self, df2):
+    def with_replacement_df(self, df2) -> "Channel":
         return Channel(
                 df=df2,
                 header=self.header,
@@ -458,7 +464,7 @@ class Channel:
                 steps=self.steps,
             ) 
     
-    def with_columns(self, df2):
+    def with_columns(self, df2) -> "Channel":
         df3 = self.df.with_columns(df2)
         return self.with_replacement_df(df3)
     
@@ -466,7 +472,7 @@ class Channel:
     def multifit_quadratic_gain_cal(
         self, multifit: moss.MultiFit, previous_cal_step_index, 
         calibrated_col, use_expr=True
-    ):
+    ) -> "Channel":
         step = moss.MultiFitQuadraticGainCalStep.learn(self, multifit_spec=multifit,
                                              previous_cal_step_index=previous_cal_step_index,
                                              calibrated_col=calibrated_col,
@@ -474,7 +480,7 @@ class Channel:
         return self.with_step(step)
     
     def multifit_mass_cal(self, multifit: moss.MultiFit, 
-                            previous_cal_step_index, calibrated_col, use_expr=True):
+                            previous_cal_step_index, calibrated_col, use_expr=True) -> "Channel":
         step = moss.MultiFitMassCalibrationStep.learn(self, multifit_spec=multifit,
                                             previous_cal_step_index=previous_cal_step_index,
                                              calibrated_col=calibrated_col,
@@ -482,7 +488,7 @@ class Channel:
         return self.with_step(step)
 
     
-    def concat_df(self, df):
+    def concat_df(self, df) -> "Channel":
         ch2 = moss.Channel(pl.concat([self.df, df]),
                         self.header,
                         self.noise,
@@ -491,13 +497,13 @@ class Channel:
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
     
-    def concat_ch(self, ch):
+    def concat_ch(self, ch) -> "Channel":
         ch2 = self.concat_df(ch.df)
         return ch2
     
     def phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col, line_names,
                                           previous_cal_step_index, corrected_col=None,
-                                          use_expr=True):
+                                          use_expr=True) -> "Channel":
         if corrected_col is None:
             corrected_col=uncorrected_col+"_pc"
         step = moss.phase_correct.phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col,

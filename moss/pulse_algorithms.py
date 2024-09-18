@@ -9,7 +9,7 @@ result_dtype = np.dtype([
     ('pulse_average', np.float32),
     ('pulse_rms', np.float32),
     ('promptness', np.float32),
-    ('rise_times', np.float32),
+    ('rise_time', np.float32),
     ('postpeak_deriv', np.float32),
     ('peak_index', np.uint16),
     ('peak_value', np.uint16),
@@ -126,9 +126,9 @@ def summarize_data_numba(
             k += 1
 
         if high_value > low_value:
-            results['rise_times'][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
+            results['rise_time'][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
         else:
-            results['rise_times'][j] = timebase
+            results['rise_time'][j] = timebase
 
         f0, f1, f3, f4 = 2, 1, -1, -2
         s0, s1, s2, s3 = pulse[peak_samplenumber], pulse[peak_samplenumber + 1], pulse[peak_samplenumber + 2], pulse[peak_samplenumber + 3]

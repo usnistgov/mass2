@@ -125,4 +125,10 @@ class LJHFile():
             df = df.select(pl.exclude("posix_usec"))
         header_df = pl.DataFrame(self.header_dict)
         return df, header_df
+    
+    def write_truncated_ljh(self, filename, nPulses):
+        with open(filename, "wb") as f:
+            f.write(self.header_str)
+            for i in range(nPulses):
+                f.write(self._mmap[i].tobytes())
 
