@@ -148,7 +148,8 @@ def __(data3, moss, np):
 
 @app.cell
 def __(data3, dropdown_ch, moss, pl):
-    _result = data3.channels[dropdown_ch.value].linefit(600, col="energy_5lagy_dc", dlo=20,dhi=20, 
+    _result = data3.channels[dropdown_ch.value].linefit(600, col="energy_5lagy_dc", dlo=20,dhi=20,
+                                                        binsize=0.25,
                                 use_expr=(pl.col("state_label")=="SCAN3").and_(pl.col("5lagx").is_between(-1,-0.4)))
     _result.plotm()
     moss.show()
@@ -245,91 +246,11 @@ def __(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
     _baseline_energies = _df["energy_5lagy_dc"].to_numpy()
     fig_=plt.hist(_baseline_energies, np.arange(-4,4,0.25))
     _fwhm_baseline = np.std(_baseline_energies)*2.35
-    plt.title(f"{_fwhm_baseline=:.2f}  {_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
+    plt.title(f"ch={dropdown_ch.value} {_fwhm_baseline=:.2f}  \n{_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
     plt.xlabel("energy / eV")
     moss.show()
 
     return calstep, fig_, gain
-
-
-@app.cell
-def __(calstep, moss, np, plt):
-    n_highlight=10
-    pfresult = calstep.pfresult
-    assignment_result = calstep.assignment_result
-    self = pfresult
-    inds_prominence = self.inds_sorted_by_prominence()[:n_highlight]
-    inds_peak_height = self.inds_sorted_by_peak_height()[:n_highlight]
-    plt.figure()
-    ax=plt.gca()
-    plt.plot(pfresult.bin_centers, pfresult.smoothed_counts)
-    ax.plot(self.bin_centers[self.local_maxima_inds],
-           self.smoothed_counts[self.local_maxima_inds],".",
-           label="peaks")
-    ax.plot(self.bin_centers[self.local_minima_inds],
-           self.smoothed_counts[self.local_minima_inds],".",
-           label="mins")
-    plt.yscale("log")
-    if assignment_result is not None:
-        inds_assigned = np.searchsorted(self.bin_centers, assignment_result.ph_assigned)
-        inds_unassigned = np.searchsorted(self.bin_centers, assignment_result.ph_unassigned())
-        bin_centers_assigned = self.bin_centers[inds_assigned]
-        bin_centers_unassigned = self.bin_centers[inds_unassigned]
-        smoothed_counts_assigned = self.smoothed_counts[inds_assigned]
-        smoothed_counts_unassigned = self.smoothed_counts[inds_unassigned]
-        ax.plot(bin_centers_assigned, smoothed_counts_assigned,"o",label="assigned")
-        ax.plot(bin_centers_unassigned, smoothed_counts_unassigned,"o",label="unassigned")
-        # for name, x, y in zip(assignment_result.names_target, bin_centers_assigned, smoothed_counts_assigned):
-        #     ax.annotate(str(name), (x,y), rotation=30)
-        for i in range(len(self.local_maxima_inds)):
-            lmi = self.local_maxima_inds[i]
-            bc = self.bin_centers[lmi]
-            prom = self.prominence()[i]
-            sc = self.smoothed_counts[lmi]
-            ax.annotate(f"{prom:.2f}", (bc, sc), rotation=30)
-        ax.set_title(f"SmoothedLocalMaximaResult rms_residual={assignment_result.rms_residual:.2f} eV")
-
-    moss.show()
-    return (
-        assignment_result,
-        ax,
-        bc,
-        bin_centers_assigned,
-        bin_centers_unassigned,
-        i,
-        inds_assigned,
-        inds_peak_height,
-        inds_prominence,
-        inds_unassigned,
-        lmi,
-        n_highlight,
-        pfresult,
-        prom,
-        sc,
-        self,
-        smoothed_counts_assigned,
-        smoothed_counts_unassigned,
-    )
-
-
-@app.cell
-def __(pfresult):
-    pfresult.local_maxima_inds
-    return
-
-
-@app.cell
-def __(pfresult):
-    pfresult.local_minima_inds
-    return
-
-
-@app.cell
-def __(pfresult):
-    # define prominence as the height relative to the nearest minima
-    # we require a minimum before and after each maximum
-    prominence = [2*pfresult.local_maxima_inds[i]-pfresult.local_minima_inds[i]-pfresult.local_minima_inds[i+1] for i in range(len(pfresult.local_maxima_inds))]
-    return prominence,
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.8.0"
+__generated_with = "0.8.17"
 app = marimo.App(width="medium", app_title="ebit moss example")
 
 
@@ -145,7 +145,7 @@ def __(data3, label_lines, line_names, pl):
                 calibrated_col="energy_filtValue_dc_pc",
                 ph_smoothing_fwhm=50,
                 use_expr=pl.col("state_label") == "START",
-                n_extra=6,
+                n_extra=7,
             ))
     return data4,
 

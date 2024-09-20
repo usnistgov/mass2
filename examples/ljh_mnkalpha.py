@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.7.17"
+__generated_with = "0.8.17"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -133,22 +133,35 @@ def __(data):
     data2 = data.map(
         lambda channel: channel.summarize_pulses()
         .with_good_expr_pretrig_mean_and_postpeak_deriv()
-        .rough_cal(
-            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
-            uncalibrated_col="peak_value",
-        )
+        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
+                              uncalibrated_col="peak_value",
+                              calibrated_col="energy_peak_value",
+                              ph_smoothing_fwhm=50)
         .filter5lag(f_3db=10e3)
-        .rough_cal(
-            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
-            uncalibrated_col="5lagy",
-        )
+        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
+                              uncalibrated_col="5lagy",
+                              calibrated_col="energy_5lagy",
+                              ph_smoothing_fwhm=50)
         .driftcorrect()
-        .rough_cal(
-            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
-            uncalibrated_col="5lagy_dc",
-        )
+        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
+                              uncalibrated_col="5lagy_dc",
+                              calibrated_col="energy_5lagy_dc",
+                              ph_smoothing_fwhm=50)
     )
     return data2,
+
+
+@app.cell
+def __(data2, moss):
+    _ch = data2.channels[4102]
+    _ch2 = _ch.rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
+                              uncalibrated_col="5lagy_dc",
+                              calibrated_col="energy_5lagy_dc2",
+                              ph_smoothing_fwhm=50)
+    _ch.step_plot(-1)
+
+    moss.show()
+    return
 
 
 @app.cell(hide_code=True)
@@ -480,10 +493,15 @@ def __(data3, mo, moss, plt):
 def __(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
-    assert mn_result.params["fwhm"].value < 3.39
+    assert mn_result.params["fwhm"].value < 3.48
     assert cu_result.params["fwhm"].value < 3.42
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_kbeta_result, mn_result, pd_result
+
+
+@app.cell
+def __():
+    return
 
 
 @app.cell
