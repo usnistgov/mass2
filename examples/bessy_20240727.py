@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.8.15"
+__generated_with = "0.8.17"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -84,8 +84,8 @@ def __(data3, moss):
 
 
 @app.cell
-def __(data2, moss):
-    data2.ch0.plot_scatter("pulse_rms", "pulse_average", color_col="state_label")
+def __(data3, moss):
+    data3.ch0.plot_scatter("energy_5lagy_dc", "5lagy_dc", color_col="state_label")
     moss.show()
     return
 
@@ -147,27 +147,27 @@ def __(data3, moss, np):
 
 
 @app.cell
-def __(data3, moss, pl):
-    _result = data3.ch0.linefit(600, col="energy_5lagy_dc", dlo=20,dhi=20, 
-                                use_expr=(pl.col("state_label")=="SCAN3").and_(pl.col("rise_time").is_between(1e-5,8.2e-5)))
+def __(data3, dropdown_ch, moss, pl):
+    _result = data3.channels[dropdown_ch.value].linefit(600, col="energy_5lagy_dc", dlo=20,dhi=20, 
+                                use_expr=(pl.col("state_label")=="SCAN3").and_(pl.col("5lagx").is_between(-1,-0.4)))
     _result.plotm()
     moss.show()
     return
 
 
 @app.cell
-def __(data3, moss, pl, plt):
-    data3.ch0.plot_scatter("5lagx", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
+def __(data3, dropdown_ch, moss, pl, plt):
+    data3.channels[dropdown_ch.value].plot_scatter("5lagx", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
     plt.grid()
     plt.ylim(595,605)
-    plt.xlim(-1,1)
+    plt.xlim(-1.5,1)
     moss.show()
     return
 
 
 @app.cell
-def __(data3, moss, pl, plt):
-    data3.ch0.plot_scatter("rise_time", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
+def __(data3, dropdown_ch, moss, pl, plt):
+    data3.channels[dropdown_ch.value].plot_scatter("rise_time", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
     plt.grid()
     plt.ylim(595,605)
     moss.show()
@@ -175,8 +175,8 @@ def __(data3, moss, pl, plt):
 
 
 @app.cell
-def __(data3, moss, pl, plt):
-    data3.ch0.plot_scatter("pretrig_mean", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
+def __(data3, dropdown_ch, moss, pl, plt):
+    data3.channels[dropdown_ch.value].plot_scatter("pretrig_mean", "energy_5lagy_dc", use_expr=pl.col("state_label")=="SCAN3")
     plt.ylim(595,605)
     plt.grid()
     moss.show()
@@ -218,13 +218,118 @@ def __(data3, dropdown_ch, dropdown_step, mo, moss):
     return
 
 
-@app.cell(disabled=True)
-def __(data3, moss):
-    ljh4219 = moss.ljhfiles.LJHFile(data3.ch0.header.df["Filename"][0])
-    ljh4219.write_truncated_ljh(data3.ch0.header.df["Filename"][0]+"trunc", 100000)
-    ljh4220 = moss.ljhfiles.LJHFile(data3.channels[4220].header.df["Filename"][0])
-    ljh4220.write_truncated_ljh(data3.channels[4220].header.df["Filename"][0]+"trunc", 100000)
-    return ljh4219, ljh4220
+@app.cell
+def __(data3, dropdown_ch):
+    # use this filter to calculate baseline resolution
+    _ch=data3.channels[dropdown_ch.value]
+    _df = _ch.noise.df
+    for step in _ch.steps:
+        _df = step.calc_from_df(_df)
+    df_baseline = _df
+    df_baseline
+    return df_baseline, step
+
+
+@app.cell
+def __(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
+    def gain(e):
+        _ch=data3.channels[dropdown_ch.value]
+        calstep = _ch.steps[4]
+        ph = calstep.energy2ph(e)
+        gain = ph/e
+        return gain
+        
+    _ch=data3.channels[dropdown_ch.value]
+    calstep = _ch.steps[4]
+    _df = df_baseline.filter(pl.col("5lagx").is_between(-3,3))
+    _baseline_energies = _df["energy_5lagy_dc"].to_numpy()
+    fig_=plt.hist(_baseline_energies, np.arange(-4,4,0.25))
+    _fwhm_baseline = np.std(_baseline_energies)*2.35
+    plt.title(f"{_fwhm_baseline=:.2f}  {_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
+    plt.xlabel("energy / eV")
+    moss.show()
+
+    return calstep, fig_, gain
+
+
+@app.cell
+def __(calstep, moss, np, plt):
+    n_highlight=10
+    pfresult = calstep.pfresult
+    assignment_result = calstep.assignment_result
+    self = pfresult
+    inds_prominence = self.inds_sorted_by_prominence()[:n_highlight]
+    inds_peak_height = self.inds_sorted_by_peak_height()[:n_highlight]
+    plt.figure()
+    ax=plt.gca()
+    plt.plot(pfresult.bin_centers, pfresult.smoothed_counts)
+    ax.plot(self.bin_centers[self.local_maxima_inds],
+           self.smoothed_counts[self.local_maxima_inds],".",
+           label="peaks")
+    ax.plot(self.bin_centers[self.local_minima_inds],
+           self.smoothed_counts[self.local_minima_inds],".",
+           label="mins")
+    plt.yscale("log")
+    if assignment_result is not None:
+        inds_assigned = np.searchsorted(self.bin_centers, assignment_result.ph_assigned)
+        inds_unassigned = np.searchsorted(self.bin_centers, assignment_result.ph_unassigned())
+        bin_centers_assigned = self.bin_centers[inds_assigned]
+        bin_centers_unassigned = self.bin_centers[inds_unassigned]
+        smoothed_counts_assigned = self.smoothed_counts[inds_assigned]
+        smoothed_counts_unassigned = self.smoothed_counts[inds_unassigned]
+        ax.plot(bin_centers_assigned, smoothed_counts_assigned,"o",label="assigned")
+        ax.plot(bin_centers_unassigned, smoothed_counts_unassigned,"o",label="unassigned")
+        # for name, x, y in zip(assignment_result.names_target, bin_centers_assigned, smoothed_counts_assigned):
+        #     ax.annotate(str(name), (x,y), rotation=30)
+        for i in range(len(self.local_maxima_inds)):
+            lmi = self.local_maxima_inds[i]
+            bc = self.bin_centers[lmi]
+            prom = self.prominence()[i]
+            sc = self.smoothed_counts[lmi]
+            ax.annotate(f"{prom:.2f}", (bc, sc), rotation=30)
+        ax.set_title(f"SmoothedLocalMaximaResult rms_residual={assignment_result.rms_residual:.2f} eV")
+
+    moss.show()
+    return (
+        assignment_result,
+        ax,
+        bc,
+        bin_centers_assigned,
+        bin_centers_unassigned,
+        i,
+        inds_assigned,
+        inds_peak_height,
+        inds_prominence,
+        inds_unassigned,
+        lmi,
+        n_highlight,
+        pfresult,
+        prom,
+        sc,
+        self,
+        smoothed_counts_assigned,
+        smoothed_counts_unassigned,
+    )
+
+
+@app.cell
+def __(pfresult):
+    pfresult.local_maxima_inds
+    return
+
+
+@app.cell
+def __(pfresult):
+    pfresult.local_minima_inds
+    return
+
+
+@app.cell
+def __(pfresult):
+    # define prominence as the height relative to the nearest minima
+    # we require a minimum before and after each maximum
+    prominence = [2*pfresult.local_maxima_inds[i]-pfresult.local_minima_inds[i]-pfresult.local_minima_inds[i+1] for i in range(len(pfresult.local_maxima_inds))]
+    return prominence,
 
 
 if __name__ == "__main__":

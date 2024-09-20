@@ -41,48 +41,52 @@ class AutoCorrelation:
         axis.set_xlabel("Lag Time (s)")
         axis.figure.tight_layout()
 
-def calc_psd(data: ndarray, dt: float, window: None=None) -> ndarray:
-        """Process a data segment of length 2m using the window function
-        given.  window can be None (square window), a callable taking the
-        length and returning a sequence, or a sequence."""
-        ntraces, m2 = data.shape
-        data = data - np.mean(data, axis=0) # don't use -= here in case input array is read only
-        if np.isnan(data).any():
-            raise ValueError("data contains NaN")
-        if window is None:
-            wksp = data
-            sum_window = m2
-        else:
-            try:
-                w = window(m2)
-            except TypeError:
-                w = np.array(window)
-            wksp = w * data
-            sum_window = (w**2).sum()
+def psd_2d(Nt: ndarray, dt: float) -> ndarray:
+    # Nt is size (n,m) with m records of length n
+    (n, m) = Nt.shape
+    df = 1 / n / dt  # the frequency bin spacing of the rfft
+    # take the absolute value of the rfft of each record, then average all records
+    Nabs = np.mean(np.abs(np.fft.rfft(Nt, axis=0)), axis=1)
+    # PSD = 2*Nabs^2/n/df
+    # the 2 accounts for the power that would be in the negative frequency bins, due to use of rfft
+    # n comes from parseval's theorm
+    # df normalizes binsize since rfft doesn't know the bin size
+    psd = 2 * Nabs**2 / n / df
+    # Handle the DC component and Nyquist frequency differently (no factor of 2)
+    psd[0] /= 2  # DC component
+    if n % 2 == 0:  # If even number of samples
+        psd[-1] /= 2  # Nyquist frequency
+    return psd
 
-        scale_factor = 2. / (sum_window * m2)
-        scale_factor *= dt * m2
-        wksp = np.fft.rfft(wksp, axis=1)
+def calc_autocorrelation_vec(data: ndarray) -> ndarray:
+    ntraces, nsamples = data.shape
+    ac = np.zeros(nsamples, dtype=float)
 
-        # The first line adds 2x too much to the first/last bins.
-        ps = np.abs(wksp)**2
-        specsum = scale_factor * np.sum(ps, axis=0)
-        return specsum / ntraces
+    for i in range(ntraces):
+        pulse = data[i,:]
+        pulse = pulse - pulse.mean() # don't use -= here in case input array is read only
+        ac += np.correlate(pulse, pulse, 'full')[nsamples - 1:]
 
+    ac /= ntraces
+    return ac
 
 def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 def noise_psd(data: ndarray, dt: float, window: None=None) -> "NoisePSD":
-    psd = calc_psd(data, dt, window) 
+    assert window is None, "windowing not implemented"
+    psd = psd_2d(data.T, dt) 
     nbins = len(psd)
+    autocorr_vec = calc_autocorrelation_vec(data)
     frequencies = calc_psd_frequencies(nbins, dt)
-    return NoisePSD(psd,
-                         frequencies)
+    return NoisePSD(psd=psd,
+                    autocorr_vec=autocorr_vec,
+                    frequencies=frequencies)
 
 @dataclass
 class NoisePSD:
     psd: np.ndarray
+    autocorr_vec: np.ndarray
     frequencies: np.ndarray
     
 

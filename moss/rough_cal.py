@@ -179,6 +179,7 @@ class SmoothedLocalMaximaResult:
     counts: np.ndarray
     smoothed_counts: np.ndarray
     local_maxima_inds: np.ndarray # inds into bin_centers
+    local_minima_inds: np.ndarray # inds into bin_centers
 
     def inds_sorted_by_peak_height(self) -> ndarray:
         return self.local_maxima_inds[np.argsort(-self.peak_height())]
@@ -196,8 +197,15 @@ class SmoothedLocalMaximaResult:
         return self.smoothed_counts[self.local_maxima_inds]
 
     def prominence(self) -> ndarray:
-        peak_height = self.peak_height()
-        return np.diff(peak_height, prepend=0)-np.diff(peak_height,append=0)
+        assert len(self.local_minima_inds) == len(self.local_maxima_inds)+1, "peakfind_local_maxima_of_smoothed_hist must ensure this "
+        prominence = np.zeros_like(self.local_maxima_inds, dtype=float64)
+        for i in range(len(self.local_maxima_inds)):
+            sc_max = self.smoothed_counts[self.local_maxima_inds[i]]
+            sc_min_before = self.smoothed_counts[self.local_minima_inds[i]]
+            sc_min_after = self.smoothed_counts[self.local_minima_inds[i+1]]
+            prominence[i] = (2*sc_max - sc_min_before - sc_min_after)/2
+        assert np.all(prominence>=0), "prominence should be non-negative"
+        return prominence
 
     def plot(self, assignment_result: Optional[BestAssignmentPfitGainResult]=None, n_highlight: int=10, plot_counts: bool=False, ax: Optional[Axes]=None) -> Axes:
         if ax is None:
@@ -270,15 +278,31 @@ def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edge
     return smoothed_counts, bin_edges, counts
 
 def local_maxima(y: ndarray) -> ndarray:
-    flag = (y[1:-1] > y[:-2]) & (y[1:-1] > y[2:])
-    local_maxima_inds = np.nonzero(flag)[0]
-    return local_maxima_inds
+    local_maxima_inds = []
+    local_minima_inds = []
+    increasing = False
+    for i in range(len(y)-1):
+        if increasing and (y[i+1] < y[i]):
+            local_maxima_inds.append(i)
+            increasing = False
+        if not increasing and (y[i+1] > y[i]):
+            local_minima_inds.append(i)
+            increasing = True
+    #increasing starts false, so we always start with a miniumum
+    return np.array(local_maxima_inds), np.array(local_minima_inds)
 
 def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: Optional[ndarray]=None) -> SmoothedLocalMaximaResult:
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bin_edges)    
-    local_maxima_inds = local_maxima(smoothed_counts)
-    return SmoothedLocalMaximaResult(fwhm_pulse_height_units,bin_centers, counts, smoothed_counts, local_maxima_inds)
+    local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
+    # require a minimum before and after a maximum (the first check is redundant with behavior of local_maxima)
+    if local_maxima_inds[0] < local_minima_inds[0]:
+        local_maxima_inds = local_maxima_inds[1:]
+    if local_maxima_inds[-1] > local_minima_inds[-1]:    
+        local_maxima_inds = local_maxima_inds[:-1]
+    return SmoothedLocalMaximaResult(fwhm_pulse_height_units,bin_centers, 
+                                     counts, smoothed_counts, local_maxima_inds,
+                                     local_minima_inds)
 
 def find_local_maxima(pulse_heights, gaussian_fwhm):
     """Smears each pulse by a gaussian of gaussian_fhwm and finds local maxima,
@@ -330,6 +354,9 @@ def rank_assignments(ph, e):
     y = y0+(y1-y0)*x_m_x0_over_x1_m_x0
     y_expected = e[1:-1]
     rms_e_residual = moss.misc.root_mean_squared(y-y_expected, axis=1)
+    # prefer negative slopes for gain
+    gain_first = ph[0]/e[0]
+    gain_last = ph[-1]/e[-1]
     return rms_e_residual, pha
 
 def find_optimal_assignment(ph, e):

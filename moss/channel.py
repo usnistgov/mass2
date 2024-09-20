@@ -310,8 +310,11 @@ class Channel:
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter5lag = moss.fourier_filter(
             avg_signal=avg_pulse[2:-2],
+            n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
+            noise_autocorr_vec=spectrum5lag.autocorr_vec,
             dt=self.header.frametime_s,
+            fmax=None, # not exposed in the API
             f_3db=f_3db,
         )
         step = Filter5LagStep(
