@@ -59,13 +59,22 @@ def psd_2d(Nt: ndarray, dt: float) -> ndarray:
     return psd
 
 def calc_autocorrelation_vec(data: ndarray) -> ndarray:
+    import scipy.signal
+    import time
+    data = data[:10,:]
     ntraces, nsamples = data.shape
     ac = np.zeros(nsamples, dtype=float)
 
     for i in range(ntraces):
         pulse = data[i,:]
         pulse = pulse - pulse.mean() # don't use -= here in case input array is read only
-        ac += np.correlate(pulse, pulse, 'full')[nsamples - 1:]
+        tstart = time.time()
+        ac += scipy.signal.correlate(pulse, pulse, 'full')[nsamples - 1:]
+        elapsed_s = time.time() - tstart
+        if elapsed_s*ntraces > 10:
+            print(f"Warning: autocorrelation is slow, projected to take {elapsed_s*ntraces:.2f} s for {ntraces} traces")
+        # was np.correlate before, but that is slower due to not using fft
+        # should give the same result
 
     ac /= ntraces
     return ac

@@ -10,6 +10,7 @@ import numpy as np
 import time
 import mass
 
+
 @dataclass(frozen=True)
 class ChannelHeader:
     description: str  # filename or date/run number, etc

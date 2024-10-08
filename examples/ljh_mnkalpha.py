@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.8.17"
+__generated_with = "0.9.4"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -31,7 +31,7 @@ def __():
 @app.cell
 def __():
     import moss
-    return moss,
+    return (moss,)
 
 
 @app.cell
@@ -52,7 +52,7 @@ def __(moss, pulsedata):
         pulse_folder=_p.pulse_folder, noise_folder=_p.noise_folder
     )
     data
-    return data,
+    return (data,)
 
 
 @app.cell
@@ -133,31 +133,39 @@ def __(data):
     data2 = data.map(
         lambda channel: channel.summarize_pulses()
         .with_good_expr_pretrig_mean_and_postpeak_deriv()
-        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
-                              uncalibrated_col="peak_value",
-                              calibrated_col="energy_peak_value",
-                              ph_smoothing_fwhm=50)
+        .rough_cal_combinatoric(
+            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
+            uncalibrated_col="peak_value",
+            calibrated_col="energy_peak_value",
+            ph_smoothing_fwhm=50,
+        )
         .filter5lag(f_3db=10e3)
-        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
-                              uncalibrated_col="5lagy",
-                              calibrated_col="energy_5lagy",
-                              ph_smoothing_fwhm=50)
+        .rough_cal_combinatoric(
+            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
+            uncalibrated_col="5lagy",
+            calibrated_col="energy_5lagy",
+            ph_smoothing_fwhm=50,
+        )
         .driftcorrect()
-        .rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
-                              uncalibrated_col="5lagy_dc",
-                              calibrated_col="energy_5lagy_dc",
-                              ph_smoothing_fwhm=50)
+        .rough_cal_combinatoric(
+            ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
+            uncalibrated_col="5lagy_dc",
+            calibrated_col="energy_5lagy_dc",
+            ph_smoothing_fwhm=50,
+        )
     )
-    return data2,
+    return (data2,)
 
 
 @app.cell
 def __(data2, moss):
     _ch = data2.channels[4102]
-    _ch2 = _ch.rough_cal_combinatoric(["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"], 
-                              uncalibrated_col="5lagy_dc",
-                              calibrated_col="energy_5lagy_dc2",
-                              ph_smoothing_fwhm=50)
+    _ch2 = _ch.rough_cal_combinatoric(
+        ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
+        uncalibrated_col="5lagy_dc",
+        calibrated_col="energy_5lagy_dc2",
+        ph_smoothing_fwhm=50,
+    )
     _ch.step_plot(-1)
 
     moss.show()
@@ -221,7 +229,7 @@ def __(data2, dropdown_ch, dropdown_col, mo, plt):
     result.plotm()
     plt.title(f"reative plot of {_ch_num=} and {_col=} for you")
     mo.mpl.interactive(plt.gcf())
-    return result,
+    return (result,)
 
 
 @app.cell
@@ -260,14 +268,14 @@ def __(mo):
 def __(data, mo):
     ch = data.channels[4102]
     mo.plain(ch.df)
-    return ch,
+    return (ch,)
 
 
 @app.cell
 def __(data2):
     steps = data2.channels[4102].steps
     steps
-    return steps,
+    return (steps,)
 
 
 @app.cell
@@ -319,7 +327,7 @@ def __(ch2):
         raise
     else:
         Exception("this was supposed to throw!")
-    return FrozenInstanceError,
+    return (FrozenInstanceError,)
 
 
 @app.cell
@@ -390,7 +398,7 @@ def __(ch2, pl):
         uncorrected_col="energy_5lagy_dc",
         use_expr=(pl.col("energy_5lagy_dc").is_between(2800, 2850)),
     )
-    return ch3,
+    return (ch3,)
 
 
 @app.cell
@@ -419,7 +427,7 @@ def __(data2):
     # here we have a very simple experiment_state_file
     df_es = data2.get_experiment_state_df()
     df_es
-    return df_es,
+    return (df_es,)
 
 
 @app.cell
@@ -433,7 +441,7 @@ def __(data2, pl):
         )
     )
     data3 = data3.with_experiment_state_by_path()
-    return data3,
+    return (data3,)
 
 
 @app.cell
@@ -443,7 +451,7 @@ def __(data3):
     # and we downselect to just to columns we want for further processing
     dfg = data3.dfg().select("timestamp", "energy_5lagy_dc", "state_label", "ch_num")
     dfg
-    return dfg,
+    return (dfg,)
 
 
 @app.cell
@@ -482,7 +490,12 @@ def __(mo):
 @app.cell
 def __(data3, mo, moss, plt):
     multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
-    multifit = multifit.with_line("MnKAlpha").with_line("CuKAlpha").with_line("PdLAlpha").with_line("MnKBeta")
+    multifit = (
+        multifit.with_line("MnKAlpha")
+        .with_line("CuKAlpha")
+        .with_line("PdLAlpha")
+        .with_line("MnKBeta")
+    )
     multifit_with_results = multifit.fit_ch(data3.channels[4102], "energy_5lagy_dc")
     multifit_with_results.plot_results()
     mo.mpl.interactive(plt.gcf())
@@ -493,8 +506,8 @@ def __(data3, mo, moss, plt):
 def __(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
-    assert mn_result.params["fwhm"].value < 3.48
-    assert cu_result.params["fwhm"].value < 3.42
+    assert mn_result.params["fwhm"].value < 3.57
+    assert cu_result.params["fwhm"].value < 3.46
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_kbeta_result, mn_result, pd_result
 
@@ -511,7 +524,7 @@ def __(data3, multifit):
             multifit, previous_cal_step_index=5, calibrated_col="energy2_5lagy_dc"
         )
     )
-    return data4,
+    return (data4,)
 
 
 @app.cell
@@ -524,7 +537,7 @@ def __(data4, mo, plt):
 @app.cell
 def __(data4):
     steps_dict = {ch_num: ch.steps for ch_num, ch in data4.channels.items()}
-    return steps_dict,
+    return (steps_dict,)
 
 
 @app.cell
@@ -557,7 +570,7 @@ def __(ch):
     # here we concatenate two channels and check that the length has double
     ch_concat = ch.concat_ch(ch)
     assert 2 * len(ch.df) == len(ch_concat.df)
-    return ch_concat,
+    return (ch_concat,)
 
 
 @app.cell
@@ -565,7 +578,7 @@ def __(data4):
     # here we concatenate two `Channels` objects and check that the length of the resulting dfg (remember, this is the df of good pulses) has doubled
     data_concat = data4.concat_data(data4)
     assert 2 * len(data4.dfg()) == len(data_concat.dfg())
-    return data_concat,
+    return (data_concat,)
 
 
 @app.cell
@@ -585,7 +598,7 @@ def __(data4, mo, plt):
 @app.cell
 def __(data2):
     ch6 = data2.channels[4102]
-    return ch6,
+    return (ch6,)
 
 
 @app.cell

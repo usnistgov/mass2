@@ -62,7 +62,7 @@ class TriggerResult:
                            n_record_samples, max_noise_triggers=200):
         noise_trigger_inds = get_noise_trigger_inds(self.trig_inds, n_dead_samples_after_pulse_trigger, 
                            n_record_samples, max_noise_triggers)
-        pulses, _ = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=0, 
+        pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=0, 
                                         nsamples=n_record_samples, 
                                         inds=noise_trigger_inds)
         df = pl.DataFrame({"pulse":pulses})
@@ -71,15 +71,15 @@ class TriggerResult:
                                   frametime_s=self.data_source.frametime_s)
         return noise
     
-    def to_channel(self, noise_n_dead_samples_after_pulse_trigger, npre, npost, invert=False):
+    def to_channel_copy_to_memory(self, noise_n_dead_samples_after_pulse_trigger, npre, npost, invert=False):
         noise = self.get_noise(noise_n_dead_samples_after_pulse_trigger, npre+npost, max_noise_triggers=1000)
-        pulses, used_pulse_inds = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre,
+        pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre,
                                         nsamples=npre+npost,
                                         inds = self.trig_inds)
         if invert:
-            df = pl.DataFrame({"pulse":pulses*-1, "framecount":used_pulse_inds})
+            df = pl.DataFrame({"pulse":pulses*-1, "framecount":self.trig_inds})
         else:
-            df = pl.DataFrame({"pulse":pulses, "framecount":used_pulse_inds})
+            df = pl.DataFrame({"pulse":pulses, "framecount":self.trig_inds})
         ch_header = moss.ChannelHeader(self.data_source.description,
                                        self.data_source.channel_number,
                                        self.data_source.frametime_s,
@@ -87,6 +87,73 @@ class TriggerResult:
                                        npre+npost,
                                        self.data_source.header_df)
         ch = moss.Channel(df, ch_header, noise)
+        return ch
+    
+    def to_channel_mmap(self, noise_n_dead_samples_after_pulse_trigger, 
+                        npre, npost, invert=False, verbose=True):
+        noise = self.get_noise(noise_n_dead_samples_after_pulse_trigger, npre+npost, max_noise_triggers=1000)
+        pulses = gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(self.data_source.data, 
+                                        npre=npre,
+                                        nsamples=npre+npost,
+                                        inds = self.trig_inds,
+                                        bin_path=self.data_source.bin_path,
+                                        verbose=verbose)
+        if invert:
+            df = pl.DataFrame({"pulse":pulses*-1, "framecount":self.trig_inds})
+        else:
+            df = pl.DataFrame({"pulse":pulses, "framecount":self.trig_inds})
+        ch_header = moss.ChannelHeader(self.data_source.description,
+                                       self.data_source.channel_number,
+                                       self.data_source.frametime_s,
+                                       npre, 
+                                       npre+npost,
+                                       self.data_source.header_df)
+        ch = moss.Channel(df, ch_header, noise)
+        return ch
+    
+    def to_summarized_channel(self, noise_n_dead_samples_after_pulse_trigger, 
+                              npre, npost, peak_index=None,
+                              pretrigger_ignore=0,
+                              invert=False):
+        batch_size = 10000
+        n = len(self.trig_inds)
+        n_batches = np.ceil(n/batch_size).astype(int)
+        dfs = []
+        for i_batch in range(n_batches):
+            i0 = i_batch*batch_size
+            i1 = min((i_batch+1)*batch_size, n)
+            inds = self.trig_inds[i0:i1]
+            pulses, used_pulse_inds = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, 
+                                                                                npre=npre,
+                                                                                nsamples=npre+npost,
+                                                                                inds = self.trig_inds)
+            if invert:
+                pulses = pulses*-1
+            if i_batch == 0 and peak_index is None: # learn peak index
+                peak_index = int(np.median(np.amax(pulses, axis=1)))
+            assert isinstance(peak_index, int), "peak_index must be an integer"
+            print(f"summarizing batch {i_batch=}/{n_batches=}")
+            print(f"{self.data_source.frametime_s=}, {peak_index=}, {pretrigger_ignore=}, {npre=}")
+            summary_np = moss.pulse_algorithms.summarize_data_numba(
+                    pulses,
+                    self.data_source.frametime_s,
+                    peak_samplenumber=peak_index,
+                    pretrigger_ignore=pretrigger_ignore,
+                    nPresamples=npre,
+                )
+            df_batch = pl.from_numpy(summary_np)
+            df_batch = df_batch.with_columns(pl.DataFrame({"framecount":used_pulse_inds+npre}))
+            dfs.append(df_batch)
+        df = pl.concat(dfs)
+        ch_header = moss.ChannelHeader(self.data_source.description,
+                                       self.data_source.channel_number,
+                                       self.data_source.frametime_s,
+                                       npre, 
+                                       npre+npost,
+                                       self.data_source.header_df)
+        noise = self.get_noise(noise_n_dead_samples_after_pulse_trigger, npre+npost, max_noise_triggers=1000)
+        pulse_storage = moss.PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre+npost)
+        ch = moss.Channel(df, ch_header, noise, pulse_storage=pulse_storage)
         return ch
 
 
@@ -173,15 +240,34 @@ def fasttrig_filter_trigger(data, filter_in, threshold):
     return np.array(inds)
 
 def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
-    inds = inds[inds>nsamples] # ensure all inds inbounds
+    inds = inds[inds>npre] # ensure all inds inbounds
     inds = inds[inds<(len(data)-nsamples)] # ensure all inds inbounds
     offsets = inds - npre # shift by npre to start at correct offset
     pulses = np.zeros((len(offsets), nsamples),dtype=np.int16)
     for i, offset in enumerate(offsets):
         pulses[i,:] = data[offset:offset+nsamples]
-    return pulses, offsets
+    return pulses
+
+def gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=".mmapped_pulses.npy"):
+    inds = inds[inds>npre] # ensure all inds inbounds
+    inds = inds[inds<(len(data)-nsamples)] # ensure all inds inbounds
+    offsets = inds - npre # shift by npre to start at correct offset
+    pulses = np.memmap(filename, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
+    for i, offset in enumerate(offsets):
+        pulses[i,:] = data[offset:offset+nsamples]
+    pulses.flush()
+    # re-open the mmap to ensure it is read-only
+    del pulses
+    pulses = np.memmap(filename, dtype=np.int16, mode="r", shape=(len(offsets), nsamples))
+    return pulses
 
 def gather_pulses_from_inds_pyarrow_share_memory(data, npre, nsamples, inds):
+    # pyarrow supports the +vL datatype, which is defined by three arrays
+    # one is the data source, the 2nd is the offsets, and the 3rd is the lengths
+    # however polars does not support this datatype, so this is exploratory
+    # code looking at the feature
+    # https://arrow.apache.org/docs/python/data.html#listview-arrays
+    # this would allow us to keep our records in the dataframe at little/no cost
     import pyarrow as pa
     inds = inds[inds>nsamples] # ensure all inds inbounds
     inds = inds[inds<(len(data)-nsamples)] # ensure all inds inbounds
@@ -271,3 +357,29 @@ def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_sample
         trig_inds = fasttrig_filter_trigger(data_trunc, filter_in, threshold)
         np.save(file_path, trig_inds)        
     return trig_inds
+
+def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(data, 
+                                                             npre, 
+                                                             nsamples, 
+                                                             inds, 
+                                                             bin_path,
+                                                             verbose=True):
+    import hashlib
+    bin_full_path = Path(bin_path).absolute()
+    inds_hash = hashlib.sha256(inds.tobytes()).hexdigest()
+    to_hash_str = str(npre)+str(nsamples)+str(bin_full_path)+inds_hash
+    key = hashlib.sha256(to_hash_str.encode()).hexdigest()
+    fname = f".{key}.truebq_pulse_cache.npy"
+    cache_dir_path = bin_full_path.parent/"_truebq_bin_cache"
+    cache_dir_path.mkdir(exist_ok=True)
+    file_path = cache_dir_path/fname
+    inds = np.array(inds)
+    try:
+        pulses = np.memmap(file_path, dtype=np.int16, mode="r", shape=(len(inds), nsamples))
+        if verbose: 
+            print(f"cache hit for {file_path}")
+    except FileNotFoundError:
+        pulses = gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=file_path)  
+    return pulses
+
+

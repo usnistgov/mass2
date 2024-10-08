@@ -185,16 +185,16 @@ def __(data3, dropdown_ch, moss, pl, plt):
 
 
 @app.cell
-def __(data3, moss):
-    data3.ch0.noise.spectrum().plot()
+def __(data3, dropdown_ch, moss):
+    data3.channels[dropdown_ch.value].noise.spectrum().plot()
     moss.show()
     return
 
 
 @app.cell
-def __(data3, moss, plt):
-    plt.plot(data3.ch0.noise.df["pulse"][:10].to_numpy().T)
-    plt.plot(data3.ch0.df["pulse"][:10].to_numpy().T)
+def __(data3, dropdown_ch, moss, plt):
+    plt.plot(data3.channels[dropdown_ch.value].noise.df["pulse"][:10].to_numpy().T)
+    plt.plot(data3.channels[dropdown_ch.value].df["pulse"][:10].to_numpy().T)
     plt.title("first 10 noise traces and first 10 pulse traces")
     moss.show()
     return
@@ -239,7 +239,7 @@ def __(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
         ph = calstep.energy2ph(e)
         gain = ph/e
         return gain
-        
+
     _ch=data3.channels[dropdown_ch.value]
     calstep = _ch.steps[4]
     _df = df_baseline.filter(pl.col("5lagx").is_between(-3,3))
@@ -249,7 +249,6 @@ def __(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
     plt.title(f"ch={dropdown_ch.value} {_fwhm_baseline=:.2f}  \n{_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
     plt.xlabel("energy / eV")
     moss.show()
-
     return calstep, fig_, gain
 
 
