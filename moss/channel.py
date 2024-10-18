@@ -9,6 +9,7 @@ from typing import Optional
 import numpy as np
 import time
 import mass
+import lmfit
 
 
 @dataclass(frozen=True)
@@ -365,6 +366,7 @@ class Channel:
         dlo=50,
         dhi=50,
         binsize=0.5,
+        params_update = lmfit.Parameters()
     ):
         model = mass.get_model(line, 
                                has_linear_background=has_linear_background, 
@@ -377,6 +379,9 @@ class Channel:
         bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
+        print(f"before update {params=}")
+        params = params.update(params_update)
+        print(f"after update {params=}")
         result = model.fit(
             counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3
         )
