@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.8.17"
+__generated_with = "0.9.10"
 app = marimo.App(width="medium", app_title="ebit moss example")
 
 
@@ -37,7 +37,7 @@ def __(moss, off_paths):
         off_paths, "ebit_20240723_0000"
     ).with_experiment_state_by_path()
     data
-    return data,
+    return (data,)
 
 
 @app.cell
@@ -57,12 +57,18 @@ def __(off_paths, pl):
 
 @app.cell
 def __(Path, mo, np, off_paths, plt):
-    external_trigger_file_path = Path(off_paths[0]).parent/"20240723_run0000_external_trigger.bin"
-    with open(external_trigger_file_path,"rb") as _f:
-        _header_line = _f.readline() # read the one header line before opening the binary data
+    external_trigger_file_path = (
+        Path(off_paths[0]).parent / "20240723_run0000_external_trigger.bin"
+    )
+    with open(external_trigger_file_path, "rb") as _f:
+        _header_line = (
+            _f.readline()
+        )  # read the one header line before opening the binary data
         external_trigger_subframe_count = np.fromfile(_f, "int64")
-    plt.plot(np.diff(external_trigger_subframe_count)[:10000],".")
-    plt.title(f"{external_trigger_file_path.stem} is messed up unfortunatley\nthere should only be one value of difference")
+    plt.plot(np.diff(external_trigger_subframe_count)[:10000], ".")
+    plt.title(
+        f"{external_trigger_file_path.stem} is messed up unfortunatley\nthere should only be one value of difference"
+    )
     plt.xlabel("external trigger index")
     plt.ylabel("different in subframe counts between external triggers")
     mo.mpl.interactive(plt.gcf())
@@ -84,7 +90,7 @@ def __(data, pl, timing_df):
 
 
     with_timing_df(data.ch0).df
-    return with_timing_df,
+    return (with_timing_df,)
 
 
 @app.cell
@@ -101,25 +107,25 @@ def __(data, pl):
         .driftcorrect(indicator_col="pretriggerMean", uncorrected_col="filtValue")
     )
     data2.channels[1].df.limit(1000)
-    return data2,
+    return (data2,)
 
 
 @app.cell
 def __(data2, pl, with_timing_df):
-    line_names =             [
-                    "ZnLAlpha",
-                    "AlKAlpha",
-                    "ZnKAlpha",
-                    "ScKAlpha",
-                    "MnKAlpha",
-                    # "ClKAlpha", # Cl not visible?
-                    "VKAlpha",
-                    "CoKAlpha",
-                    "GeLAlpha",
-                    "GeKAlpha",
-                    "GeKBeta",
-                    "CuKAlpha",
-                ]
+    line_names = [
+        "ZnLAlpha",
+        "AlKAlpha",
+        "ZnKAlpha",
+        "ScKAlpha",
+        "MnKAlpha",
+        # "ClKAlpha", # Cl not visible?
+        "VKAlpha",
+        "CoKAlpha",
+        "GeLAlpha",
+        "GeKAlpha",
+        "GeKBeta",
+        "CuKAlpha",
+    ]
     data3 = data2.map(
         lambda ch: with_timing_df(
             ch.rough_cal_combinatoric(
@@ -132,22 +138,31 @@ def __(data2, pl, with_timing_df):
             )
         )
     )
-    data3 = data3.map(lambda ch: ch.phase_correct_mass_specific_lines(indicator_col="filtPhase", uncorrected_col="filtValue_dc",line_names=line_names, previous_cal_step_index=-1))
+    data3 = data3.map(
+        lambda ch: ch.phase_correct_mass_specific_lines(
+            indicator_col="filtPhase",
+            uncorrected_col="filtValue_dc",
+            line_names=line_names,
+            previous_cal_step_index=-1,
+        )
+    )
     return data3, line_names
 
 
 @app.cell
 def __(data3, label_lines, line_names, pl):
     data4 = data3.map(lambda ch: label_lines(ch, -2))
-    data4 = data4.map(lambda ch: ch.rough_cal_combinatoric(
-                line_names,
-                uncalibrated_col="filtValue_dc_pc",
-                calibrated_col="energy_filtValue_dc_pc",
-                ph_smoothing_fwhm=50,
-                use_expr=pl.col("state_label") == "START",
-                n_extra=7,
-            ))
-    return data4,
+    data4 = data4.map(
+        lambda ch: ch.rough_cal_combinatoric(
+            line_names,
+            uncalibrated_col="filtValue_dc_pc",
+            calibrated_col="energy_filtValue_dc_pc",
+            ph_smoothing_fwhm=50,
+            use_expr=pl.col("state_label") == "START",
+            n_extra=7,
+        )
+    )
+    return (data4,)
 
 
 @app.cell
@@ -166,7 +181,7 @@ def __(data3, mo):
 
     Show rough_cal results for {dropdown_ch}. You can change it via this dropdown.
     """)
-    return dropdown_ch,
+    return (dropdown_ch,)
 
 
 @app.cell
@@ -231,7 +246,7 @@ def __(data4, moss, pl):
     )
     result.plotm()
     moss.show()
-    return result,
+    return (result,)
 
 
 @app.cell
@@ -268,8 +283,7 @@ def __(moss, pl):
         default_bin_size=0.6,
     )
     multifit = (
-        multifit#.with_line("MgKAlpha", dlo=50)
-        .with_line("AlKAlpha")
+        multifit.with_line("AlKAlpha")  # .with_line("MgKAlpha", dlo=50)
         .with_line("ScKAlpha")
         .with_line("VKAlpha")
         .with_line("MnKAlpha")
@@ -281,7 +295,7 @@ def __(moss, pl):
     # mf_result = multifit.fit_ch(data4.channels[int(dropdown_ch.value)], "energy_filtValue_dc_pc")
     # mf_result.plot_results()
     # mo.mpl.interactive(plt.gcf())
-    return multifit,
+    return (multifit,)
 
 
 @app.cell
@@ -291,13 +305,28 @@ def __(data4, multifit):
             multifit, previous_cal_step_index=-1, calibrated_col="energy2_filtValue_dc_pc"
         )
     )
-    return data5,
+    return (data5,)
 
 
 @app.cell
 def __(data5, dropdown_ch, moss):
     data5.channels[int(dropdown_ch.value)].step_plot(-1)
     moss.show()
+    return
+
+
+@app.cell(hide_code=True)
+def __(mo):
+    mo.md(
+        r"""
+        ### TODOS
+        * hunter run on all data again and report any errors
+        * plot rms_residual_energy vs channel number
+        * plot gain spline vs channel
+        * plot filt_value vs area
+        * make a drift at a line plot
+        """
+    )
     return
 
 
