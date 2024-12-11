@@ -66,7 +66,7 @@ def hist_of_series(series, bin_edges):
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
     counts = series.rename("count").hist(
         bin_edges, include_category=False, include_breakpoint=False
-    )[1:-1]
+    )
     return bin_centers, counts.to_numpy().T[0]
 
 def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
@@ -76,7 +76,7 @@ def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
     hist = series.rename("count").hist(
         bin_edges, include_category=False, include_breakpoint=False
-    )[1:-1]
+    )
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")

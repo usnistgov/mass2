@@ -96,7 +96,9 @@ class Channel:
             fig = plt.figure()
             ax = plt.gca()
         plt.sca(ax) # set current axis so I can use plt api
-        if use_good_expr:
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
             filter_expr = self.good_expr.and_(use_expr)
         else:
             filter_expr=use_expr
@@ -311,7 +313,7 @@ class Channel:
         )
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter5lag = moss.fourier_filter(
-            avg_signal=avg_pulse[2:-2],
+            avg_signal=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
             noise_autocorr_vec=spectrum5lag.autocorr_vec,

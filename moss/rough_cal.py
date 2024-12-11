@@ -244,7 +244,8 @@ class SmoothedLocalMaximaResult:
         ax.legend()
         ax.set_xlabel("pulse height")
         ax.set_ylabel("intensity")
-        ax.set_ylim(1/self.fwhm_pulse_height_units, ax.get_ylim()[1])
+        # print(f"{np.amax(self.smoothed_counts)=} {np.amin(self.smoothed_counts)=} ")
+        # ax.set_ylim(1/self.fwhm_pulse_height_units, ax.get_ylim()[1])
 
 
         return ax
@@ -265,6 +266,7 @@ def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edge
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
+    assert len(pulse_heights>10), "not enough pulses"
     if bin_edges is None:
         n = 128 * 1024
         lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
@@ -292,6 +294,7 @@ def local_maxima(y: ndarray) -> ndarray:
     return np.array(local_maxima_inds), np.array(local_minima_inds)
 
 def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: Optional[ndarray]=None) -> SmoothedLocalMaximaResult:
+    assert len(pulse_heights>10), "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bin_edges)    
     local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
@@ -590,6 +593,7 @@ class RoughCalibrationStep(moss.CalStep):
 
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        assert len(uncalibrated)>10, "not enough pulses"
         pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
                                                                          fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = moss.rough_cal.find_optimal_assignment2(

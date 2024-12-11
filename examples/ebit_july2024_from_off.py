@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.9.10"
+__generated_with = "0.9.28"
 app = marimo.App(width="medium", app_title="ebit moss example")
 
 
@@ -315,7 +315,7 @@ def __(data5, dropdown_ch, moss):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def __(mo):
     mo.md(
         r"""
