@@ -2,7 +2,7 @@
 import mass
 import numpy as np
 
-if not "Am241Q" in mass.spectra.keys():
+if "Am241Q" not in mass.spectra.keys():
     mass.addline("Am241", 
                 linetype="Q",
                 material="DES",

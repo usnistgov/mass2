@@ -1,5 +1,4 @@
 import os
-from os import path
 import re
 from typing import List, Iterator, Tuple
 

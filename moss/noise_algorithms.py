@@ -1,6 +1,6 @@
 import numpy as np
 import pylab as plt #type: ignore
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from numpy import ndarray
 from typing import Tuple, Optional
 import matplotlib.pyplot as plt

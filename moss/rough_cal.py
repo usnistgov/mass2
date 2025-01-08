@@ -10,7 +10,7 @@ from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult #type: ignore
 import typing
-from typing import List, Optional, Tuple, Union, Callable
+from typing import List, Optional, Tuple, Union
 import itertools
 
 

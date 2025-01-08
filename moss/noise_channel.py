@@ -1,7 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import polars as pl
-import pylab as plt
-import functools
 import moss
 import numpy as np
 
@@ -43,7 +41,7 @@ class NoiseChannel:
         elif trunc_back > 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:-trunc_back]
         else:
-            raise ValueError(f"trunc_back must be >= 0")
+            raise ValueError("trunc_back must be >= 0")
         return noise_traces_clean2
 
     # @functools.cache

@@ -42,7 +42,7 @@ class FitSpec:
             unit_str="eV",
             attr_str=series.name,
             states_hint=f"{self.use_expr}",
-            cut_hint=f"",
+            cut_hint="",
         )
         return result
     

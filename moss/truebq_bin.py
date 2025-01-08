@@ -4,7 +4,6 @@ import pylab as plt
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
-import numba.typed
 import moss
 
 header_dtype = np.dtype(
@@ -53,7 +52,7 @@ class TriggerResult:
         plt.title(f"{self.data_source.description}, trigger result debug plot")
         plt.legend()
         if x_axis_time_s:
-            plt.xlabel(f"time with arb offset / s")
+            plt.xlabel("time with arb offset / s")
         else:
             plt.xlabel(f"sample number with arb offset after decimation={decimate}")
         plt.ylabel("signal (arb)")
