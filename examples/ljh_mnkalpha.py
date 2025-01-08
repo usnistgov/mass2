@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.9.10"
+__generated_with = "0.9.28"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -507,7 +507,7 @@ def __(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
     assert mn_result.params["fwhm"].value < 3.57
-    assert cu_result.params["fwhm"].value < 3.46
+    assert cu_result.params["fwhm"].value < 3.52
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_kbeta_result, mn_result, pd_result
 

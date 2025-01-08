@@ -75,6 +75,9 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
     """
     files1 = find_ljh_files(folder1)
     files2 = find_ljh_files(folder2)
+    # print(f"in folder {folder1} found {len(files1)} files")
+    # print(f"in folder {folder2} found {len(files2)} files")
+
 
     files1_by_channel = {extract_channel_number(f): f for f in files1}
     files2_by_channel = {extract_channel_number(f): f for f in files2}
@@ -83,11 +86,10 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
     for channel in files1_by_channel:
         if channel in files2_by_channel:
             matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
-            if limit is not None:
-                if len(matching_pairs) == limit:
-                    break
-
-    return matching_pairs
+    # print(f"in match_files_by_channel found {len(matching_pairs)} channel pairs, {limit=}")
+    matching_pairs_limited = matching_pairs[:limit]
+    # print(f"in match_files_by_channel found {len(matching_pairs)=} after limit of {limit=}")
+    return matching_pairs_limited
 
 def experiment_state_path_from_ljh_path(ljh_path):
     # Split the path into directory and filename

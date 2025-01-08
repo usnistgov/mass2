@@ -3,6 +3,7 @@ import pylab as plt
 import polars as pl
 import dill
 import marimo as mo
+from typing import Dict, Any
 
 def show(fig=None):
     if fig is None:
@@ -123,3 +124,15 @@ def launch_examples():
 
 def root_mean_squared(x, axis=None):
     return np.sqrt(np.mean(x**2,axis))
+
+def merge_dicts_ordered_by_keys(dict1: Dict[int, Any], dict2: Dict[int, Any]) -> Dict[int, Any]:
+    # Combine both dictionaries' items (key, value) into a list of tuples
+    combined_items = list(dict1.items()) + list(dict2.items())
+    
+    # Sort the combined list of tuples by key
+    combined_items.sort(key=lambda item: item[0])
+    
+    # Convert the sorted list of tuples back into a dictionary
+    merged_dict: Dict[int, Any] = {key: value for key, value in combined_items}
+    
+    return merged_dict
