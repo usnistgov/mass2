@@ -6,20 +6,15 @@ import polars as pl
 import mass
 
 def fourier_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):
-    mass_filter = mass.optimal_filtering.Filter(avg_signal=avg_signal, 
-                                                n_pretrigger=n_pretrigger, 
-                                                noise_psd=noise_psd, 
-                                                noise_autocorr=noise_autocorr_vec, 
-                                                sample_time=dt)
-    mass_filter.compute(fmax=fmax, f_3db=f_3db)
-    mass_filter.filt_noconst
-    print(f"{mass_filter.variances=}")
-    var = mass_filter.variances["noconst"]
-    v_dv = var**(-.5) / np.sqrt(8 * np.log(2)) 
-    return Filter(filter=mass_filter.filt_noconst, 
-                  v_dv_known_wrong=v_dv, 
+    peak_signal = np.amax(avg_signal)-avg_signal[0]
+    maker = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=noise_psd,
+                             noise_autocorr=noise_autocorr_vec,
+                             sample_time_sec=dt, peak=peak_signal)
+    mass_filter = maker.compute_5lag(fmax=fmax, f_3db=f_3db)
+    return Filter(filter=mass_filter.values, 
+                  v_dv_known_wrong=mass_filter.predicted_v_over_dv, 
                   dt=dt, 
-                  filter_type="noconst")    
+                  filter_type="mass fourier")    
 
 @dataclass(frozen=True)
 class Filter:

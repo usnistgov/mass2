@@ -7,11 +7,13 @@ import collections
 import mass
 import moss
 import joblib
+import traceback
 
 @dataclass(frozen=True)
 class Channels:
-    channels: collections.OrderedDict[int, moss.Channel]
+    channels: dict[int, moss.Channel]
     description: str
+    bad_channels: dict[int, moss.BadChannel] = field(default_factory=dict)
 
     @property
     def ch0(self):
@@ -49,9 +51,9 @@ class Channels:
     ):
         model = mass.get_model(line, has_linear_background=False, has_tails=False)
         pe = model.spect.peak_energy
-        _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
+        bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
-        bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
+        bin_centers, counts = moss.misc.hist_of_series(df_small[col], bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
         result = model.fit(
@@ -66,19 +68,99 @@ class Channels:
             cut_hint="",
         )
         return result
+    
+    def plot_hist(self, col, bin_edges, use_expr=True, axis=None):
+        df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
+        return moss.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
 
-    def map(self, f, allow_throw=True):
-        new_channels = collections.OrderedDict()
+    def plot_hists(self, col, bin_edges, group_by_col, axis=None, 
+    use_expr=None, skip_none=True):
+        """
+        Plots histograms for the given column, grouped by the specified column.
+        
+        Parameters:
+        - col (str): The column name to plot.
+        - bin_edges (array-like): The edges of the bins for the histogram.
+        - group_by_col (str): The column name to group by. This is required.
+        - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+        """
+        if axis is None:
+            fig, ax = plt.subplots()  # Create a new figure if no axis is provided
+        else:
+            ax = axis
+
+
+
+
+        if use_expr is None:
+            df_small = (self.dfg().lazy().
+                        select(col, group_by_col)
+            ).collect().sort(group_by_col,descending=False)
+        else:
+            df_small = (self.dfg().lazy().filter(use_expr).
+                        select(col, group_by_col)
+            ).collect().sort(group_by_col,descending=False)            
+    
+
+        # Plot a histogram for each group
+        for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
+            if group_name is None and skip_none:
+                continue
+            # Get the data for the column to plot
+            values = group_data[col]
+            bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
+            # Plot the histogram for the current group
+            if group_name=="EBIT":
+                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+            else:
+                ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
+            # plt.plot(bin_centers, counts, label=group_name)
+
+        # Customize the plot
+        ax.set_xlabel(str(col))
+        ax.set_ylabel('Frequency')
+        ax.set_title(f"Coadded Histogram of {col} grouped by {group_by_col}")
+        
+        # Add a legend to label the groups
+        ax.legend(title=group_by_col)
+
+        plt.tight_layout()
+
+
+    def map(self, f, allow_throw=False):
+        new_channels = {}
+        new_bad_channels = {}
         for key, channel in self.channels.items():
             try:
                 new_channels[key] = f(channel)
             except KeyboardInterrupt:
                 raise
             except Exception as ex:
+                error_type: type = type(ex)
+                error_message: str = str(ex)
+                backtrace: str = traceback.format_exc()
                 if allow_throw:
                     raise
                 print(f"{key=} {channel=} failed this step")
-        return Channels(new_channels, self.description)
+                print(f"{error_type=}")
+                print(f"{error_message=}")
+                new_bad_channels[key] = channel.as_bad(error_type, error_message, backtrace)
+        new_bad_channels = moss.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
+
+        return Channels(new_channels, self.description,bad_channels=new_bad_channels)
+    
+    def set_bad(self, ch_num, msg, require_ch_num_exists=True):
+        new_channels = {}
+        new_bad_channels = {}
+        if require_ch_num_exists:
+            assert ch_num in self.channels.keys(), f"{ch_num} can't be set bad because it does not exist"
+        for key, channel in self.channels.items():
+            if key == ch_num:
+                new_bad_channels[key] = channel.as_bad(None, msg, None)
+            else:
+                new_channels[key] = channel
+        return Channels(new_channels, self.description,bad_channels=new_bad_channels)
+
 
     def linefit_joblib(self, line, col, prefer="threads", n_jobs=4):
         def work(key):
@@ -102,11 +184,14 @@ class Channels:
 
     @classmethod
     def from_ljh_path_pairs(cls, pulse_noise_pairs, description):
-        _channels = collections.OrderedDict()
+        channels = {}
+        print(f"in from_ljh_path_pairs {len(pulse_noise_pairs)}")
         for pulse_path, noise_path in pulse_noise_pairs:
             channel = moss.Channel.from_ljh(pulse_path, noise_path)
-            _channels[channel.header.ch_num] = channel
-        return cls(_channels, description)
+            assert channel.header.ch_num not in channels.keys()
+            channels[channel.header.ch_num] = channel
+        print(f"in from_ljh_path_pairs {len(channels)=}")
+        return cls(channels, description)
     
     @classmethod
     def from_off_paths(cls, off_paths, description):
@@ -122,12 +207,16 @@ class Channels:
         assert os.path.isdir(pulse_folder),f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
             paths = moss.ljhutil.find_ljh_files(pulse_folder)
-            pairs = ((path, None) for path in paths)
+            pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             pairs = moss.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
-        return cls.from_ljh_path_pairs(pairs, description)
+        print(f"{description}")
+        print(f"in from_ljh_folder has {len(pairs)} pairs")
+        data = cls.from_ljh_path_pairs(pairs, description)
+        print(f"and the Channels obj has {len(data.channels)} pairs")
+        return data
     
     def get_experiment_state_df(self, experiment_state_path=None):
         if experiment_state_path is None:
@@ -155,17 +244,18 @@ class Channels:
         return Channels(ch2s, self.description)    
     
     def with_steps_dict(self, steps_dict):
-        ch2s = {}
-        for ch_num, steps in steps_dict.items():
-            ch = self.channels[ch_num]
-            ch2 = ch.with_steps(steps)
-            ch2s[ch_num] = ch2
-        return Channels(ch2s, self.description+"\nfollowed some steps!!")
+        def load_steps(channel):
+            try:
+                steps = steps_dict[channel.header.ch_num]
+            except:
+                raise Exception("steps dict did not contain steps for this ch_num")
+            return channel.with_steps(steps)
+        return self.map(load_steps)
     
     def concat_data(self, other_data):
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
-        ch_nums = sorted(list(set(self.channels.keys()).union(other_data.channels.keys())))
+        ch_nums = sorted(list(set(self.channels.keys()).intersection(other_data.channels.keys())))
         channels2 = {}
         for ch_num in ch_nums:
             ch = self.channels[ch_num]
@@ -188,5 +278,15 @@ class Channels:
                         n_samples=n_samples, 
                         df=df))
         return Channels(channels, description)
+    
+    def save_steps(self, filename):
+        import pickle
+        steps = {}
+        for channum, ch in self.channels.items():
+            steps[channum] = ch.steps[:]
+        steps
+        with open(filename, "wb") as f:
+            pickle.dump(steps, f)
+        return steps
         
         

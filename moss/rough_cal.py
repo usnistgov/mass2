@@ -244,7 +244,8 @@ class SmoothedLocalMaximaResult:
         ax.legend()
         ax.set_xlabel("pulse height")
         ax.set_ylabel("intensity")
-        ax.set_ylim(1/self.fwhm_pulse_height_units, ax.get_ylim()[1])
+        # print(f"{np.amax(self.smoothed_counts)=} {np.amin(self.smoothed_counts)=} ")
+        # ax.set_ylim(1/self.fwhm_pulse_height_units, ax.get_ylim()[1])
 
 
         return ax
@@ -265,6 +266,7 @@ def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edge
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
+    assert len(pulse_heights>10), "not enough pulses"
     if bin_edges is None:
         n = 128 * 1024
         lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
@@ -292,6 +294,7 @@ def local_maxima(y: ndarray) -> ndarray:
     return np.array(local_maxima_inds), np.array(local_minima_inds)
 
 def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int, bin_edges: Optional[ndarray]=None) -> SmoothedLocalMaximaResult:
+    assert len(pulse_heights>10), "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, step_size = moss.misc.midpoints_and_step_size(bin_edges)    
     local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
@@ -340,6 +343,7 @@ def rank_assignments(ph, e):
     e = np.array(sorted(list(e)))
     ph = np.array(sorted(list(ph)))
     pha = np.array(list(itertools.combinations(ph, len(e))))
+    pha_inds = np.array(list(itertools.combinations(np.arange(len(ph)), len(e))))
     # pha[i,:] is one choice of len(e) values from ph to assign to e
     # we use linear interpolation of the form y = y0 + (y1-y0)*(x-x0)/(x1-x0)
     # on each set of 3 values
@@ -357,7 +361,7 @@ def rank_assignments(ph, e):
     # prefer negative slopes for gain
     gain_first = ph[0]/e[0]
     gain_last = ph[-1]/e[-1]
-    return rms_e_residual, pha
+    return rms_e_residual, pha, pha_inds
 
 def find_optimal_assignment(ph, e):
     # ph is a list of peak heights longer than e
@@ -369,12 +373,75 @@ def find_optimal_assignment(ph, e):
     if len(e) <= 2:
         return 0, np.array(sorted(ph[:len(e)]))
     
-    rms_e_residual, pha = rank_assignments(ph, e)
+    rms_e_residual, pha, pha_inds = rank_assignments(ph, e)
     ind = np.argmin(rms_e_residual)
     return rms_e_residual[ind], pha[ind]
 
+def find_optimal_assignment_height_info(ph, e, line_heights_allowed):
+    # ph is a list of peak heights longer than e
+    # e is a list of known peak energies
+    # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
+    
+    # when given 3 or less energies to match, use the largest peaks in peak order
+    assert len(e) >= 1
+    if len(e) <= 2:
+        return 0, np.array(sorted(ph[:len(e)]))
+    
+    rms_e_residual, pha, pha_inds = rank_assignments(ph, e)
+    best_ind = None
+    best_rms_residual = np.inf
+    print(f"{e=}")
+    for i_assign in range(len(rms_e_residual)):
+        rms_e_candidate = rms_e_residual[i_assign]
+        # pha[i,:] is one choice of len(e) values from ph to assign to e
+        pha_inds_candidate = pha_inds[i_assign,:]
+        if rms_e_candidate > best_rms_residual:
+            continue
+        # check if peaks mathch height info
+        print(f"{pha_inds_candidate=}")
+        print(f"{line_heights_allowed=}")
+        failed_line_height_check = False
+        for j in range(len(e)):
+            if pha_inds_candidate[j] not in line_heights_allowed[j]:
+                failed_line_height_check = True
+                print("not allowed")
+                a = pha_inds_candidate[j]
+                b = line_heights_allowed[j]
+                print(f"{a=} {b=}")
+                break
+        if failed_line_height_check:
+            continue
+        print("is new best!")
+        best_rms_residual = rms_e_candidate
+        best_ind = i_assign
+    if best_ind is None:
+        raise Exception("no assignment found satisfying peak height info")
+    return rms_e_residual[best_ind], pha[best_ind, :]
+
 def find_optimal_assignment2(ph, e, line_names):
     rms_e_residual, pha = find_optimal_assignment(ph, e)
+    gain = pha/e
+    deg = min(len(e)-1,2)
+    if deg == 0:
+        pfit_gain = np.polynomial.Polynomial(gain)
+    else:
+        pfit_gain = np.polynomial.Polynomial.fit(pha, 
+                                                gain, 
+                                                deg=min(len(e)-1,2))
+    result = moss.rough_cal.BestAssignmentPfitGainResult(
+        rms_e_residual,
+        ph_assigned=pha,
+        residual_e=None,
+        assignment_inds=None,
+        pfit_gain=pfit_gain,
+        energy_target=e,
+        names_target=line_names,
+        ph_target=ph,
+    )
+    return result
+
+def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed):
+    rms_e_residual, pha = find_optimal_assignment_height_info(ph, e, line_heights_allowed)
     gain = pha/e
     deg = min(len(e)-1,2)
     if deg == 0:
@@ -590,6 +657,7 @@ class RoughCalibrationStep(moss.CalStep):
 
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        assert len(uncalibrated)>10, "not enough pulses"
         pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
                                                                          fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = moss.rough_cal.find_optimal_assignment2(
@@ -607,6 +675,34 @@ class RoughCalibrationStep(moss.CalStep):
             success=True)
         return step
     
+    @classmethod
+    def learn_combinatoric_height_info(cls, ch: Channel, line_names: List[str], line_heights_allowed: List[List[int]], 
+                                            uncalibrated_col: str, calibrated_col: str, 
+        ph_smoothing_fwhm: int, n_extra: int,
+        use_expr: bool=True
+    ) -> "RoughCalibrationStep":
+        import mass #type: ignore
+
+        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
+        assert len(uncalibrated)>10, "not enough pulses"
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, 
+                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = moss.rough_cal.find_optimal_assignment2_height_info(
+            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names, line_heights_allowed)
+
+
+        step = cls(
+            [uncalibrated_col],
+            [calibrated_col],
+            ch.good_expr,
+            use_expr=use_expr,
+            pfresult=pfresult,
+            assignment_result=assignment_result, 
+            ph2energy=assignment_result.ph2energy,
+            success=True)
+        return step
+
     @classmethod
     def learn_3peak(cls, ch: Channel,
     line_names: list[str | float64],

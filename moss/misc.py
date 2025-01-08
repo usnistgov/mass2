@@ -3,6 +3,7 @@ import pylab as plt
 import polars as pl
 import dill
 import marimo as mo
+from typing import Dict, Any
 
 def show(fig=None):
     if fig is None:
@@ -66,7 +67,7 @@ def hist_of_series(series, bin_edges):
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
     counts = series.rename("count").hist(
         bin_edges, include_category=False, include_breakpoint=False
-    )[1:-1]
+    )
     return bin_centers, counts.to_numpy().T[0]
 
 def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
@@ -76,7 +77,7 @@ def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
     hist = series.rename("count").hist(
         bin_edges, include_category=False, include_breakpoint=False
-    )[1:-1]
+    )
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
@@ -123,3 +124,15 @@ def launch_examples():
 
 def root_mean_squared(x, axis=None):
     return np.sqrt(np.mean(x**2,axis))
+
+def merge_dicts_ordered_by_keys(dict1: Dict[int, Any], dict2: Dict[int, Any]) -> Dict[int, Any]:
+    # Combine both dictionaries' items (key, value) into a list of tuples
+    combined_items = list(dict1.items()) + list(dict2.items())
+    
+    # Sort the combined list of tuples by key
+    combined_items.sort(key=lambda item: item[0])
+    
+    # Convert the sorted list of tuples back into a dictionary
+    merged_dict: Dict[int, Any] = {key: value for key, value in combined_items}
+    
+    return merged_dict

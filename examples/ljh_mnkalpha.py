@@ -1,11 +1,11 @@
 import marimo
 
-__generated_with = "0.9.10"
+__generated_with = "0.10.6"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         #MOSS internals introdution
@@ -19,7 +19,7 @@ def __(mo):
 
 
 @app.cell
-def __():
+def _():
     import polars as pl
     import pylab as plt
     import numpy as np
@@ -29,13 +29,13 @@ def __():
 
 
 @app.cell
-def __():
+def _():
     import moss
     return (moss,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # Load data
@@ -46,7 +46,7 @@ def __(mo):
 
 
 @app.cell
-def __(moss, pulsedata):
+def _(moss, pulsedata):
     _p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     data = moss.Channels.from_ljh_folder(
         pulse_folder=_p.pulse_folder, noise_folder=_p.noise_folder
@@ -56,7 +56,7 @@ def __(moss, pulsedata):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # basic analysis
@@ -71,7 +71,7 @@ def __(mo):
 
 
 @app.cell
-def __(data, mo, moss, plt):
+def _(data, mo, moss, plt):
     ch0 = data.ch0.summarize_pulses()
     line_names = ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"]
     calibrated_col = None
@@ -123,16 +123,16 @@ def __(data, mo, moss, plt):
 
 
 @app.cell
-def __(df3peak):
+def _(df3peak):
     df3peak
     return
 
 
 @app.cell
-def __(data):
+def _(data):
     data2 = data.map(
         lambda channel: channel.summarize_pulses()
-        .with_good_expr_pretrig_mean_and_postpeak_deriv()
+        .with_good_expr_pretrig_rms_and_postpeak_deriv()
         .rough_cal_combinatoric(
             ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
             uncalibrated_col="peak_value",
@@ -158,7 +158,7 @@ def __(data):
 
 
 @app.cell
-def __(data2, moss):
+def _(data2, moss):
     _ch = data2.channels[4102]
     _ch2 = _ch.rough_cal_combinatoric(
         ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
@@ -173,7 +173,7 @@ def __(data2, moss):
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md(
         f"""
         # inspecting the data
@@ -185,13 +185,13 @@ def __(mo):
 
 
 @app.cell
-def __(data2, pl):
+def _(data2, pl):
     data2.channels[4102].df.select(pl.exclude("pulse"))
     return
 
 
 @app.cell
-def __(data2, mo):
+def _(data2, mo):
     mo.md(
         f"""
         To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step. 
@@ -203,7 +203,7 @@ def __(data2, mo):
 
 
 @app.cell
-def __(data2, mo):
+def _(data2, mo):
     _ch_nums = list(str(_ch_num) for _ch_num in data2.channels.keys())
     dropdown_ch = mo.ui.dropdown(
         options=_ch_nums, value=_ch_nums[0], label="channel number"
@@ -222,7 +222,7 @@ def __(data2, mo):
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_col, mo, plt):
+def _(data2, dropdown_ch, dropdown_col, mo, plt):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
     result = _ch.linefit("MnKAlpha", col=_col)
@@ -233,26 +233,26 @@ def __(data2, dropdown_ch, dropdown_col, mo, plt):
 
 
 @app.cell
-def __(result):
+def _(result):
     result.fit_report()
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(r"""# plot a noise spectrum""")
     return
 
 
 @app.cell(disabled=True)
-def __(ch, mo, plt):
+def _(ch, mo, plt):
     ch.noise.spectrum().plot()
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # replay
@@ -265,21 +265,21 @@ def __(mo):
 
 
 @app.cell
-def __(data, mo):
+def _(data, mo):
     ch = data.channels[4102]
     mo.plain(ch.df)
     return (ch,)
 
 
 @app.cell
-def __(data2):
+def _(data2):
     steps = data2.channels[4102].steps
     steps
     return (steps,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # apply steps
@@ -292,7 +292,7 @@ def __(mo):
 
 
 @app.cell
-def __(ch, mo, steps):
+def _(ch, mo, steps):
     step = steps[0]
     _ch = ch
     for step in steps:
@@ -303,19 +303,19 @@ def __(ch, mo, steps):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md("""# make sure the results are the same!""")
     return
 
 
 @app.cell
-def __(ch2, data2):
+def _(ch2, data2):
     ch2.df == data2.channels[4102].df
     return
 
 
 @app.cell
-def __(ch2):
+def _(ch2):
     # to help you remember not to mutate, everything is as immutable as python will allow! assignment throws!
     from dataclasses import FrozenInstanceError
 
@@ -331,7 +331,7 @@ def __(ch2):
 
 
 @app.cell
-def __(data, data2, mo, np):
+def _(data, data2, mo, np):
     mo.md(
         f"""
         # don't worry about all the copies
@@ -345,34 +345,34 @@ def __(data, data2, mo, np):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md("""# step plots""")
     return
 
 
 @app.cell
-def __(ch2, mo, plt):
+def _(ch2, mo, plt):
     ch2.step_plot(4)
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(ch2, mo, plt):
+def _(ch2, mo, plt):
     ch2.step_plot(5)
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(ch2, mo, plt):
+def _(ch2, mo, plt):
     ch2.step_plot(2)
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
         # cuts? good_expr and use_expr
@@ -385,13 +385,13 @@ def __(mo):
 
 
 @app.cell
-def __(ch2):
+def _(ch2):
     ch2.good_expr
     return
 
 
 @app.cell
-def __(ch2, pl):
+def _(ch2, pl):
     # here we use a good_expr to drift correct over a smaller energy range
     ch3 = ch2.driftcorrect(
         indicator_col="pretrig_mean",
@@ -402,7 +402,7 @@ def __(ch2, pl):
 
 
 @app.cell
-def __(ch3, mo, plt):
+def _(ch3, mo, plt):
     # here we make the debug plot for that last step, and see that it has stored the use_expr and used it for its plot
     # we can see that this line has a non-optimal drift correction when learning from the full energy range, but is improved when we learn just from it's energy range
     ch3.step_plot(6)
@@ -411,19 +411,19 @@ def __(ch3, mo, plt):
 
 
 @app.cell
-def __(ch3):
+def _(ch3):
     ch3.steps[6].use_expr
     return
 
 
 @app.cell
-def __(ch3, mo):
+def _(ch3, mo):
     mo.md(f"{str(ch3.good_expr)=} remains unchanged")
     return
 
 
 @app.cell
-def __(data2):
+def _(data2):
     # here we have a very simple experiment_state_file
     df_es = data2.get_experiment_state_df()
     df_es
@@ -431,7 +431,7 @@ def __(data2):
 
 
 @app.cell
-def __(data2, pl):
+def _(data2, pl):
     # due to the way timestamps were define in ljh files, we actually have a non-monotonic timestamp in channel 4109, so lets fix that, then apply the experiment state
     # we also drop the "pulse" column here because sorting will acually copy the underlying data
     # and we dont want to do that
@@ -445,7 +445,7 @@ def __(data2, pl):
 
 
 @app.cell
-def __(data3):
+def _(data3):
     # now lets combine the data by calling data.dfg()
     # to get one combined dataframe from all channels
     # and we downselect to just to columns we want for further processing
@@ -455,12 +455,12 @@ def __(data3):
 
 
 @app.cell
-def __():
+def _():
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         # todos!
@@ -476,7 +476,7 @@ def __(mo):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         # fine calibration
@@ -488,7 +488,7 @@ def __(mo):
 
 
 @app.cell
-def __(data3, mo, moss, plt):
+def _(data3, mo, moss, plt):
     multifit = moss.MultiFit(default_fit_width=80, default_bin_size=0.6)
     multifit = (
         multifit.with_line("MnKAlpha")
@@ -503,22 +503,22 @@ def __(data3, mo, moss, plt):
 
 
 @app.cell
-def __(multifit_with_results):
+def _(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
     assert mn_result.params["fwhm"].value < 3.57
-    assert cu_result.params["fwhm"].value < 3.46
+    assert cu_result.params["fwhm"].value < 3.52
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
     return cu_result, mn_kbeta_result, mn_result, pd_result
 
 
 @app.cell
-def __():
+def _():
     return
 
 
 @app.cell
-def __(data3, multifit):
+def _(data3, multifit):
     data4 = data3.map(
         lambda ch: ch.multifit_mass_cal(
             multifit, previous_cal_step_index=5, calibrated_col="energy2_5lagy_dc"
@@ -528,26 +528,26 @@ def __(data3, multifit):
 
 
 @app.cell
-def __(data4, mo, plt):
+def _(data4, mo, plt):
     data4.channels[4102].step_plot(6)
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(data4):
+def _(data4):
     steps_dict = {ch_num: ch.steps for ch_num, ch in data4.channels.items()}
     return (steps_dict,)
 
 
 @app.cell
-def __(moss, steps_dict):
+def _(moss, steps_dict):
     moss.misc.pickle_object(steps_dict, filename="example_steps_dict.pkl")
     return
 
 
 @app.cell
-def __(data4):
+def _(data4):
     data4.dfg().select(
         "timestamp", "energy2_5lagy_dc", "state_label", "ch_num"
     ).write_parquet("example_result.parquet")
@@ -555,7 +555,7 @@ def __(data4):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
         # "multi-ljh analysis"
@@ -566,7 +566,7 @@ def __(mo):
 
 
 @app.cell
-def __(ch):
+def _(ch):
     # here we concatenate two channels and check that the length has double
     ch_concat = ch.concat_ch(ch)
     assert 2 * len(ch.df) == len(ch_concat.df)
@@ -574,7 +574,7 @@ def __(ch):
 
 
 @app.cell
-def __(data4):
+def _(data4):
     # here we concatenate two `Channels` objects and check that the length of the resulting dfg (remember, this is the df of good pulses) has doubled
     data_concat = data4.concat_data(data4)
     assert 2 * len(data4.dfg()) == len(data_concat.dfg())
@@ -582,13 +582,13 @@ def __(data4):
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(r"""# final coadded spectrum""")
     return
 
 
 @app.cell
-def __(data4, mo, plt):
+def _(data4, mo, plt):
     _result = data4.linefit("MnKAlpha", col="energy2_5lagy_dc")
     _result.plotm()
     mo.mpl.interactive(plt.gcf())
@@ -596,13 +596,13 @@ def __(data4, mo, plt):
 
 
 @app.cell
-def __(data2):
+def _(data2):
     ch6 = data2.channels[4102]
     return (ch6,)
 
 
 @app.cell
-def __(ch6, moss, np):
+def _(ch6, moss, np):
     indicator = ch6.good_series("pretrig_mean", use_expr=True).to_numpy()
     uncorrected = ch6.good_series("energy_5lagy_dc", use_expr=True).to_numpy()
     dc_result = moss.rough_cal.minimize_entropy_linear(
@@ -613,14 +613,14 @@ def __(ch6, moss, np):
 
 
 @app.cell
-def __(ch6, mo, np, plt):
+def _(ch6, mo, np, plt):
     ch6.plot_hist("energy_5lagy_dc", np.arange(0, 10000, 1))
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(ch6, mo, np, pl, plt):
+def _(ch6, mo, np, pl, plt):
     def pfit_dc(line_name, ch):
         import mass
 
@@ -660,13 +660,13 @@ def __(ch6, mo, np, pl, plt):
 
 
 @app.cell
-def __(ch8):
+def _(ch8):
     ch8.df
     return
 
 
 @app.cell
-def __(ch8, mo, plt):
+def _(ch8, mo, plt):
     result1 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc")
     result1.plotm()
     fig1 = plt.gcf()

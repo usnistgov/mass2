@@ -32,6 +32,7 @@ class ChannelHeader:
             df=df,
         )
 
+
 @dataclass(frozen=True)
 class Channel:
     df: pl.DataFrame | pl.LazyFrame = field(repr=False)
@@ -89,14 +90,92 @@ class Channel:
         return step.dbg_plot(df_after, **kwargs)
 
     def plot_hist(self, col, bin_edges, axis=None):
-        return moss.misc.plot_hist_of_series(self.df[col], bin_edges, axis)
+        return moss.misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
     
+    # def plot_hists(self, col, bin_edges, group_by_col, axis=None):
+    #     """
+    #     Plots histograms for the given column, grouped by the specified column.
+        
+    #     Parameters:
+    #     - col (str): The column name to plot.
+    #     - bin_edges (array-like): The edges of the bins for the histogram.
+    #     - group_by_col (str): The column name to group by. This is required.
+    #     - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+    #     """
+    #     if axis is None:
+    #         fig, ax = plt.subplots()  # Create a new figure if no axis is provided
+    #     else:
+    #         ax = axis
+    #     # Group by the specified column and filter using good_expr
+    #     df_grouped = (self.df.filter(self.good_expr)
+    #                 .group_by(group_by_col, maintain_order=True)
+    #                 .agg([pl.col(col).alias(col)])
+    #     )
+        
+    #     # Collect the result to evaluate the lazy expression
+    #     df_grouped_collected = df_grouped.collect()
+
+    def plot_hists(self, col, bin_edges, group_by_col, axis=None, use_good_expr=True, 
+    use_expr=True, skip_none=True):
+        """
+        Plots histograms for the given column, grouped by the specified column.
+        
+        Parameters:
+        - col (str): The column name to plot.
+        - bin_edges (array-like): The edges of the bins for the histogram.
+        - group_by_col (str): The column name to group by. This is required.
+        - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+        """
+        if axis is None:
+            fig, ax = plt.subplots()  # Create a new figure if no axis is provided
+        else:
+            ax = axis
+
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr=use_expr
+
+        # Group by the specified column and filter using good_expr
+        df_small = (self.df.lazy().filter(filter_expr).
+                    select(col, group_by_col)
+        ).collect().sort(group_by_col,descending=False)
+    
+
+        # Plot a histogram for each group
+        for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
+            if group_name is None and skip_none:
+                continue
+            # Get the data for the column to plot
+            values = group_data[col]
+            bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
+            # Plot the histogram for the current group
+            if group_name=="EBIT":
+                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+            else:
+                ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
+            # plt.plot(bin_centers, counts, label=group_name)
+
+        # Customize the plot
+        ax.set_xlabel(str(col))
+        ax.set_ylabel('Frequency')
+        ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
+        
+        # Add a legend to label the groups
+        ax.legend(title=group_by_col)
+
+        plt.tight_layout()
+
     def plot_scatter(self, x_col, y_col, color_col=None, use_expr=True, use_good_expr=True, skip_none=True, ax=None):
         if ax is None:
             fig = plt.figure()
             ax = plt.gca()
         plt.sca(ax) # set current axis so I can use plt api
-        if use_good_expr:
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
             filter_expr = self.good_expr.and_(use_expr)
         else:
             filter_expr=use_expr
@@ -115,7 +194,7 @@ class Channel:
             plt.legend(title=color_col)
         plt.tight_layout()
     
-    def good_series(self, col, use_expr):
+    def good_series(self, col, use_expr=True):
         return moss.good_series(self.df, col, self.good_expr, use_expr)
     
     def rough_gain_cal(
@@ -161,6 +240,20 @@ class Channel:
         use_expr=True
     ) -> "Channel":
         step = moss.RoughCalibrationStep.learn_combinatoric(self, line_names, 
+                                             uncalibrated_col=uncalibrated_col,
+                                             calibrated_col=calibrated_col,
+                                             ph_smoothing_fwhm=ph_smoothing_fwhm,
+                                             n_extra=n_extra,
+                                             use_expr=use_expr)
+        return self.with_step(step)
+    
+    def rough_cal_combinatoric_height_info(
+        self, line_names, line_heights_allowed, uncalibrated_col, calibrated_col, 
+        ph_smoothing_fwhm, n_extra=3,
+        use_expr=True
+    ) -> "Channel":
+        step = moss.RoughCalibrationStep.learn_combinatoric_height_info(self, line_names, 
+                                                            line_heights_allowed,
                                              uncalibrated_col=uncalibrated_col,
                                              calibrated_col=calibrated_col,
                                              ph_smoothing_fwhm=ph_smoothing_fwhm,
@@ -222,17 +315,21 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
-    def with_good_expr_pretrig_mean_and_postpeak_deriv(self, replace=False) -> "Channel":
+    def with_good_expr_pretrig_rms_and_postpeak_deriv(self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False) -> "Channel":
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
-            self.df["postpeak_deriv"].to_numpy(), nsigma=20
+            self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
         )
         max_pretrig_rms = moss.misc.outlier_resistant_nsigma_above_mid(
-            self.df["pretrig_rms"].to_numpy(), nsigma=20
+            self.df["pretrig_rms"].to_numpy(), nsigma=n_sigma_pretrig_rms
         )
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(
             pl.col("pretrig_rms") < max_pretrig_rms
         )
         return self.with_good_expr(good_expr, replace)
+    
+    def with_range_around_median(self, col, range_up, range_down):
+        med = np.median(self.df[col].to_numpy())
+        return self.with_good_expr(pl.col(col).is_between(med-range_down, med+range_up))
     
     def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
@@ -311,7 +408,7 @@ class Channel:
         )
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter5lag = moss.fourier_filter(
-            avg_signal=avg_pulse[2:-2],
+            avg_signal=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
             noise_autocorr_vec=spectrum5lag.autocorr_vec,
@@ -518,3 +615,14 @@ class Channel:
         step = moss.phase_correct.phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col,
                                         corrected_col, previous_cal_step_index, line_names, use_expr)
         return self.with_step(step)
+    
+    def as_bad(self, error_type, error_msg, backtrace):
+        return BadChannel(self, error_type, error_msg, backtrace)
+
+    
+@dataclass(frozen=True)
+class BadChannel:
+    ch: Channel
+    error_type: type
+    error_msg: str
+    backtrace: str
