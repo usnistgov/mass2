@@ -1,6 +1,5 @@
 import moss
-import pulsedata 
-
+import pulsedata
 
 
 def test_to_df():

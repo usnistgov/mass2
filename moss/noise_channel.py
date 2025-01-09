@@ -3,6 +3,7 @@ import polars as pl
 import moss
 import numpy as np
 
+
 @dataclass(frozen=True)
 class NoiseChannel:
     df: pl.DataFrame | pl.LazyFrame  # DO NOT MUTATE THIS!!!
@@ -22,15 +23,15 @@ class NoiseChannel:
         )
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
-    
-    def get_records_2d(self,         
-            trace_col_name="pulse",
-            n_limit=10000,
-            excursion_nsigma=5,
-            trunc_front=0,
-            trunc_back=0):
+
+    def get_records_2d(self,
+                       trace_col_name="pulse",
+                       n_limit=10000,
+                       excursion_nsigma=5,
+                       trunc_front=0,
+                       trunc_back=0):
         df_noise2, max_excursion = self.calc_max_excursion(
-        trace_col_name, n_limit, excursion_nsigma
+            trace_col_name, n_limit, excursion_nsigma
         )
         noise_traces_clean = (
             df_noise2.filter(pl.col("excursion") < max_excursion)["pulse"]
@@ -53,10 +54,9 @@ class NoiseChannel:
         trunc_front=0,
         trunc_back=0,
     ):
-        records = self.get_records_2d( trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
         spectrum = moss.noise_psd(records, dt=self.frametime_s)
         return spectrum
-
 
     def __hash__(self):
         # needed to make functools.cache work

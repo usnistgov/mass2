@@ -1,16 +1,16 @@
 import numpy as np
-import pylab as plt #type: ignore
+import pylab as plt  # type: ignore
 from dataclasses import dataclass
 from numpy import ndarray
 from typing import Tuple, Optional
-import matplotlib.pyplot as plt
+
 
 def calc_autocorrelation(data):
     ntraces, nsamples = data.shape
     ac = np.zeros(nsamples, dtype=float)
 
     for i in range(ntraces):
-        pulse = data[i,:]
+        pulse = data[i, :]
         pulse -= pulse.mean()
         ac += np.correlate(pulse, pulse, 'full')[nsamples - 1:]
 
@@ -18,18 +18,20 @@ def calc_autocorrelation(data):
     ac /= nsamples - np.arange(nsamples, dtype=float)
     return ac
 
+
 def calc_autocorrelation_times(n, dt):
     return np.arange(n)*dt
 
+
 def autocorrelation(data, dt):
-    return AutoCorrelation(calc_autocorrelation(data), 
+    return AutoCorrelation(calc_autocorrelation(data),
                            calc_autocorrelation_times(data.shape[1], dt))
+
 
 @dataclass
 class AutoCorrelation:
     ac: np.ndarray
     times: np.ndarray
-    
 
     def plot(self, axis=None, **plotkwarg):
         if axis is None:
@@ -41,9 +43,10 @@ class AutoCorrelation:
         axis.set_xlabel("Lag Time (s)")
         axis.figure.tight_layout()
 
+
 def psd_2d(Nt: ndarray, dt: float) -> ndarray:
     # Nt is size (n,m) with m records of length n
-    (n, m) = Nt.shape
+    (n, _m) = Nt.shape
     df = 1 / n / dt  # the frequency bin spacing of the rfft
     # take the absolute value of the rfft of each record, then average all records
     Nabs = np.mean(np.abs(np.fft.rfft(Nt, axis=0)), axis=1)
@@ -58,16 +61,17 @@ def psd_2d(Nt: ndarray, dt: float) -> ndarray:
         psd[-1] /= 2  # Nyquist frequency
     return psd
 
+
 def calc_autocorrelation_vec(data: ndarray) -> ndarray:
     import scipy.signal
     import time
-    data = data[:10,:]
+    data = data[:10, :]
     ntraces, nsamples = data.shape
     ac = np.zeros(nsamples, dtype=float)
 
     for i in range(ntraces):
-        pulse = data[i,:]
-        pulse = pulse - pulse.mean() # don't use -= here in case input array is read only
+        pulse = data[i, :]
+        pulse = pulse - pulse.mean()  # don't use -= here in case input array is read only
         tstart = time.time()
         ac += scipy.signal.correlate(pulse, pulse, 'full')[nsamples - 1:]
         elapsed_s = time.time() - tstart
@@ -79,12 +83,14 @@ def calc_autocorrelation_vec(data: ndarray) -> ndarray:
     ac /= ntraces
     return ac
 
+
 def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
-def noise_psd(data: ndarray, dt: float, window: None=None) -> "NoisePSD":
+
+def noise_psd(data: ndarray, dt: float, window: None = None) -> "NoisePSD":
     assert window is None, "windowing not implemented"
-    psd = psd_2d(data.T, dt) 
+    psd = psd_2d(data.T, dt)
     nbins = len(psd)
     autocorr_vec = calc_autocorrelation_vec(data)
     frequencies = calc_psd_frequencies(nbins, dt)
@@ -92,14 +98,15 @@ def noise_psd(data: ndarray, dt: float, window: None=None) -> "NoisePSD":
                     autocorr_vec=autocorr_vec,
                     frequencies=frequencies)
 
+
 @dataclass
 class NoisePSD:
     psd: np.ndarray
     autocorr_vec: np.ndarray
     frequencies: np.ndarray
-    
 
-    def plot(self, axis: Optional[plt.axis]=None, arb_to_unit_scale_and_label: Tuple[int, str]=(1, "arb"), sqrt_psd: bool=True, loglog: bool=True, **plotkwarg):
+    def plot(self, axis: Optional[plt.axis] = None, arb_to_unit_scale_and_label: Tuple[int, str] = (1, "arb"),
+             sqrt_psd: bool = True, loglog: bool = True, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()
@@ -112,10 +119,9 @@ class NoisePSD:
         else:
             axis.plot(freq, psd, **plotkwarg)
             axis.set_ylabel(f"Power Spectral Density ({unit_label}$^2$ Hz$^{{-1}}$)")
-        if loglog: plt.loglog()
+        if loglog:
+            plt.loglog()
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
         plt.title(f"noise from records of length {len(self.frequencies)*2-2}")
         axis.figure.tight_layout()
-
-

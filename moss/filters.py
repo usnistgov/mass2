@@ -5,21 +5,23 @@ import moss
 import polars as pl
 import mass
 
+
 def fourier_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):
     peak_signal = np.amax(avg_signal)-avg_signal[0]
     maker = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=noise_psd,
                              noise_autocorr=noise_autocorr_vec,
                              sample_time_sec=dt, peak=peak_signal)
     mass_filter = maker.compute_5lag(fmax=fmax, f_3db=f_3db)
-    return Filter(filter=mass_filter.values, 
-                  v_dv_known_wrong=mass_filter.predicted_v_over_dv, 
-                  dt=dt, 
-                  filter_type="mass fourier")    
+    return Filter(filter=mass_filter.values,
+                  v_dv_known_wrong=mass_filter.predicted_v_over_dv,
+                  dt=dt,
+                  filter_type="mass fourier")
+
 
 @dataclass(frozen=True)
 class Filter:
     filter: np.ndarray
-    v_dv_known_wrong: float 
+    v_dv_known_wrong: float
     dt: float
     filter_type: str
 
@@ -37,10 +39,9 @@ class Filter:
     def frequencies(self):
         n = len(self.filter)
         return np.arange(0, n, dtype=float) * 0.5 / ((n - 1) * self.dt)
-    
+
     def __call__(self, pulse):
         return np.dot(self.filter, pulse)
-
 
 
 def filter_data_5lag(filter_values, pulses):
