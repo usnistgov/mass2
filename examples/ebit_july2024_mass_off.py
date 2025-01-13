@@ -8,7 +8,6 @@ app = marimo.App(width="medium")
 def __():
     import marimo as mo
     import mass
-    import mass
     from mass.off import (
         ChannelGroup,
         getOffFileListFromOneFile,

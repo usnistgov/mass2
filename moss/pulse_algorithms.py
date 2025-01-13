@@ -20,6 +20,7 @@ result_dtype = np.dtype([
 # Create a type alias for the structured array
 ResultArrayType = NDArray[result_dtype]
 
+
 @jit(nopython=True)
 def summarize_data_numba(
     rawdata: NDArray[np.uint16],
@@ -131,7 +132,8 @@ def summarize_data_numba(
             results['rise_time'][j] = timebase
 
         f0, f1, f3, f4 = 2, 1, -1, -2
-        s0, s1, s2, s3 = pulse[peak_samplenumber], pulse[peak_samplenumber + 1], pulse[peak_samplenumber + 2], pulse[peak_samplenumber + 3]
+        s0, s1, s2, s3 = pulse[peak_samplenumber], pulse[peak_samplenumber +
+                                                         1], pulse[peak_samplenumber + 2], pulse[peak_samplenumber + 3]
         s4 = pulse[peak_samplenumber + 4]
         t0 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
         s0, s1, s2, s3 = s1, s2, s3, s4

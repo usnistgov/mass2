@@ -1,10 +1,5 @@
-import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import polars as pl
-import pylab as plt
-import functools
-import typing
-import numpy as np
 import moss
 
 
@@ -42,7 +37,7 @@ class SummarizeStep(CalStep):
             for df_iter in df.iter_slices()
         ).with_columns(df)
         return df2
-    
+
     def dbg_plot(self, df_after, **kwargs):
         pass
 
@@ -72,7 +67,7 @@ class CalSteps:
 
     def __getitem__(self, key):
         return self.steps[key]
-    
+
     def __len__(self):
         return len(self.steps)
 
@@ -84,4 +79,3 @@ class CalSteps:
     def with_step(self, step: CalStep):
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
-    

@@ -1,6 +1,7 @@
 import numpy as np
 import numba
 
+
 @numba.njit
 def python_nearest_arrivals(reference_times, other_times):
     """Identical to nearest_arrivals(...)."""

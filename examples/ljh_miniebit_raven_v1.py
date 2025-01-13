@@ -110,7 +110,7 @@ def __():
 @app.cell(hide_code=True)
 def __(mo):
     mo.md(
-        f"""
+        """
         # inspecting the data
 
         Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell. marimo's nicest display doesn't work with array columns like our pulse column, so lets leave that out for now.

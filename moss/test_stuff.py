@@ -1,9 +1,5 @@
-import pytest
 import moss
-import os
-import mass
-import pulsedata 
-
+import pulsedata
 
 
 def test_to_df():
