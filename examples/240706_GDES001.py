@@ -1,11 +1,11 @@
 import marimo
 
-__generated_with = "0.9.4"
+__generated_with = "0.10.12"
 app = marimo.App(width="medium")
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import moss
     import numpy as np
@@ -17,7 +17,7 @@ def __():
 
 
 @app.cell
-def __(Path, np):
+def _(Path, np):
     bin_path = (
         Path("C:/Users/oneilg/Desktop/python/240706_truebq/")
         / "240726_151601_GDES001 2.4 V High SR"
@@ -45,7 +45,13 @@ def __(Path, np):
 
 
 @app.cell
-def __(bin_path, moss, threshold, trigger_filter):
+def _(plt):
+    plt.plot(4)
+    return
+
+
+@app.cell
+def _(bin_path, moss, threshold, trigger_filter):
     bin = moss.TrueBqBin.load(bin_path)
     trigger_result = bin.trigger(trigger_filter, threshold, limit_hours=2)
     trigger_result.plot(decimate=50, n_limit=100000, offset=0, x_axis_time_s=True)
@@ -54,12 +60,12 @@ def __(bin_path, moss, threshold, trigger_filter):
 
 
 @app.cell
-def __():
+def _():
     return
 
 
 @app.cell
-def __():
+def _():
     # long_noise = trigger_result.get_noise(
     #     n_dead_samples_after_pulse_trigger=100000, n_record_samples=500000
     # )
@@ -69,7 +75,7 @@ def __():
 
 
 @app.cell
-def __(npost, npre, trigger_result):
+def _(npost, npre, trigger_result):
     ch = trigger_result.to_channel_mmap(
         noise_n_dead_samples_after_pulse_trigger=100000,
         npre=npre,
@@ -81,7 +87,7 @@ def __(npost, npre, trigger_result):
 
 
 @app.cell
-def __(
+def _(
     ch,
     energy_of_highest_peak_ev,
     min_frames_from_last,
@@ -112,7 +118,7 @@ def __(
 
 
 @app.cell
-def __(ch2, moss, np, pl):
+def _(ch2, moss, np, pl):
     pulses = ch2.df["pulse"].to_numpy()
     avg_pulse = ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
     template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
@@ -135,7 +141,7 @@ def __(ch2, moss, np, pl):
 
 
 @app.cell
-def __(ch3, min_frames_from_last, min_frames_until_next, np, pl):
+def _(ch3, min_frames_from_last, min_frames_until_next, np, pl):
     cat_cond = {
         "first_and_last": True,
         "clean": pl.all_horizontal(pl.all().is_not_null()),
@@ -172,7 +178,7 @@ def __(ch3, min_frames_from_last, min_frames_until_next, np, pl):
 
 
 @app.cell
-def __(ch, moss, plt):
+def _(ch, moss, plt):
     plt.plot(ch.df["pulse"][:20].to_numpy().T)
     # plt.plot(
     #     ch3.df.filter(ch3.good_expr, pl.col("residual_rms") > 12)["pulse"]
@@ -188,7 +194,7 @@ def __(ch, moss, plt):
 
 
 @app.cell
-def __(avg_pulse, moss, plt):
+def _(avg_pulse, moss, plt):
     plt.plot(avg_pulse)
     plt.xlabel("framecount")
     plt.ylabel("signal (arb)")
@@ -197,42 +203,42 @@ def __(avg_pulse, moss, plt):
 
 
 @app.cell
-def __(ch2, moss, np):
+def _(ch2, moss, np):
     ch2.plot_hist("energy_5lagy", np.arange(0, 6500000, 2000))
     moss.show()
     return
 
 
 @app.cell
-def __(ch3, moss):
+def _(ch3, moss):
     ch3.plot_scatter("5lagx", "energy_5lagy", color_col="residual_rms_range")
     moss.show()
     return
 
 
 @app.cell
-def __(ch3, moss):
+def _(ch3, moss):
     ch3.plot_scatter("pretrig_mean", "energy_5lagy", color_col="residual_rms_range")
     moss.show()
     return
 
 
 @app.cell
-def __(ch2, moss):
+def _(ch2, moss):
     ch2.plot_scatter("framecount", "pretrig_mean")
     moss.show()
     return
 
 
 @app.cell
-def __(ch3, moss):
+def _(ch3, moss):
     ch3.plot_scatter("residual_rms", "energy_5lagy", color_col="residual_rms_range")
     moss.show()
     return
 
 
 @app.cell
-def __(cat_cond, mo):
+def _(cat_cond, mo):
     dropdown_pulse_category = mo.ui.dropdown(
         cat_cond.keys(),
         value=list(cat_cond.keys())[0],
@@ -242,7 +248,7 @@ def __(cat_cond, mo):
 
 
 @app.cell
-def __(ch4, dropdown_pulse_category, mo, moss, pl, plt):
+def _(ch4, dropdown_pulse_category, mo, moss, pl, plt):
     _cat = dropdown_pulse_category.value
     _pulses = (
         ch4.df.lazy()
@@ -260,7 +266,7 @@ def __(ch4, dropdown_pulse_category, mo, moss, pl, plt):
 
 
 @app.cell
-def __(ch4, mo):
+def _(ch4, mo):
     def get_step_desc(i):
         return str(ch4.get_step(i)[0])[:50]
 
@@ -277,7 +283,7 @@ def __(ch4, mo):
 
 
 @app.cell
-def __(ch4):
+def _(ch4):
     stepplotter = (
         ch4.mo_stepplots()
     )  # can't show stepplotter in same cell it's defined, just how marimo works
@@ -285,13 +291,13 @@ def __(ch4):
 
 
 @app.cell
-def __(stepplotter):
+def _(stepplotter):
     stepplotter.show()
     return
 
 
 @app.cell
-def __(ch4, min_frames_from_last, moss, np, pl, plt):
+def _(ch4, min_frames_from_last, moss, np, pl, plt):
     # live time clean hist
     def livetime_clean_energies():
         df = (
@@ -332,7 +338,7 @@ def __(ch4, min_frames_from_last, moss, np, pl, plt):
 
 
 @app.cell
-def __(ch4, moss, pl):
+def _(ch4, moss, pl):
     result = ch4.linefit(
         "Am241Q",
         "energy_5lagy",
@@ -347,7 +353,7 @@ def __(ch4, moss, pl):
 
 
 @app.cell
-def __(ch4, pl):
+def _(ch4, pl):
     # this shows the dataframe without pulse data
     ch4.df.select(pl.exclude("pulse"))
     # uncomment below to save dataframe
