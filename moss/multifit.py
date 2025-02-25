@@ -103,9 +103,18 @@ class MultiFit:
         d = {}
         d["line"] = [fitspec.model.spect.shortname for fitspec in self.fitspecs]
         d["peak_energy_ref"] = [fitspec.model.spect.peak_energy for fitspec in self.fitspecs]
+        d["peak_energy_ref_err"] = []
+        # for quickline, position_uncertainty is a string
+        # translate that into a large value for uncertainty so we can proceed without crashing
+        for fitspec in self.fitspecs:
+            if isinstance(fitspec.model.spect.position_uncertainty, str):
+                v = 0.1*fitspec.model.spect.peak_energy # 10% error is large!
+            else:
+                v = fitspec.model.spect.position_uncertainty
+            d["peak_energy_ref_err"].append(v)
         for param_name in param_names:
             d[param_name] = [result.params[param_name].value for result in self.results]
-            d[param_name+"_strerr"] = [result.params[param_name].stderr for result in self.results]
+            d[param_name+"_stderr"] = [result.params[param_name].stderr for result in self.results]
         return pl.DataFrame(d)
 
     def fit_series_without_use_expr(self, series: pl.Series):
@@ -185,12 +194,14 @@ class MultiFit:
         return pfit_gain, rms_residual_energy
 
     def to_mass_cal(self, previous_energy2ph, curvetype="gain", approximate=False):
-        cal = mass.calibration.EnergyCalibration(curvetype=curvetype, approximate=approximate)
         df = self.results_params_as_df()
-        for peak_in_energy_rough_cal, e, name in zip(df["peak_ph"].to_numpy(), df["peak_energy_ref"].to_numpy(),
-                                                     df["line"]):
-            ph_uncalibrated = previous_energy2ph(peak_in_energy_rough_cal)
-            cal.add_cal_point(ph_uncalibrated, e, name=str(name))
+        maker = mass.calibration.EnergyCalibrationMaker(
+            ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]), 
+            energy=df["peak_energy_ref"].to_numpy(), 
+            dph=df["peak_ph_stderr"].to_numpy(), 
+            de=df["peak_energy_ref_err"].to_numpy(), 
+            names=[name for name in df["line"]])
+        cal = maker.make_calibration(curvename=curvetype, approximate=approximate)
         return cal
 
 
