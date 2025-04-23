@@ -409,7 +409,7 @@ class Channel:
             .mean(axis=0)
         )
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
-        filter5lag = moss.fourier_filter(
+        filter5lag = moss.mass_5lag_filter(
             avg_signal=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,

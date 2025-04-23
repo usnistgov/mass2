@@ -9,8 +9,9 @@ dependencies = [
     "polars",
     "scipy",
     "numpy","ipympl","matplotlib","itables",
-    "marimo", # good notebooks!
-    "tornado",# for matplotlib plots in marimo
+    "marimo", 
+    # for matplotlib plots in marimo
+    "tornado",
     "numba",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
     "mass @ git+https://github.com/usnistgov/mass#egg=mass",
@@ -34,8 +35,9 @@ requires = ["flit_core >=3.2,<4"]
 
 # pyproject.toml
 [tool.pytest.ini_options]
-addopts = "-W error" # error on warnings
+# error on warnings
+addopts = "-W error" 
 testpaths = [
     "moss",
-    "examples",
+    "examples"
 ]

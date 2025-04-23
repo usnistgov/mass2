@@ -11,7 +11,7 @@ def calc_autocorrelation(data):
 
     for i in range(ntraces):
         pulse = data[i, :]
-        pulse -= pulse.mean()
+        pulse = pulse - pulse.mean()
         ac += np.correlate(pulse, pulse, 'full')[nsamples - 1:]
 
     ac /= ntraces
@@ -62,41 +62,39 @@ def psd_2d(Nt: ndarray, dt: float) -> ndarray:
     return psd
 
 
-def calc_autocorrelation_vec(data: ndarray) -> ndarray:
-    import scipy.signal
-    import time
-    data = data[:10, :]
-    ntraces, nsamples = data.shape
-    ac = np.zeros(nsamples, dtype=float)
-
-    for i in range(ntraces):
-        pulse = data[i, :]
-        pulse = pulse - pulse.mean()  # don't use -= here in case input array is read only
-        tstart = time.time()
-        ac += scipy.signal.correlate(pulse, pulse, 'full')[nsamples - 1:]
-        elapsed_s = time.time() - tstart
-        if elapsed_s*ntraces > 10:
-            print(f"Warning: autocorrelation is slow, projected to take {elapsed_s*ntraces:.2f} s for {ntraces} traces")
-        # was np.correlate before, but that is slower due to not using fft
-        # should give the same result
-
-    ac /= ntraces
-    return ac
 
 
 def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 
-def noise_psd(data: ndarray, dt: float, window: None = None) -> "NoisePSD":
+def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoisePSD":
+    import scipy.signal
+    f, Pxx = scipy.signal.periodogram(data, fs=1/dt, 
+                                      window=window, axis=-1,
+                                      detrend=detrend)
+    # len(f) = data.shape[1]//2+1
+    # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
+    Pxx_mean = np.mean(Pxx, axis=0)
+    # Pxx_mean[j] is the averaged PSD at frequency f[j] over all traces
+    autocorr_vec = calc_autocorrelation(data)
+    return NoisePSD(psd=Pxx_mean, autocorr_vec=autocorr_vec,
+                    frequencies=f)
+
+
+def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
     assert window is None, "windowing not implemented"
-    psd = psd_2d(data.T, dt)
-    nbins = len(psd)
-    autocorr_vec = calc_autocorrelation_vec(data)
+    import mass
+    (n_pulses, len_pulse) = data.shape
+    # see test_ravel_behavior to be sure this is written correctly
+    f_mass, psd_mass = mass.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
+    nbins = len(psd_mass)
+    autocorr_vec = calc_autocorrelation(data)
     frequencies = calc_psd_frequencies(nbins, dt)
-    return NoisePSD(psd=psd,
+    return NoisePSD(psd=psd_mass,
                     autocorr_vec=autocorr_vec,
-                    frequencies=frequencies)
+                    frequencies=f_mass)   
+
 
 
 @dataclass

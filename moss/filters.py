@@ -6,32 +6,34 @@ import polars as pl
 import mass
 
 
-def fourier_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):
+def mass_5lag_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):
     peak_signal = np.amax(avg_signal)-avg_signal[0]
     maker = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=noise_psd,
                              noise_autocorr=noise_autocorr_vec,
                              sample_time_sec=dt, peak=peak_signal)
     mass_filter = maker.compute_5lag(fmax=fmax, f_3db=f_3db)
     return Filter(filter=mass_filter.values,
-                  v_dv_known_wrong=mass_filter.predicted_v_over_dv,
+                  v_over_dv=mass_filter.predicted_v_over_dv,
                   dt=dt,
-                  filter_type="mass fourier")
+                  filter_type="mass 5lag", 
+                  mass_filter = mass_filter)
 
 
 @dataclass(frozen=True)
 class Filter:
     filter: np.ndarray
-    v_dv_known_wrong: float
+    v_over_dv: float
     dt: float
     filter_type: str
+    mass_filter: mass.Filter5Lag
 
     def plot(self, axis=None, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()
-        axis.plot(self.frequencies(), self.filter, label="fourier filter", **plotkwarg)
+        axis.plot(self.frequencies(), self.filter, label="mass 5lag filter", **plotkwarg)
         axis.grid()
-        axis.set_title(f"{self.filter_type=} v_dv_known_wrong={self.v_dv_known_wrong:.2f}")
+        axis.set_title(f"{self.filter_type=} v_dv_known_wrong={self.v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Lag Time (s)")
         axis.figure.tight_layout()
@@ -41,7 +43,11 @@ class Filter:
         return np.arange(0, n, dtype=float) * 0.5 / ((n - 1) * self.dt)
 
     def __call__(self, pulse):
-        return np.dot(self.filter, pulse)
+        """
+        pulse : npt.ArrayLike
+            A 1-d array, a single pulse record, or a 2-d array, where `x[i, :]` is pulse record number `i`.
+        """
+        return self.mass_filter.filter_records(pulse)
 
 
 def filter_data_5lag(filter_values, pulses):

@@ -24,17 +24,44 @@ class NoiseChannel:
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
+
     def get_records_2d(self,
                        trace_col_name="pulse",
                        n_limit=10000,
                        excursion_nsigma=5,
                        trunc_front=0,
                        trunc_back=0):
+        """
+        Return a 2D NumPy array of cleaned noise traces from the specified column.
+
+        This method identifies noise traces with excursions below a threshold and
+        optionally truncates the beginning and/or end of each trace.
+
+        Parameters:
+        ----------
+        trace_col_name : str, optional
+            Name of the column containing trace data. Default is "pulse".
+        n_limit : int, optional
+            Maximum number of traces to analyze. Default is 10000.
+        excursion_nsigma : float, optional
+            Threshold for maximum excursion in units of noise sigma. Default is 5.
+        trunc_front : int, optional
+            Number of samples to truncate from the front of each trace. Default is 0.
+        trunc_back : int, optional
+            Number of samples to truncate from the back of each trace. Must be >= 0. Default is 0.
+
+        Returns:
+        -------
+        np.ndarray
+            A 2D array of cleaned and optionally truncated noise traces.
+
+            Shape: (n_pulses, len(pulse))
+        """
         df_noise2, max_excursion = self.calc_max_excursion(
             trace_col_name, n_limit, excursion_nsigma
         )
         noise_traces_clean = (
-            df_noise2.filter(pl.col("excursion") < max_excursion)["pulse"]
+            df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"]
             .to_numpy()
         )
         if trunc_back == 0:
@@ -43,6 +70,7 @@ class NoiseChannel:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:-trunc_back]
         else:
             raise ValueError("trunc_back must be >= 0")
+        assert noise_traces_clean2.shape[0]>0
         return noise_traces_clean2
 
     # @functools.cache
@@ -55,7 +83,8 @@ class NoiseChannel:
         trunc_back=0,
     ):
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
-        spectrum = moss.noise_psd(records, dt=self.frametime_s)
+        spectrum = moss.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
+        f = spectrum.frequencies[1]
         return spectrum
 
     def __hash__(self):
