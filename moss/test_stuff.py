@@ -73,33 +73,6 @@ def test_follow_mass_filtering_rst():
     assert filter.dt == frametime_s
 
 
-
-# def test_filter5lag():
-#     import polars as pl
-#     n = 500
-#     Maxsignal = 1000.0
-#     sigma_noise = 1.0
-#     tau = [.05, .25]
-#     t = np.linspace(-1, 1, n+4)
-#     npre = (t < 0).sum()
-#     signal = (np.exp(-t/tau[1]) - np.exp(-t/tau[0]) )
-#     signal[t <= 0] = 0
-#     signal *= Maxsignal / signal.max()
-
-#     noise_covar = np.zeros(n)
-#     noise_covar[0] = sigma_noise**2
-#     noise_trace = np.random.randn(n)
-#     df = pl.DataFrame({"pulse": signal})
-#     df_noise = pl.DataFrame({"pulse": noise_trace})
-
-#     frametime_s = 10e-6
-#     header_df = pl.DataFrame()
-#     header = moss.ChannelHeader("dummy for test", 0, frametime_s, n_presamples=n//2,
-#                                 n_samples =n, df=header_df)
-#     noise_ch = moss.NoiseChannel(df_noise, header_df, frametime_s)
-#     ch = moss.Channel(df, header, noise=noise_ch)
-#     ch.filter5lag()
-
 def test_noise_autocorr():
     import polars as pl
     import mass
@@ -193,7 +166,7 @@ def test_ravel_behavior():
     assert np.allclose(a[0,:], np.arange(5))
     assert np.allclose(a.ravel(), np.arange(50))
 
-def test_noise_psd_colored():
+def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     import polars as pl
     import mass
     np.random.seed(1)
@@ -228,60 +201,3 @@ def test_noise_psd_colored():
     assert len(psd.frequencies) == 6
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
     assert np.allclose(psd_raw.psd, psd.psd)
-
-# def test_vdv_of_simple_filter_case_standalone_mass_psd_and_autocorr():
-#     # we create a test signal consisting of zeros, with a 1 in the middle
-#     # then white noise with std_dev=1
-#     # we take a psd of the noise, then calculate the a fourier_filter, 
-#     # and check v_dv
-#     # this test case is similar making a measurement with a single sample and std_dev=1
-#     # so the signal to noise (v_dv) should = 1
-#     # here we get 0.3
-#     import mass
-#     import scipy.signal
-#     # create noise with n=1000 traces of m=10 samples each, assume units of V
-#     noise_traces = np.random.normal(loc=0.0, scale=1, size=(1000,10))
-#     dt = 1.0
-#     f_mass, psd_mass = mass.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=1000, dt=dt)
-#     # the psd frequencies should have length m/2+1=6
-#     # and have a max value of sample_rate/2 = 0.5/dt = 0.5
-#     f_expected = np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5])
-#     assert np.allclose(f_mass, f_expected)
-#     # we should have power 1 V^2/sqrt(hz) in every bin for a two sided fft
-#     # but since we are considering an fft of real values, we choose to put all the power
-#     # in the positive frequency bins, and get 2 V^2/sqrt(hz) in each bin
-#     psd_expected = [2, 2, 2, 2, 2, 2]
-#     assert np.allclose(psd_mass, psd_expected, rtol=0.15)
-#     noise_autocorr_mass = mass.power_spectrum.autocorrelation_broken_from_pulses(noise_traces.T)
-#     # every sample is indepdenent, and the std_dev of each sample is 1
-#     # so the autocorrelation should have 1 for the 0 lag, and 0 for all other lags
-#     noise_autocorr_expected = np.array([1,0,0,0,0,0,0,0,0,0], dtype=np.float64)
-#     assert np.allclose(noise_autocorr_mass, noise_autocorr_expected, atol=0.15)
-#     avg_signal = np.array([0,0,0,0,0,1,0,0,0,0], dtype=np.float64)
-#     # our signal is all zeros and a single 1
-#     # with perfect baseline knowledge, this is the same as measuing a signal of
-#     # size 1 with a single sample with noise of std_dev=1
-#     # so we expect a signal to noise of 1
-#     # with 9 baseline samples, we expect approximatley 1/sqrt(9) = 0.3 additional noise
-#     # so the expected resolving power is ~0.7
-#     n_pretrigger = 2   # n_pretrigger should not matter for calculating v_over_dv, FilterMaker requires however
-#     peak_signal = np.amax(avg_signal)-avg_signal[0] # peak signal is used for normalization of the filter to follow the "mass convention" of the filt_value of a pulse equaling the max-pretrigger_mean
-#     maker_with_autocorr = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=psd_mass,
-#                              noise_autocorr=noise_autocorr_mass,
-#                              sample_time_sec=dt, peak=peak_signal)
-#     filter_with_autocorr = maker_with_autocorr.compute_fourier(fmax=None, f_3db=None)
-#     # providing noise_autocorr does not change the filter computation in compute_fourier
-#     # but does change the v_over_dv calculation
-#     maker_without_autocorr = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=psd_mass,
-#                              noise_autocorr=None,
-#                              sample_time_sec=dt, peak=peak_signal)
-#     filter_without_autocorr = maker_without_autocorr.compute_fourier(fmax=None, f_3db=None)
-
-#     # the filters should be identical
-#     assert np.allclose(filter_with_autocorr.values, filter_without_autocorr.values)
-
-#     # the v_over_dv values should be very close
-#     assert filter_with_autocorr.predicted_v_over_dv == pytest.approx(filter_without_autocorr.predicted_v_over_dv, rel=0.1)
-#     # the absolute scale should be in range of 0.7-1, so lets use 1 with reltol 0.4
-#     assert filter_with_autocorr.predicted_v_over_dv == pytest.approx(1, rel=0.4)
-
