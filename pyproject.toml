@@ -41,3 +41,6 @@ testpaths = [
     "moss",
     "examples"
 ]
+filterwarnings = [
+    "ignore:Using UFloat objects with std_dev==0 may give unexpected results:UserWarning"
+]
