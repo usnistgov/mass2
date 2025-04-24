@@ -42,5 +42,5 @@ testpaths = [
     "examples"
 ]
 filterwarnings = [
-    "ignore::*UFloat objects with std_dev==0*:"
-]
+    "ignore::UserWarning: Using UFloat objects with std_dev==0 may give unexpected results."
+    ]
