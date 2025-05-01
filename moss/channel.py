@@ -91,7 +91,9 @@ class Channel:
         return step.dbg_plot(df_after, **kwargs)
 
     def plot_hist(self, col, bin_edges, axis=None):
-        return moss.misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
+        axis = moss.misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
+        axis.set_title(f"ch {self.header.ch_num} plot_hist")
+        return axis
 
     # def plot_hists(self, col, bin_edges, group_by_col, axis=None):
     #     """
@@ -375,18 +377,28 @@ class Channel:
     def typical_peak_ind(self, col="pulse"):
         return int(np.median(self.df.limit(100)[col].to_numpy().argmax(axis=1)))
 
-    def summarize_pulses(self, col="pulse") -> "Channel":
+    def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index = None) -> "Channel":
+        if peak_index is None:
+            peak_index = self.typical_peak_ind(col)
         step = SummarizeStep(
             inputs=[col],
             output="many",
             good_expr=self.good_expr,
             use_expr=True,
             frametime_s=self.header.frametime_s,
-            peak_index=self.typical_peak_ind(col),
+            peak_index=peak_index,
             pulse_col=col,
-            pretrigger_ignore=0,
+            pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.header.n_presamples,
         )
+        return self.with_step(step)
+    
+    def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
+        step = moss.PretrigMeanJumpFixStep(inputs=[uncorrected],
+                                            output=[corrected],
+                                            good_expr=self.good_expr,
+                                            use_expr=True,
+                                            period=period)
         return self.with_step(step)
 
     def filter5lag(
@@ -431,6 +443,13 @@ class Channel:
     def good_df(self, cols=pl.all(), use_expr=True):
         return (self.df.lazy()
                 .filter(self.good_expr)
+                .filter(use_expr)
+                .select(cols)
+                .collect())
+    
+    def bad_df(self, cols=pl.all(), use_expr=True):
+            return (self.df.lazy()
+                .filter(self.good_expr.not_())
                 .filter(use_expr)
                 .select(cols)
                 .collect())
@@ -560,6 +579,10 @@ class Channel:
             df = self.df
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
+    
+    def with_external_trigger_df(self, df_ext: pl.DataFrame):
+        # df2 = self.df.join_asof(df_ext, )
+        raise Exception("not implemented")
 
     def with_replacement_df(self, df2) -> "Channel":
         return Channel(

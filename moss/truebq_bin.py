@@ -138,7 +138,7 @@ class TriggerResult:
                 pulses,
                 self.data_source.frametime_s,
                 peak_samplenumber=peak_index,
-                pretrigger_ignore=pretrigger_ignore,
+                pretrigger_ignore_samples=pretrigger_ignore,
                 nPresamples=npre,
             )
             df_batch = pl.from_numpy(summary_np)

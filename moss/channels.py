@@ -7,6 +7,8 @@ import mass
 import moss
 import joblib
 import traceback
+import lmfit
+import pathlib
 
 
 @dataclass(frozen=True)
@@ -48,20 +50,28 @@ class Channels:
         dlo=50,
         dhi=50,
         binsize=0.5,
+        params_update=lmfit.Parameters()
     ):
-        model = mass.get_model(line, has_linear_background=False, has_tails=False)
+        model = mass.get_model(line,
+                               has_linear_background=has_linear_background,
+                               has_tails=has_tails)
         pe = model.spect.peak_energy
-        bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
-        df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
-        bin_centers, counts = moss.misc.hist_of_series(df_small[col], bin_edges)
+        _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
+        df_small = (
+            self.dfg().lazy().filter(use_expr).select(col).collect()
+        )
+        bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
+        print(f"before update {params=}")
+        params = params.update(params_update)
+        print(f"after update {params=}")
         result = model.fit(
             counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3
         )
         result.set_label_hints(
             binsize=bin_centers[1] - bin_centers[0],
-            ds_shortname=self.description,
+            ds_shortname=f"{len(self.channels)} channels, {self.description}",
             unit_str="eV",
             attr_str=col,
             states_hint=f"{use_expr=}",
@@ -71,7 +81,9 @@ class Channels:
 
     def plot_hist(self, col, bin_edges, use_expr=True, axis=None):
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
-        return moss.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
+        ax = moss.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
+        ax.set_title(f"{len(self.channels)} channels, {self.description}")
+
 
     def plot_hists(self, col, bin_edges, group_by_col, axis=None,
                    use_expr=None, skip_none=True):
@@ -212,10 +224,19 @@ class Channels:
         print(f"and the Channels obj has {len(data.channels)} pairs")
         return data
 
+    def get_an_ljh_path(self):
+        return pathlib.Path(self.ch0.header.df["Filename"][0])
+
+    def get_path_in_output_folder(self, filename):
+        ljh_path = self.get_an_ljh_path()
+        base_name, run_num = ljh_path.name.split('_chan')
+        output_dir = ljh_path.parent.parent/"{run_num}moss_output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir/filename
+
     def get_experiment_state_df(self, experiment_state_path=None):
         if experiment_state_path is None:
-            first_ch = next(iter(self.channels.values()))
-            ljh_path = first_ch.header.df["Filename"][0]
+            ljh_path = self.get_an_ljh_path()
             experiment_state_path = moss.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         # _col0, _col1 = df.columns
@@ -227,9 +248,16 @@ class Channels:
 
     def with_experiment_state_by_path(self, experiment_state_path=None):
         df_es = self.get_experiment_state_df(experiment_state_path)
-        return self.with_experiment_state(df_es)
+        return self.with_experiment_state_df(df_es)
+    
+    def with_external_trigger_by_path(self, path=None):
+        raise Exception("not implemented")
+        
+    
+    def with_external_trigger_df(self, df_ext):
+        raise Exception("not implemented")
 
-    def with_experiment_state(self, df_es):
+    def with_experiment_state_df(self, df_es):
         # this is not as performant as making use_exprs for states
         # and using .set_sorted on the timestamp column
         ch2s = {}
@@ -245,7 +273,23 @@ class Channels:
                 raise Exception("steps dict did not contain steps for this ch_num")
             return channel.with_steps(steps)
         return self.map(load_steps)
-
+    
+    def save_steps(self, filename):
+        import pickle
+        steps = {}
+        for channum, ch in self.channels.items():
+            steps[channum] = ch.steps[:]
+        steps
+        with open(filename, "wb") as f:
+            pickle.dump(steps, f)
+        return steps
+    
+    def parent_folder_path(self):
+        import pathlib
+        parent_folder_path =  pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
+        print(f"{parent_folder_path=}")
+        return parent_folder_path
+    
     def concat_data(self, other_data):
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
@@ -273,12 +317,4 @@ class Channels:
                                                                           df=df))
         return Channels(channels, description)
 
-    def save_steps(self, filename):
-        import pickle
-        steps = {}
-        for channum, ch in self.channels.items():
-            steps[channum] = ch.steps[:]
-        steps
-        with open(filename, "wb") as f:
-            pickle.dump(steps, f)
-        return steps
+

@@ -26,7 +26,7 @@ def summarize_data_numba(
     rawdata: NDArray[np.uint16],
     timebase: float,
     peak_samplenumber: int,
-    pretrigger_ignore: int,
+    pretrigger_ignore_samples: int,
     nPresamples: int,
     first: int = 0,
     end: int = 0
@@ -38,7 +38,7 @@ def summarize_data_numba(
     if end <= 0:
         end = nPulses
 
-    e_nPresamples = nPresamples - pretrigger_ignore
+    e_nPresamples = nPresamples - pretrigger_ignore_samples
 
     # Create the structured array for results
     results = np.zeros(nPulses, dtype=result_dtype)

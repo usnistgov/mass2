@@ -1,6 +1,7 @@
 import os
 import re
-from typing import List, Iterator, Tuple
+from typing import List, Iterator, Tuple, Union
+import pathlib
 
 # functions for finding ljh files and opening them as Channels
 
@@ -94,16 +95,14 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
     return matching_pairs_limited
 
 
-def experiment_state_path_from_ljh_path(ljh_path):
-    # Split the path into directory and filename
-    dir_name, file_name = os.path.split(ljh_path)
-
-    # Split the filename into parts based on '_chan' and '.ljh'
-    base_name, _ = file_name.split('_chan')
-    # Create the new filename
+def experiment_state_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> pathlib.Path:
+    ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
+    base_name = ljh_path.name.split('_chan')[0]
     new_file_name = f"{base_name}_experiment_state.txt"
+    return ljh_path.parent / new_file_name
 
-    # Join the directory and new filename to form the new path
-    experiment_state_path = os.path.join(dir_name, new_file_name)
-
-    return experiment_state_path
+def external_trigger_bin_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> pathlib.Path:
+    ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
+    base_name = ljh_path.name.split('_chan')[0]
+    new_file_name = f"{base_name}_external_trigger.bin"
+    return ljh_path.parent / new_file_name
