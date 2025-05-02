@@ -188,7 +188,7 @@ def _(ch_num, data3, moss, plt):
 
 @app.cell
 def _(mo):
-    mo.md(r"""# significant pulse-height rise-time correlation causing high energy tails""")
+    mo.md("""# significant pulse-height rise-time correlation causing high energy tails""")
     return
 
 
@@ -327,10 +327,13 @@ def _(ch_num, data3, lmfit, plt):
 
 
 @app.cell
-def _(data3, params_update, plt):
-    result_data = data3.linefit(81000, "energy_5lagy_dc", dlo=400, dhi=400, binsize=10, has_tails=True, params_update=params_update)
+def _(data3, moss, params_update, pl):
+    result_data = data3.linefit(81000, "energy_5lagy_dc", dlo=400, 
+                                dhi=400, binsize=10, 
+                                has_tails=True, params_update=params_update,
+                               use_expr=pl.col("rise_time").is_between(0.00073, 0.000731))
     result_data.plotm()
-    plt.show()
+    moss.show()
     return
 
 
@@ -360,6 +363,17 @@ def _(data3, mo):
         "timestamp", "energy_5lagy_dc", "ch_num"
     ).write_parquet(data3.get_path_in_output_folder("list_mode.parquet"))
     mo.md("""#save "list mode" data as parquet""")
+    return
+
+
+@app.cell
+def _(data3):
+    ljh_path = data3.get_an_ljh_path()
+    base_name, post_chan = ljh_path.name.split('_chan')
+    date, run_num = base_name.split("_run")
+    print(base_name)
+    print(run_num)
+    print(date)
     return
 
 

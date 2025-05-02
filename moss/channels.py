@@ -228,9 +228,11 @@ class Channels:
         return pathlib.Path(self.ch0.header.df["Filename"][0])
 
     def get_path_in_output_folder(self, filename):
+        import datetime
         ljh_path = self.get_an_ljh_path()
         base_name, run_num = ljh_path.name.split('_chan')
-        output_dir = ljh_path.parent.parent/"{run_num}moss_output"
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = ljh_path.parent.parent/f"{run_num}moss_output"
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir/filename
 
