@@ -1,6 +1,8 @@
+
+
 import marimo
 
-__generated_with = "0.10.13"
+__generated_with = "0.13.3"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -101,25 +103,7 @@ def _(data, mo, moss, plt):
         min_gain_fraction_at_ph_30k,
     )
     mo.mpl.interactive(plt.gcf())
-    return (
-        acceptable_rms_residual_e,
-        calibrated_col,
-        ch0,
-        df3peak,
-        dfe,
-        fwhm_pulse_height_units,
-        line_energies,
-        line_names,
-        mass,
-        max_fractional_energy_error_3rd_assignment,
-        min_gain_fraction_at_ph_30k,
-        n_extra_peaks,
-        pfresult,
-        possible_phs,
-        uncalibrated,
-        uncalibrated_col,
-        use_expr,
-    )
+    return (df3peak,)
 
 
 @app.cell
@@ -244,7 +228,7 @@ def _(mo):
     return
 
 
-@app.cell(disabled=True)
+@app.cell
 def _(ch, mo, plt):
     ch.noise.spectrum().plot()
     mo.mpl.interactive(plt.gcf())
@@ -299,7 +283,7 @@ def _(ch, mo, steps):
         _ch = _ch.with_step(step)
     ch2 = _ch
     mo.plain(ch2.df)
-    return ch2, step
+    return (ch2,)
 
 
 @app.cell
@@ -327,7 +311,7 @@ def _(ch2):
         raise
     else:
         Exception("this was supposed to throw!")
-    return (FrozenInstanceError,)
+    return
 
 
 @app.cell
@@ -427,7 +411,7 @@ def _(data2):
     # here we have a very simple experiment_state_file
     df_es = data2.get_experiment_state_df()
     df_es
-    return (df_es,)
+    return
 
 
 @app.cell
@@ -451,7 +435,7 @@ def _(data3):
     # and we downselect to just to columns we want for further processing
     dfg = data3.dfg().select("timestamp", "energy_5lagy_dc", "state_label", "ch_num")
     dfg
-    return (dfg,)
+    return
 
 
 @app.cell
@@ -509,7 +493,7 @@ def _(multifit_with_results):
     assert mn_result.params["fwhm"].value < 3.58
     assert cu_result.params["fwhm"].value < 3.52
     # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
-    return cu_result, mn_kbeta_result, mn_result, pd_result
+    return
 
 
 @app.cell
@@ -571,7 +555,7 @@ def _(ch):
     # here we concatenate two channels and check that the length has double
     ch_concat = ch.concat_ch(ch)
     assert 2 * len(ch.df) == len(ch_concat.df)
-    return (ch_concat,)
+    return
 
 
 @app.cell
@@ -579,7 +563,7 @@ def _(data4):
     # here we concatenate two `Channels` objects and check that the length of the resulting dfg (remember, this is the df of good pulses) has doubled
     data_concat = data4.concat_data(data4)
     assert 2 * len(data4.dfg()) == len(data_concat.dfg())
-    return (data_concat,)
+    return
 
 
 @app.cell
@@ -610,7 +594,7 @@ def _(ch6, moss, np):
         indicator, uncorrected, bin_edges=np.arange(0, 9000, 1), fwhm_in_bin_number_units=4
     )
     print(dc_result)
-    return dc_result, indicator, uncorrected
+    return
 
 
 @app.cell
@@ -657,7 +641,7 @@ def _(ch6, mo, np, pl, plt):
     ch8 = pfit_dc("CuKAlpha", ch7)
     fig12 = plt.gcf()
     mo.vstack([mo.mpl.interactive(fig11), mo.mpl.interactive(fig12)])
-    return ch7, ch8, fig11, fig12, pfit_dc
+    return (ch8,)
 
 
 @app.cell
@@ -681,7 +665,18 @@ def _(ch8, mo, plt):
     result4.plotm()
     fig4 = plt.gcf()
     mo.vstack([mo.mpl.interactive(fig) for fig in [fig2, fig3]])
-    return fig1, fig2, fig3, fig4, result1, result2, result3, result4
+    return
+
+
+@app.cell
+def _(data):
+    data.ch0.header.df["Filename"][0]
+    return
+
+
+@app.cell
+def _():
+    return
 
 
 if __name__ == "__main__":
