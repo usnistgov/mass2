@@ -70,7 +70,7 @@ def _(mo):
         One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
         The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities,
-        such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects. 
+        such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
 
         The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a
         one-argument function, where the one argument is a `Channel` and the function returns a `Channel`,
@@ -186,7 +186,7 @@ def _(data2, pl):
 def _(data2, mo):
     mo.md(
         f"""
-        To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step. 
+        To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step.
 
         {data2.channels[4102].step_summary()=}
         """
@@ -327,7 +327,8 @@ def _(data, data2, mo, np):
     mo.md(
         f"""
         # don't worry about all the copies
-        we are copying dataframes, but we aren't copying the underlying memory, so our memory usage is about the same as it would be if we used a mutating style of coding.
+        we are copying dataframes, but we aren't copying the underlying memory, so our memory usage is about the same as it would be
+        if we used a mutating style of coding.
 
         `{np.shares_memory(data.channels[4102].df["rowcount"].to_numpy(), data2.channels[4102].df["rowcount"].to_numpy())=}`
         `{np.shares_memory(data.channels[4102].df["pulse"].to_numpy(), data2.channels[4102].df["pulse"].to_numpy())=}`
@@ -368,9 +369,13 @@ def _(mo):
     mo.md(
         """
         # cuts? good_expr and use_expr
-        We're using polars expressions in place of cuts. Each `Channel` can work with two of these, `good_expr` which is intended to isolate clean pulses that will yield good resolution, and `use_expr` which is intended to time slice to seperate out different states of the experiment. However, there is nothing binding these behaviors.
+        We're using polars expressions in place of cuts. Each `Channel` can work with two of these, `good_expr` which is
+        intended to isolate clean pulses that will yield good resolution, and `use_expr` which is intended to time slice
+        to seperate out different states of the experiment. However, there is nothing binding these behaviors.
 
-        `good_expr` is stored in the `Channel` and use automatically in many functions, including plots. `use_expr` is passed on a per function basis, and is not generally stored, although some steps will store the `use_expr` provided during that step. Many functions have something like `plot(df.filter(good_expr).filter(use_expr))` in them.
+        `good_expr` is stored in the `Channel` and use automatically in many functions, including plots. `use_expr`
+        is passed on a per function basis, and is not generally stored, although some steps will store the `use_expr`
+        provided during that step. Many functions have something like `plot(df.filter(good_expr).filter(use_expr))` in them.
         """
     )
     return
@@ -396,7 +401,8 @@ def _(ch2, pl):
 @app.cell
 def _(ch3, mo, plt):
     # here we make the debug plot for that last step, and see that it has stored the use_expr and used it for its plot
-    # we can see that this line has a non-optimal drift correction when learning from the full energy range, but is improved when we learn just from it's energy range
+    # we can see that this line has a non-optimal drift correction when learning from the full energy range,
+    # but is improved when we learn just from it's energy range
     ch3.step_plot(6)
     mo.mpl.interactive(plt.gcf())
     return
@@ -424,7 +430,8 @@ def _(data2):
 
 @app.cell
 def _(data2, pl):
-    # due to the way timestamps were define in ljh files, we actually have a non-monotonic timestamp in channel 4109, so lets fix that, then apply the experiment state
+    # due to the way timestamps were define in ljh files, we actually have a non-monotonic timestamp in channel 4109,
+    # so let's fix that then apply the experiment state.
     # we also drop the "pulse" column here because sorting will acually copy the underlying data
     # and we dont want to do that
     data3 = data2.map(
@@ -500,7 +507,8 @@ def _(multifit_with_results):
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
     assert mn_result.params["fwhm"].value < 3.58
     assert cu_result.params["fwhm"].value < 3.52
-    # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions, including Cu being better than Mn, and we can do sub-3eV Mn
+    # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions,
+    # including Cu being better than Mn, and we can do sub-3eV Mn
     return
 
 
@@ -552,7 +560,10 @@ def _(mo):
     mo.md(
         r"""
         # "multi-ljh analysis"
-        we can easily concatenate a `Channel`s or `Channels`s with `Channel.contcat_df`, `Channel.concat_ch`, and `channels.concat_data`. For now the steps and df history are dropped, since it's not quite clear how to use them helpfully. Internally this relies on polars ability to concat `DataFrame`s without allocation.
+        we can easily concatenate a `Channel`s or `Channels`s with `Channel.contcat_df`, `Channel.concat_ch`, and
+        `channels.concat_data`.
+        For now the steps and df history are dropped, since it's not quite clear how to use them helpfully.
+        Internally this relies on polars ability to concat `DataFrame`s without allocation.
         """
     )
     return
@@ -568,7 +579,8 @@ def _(ch):
 
 @app.cell
 def _(data4):
-    # here we concatenate two `Channels` objects and check that the length of the resulting dfg (remember, this is the df of good pulses) has doubled
+    # here we concatenate two `Channels` objects and check that the length of the resulting dfg
+    # (remember, this is the df of good pulses) has doubled
     data_concat = data4.concat_data(data4)
     assert 2 * len(data4.dfg()) == len(data_concat.dfg())
     return

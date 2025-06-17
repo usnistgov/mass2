@@ -31,7 +31,7 @@ def _(Path, np):
     energy_of_highest_peak_ev = 5637.82e3
 
     npre = 4000
-    npost= 7000
+    npost = 7000
     return (
         bin_path,
         energy_of_highest_peak_ev,
@@ -123,13 +123,11 @@ def _(ch2, moss, np, pl):
     avg_pulse = ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
     template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
 
-
     def residual_rms(pulse, template):
         dot = np.dot(pulse, template)
         pulse2 = dot * template
         residual = pulse2 - pulse
         return moss.misc.root_mean_squared(residual)
-
 
     residual_rmss = [residual_rms(pulses[i, :], template) for i in range(pulses.shape[0])]
     ch3 = ch2.with_columns(pl.Series("residual_rms", residual_rmss))
@@ -154,7 +152,6 @@ def _(ch3, min_frames_from_last, min_frames_until_next, np, pl):
         ).and_(pl.col("frames_until_next") < min_frames_until_next),
     }
 
-
     def categorize_df(df, cat_cond):
         """returns a series showing which category each pulse is in
         pulses will be assigned to the last category for which the condition evaluates to True"""
@@ -171,7 +168,6 @@ def _(ch3, min_frames_from_last, min_frames_until_next, np, pl):
             physical[in_category] = category_int
         category = pl.Series("category", physical).cast(dtype)
         return category
-
 
     ch4 = ch3.with_columns(categorize_df(ch3.df, cat_cond))
     return cat_cond, categorize_df, ch4
@@ -270,12 +266,10 @@ def _(ch4, mo):
     def get_step_desc(i):
         return str(ch4.get_step(i)[0])[:50]
 
-
     step_desc_list = [f"stepnum={i}, {get_step_desc(i)}" for i in range(len(ch4.steps))]
     dropdown_step = mo.ui.dropdown(
         step_desc_list, value=step_desc_list[0], label="choose step"
     )
-
 
     def step_num():
         return step_desc_list.index(dropdown_step.value)
@@ -309,7 +303,6 @@ def _(ch4, min_frames_from_last, moss, np, pl, plt):
         live_frames = np.sum(df["frames_from_last"].to_numpy() - min_frames_from_last)
         live_time_s = live_frames * ch4.header.frametime_s
         return df["energy_5lagy"], live_time_s
-
 
     energies, live_time_s = livetime_clean_energies()
     bin_edges = np.arange(0, 6000000, 1000.0)
