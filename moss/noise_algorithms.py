@@ -62,15 +62,13 @@ def psd_2d(Nt: ndarray, dt: float) -> ndarray:
     return psd
 
 
-
-
 def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 
 def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoisePSD":
     import scipy.signal
-    f, Pxx = scipy.signal.periodogram(data, fs=1/dt, 
+    f, Pxx = scipy.signal.periodogram(data, fs=1/dt,
                                       window=window, axis=-1,
                                       detrend=detrend)
     # len(f) = data.shape[1]//2+1
@@ -88,13 +86,12 @@ def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
     (n_pulses, len_pulse) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
-    nbins = len(psd_mass)
     autocorr_vec = calc_autocorrelation(data)
-    frequencies = calc_psd_frequencies(nbins, dt)
+    # nbins = len(psd_mass)
+    # frequencies = calc_psd_frequencies(nbins, dt)
     return NoisePSD(psd=psd_mass,
                     autocorr_vec=autocorr_vec,
-                    frequencies=f_mass)   
-
+                    frequencies=f_mass)
 
 
 @dataclass

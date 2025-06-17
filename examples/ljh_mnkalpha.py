@@ -11,7 +11,10 @@ def _(mo):
     mo.md(
         """
         #MOSS internals introdution
-        MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS. MOSS support many algorithms for pulse filtering, calibration, and corrections. MOSS is built on modern open source data science software, including pola.rs and marimo. MOSS supports some key features that MASS struggled with including:
+        MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS.
+        MOSS supports many algorithms for pulse filtering, calibration, and corrections.
+        MOSS is built on modern open source data science software, including pola.rs and marimo.
+        MOSS supports some key features that MASS struggled with including:
           * consecutive data set analysis
           * online (aka realtime) analysis
           * easily supporting different analysis chains
@@ -62,11 +65,17 @@ def _(mo):
     mo.md(
         """
         # basic analysis
-        The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
+        The variables `data` is the conventional name for a `Channels` object. It contains a list of
+        `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy.
+        One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
-        The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects. 
+        The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities,
+        such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects. 
 
-        The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
+        The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a
+        one-argument function, where the one argument is a `Channel` and the function returns a `Channel`,
+          `data.transform_channels` returns a `Channels`. There is no mutation, and we can't
+          re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
         """
     )
     return
@@ -83,7 +92,6 @@ def _(data, mo, moss, plt):
     min_gain_fraction_at_ph_30k: float = 0.25
     fwhm_pulse_height_units: float = 75
     n_extra_peaks: int = 10
-    acceptable_rms_residual_e: float = 10
     import mass  # type: ignore
 
     if calibrated_col is None:
@@ -150,7 +158,7 @@ def _(data2, moss):
         calibrated_col="energy_5lagy_dc2",
         ph_smoothing_fwhm=50,
     )
-    _ch.step_plot(-1)
+    _ch2.step_plot(-1)
 
     moss.show()
     return
@@ -634,7 +642,6 @@ def _(ch6, mo, np, pl, plt):
         )
         return ch2
 
-
     ch7 = pfit_dc("MnKAlpha", ch6)
     fig11 = plt.gcf()
     plt.figure()
@@ -654,7 +661,7 @@ def _(ch8):
 def _(ch8, mo, plt):
     result1 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc")
     result1.plotm()
-    fig1 = plt.gcf()
+    # fig1 = plt.gcf()
     result2 = ch8.linefit("CuKAlpha", col="energy_5lagy_dc_CuKAlpha")
     result2.plotm()
     fig2 = plt.gcf()
@@ -663,7 +670,7 @@ def _(ch8, mo, plt):
     fig3 = plt.gcf()
     result4 = ch8.linefit("MnKAlpha", col="energy_5lagy_dc")
     result4.plotm()
-    fig4 = plt.gcf()
+    # fig4 = plt.gcf()
     mo.vstack([mo.mpl.interactive(fig) for fig in [fig2, fig3]])
     return
 

@@ -12,7 +12,6 @@ def _():
     import pylab as plt
     import numpy as np
     import marimo as mo
-    import pulsedata
     return mo, np, pl, plt
 
 
@@ -302,7 +301,7 @@ def _(ch_num, data3, moss, np, plt):
     _energy_col = "energy_5lagy_dc"
     plt.hist(df_baseline[_energy_col], bins=np.arange(-100,100,5)+np.median(df_baseline[_energy_col]))
     plt.xlabel(f"{_energy_col} from noise traces")
-    plt.ylabel(f"count/bin")
+    plt.ylabel("count/bin")
     plt.title("running noise traces through the same analysis steps")
     moss.show()
     return
@@ -353,7 +352,7 @@ def _(mo):
 
 @app.cell
 def _(data3):
-    data3.save_steps(data3.get_path_in_output_folder("steps_dict.pkl"));
+    data3.save_steps(data3.get_path_in_output_folder("steps_dict.pkl"))
     return
 
 

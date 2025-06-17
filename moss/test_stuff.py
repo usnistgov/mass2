@@ -11,6 +11,7 @@ def test_ljh_to_polars():
     ljh = moss.LJHFile(p.pulse_folder/"20230626_run0001_chan4102.ljh")
     df, header_df = ljh.to_polars()
 
+
 def test_follow_mass_filtering_rst():
     # following https://github.com/usnistgov/mass/blob/master/doc/filtering.rst
     import numpy as np
@@ -18,15 +19,15 @@ def test_follow_mass_filtering_rst():
     import polars as pl
     np.random.seed(1)
 
-    ### make a pulse and call mass.FilterMaker directly
-    ### test that the calculated values are correct per the mass docs
+    # make a pulse and call mass.FilterMaker directly
+    # test that the calculated values are correct per the mass docs
     n = 504
     Maxsignal = 1000.0
     sigma_noise = 1.0
     tau = [.05, .25]
     t = np.linspace(-1, 1, n)
     npre = (t < 0).sum()
-    signal = (np.exp(-t/tau[1]) - np.exp(-t/tau[0]) )
+    signal = (np.exp(-t/tau[1]) - np.exp(-t/tau[0]))
     signal[t <= 0] = 0
     signal *= Maxsignal / signal.max()
 
@@ -40,24 +41,24 @@ def test_follow_mass_filtering_rst():
     assert mass_filter.predicted_v_over_dv == pytest.approx(2741.65, rel=1e-3)
     assert mass_filter.filter_records(signal)[0] == pytest.approx(Maxsignal)
 
-    ### then compare to the equivalent code in moss
-    ### 1. generate noise with the same covar
-    ### 2. make a channel and noise channel
-    ### 3. call filter5lag
-    ### 4. check outputs match and make sense
+    # then compare to the equivalent code in moss
+    # 1. generate noise with the same covar
+    # 2. make a channel and noise channel
+    # 3. call filter5lag
+    # 4. check outputs match and make sense
 
     # 250 pulses of length 504
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
     noise_traces = np.random.randn(250, n)
-    pulse_traces = np.tile(signal, (250,1))+noise_traces
+    pulse_traces = np.tile(signal, (250, 1))+noise_traces
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = moss.NoiseChannel(df_noise, header_df, frametime_s)
-    header = moss.ChannelHeader("dummy for test",ch_num=0, frametime_s=frametime_s, 
-                                n_presamples=n//2,                                
-                                n_samples =n, df=header_df)
-    df = pl.DataFrame({"pulse":pulse_traces})
+    header = moss.ChannelHeader("dummy for test", ch_num=0, frametime_s=frametime_s,
+                                n_presamples=n//2,
+                                n_samples=n, df=header_df)
+    df = pl.DataFrame({"pulse": pulse_traces})
     ch = moss.Channel(df, header, noise=noise_ch)
     ch = ch.filter5lag()
     step: moss.Filter5LagStep = ch.steps[-1]
@@ -93,12 +94,13 @@ def test_noise_autocorr():
     ac_direct = moss.noise_algorithms.autocorrelation(noise_traces, dt=frametime_s).ac
     assert len(ac_direct) == 500
     assert ac_direct[0] == pytest.approx(1, rel=1e-1)
-    assert np.mean(np.abs(ac_direct[1:])) == pytest.approx(0, abs=1e-2) 
+    assert np.mean(np.abs(ac_direct[1:])) == pytest.approx(0, abs=1e-2)
 
     spect = noise_ch.spectrum()
     assert len(spect.autocorr_vec) == 500
     assert spect.autocorr_vec[0] == pytest.approx(1, rel=1e-2)
     assert np.mean(np.abs(spect.autocorr_vec[1:])) == pytest.approx(0, abs=1e-2)
+
 
 def test_noise_psd():
     import polars as pl
@@ -112,29 +114,29 @@ def test_noise_psd():
     # PSD = sigma**2/delta_f
     # sigma**2 = 1
     # delta_f == 1
-    #PSD = 1/Hz
+    # PSD = 1/Hz
     noise_traces = np.random.randn(1000, 500)
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = moss.NoiseChannel(df=df_noise, 
-                                 header_df=header_df, 
+    noise_ch = moss.NoiseChannel(df=df_noise,
+                                 header_df=header_df,
                                  frametime_s=frametime_s)
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
     f_mass, psd_mass = mass.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=1000, dt=frametime_s)
-    assert len(f_mass) == 251 # half the length of the noise traces + 1
+    assert len(f_mass) == 251  # half the length of the noise traces + 1
     expect = np.ones(251)
     assert np.allclose(psd_mass, expect, atol=0.15)
 
     psd_raw_periodogram = moss.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
-    assert len(psd_raw_periodogram.frequencies) == 251 # half the length of the noise traces + 1
+    assert len(psd_raw_periodogram.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], expect[1:-1], atol=0.15)
-    assert psd_raw_periodogram.psd[0] == pytest.approx(0.5, rel=1e-1) # scipy handles the 0 bin and last bin differently
+    assert psd_raw_periodogram.psd[0] == pytest.approx(0.5, rel=1e-1)  # scipy handles the 0 bin and last bin differently
     assert psd_raw_periodogram.psd[-1] == pytest.approx(0.5, rel=1e-1)
 
-    psd_raw = moss.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s) 
-    assert len(psd_raw.frequencies) == 251 # half the length of the noise traces + 1
+    psd_raw = moss.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    assert len(psd_raw.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], expect[1:-1], atol=0.15)
 
@@ -142,6 +144,7 @@ def test_noise_psd():
     assert len(psd.frequencies) == 251
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
     assert np.allclose(psd_raw.psd, psd.psd)
+
 
 def test_get_pulses_2d():
     import polars as pl
@@ -151,20 +154,22 @@ def test_get_pulses_2d():
     # 1000 pulses of length 500
     noise_traces = np.random.randn(10, 5)
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = moss.NoiseChannel(df=df_noise, 
-                                 header_df=header_df, 
+    noise_ch = moss.NoiseChannel(df=df_noise,
+                                 header_df=header_df,
                                  frametime_s=frametime_s)
     pulses = noise_ch.get_records_2d()
-    assert pulses.shape[0] == 10 # npulses
-    assert pulses.shape[1] == 5 # length of pulses
+    assert pulses.shape[0] == 10  # npulses
+    assert pulses.shape[1] == 5  # length of pulses
+
 
 def test_ravel_behavior():
     # noise_algorithms.noise_psd_mass relies on this behavior
     # 10 pulses of length 5
     # first pulse = a[0,:]==[0 1 2 3 4]
-    a = np.arange(50).reshape(10,5)
-    assert np.allclose(a[0,:], np.arange(5))
+    a = np.arange(50).reshape(10, 5)
+    assert np.allclose(a[0, :], np.arange(5))
     assert np.allclose(a.ravel(), np.arange(50))
+
 
 def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     import polars as pl
@@ -173,27 +178,26 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     header_df = pl.DataFrame()
     frametime_s = 0.5
     noise_traces = np.tile(np.arange(10), (5, 1))
-    assert np.allclose(noise_traces[0,:], np.arange(10))
+    assert np.allclose(noise_traces[0, :], np.arange(10))
     assert np.allclose(noise_traces.shape, np.array([5, 10]))
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = moss.NoiseChannel(df=df_noise, 
-                                 header_df=header_df, 
+    noise_ch = moss.NoiseChannel(df=df_noise,
+                                 header_df=header_df,
                                  frametime_s=frametime_s)
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
     f_mass, psd_mass = mass.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=5, dt=frametime_s)
-    assert len(f_mass) == 6 # half the length of the noise traces + 1
-    expect = np.ones(6)
+    assert len(f_mass) == 6  # half the length of the noise traces + 1
+    # expect = np.ones(6)
 
     psd_raw_periodogram = moss.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
-    assert len(psd_raw_periodogram.frequencies) == 6 # half the length of the noise traces + 1
+    assert len(psd_raw_periodogram.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
-
-    psd_raw = moss.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s) 
-    assert len(psd_raw.frequencies) == 6 # half the length of the noise traces + 1
+    psd_raw = moss.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    assert len(psd_raw.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
