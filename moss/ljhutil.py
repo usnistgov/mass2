@@ -106,6 +106,7 @@ def experiment_state_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> p
     new_file_name = f"{base_name}_experiment_state.txt"
     return ljh_path.parent / new_file_name
 
+
 def external_trigger_bin_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split('_chan')[0]

@@ -108,7 +108,7 @@ class MultiFit:
         # translate that into a large value for uncertainty so we can proceed without crashing
         for fitspec in self.fitspecs:
             if isinstance(fitspec.model.spect.position_uncertainty, str):
-                v = 0.1*fitspec.model.spect.peak_energy # 10% error is large!
+                v = 0.1*fitspec.model.spect.peak_energy  # 10% error is large!
             else:
                 v = fitspec.model.spect.position_uncertainty
             d["peak_energy_ref_err"].append(v)
@@ -196,10 +196,10 @@ class MultiFit:
     def to_mass_cal(self, previous_energy2ph, curvetype="gain", approximate=False):
         df = self.results_params_as_df()
         maker = mass.calibration.EnergyCalibrationMaker(
-            ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]), 
-            energy=df["peak_energy_ref"].to_numpy(), 
-            dph=df["peak_ph_stderr"].to_numpy(), 
-            de=df["peak_energy_ref_err"].to_numpy(), 
+            ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]),
+            energy=df["peak_energy_ref"].to_numpy(),
+            dph=df["peak_ph_stderr"].to_numpy(),
+            de=df["peak_energy_ref_err"].to_numpy(),
             names=[name for name in df["line"]])
         cal = maker.make_calibration(curvename=curvetype, approximate=approximate)
         return cal

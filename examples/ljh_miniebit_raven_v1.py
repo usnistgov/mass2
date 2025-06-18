@@ -76,8 +76,8 @@ def __(mo):
 def __(data, pl):
     data2 = data.map(
         lambda channel: channel.with_good_expr_pretrig_mean_and_postpeak_deriv()
-        .with_good_expr(pl.col("pulse_average")>0)
-        .with_good_expr(pl.col("promptness")<0.98)
+        .with_good_expr(pl.col("pulse_average") > 0)
+        .with_good_expr(pl.col("promptness") < 0.98)
         .rough_cal_combinatoric(
             ["FeLAlpha"],
             uncalibrated_col="peak_value",
@@ -93,7 +93,7 @@ def __(data, pl):
         )
         .driftcorrect()
         .rough_cal_combinatoric(
-            ["FeLAlpha","OKAlpha"],
+            ["FeLAlpha", "OKAlpha"],
             uncalibrated_col="5lagy_dc",
             calibrated_col="energy_5lagy_dc",
             ph_smoothing_fwhm=50,
@@ -121,7 +121,7 @@ def __(mo):
 
 @app.cell
 def __(data2, pl):
-    data2.ch0.with_good_expr(pl.col("promptness")<0.98).df.select(pl.exclude("pulse"))
+    data2.ch0.with_good_expr(pl.col("promptness") < 0.98).df.select(pl.exclude("pulse"))
     return
 
 
@@ -155,14 +155,14 @@ def __(result):
 @app.cell
 def __(data2, mo):
     chs = list(data2.channels.keys())
-    dropdown_ch = mo.ui.dropdown({str(k):k for k in chs}, value=str(chs[0]),label="ch")
+    dropdown_ch = mo.ui.dropdown({str(k): k for k in chs}, value=str(chs[0]), label="ch")
     _energy_cols = [col for col in data2.dfg().columns if col.startswith("energy")]
     dropdown_col = mo.ui.dropdown(
         options=_energy_cols, value=_energy_cols[0], label="energy col"
     )
     steps = data2.ch0.steps
     steps[0].description
-    steps_d = {f"{i} {steps[i].description}":i for i in range(len(steps))}
+    steps_d = {f"{i} {steps[i].description}": i for i in range(len(steps))}
     dropdown_step = mo.ui.dropdown(steps_d, value=list(steps_d.keys())[-1], label="step")
     return chs, dropdown_ch, dropdown_col, dropdown_step, steps, steps_d
 
@@ -175,7 +175,7 @@ def __(dropdown_ch, dropdown_col, dropdown_step, mo):
 
 @app.cell
 def __(data2, dropdown_ch, dropdown_step, moss):
-    _ch=data2.channels[dropdown_ch.value]
+    _ch = data2.channels[dropdown_ch.value]
     _ch.step_plot(dropdown_step.value)
     moss.show()
     return
@@ -218,7 +218,7 @@ def __(data2, dropdown_ch, dropdown_col, mo, plt):
 
 @app.cell
 def __(data2, moss):
-    data2.ch0.plot_scatter("pulse_average","energy_5lagy")
+    data2.ch0.plot_scatter("pulse_average", "energy_5lagy")
     moss.show()
     return
 
@@ -228,7 +228,7 @@ def __(data, dropdown_ch, dropdown_col, moss):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data.channels[int(_ch_num)]
     print(f"{len(_ch.df)=}")
-    _ch.plot_scatter("timestamp","pretrig_mean", use_good_expr=False)
+    _ch.plot_scatter("timestamp", "pretrig_mean", use_good_expr=False)
     moss.show()
     return
 
@@ -237,7 +237,7 @@ def __(data, dropdown_ch, dropdown_col, moss):
 def __(data, dropdown_ch, dropdown_col, moss):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data.channels[int(_ch_num)]
-    _ch.plot_scatter("timestamp","pulse_rms")
+    _ch.plot_scatter("timestamp", "pulse_rms")
     moss.show()
     return
 
@@ -246,7 +246,7 @@ def __(data, dropdown_ch, dropdown_col, moss):
 def __(data2, dropdown_ch, dropdown_col, moss, np):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
-    _ch.plot_hist("energy_5lagy_dc", np.arange(0,3000,5))
+    _ch.plot_hist("energy_5lagy_dc", np.arange(0, 3000, 5))
     moss.show()
     return
 

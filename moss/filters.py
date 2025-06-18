@@ -15,8 +15,8 @@ def mass_5lag_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt
     return Filter(filter=mass_filter.values,
                   v_over_dv=mass_filter.predicted_v_over_dv,
                   dt=dt,
-                  filter_type="mass 5lag", 
-                  mass_filter = mass_filter)
+                  filter_type="mass 5lag",
+                  mass_filter=mass_filter)
 
 
 @dataclass(frozen=True)

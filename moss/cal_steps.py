@@ -5,7 +5,6 @@ import numpy as np
 import pylab as plt
 
 
-
 @dataclass(frozen=True)
 class CalStep:
     inputs: list[str]
@@ -25,9 +24,9 @@ class PretrigMeanJumpFixStep(CalStep):
     def calc_from_df(self, df: pl.DataFrame):
         ptm1 = df[self.inputs[0]].to_numpy()
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
-        df2 = pl.DataFrame({self.output[0]:ptm2}).with_columns(df)
+        df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
-    
+
     def dbg_plot(self, df_after, **kwargs):
         plt.figure()
         plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0])
@@ -37,9 +36,6 @@ class PretrigMeanJumpFixStep(CalStep):
         plt.ylabel("pretrig mean")
         plt.tight_layout()
         return plt.gca()
-
-
-
 
 
 @dataclass(frozen=True)

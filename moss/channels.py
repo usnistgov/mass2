@@ -84,7 +84,6 @@ class Channels:
         ax = moss.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
 
-
     def plot_hists(self, col, bin_edges, group_by_col, axis=None,
                    use_expr=None, skip_none=True):
         """
@@ -228,7 +227,6 @@ class Channels:
         return pathlib.Path(self.ch0.header.df["Filename"][0])
 
     def get_path_in_output_folder(self, filename):
-        import datetime
         ljh_path = self.get_an_ljh_path()
         base_name, post_chan = ljh_path.name.split('_chan')
         date, run_num = base_name.split("_run")        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -251,11 +249,10 @@ class Channels:
     def with_experiment_state_by_path(self, experiment_state_path=None):
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
-    
+
     def with_external_trigger_by_path(self, path=None):
         raise Exception("not implemented")
-        
-    
+
     def with_external_trigger_df(self, df_ext):
         raise Exception("not implemented")
 
@@ -275,7 +272,7 @@ class Channels:
                 raise Exception("steps dict did not contain steps for this ch_num")
             return channel.with_steps(steps)
         return self.map(load_steps)
-    
+
     def save_steps(self, filename):
         import pickle
         steps = {}
@@ -285,13 +282,13 @@ class Channels:
         with open(filename, "wb") as f:
             pickle.dump(steps, f)
         return steps
-    
+
     def parent_folder_path(self):
         import pathlib
-        parent_folder_path =  pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
+        parent_folder_path = pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
         print(f"{parent_folder_path=}")
         return parent_folder_path
-    
+
     def concat_data(self, other_data):
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
@@ -318,5 +315,3 @@ class Channels:
                                                                           n_samples=n_samples,
                                                                           df=df))
         return Channels(channels, description)
-
-
