@@ -37,7 +37,7 @@ def __(mo):
     mo.md(
         r"""
         # why a mass.off style analysis?
-        This is included in moss to 
+        This is included in moss to
         1. show how to use variable assignments to force evaluation order to handle the mutable nature of mass
         2. Show a direct 1-1 comparison of achieved resolution at various lines.
         """
@@ -85,7 +85,6 @@ def __(
     ds.calibrationPlanAddPoint(33640, "FeKAlpha", states=states)
     ds.calibrationPlanAddPoint(43237, "ZnKAlpha", states=states)
     ds.calibrationPlanAddPoint(48190, "GeKAlpha", states=states)
-
 
     data.alignToReferenceChannel(ds, "filtValue", np.arange(0, 60000, 10))
     data.learnPhaseCorrection(
@@ -175,11 +174,11 @@ def __(a, ds, mo, plt):
 
 @app.cell
 def __(a, data, np, plt):
-    b=a
+    b = a
     data.calcExternalTriggerTiming()
     data._externalTriggerSubframes()
     plt.figure()
-    plt.plot(np.diff(data._externalTriggerSubframes()[:10000]),".")
+    plt.plot(np.diff(data._externalTriggerSubframes()[:10000]), ".")
     plt.title("external trigger differences, this should all be one value!!")
     return b,
 
