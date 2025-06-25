@@ -82,12 +82,26 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
     # print(f"in folder {folder1} found {len(files1)} files")
     # print(f"in folder {folder2} found {len(files2)} files")
 
-    files1_by_channel = {extract_channel_number(f): f for f in files1}
-    files2_by_channel = {extract_channel_number(f): f for f in files2}
+    def collect_to_dict_error_on_repeat_channel(files: List[str]) -> dict:
+        """
+        Collects files into a dictionary by channel number, raising an error if a channel number is repeated.
+        """
+        files_by_channel = {}
+        for file in files:
+            channel = extract_channel_number(file)
+            if channel in files_by_channel.keys():
+                existing_file = files_by_channel[channel]
+                raise ValueError(f"Duplicate channel number found: {channel} in file {file} and already in {existing_file}")
+            files_by_channel[channel] = file
+        return files_by_channel
+
+    # we could have repeat channels even in the same folder, so we should error on that
+    files1_by_channel = collect_to_dict_error_on_repeat_channel(files1)
+    files2_by_channel = collect_to_dict_error_on_repeat_channel(files2)
 
     matching_pairs = []
-    for channel in files1_by_channel:
-        if channel in files2_by_channel:
+    for channel in sorted(files1_by_channel.keys()):
+        if channel in files2_by_channel.keys():
             matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
     # print(f"in match_files_by_channel found {len(matching_pairs)} channel pairs, {limit=}")
     matching_pairs_limited = matching_pairs[:limit]
