@@ -1,6 +1,8 @@
+
+
 import marimo
 
-__generated_with = "0.10.9"
+__generated_with = "0.13.3"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -94,7 +96,7 @@ def _(data3, moss):
 @app.cell
 def _(data, moss):
     def _do_analysis(ch: moss.Channel) -> moss.Channel:
-        return ch.summarize_pulses().with_good_expr_pretrig_mean_and_postpeak_deriv()
+        return ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
 
 
     data2 = data.map(_do_analysis)
@@ -130,7 +132,7 @@ def _(data2, moss, pl):
 
 
     data3 = data2.map(_do_analysis)
-    return data3, line_names
+    return (data3,)
 
 
 @app.cell
@@ -209,7 +211,7 @@ def _(data3, mo):
     steps[0].description
     steps_d = {f"{i} {steps[i].description}":i for i in range(len(steps))}
     dropdown_step = mo.ui.dropdown(steps_d, value=list(steps_d.keys())[-1], label="step")
-    return chs, dropdown_ch, dropdown_step, steps, steps_d
+    return dropdown_ch, dropdown_step
 
 
 @app.cell
@@ -229,7 +231,7 @@ def _(data3, dropdown_ch):
         _df = step.calc_from_df(_df)
     df_baseline = _df
     df_baseline
-    return df_baseline, step
+    return (df_baseline,)
 
 
 @app.cell
@@ -250,7 +252,7 @@ def _(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
     plt.title(f"ch={dropdown_ch.value} {_fwhm_baseline=:.2f}  \n{_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
     plt.xlabel("energy / eV")
     moss.show()
-    return calstep, fig_, gain
+    return
 
 
 if __name__ == "__main__":
