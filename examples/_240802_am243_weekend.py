@@ -22,7 +22,8 @@ def _(mo):
     mo.md(
         r"""
         # set key parameters
-        Changing any of these will re-evaluate some or all of notebook, so it can be slow. But this is how you tweak stuff. I moved most of the numerical parameters here for ease of seeing what you may want to tweak.
+        Changing any of these will re-evaluate some or all of notebook, so it can be slow. But this is how you tweak stuff.
+        I moved most of the numerical parameters here for ease of seeing what you may want to tweak.
         """
     )
     return
@@ -42,7 +43,7 @@ def _(Path, np):
     energy_of_highest_peak_ev = 5364.1e3
 
     npre = 400
-    npost= 700
+    npost = 700
     return (
         bin_path,
         energy_of_highest_peak_ev,
@@ -113,7 +114,7 @@ def _(bin_path, mo, moss, threshold, trigger_filter):
     # so as we iterate through the large file, the OS just doesn't release the memory because it doesn't need to
     # it should be able to release that memory as needed to keep the computer running well
     trigger_result.plot(decimate=10, n_limit=100000, offset=0, x_axis_time_s=True)
-    mo.vstack([mo.md("#triggering check plot"),moss.show()])
+    mo.vstack([mo.md("#triggering check plot"), moss.show()])
     return bin, trigger_result
 
 
@@ -170,7 +171,8 @@ def _(
             pl.col("frames_from_last") > min_frames_from_last
         )
     )  # good_expr is automatically used in plots, but is ignored for categorization and final livetime hist
-    ch2=ch2.with_columns(ch2.df.select(pretrig_mean_orig=pl.col("pretrig_mean"),pretrig_mean=pl.col("pretrig_mean")%phi0_dac_units))
+    ch2 = ch2.with_columns(ch2.df.select(pretrig_mean_orig=pl.col("pretrig_mean"),
+                           pretrig_mean=pl.col("pretrig_mean") % phi0_dac_units))
     mo.md("""#first analysis steps
     1. summarize
     2. optimal filter
@@ -187,7 +189,6 @@ def _(ch2, mo, moss, np, npre, pl):
     avg_pulse = avg_pulse - np.mean(avg_pulse)
     template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
 
-
     def residual_rms(pulse):
         pulse = pulse - np.mean(pulse)
         dot = np.dot(pulse, template)
@@ -195,18 +196,19 @@ def _(ch2, mo, moss, np, npre, pl):
         residual = pulse2 - pulse
         return moss.misc.root_mean_squared(residual)
 
-
     residual_rmss = [residual_rms(pulses[i, :]) for i in range(pulses.shape[0])]
     ch3 = ch2.with_columns(pl.Series("residual_rms", residual_rmss))
     ch3 = ch3.with_columns(
         ch3.df.select(residual_rms_range=pl.col("residual_rms").cut([0, 23, 10000]))
     )
+
     def frontload(pulse):
-        a,b = npre, npre+20
+        a, b = npre, npre+20
         pulse_pt_sub = pulse - np.mean(pulse[:npre])
         area_front = np.sum(pulse_pt_sub[a:b])
         area_rest = np.sum(pulse_pt_sub[b:])
         return area_front/area_rest
+
     def last_minus_first(pulse):
         return pulse[-1]-pulse[0]
     ch3 = ch3.with_columns(pl.Series("frontload", [frontload(pulses[i, :]) for i in range(pulses.shape[0])]))
@@ -230,11 +232,11 @@ def _(ch2, mo, moss, np, npre, pl):
 
 @app.cell
 def _(ch3, max_frontload, mo, moss, np, plt):
-    ch3.plot_hist("frontload", np.linspace(0,2,501))
-    plt.axvline(max_frontload, color="k",label="max frontload")
+    ch3.plot_hist("frontload", np.linspace(0, 2, 501))
+    plt.axvline(max_frontload, color="k", label="max frontload")
     plt.yscale("log")
     plt.legend()
-    mo.vstack([mo.md("#frontload histogram (check for good frontload choice)"),moss.show()])
+    mo.vstack([mo.md("#frontload histogram (check for good frontload choice)"), moss.show()])
     return
 
 
@@ -253,8 +255,8 @@ def _(
         "first_and_last": True,
         "clean": pl.all_horizontal(pl.all().is_not_null()),
         "large_residual_rms": pl.col("residual_rms") > 12,
-        "spikey": pl.col("frontload")>max_frontload,
-        "unlock": pl.col("last_minus_first")<min_last_minus_first,
+        "spikey": pl.col("frontload") > max_frontload,
+        "unlock": pl.col("last_minus_first") < min_last_minus_first,
         "to_close_to_next": pl.col("frames_until_next") < min_frames_until_next,
         "too_close_to_last": pl.col("frames_from_last") < min_frames_from_last,
         "to_close_to_last_and_next": (
@@ -262,7 +264,6 @@ def _(
         ).and_(pl.col("frames_until_next") < min_frames_until_next),
 
     }
-
 
     def categorize_df(df, cat_cond):
         """returns a series showing which category each pulse is in
@@ -281,7 +282,6 @@ def _(
         category = pl.Series("category", physical).cast(dtype)
         return category
 
-
     ch4 = ch3.with_columns(categorize_df(ch3.df, cat_cond))
     mo.md("""#categorization
     assign pulses to categories based on things we calculated about the pulse
@@ -295,7 +295,7 @@ def _(ch, mo, moss, plt, pulses_with_subtracted_pretrigger_mean):
     plt.title("first 20 pulses")
     plt.xlabel("framecount")
     plt.ylabel("signal (arb)")
-    mo.vstack([mo.md("# first 20 pulses plot"),moss.show()])
+    mo.vstack([mo.md("# first 20 pulses plot"), moss.show()])
     return
 
 
@@ -304,7 +304,7 @@ def _(avg_pulse, mo, moss, plt):
     plt.plot(avg_pulse)
     plt.xlabel("framecount")
     plt.ylabel("signal (arb)")
-    mo.vstack([mo.md("#average pulse plot"),moss.show()])
+    mo.vstack([mo.md("#average pulse plot"), moss.show()])
     return
 
 
@@ -312,21 +312,21 @@ def _(avg_pulse, mo, moss, plt):
 def _(ch2, mo, moss, np, plt):
     ch2.plot_hist("energy_5lagy", np.arange(0, 6500000, 2000))
     plt.yscale("log")
-    mo.vstack([mo.md("## rough histogram plot without any categorization"),moss.show()])
+    mo.vstack([mo.md("## rough histogram plot without any categorization"), moss.show()])
     return
 
 
 @app.cell
 def _(ch4, mo, moss):
     ch4.plot_scatter("5lagx", "energy_5lagy", color_col="category")
-    mo.vstack([mo.md("## scatter 5lagx (subsample arrival time) vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("## scatter 5lagx (subsample arrival time) vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
 @app.cell
 def _(ch4, mo, moss):
     ch4.plot_scatter("frontload", "energy_5lagy", color_col="category")
-    mo.vstack([mo.md("#scatter energy vs frontload (spikeyness)\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("#scatter energy vs frontload (spikeyness)\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
@@ -364,28 +364,28 @@ def _(mo, np):
 @app.cell
 def _(ch2, mo, moss):
     ch2.plot_scatter("framecount", "pretrig_mean")
-    mo.vstack([mo.md("#scatter pretrig mean (corrected) vs framecount (time)\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("#scatter pretrig mean (corrected) vs framecount (time)\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
 @app.cell
 def _(ch2, mo, moss):
     ch2.plot_scatter("framecount", "pretrig_mean_orig")
-    mo.vstack([mo.md("#scatter debug pretrig_mean_orig vs framecount\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("#scatter debug pretrig_mean_orig vs framecount\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
 @app.cell
 def _(ch2, mo, moss):
     ch2.plot_scatter("pretrig_mean", "energy_5lagy")
-    mo.vstack([mo.md("#scatter pretrig_mean rms vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("#scatter pretrig_mean rms vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
 @app.cell
 def _(ch4, mo, moss):
     ch4.plot_scatter("residual_rms", "energy_5lagy", color_col="category")
-    mo.vstack([mo.md("#scatter debug plot rms vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."),moss.show()])
+    mo.vstack([mo.md("#scatter debug plot rms vs energy\ntypically I zoom in on these to look for correlations to indicate resolution could be improved with a correction, and also to build some intuition about the dataset."), moss.show()])
     return
 
 
@@ -402,21 +402,21 @@ def _(cat_cond, mo):
 
 @app.cell
 def _(ch4, mo, moss, pl, plt, pulses_with_subtracted_pretrigger_mean):
-    _elo, _ehi = 5.5e6,6e6
+    _elo, _ehi = 5.5e6, 6e6
     _pulses = (
         ch4.df.lazy()
-        .filter(pl.col("category") == "clean", pl.col("energy_5lagy").is_between(_elo,_ehi))
+        .filter(pl.col("category") == "clean", pl.col("energy_5lagy").is_between(_elo, _ehi))
         .limit(50)
         .select("pulse")
         .collect()
         .to_series()
         .to_numpy()
-    )    
+    )
     plt.plot(pulses_with_subtracted_pretrigger_mean(_pulses.T, 30))
     plt.suptitle(f"pulses which are between {_elo:g} and {_ehi:g} eV and clean")
     plt.xlabel("sample number")
     plt.ylabel("signal (dac units)")
-    mo.vstack([mo.md("#pulse in energy range viewer"),moss.show()])
+    mo.vstack([mo.md("#pulse in energy range viewer"), moss.show()])
     return
 
 
@@ -445,7 +445,7 @@ def _(
     plt.suptitle(_cat)
     plt.xlabel("sample number")
     plt.ylabel("signal (dac units)")
-    mo.vstack([mo.md("#pulse type viewer\nwith pretrigger mean subtracted"),dropdown_pulse_category, moss.show()])
+    mo.vstack([mo.md("#pulse type viewer\nwith pretrigger mean subtracted"), dropdown_pulse_category, moss.show()])
     return
 
 
@@ -460,7 +460,7 @@ def _(ch4, mo):
 
 @app.cell
 def _(mo, stepplotter):
-    mo.vstack([mo.md("#step plots"),stepplotter.show()])
+    mo.vstack([mo.md("#step plots"), stepplotter.show()])
     return
 
 
@@ -478,7 +478,6 @@ def _(ch4, min_frames_from_last, mo, moss, np, pl, plt):
         live_time_s = live_frames * ch4.header.frametime_s
         return df["energy_5lagy"], live_time_s
 
-
     energies, live_time_s = livetime_clean_energies()
     bin_edges = np.arange(0, 6000000, 1000.0)
     _, counts = moss.misc.hist_of_series(energies, bin_edges=bin_edges)
@@ -492,7 +491,7 @@ def _(ch4, min_frames_from_last, mo, moss, np, pl, plt):
         f"{np.sum(counts)} counts, {live_time_s:.2f} s live time, total count rate = {total_count_rate:.2f}+/-{total_count_rate_unc:.2f}/s"
     )
     plt.yscale("log")
-    mo.vstack([mo.md("#coadded spectrum with livetime\nbeware unlocks not neccesarily fully accounted for"),moss.show()])
+    mo.vstack([mo.md("#coadded spectrum with livetime\nbeware unlocks not neccesarily fully accounted for"), moss.show()])
     return (
         bin_centers,
         bin_edges,
@@ -520,7 +519,7 @@ def _(
     for cat in list(cat_cond.keys())[::-1]:
         _energies, _ = livetime_clean_energies(cat)
         _, _counts = moss.misc.hist_of_series(_energies, bin_edges=bin_edges)
-        plt.plot(bin_centers, _counts,label=cat)
+        plt.plot(bin_centers, _counts, label=cat)
     # plt.plot(bin_centers, counts)
 
     plt.xlabel("energy / eV")
@@ -541,10 +540,11 @@ def _(ch4, lmfit, mo, moss, pl):
         dlo=1e5,
         dhi=2e5,
         binsize=1000,
-        params_update=lmfit.create_params(fwhm={"value":4000,"min":500}, dph_de={"vary":False, "min":0.9, "max":1.1, "value":1}, peak_ph=5.64e6)
+        params_update=lmfit.create_params(fwhm={"value": 4000, "min": 500}, dph_de={
+                                          "vary": False, "min": 0.9, "max": 1.1, "value": 1}, peak_ph=5.64e6)
     )
     _result.plotm()
-    mo.vstack([mo.md("#Am241 fit"),moss.show()])
+    mo.vstack([mo.md("#Am241 fit"), moss.show()])
     return
 
 
@@ -557,11 +557,11 @@ def _(ch4, lmfit, mo, moss, pl):
         dlo=1e5,
         dhi=2e5,
         binsize=1000,
-        params_update=lmfit.create_params(fwhm={"value":4000,"min":500}, dph_de={"vary":False, "min":0.9, "max":1.1, "value":1})
+        params_update=lmfit.create_params(fwhm={"value": 4000, "min": 500}, dph_de={"vary": False, "min": 0.9, "max": 1.1, "value": 1})
     )
     _result.plotm()
 
-    mo.vstack([mo.md("#Am243 fit"),moss.show()])
+    mo.vstack([mo.md("#Am243 fit"), moss.show()])
     return
 
 
@@ -599,9 +599,10 @@ def _(mo, pl):
             if size_in_bytes < 1024:
                 return f"{size_in_bytes:.2f} {unit}"
             size_in_bytes /= 1024
-        s= f"{size_in_bytes:.2f} PB"  # In case it's enormous!
+        s = f"{size_in_bytes:.2f} PB"  # In case it's enormous!
         print(s)
         return s
+
     def estimate_dataframe_size(df: pl.DataFrame) -> str:
         """
         Estimate the memory/storage size of a Polars DataFrame containing only
@@ -641,6 +642,7 @@ def _(mo, pl):
         # Convert to human-readable format
 
         return human_readable_size(total_bytes)
+
     def write_and_measure_parquet(df: pl.DataFrame):
         """
         Write a Polars DataFrame to a temporary folder as a Parquet file,

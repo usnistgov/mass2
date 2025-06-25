@@ -2,7 +2,7 @@ import pytest
 
 
 def test_ljh_mnkalpha():
-    #enforce the order by doing it in the same function
+    # enforce the order by doing it in the same function
     # parquet_after_ljh_mnkalpha needs to open files written by ljh_mnkalpha
     from . import ljh_mnkalpha as notebook
     notebook.app.run()
@@ -12,6 +12,7 @@ def test_ljh_mnkalpha():
 def test_off_ebit():
     from . import off_ebit as notebook
     notebook.app.run()
+
 
 def test_broken_notebook():
     from . import broken_notebook as notebook
@@ -27,4 +28,3 @@ def test_ebit_july2024_from_off():
 # def test_ebit_july2024_mass_off():
 #     from . import ebit_july2024_mass_off as notebook
 #     notebook.app.run()
-

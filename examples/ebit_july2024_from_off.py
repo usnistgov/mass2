@@ -88,7 +88,6 @@ def __(data, pl, timing_df):
         df2 = df2.with_columns(pl.Series(s, dtype=pl.Categorical))
         return ch.with_replacement_df(df2)
 
-
     with_timing_df(data.ch0).df
     return (with_timing_df,)
 
@@ -172,7 +171,7 @@ def __(data3, mo):
         options=_ch_nums, value=_ch_nums[0], label="channel number"
     )
     mo.md(f"""## Rough Cal Guidance
-    The rough_cal routine works well most of the time. Always plan to inspect the step plot for it. 
+    The rough_cal routine works well most of the time. Always plan to inspect the step plot for it.
 
     1. Make sure all the lines you give it are marked as assigned or unassigned.
     2. You can turn up `n_extra` to try more lines.
@@ -233,7 +232,6 @@ def __(data3, dropdown_ch, mass, pl):
             .sort(by="timestamp")
         )
         return ch.with_columns(df2.select("line_name"))
-
 
     ch3 = label_lines(data3.channels[int(dropdown_ch.value)], -2)
     return ch3, label_lines

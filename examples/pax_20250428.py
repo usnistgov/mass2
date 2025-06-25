@@ -12,7 +12,6 @@ def _():
     import pylab as plt
     import numpy as np
     import marimo as mo
-    import pulsedata
     return mo, np, pl, plt
 
 
@@ -74,7 +73,6 @@ def _(data, moss, np, pl):
         ch = ch.with_columns(pl.DataFrame({"ptm2": ptm2}))
         return ch
 
-
     data2 = data.map(_do_analysis)
     data2 = data2.with_experiment_state_by_path()
     return (data2,)
@@ -96,7 +94,6 @@ def _(data, mo):
             value=chs[0],  # default selected value
         )
         return dropdown
-
 
     ch_dropdown = _()
     ch_dropdown
@@ -146,7 +143,6 @@ def _(mo):
 def _(data2, moss, pl):
     line_names = [81000, 121800]
 
-
     def _do_analysis(ch: moss.Channel) -> moss.Channel:
         return (
             ch.rough_cal_combinatoric(
@@ -159,16 +155,15 @@ def _(data2, moss, pl):
             .driftcorrect(
                 indicator_col="ptm_jf",
                 uncorrected_col="5lagy"
-                )
+            )
             .rough_cal_combinatoric(
                 line_names,
                 uncalibrated_col="5lagy_dc",
                 calibrated_col="energy_5lagy_dc",
                 ph_smoothing_fwhm=5,
             )
-            .with_good_expr(pl.col("energy_5lagy_dc").is_between(0,1e6))
+            .with_good_expr(pl.col("energy_5lagy_dc").is_between(0, 1e6))
         )
-
 
     data3 = data2.map(_do_analysis, allow_throw=True)
     return (data3,)
@@ -180,7 +175,7 @@ def _(ch_num, data3, moss, plt):
         "5lagx", "energy_5lagy_dc"
     )
     plt.grid()
-    plt.ylim(80e3,82e3)
+    plt.ylim(80e3, 82e3)
     plt.xlim(-1.5, 1)
     moss.show()
     return
@@ -198,7 +193,7 @@ def _(ch_num, data3, moss, plt):
         "rise_time", "energy_5lagy_dc"
     )
     plt.grid()
-    plt.ylim(80e3,82e3)
+    plt.ylim(80e3, 82e3)
     moss.show()
     return
 
@@ -212,14 +207,14 @@ def _(ch_num, data3, moss):
 
 @app.cell
 def _(ch_num, data3, moss, np, plt):
-    def plot_pulses(ch: moss.Channel, n_good_pulses = 10, spread_col="timestamp", pulse_col="pulse", n_bad_pulses=5, x_as_time=False, use_expr=True, subtract_pretrig_mean_locally_calculated=True):
-        df  = ch.good_df(use_expr=use_expr).sort(by=spread_col)
+    def plot_pulses(ch: moss.Channel, n_good_pulses=10, spread_col="timestamp", pulse_col="pulse", n_bad_pulses=5, x_as_time=False, use_expr=True, subtract_pretrig_mean_locally_calculated=True):
+        df = ch.good_df(use_expr=use_expr).sort(by=spread_col)
         df_small = df.sort(by=spread_col).gather_every(len(df)//n_good_pulses)
         good_pulses = df_small[pulse_col].to_numpy()
-        if n_bad_pulses>0:
-            df_bad  = ch.bad_df(use_expr=use_expr).sort(by=spread_col)
+        if n_bad_pulses > 0:
+            df_bad = ch.bad_df(use_expr=use_expr).sort(by=spread_col)
             df_small_bad = df_bad.sort(by=spread_col).gather_every(len(df_bad)//n_bad_pulses)
-            bad_pulses = df_small_bad[pulse_col].to_numpy()    
+            bad_pulses = df_small_bad[pulse_col].to_numpy()
         x = np.arange(ch.header.n_samples)-ch.header.n_presamples
         x_label = "sample number"
         if x_as_time:
@@ -227,7 +222,7 @@ def _(ch_num, data3, moss, np, plt):
             x_label = "time (ms)"
         for i in range(n_good_pulses):
             spread_val = df_small[spread_col][i]
-            pulse = good_pulses[i,:]
+            pulse = good_pulses[i, :]
             if subtract_pretrig_mean_locally_calculated:
                 pulse = pulse - np.mean(pulse[:int(ch.header.n_presamples*0.8)])
             if spread_col == "timestamp":
@@ -236,20 +231,19 @@ def _(ch_num, data3, moss, np, plt):
                 plt.plot(x, pulse, label=f"{spread_val:7.3g}")
         for i in range(n_bad_pulses):
             spread_val = df_small[spread_col][i]
-            pulse = bad_pulses[i,:]
+            pulse = bad_pulses[i, :]
             if subtract_pretrig_mean_locally_calculated:
                 pulse = pulse - np.mean(pulse[:int(ch.header.n_presamples*0.8)])
             if spread_col == "timestamp":
-                plt.plot(x, pulse,"--", label=f"X {spread_val}")
+                plt.plot(x, pulse, "--", label=f"X {spread_val}")
             else:
-                plt.plot(x, pulse,"--", label=f"X {spread_val:7.3g}")
+                plt.plot(x, pulse, "--", label=f"X {spread_val:7.3g}")
         plt.legend(title=spread_col, loc="center left", bbox_to_anchor=(1, 0.5))
         plt.xlabel(x_label)
         plt.ylabel("signal (arb)")
         plt.title(ch.header.description)
         plt.tight_layout()
         return plt.gca()
-
 
     plot_pulses(data3.channels[ch_num], spread_col="energy_5lagy_dc")
     moss.show()
@@ -258,9 +252,9 @@ def _(ch_num, data3, moss, np, plt):
 
 @app.cell
 def _(ch_num, data3, mo, moss, pl, plot_pulses, plt):
-    plot_pulses(data3.channels[ch_num], spread_col="rise_time", 
-                use_expr=pl.col("energy_5lagy_dc").is_between(80000,82000),n_bad_pulses=0)
-    plt.xlim(-25,75)
+    plot_pulses(data3.channels[ch_num], spread_col="rise_time",
+                use_expr=pl.col("energy_5lagy_dc").is_between(80000, 82000), n_bad_pulses=0)
+    plt.xlim(-25, 75)
     plt.grid()
     mo.vstack([mo.md("# pulse shape vs rise time for narrow energy window\nkind of looks like trigger time variation?\nplus a TESd direct hit"),
                moss.show()])
@@ -300,9 +294,9 @@ def _(ch_num, data3, moss, np, plt):
     df_baseline = _df
     df_baseline
     _energy_col = "energy_5lagy_dc"
-    plt.hist(df_baseline[_energy_col], bins=np.arange(-100,100,5)+np.median(df_baseline[_energy_col]))
+    plt.hist(df_baseline[_energy_col], bins=np.arange(-100, 100, 5)+np.median(df_baseline[_energy_col]))
     plt.xlabel(f"{_energy_col} from noise traces")
-    plt.ylabel(f"count/bin")
+    plt.ylabel("count/bin")
     plt.title("running noise traces through the same analysis steps")
     moss.show()
     return
@@ -310,7 +304,7 @@ def _(ch_num, data3, moss, np, plt):
 
 @app.cell
 def _(ch_num, data3, moss, np):
-    data3.channels[ch_num].plot_hist("energy_5lagy_dc", bin_edges=np.arange(0,150000, 10))
+    data3.channels[ch_num].plot_hist("energy_5lagy_dc", bin_edges=np.arange(0, 150000, 10))
     moss.show()
     return
 
@@ -319,8 +313,9 @@ def _(ch_num, data3, moss, np):
 def _(ch_num, data3, lmfit, plt):
     params_update = lmfit.Parameters()
     params_update.add('tail_share_hi', value=0.05, min=0.01, max=1, vary=True)
-    params_update.add('tail_tau_hi', value = 50, min=5, max=200, vary=True)
-    result_ch = data3.channels[ch_num].linefit(81000, "energy_5lagy_dc", dlo=400, dhi=400, binsize=10, has_tails=True, params_update=params_update)
+    params_update.add('tail_tau_hi', value=50, min=5, max=200, vary=True)
+    result_ch = data3.channels[ch_num].linefit(81000, "energy_5lagy_dc", dlo=400, dhi=400,
+                                               binsize=10, has_tails=True, params_update=params_update)
     result_ch.plotm()
     plt.show()
     return (params_update,)
@@ -328,10 +323,10 @@ def _(ch_num, data3, lmfit, plt):
 
 @app.cell
 def _(data3, moss, params_update, pl):
-    result_data = data3.linefit(81000, "energy_5lagy_dc", dlo=400, 
-                                dhi=400, binsize=10, 
+    result_data = data3.linefit(81000, "energy_5lagy_dc", dlo=400,
+                                dhi=400, binsize=10,
                                 has_tails=True, params_update=params_update,
-                               use_expr=pl.col("rise_time").is_between(0.00073, 0.000731))
+                                use_expr=pl.col("rise_time").is_between(0.00073, 0.000731))
     result_data.plotm()
     moss.show()
     return
@@ -341,7 +336,7 @@ def _(data3, moss, params_update, pl):
 def _(data3, mo, moss, np, plt):
     data3.plot_hist("energy_5lagy_dc", np.arange(0, 300000, 20))
     plt.yscale("log")
-    mo.vstack([mo.md("# coadded plot\nonly 2 point cal, fake lines may abound"),moss.show()])
+    mo.vstack([mo.md("# coadded plot\nonly 2 point cal, fake lines may abound"), moss.show()])
     return
 
 
@@ -353,7 +348,7 @@ def _(mo):
 
 @app.cell
 def _(data3):
-    data3.save_steps(data3.get_path_in_output_folder("steps_dict.pkl"));
+    data3.save_steps(data3.get_path_in_output_folder("steps_dict.pkl"))
     return
 
 
