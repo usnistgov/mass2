@@ -274,14 +274,15 @@ class Channels:
         return self.map(load_steps)
 
     def save_steps(self, filename):
-        import pickle
         steps = {}
         for channum, ch in self.channels.items():
             steps[channum] = ch.steps[:]
-        steps
-        with open(filename, "wb") as f:
-            pickle.dump(steps, f)
+        moss.misc.pickle_object(steps, filename)
         return steps
+    
+    def load_steps(self, filename):
+        steps = moss.misc.unpickle_object(filename)
+        return self.with_steps_dict(steps)
 
     def parent_folder_path(self):
         import pathlib

@@ -640,6 +640,11 @@ class Channel:
 
     def as_bad(self, error_type, error_msg, backtrace):
         return BadChannel(self, error_type, error_msg, backtrace)
+    
+    def save_steps(self, filename):
+        steps = {self.header.ch_num: self.steps[:]}
+        moss.misc.pickle_object(steps, filename)
+        return steps
 
 
 @dataclass(frozen=True)
