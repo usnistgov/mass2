@@ -23,16 +23,18 @@ def test_ljh_fractional_record(tmp_path):
     # half of the next record. Check that the resulting file can be opened.
     npulses = 10
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
-    ljh = moss.LJHFile(p.pulse_folder/"20230626_run0001_chan4102.ljh")
+    ljh = moss.LJHFile(p.pulse_folder / "20230626_run0001_chan4102.ljh")
     assert ljh.nPulses > npulses
-    binary_size = (npulses + 0.5) * ljh.pulse_size_bytes
-    total_size = int(binary_size) + ljh.header_size
+    binary_size1 = int((npulses + 0.5) * ljh.pulse_size_bytes)
+    binary_size2 = (2*npulses) * ljh.pulse_size_bytes
+    total_size1 = binary_size1 + ljh.header_size
 
     input_file_path = ljh.filename
     ragged_ljh_file_path = tmp_path / "test_file.ljh"
 
     with open(input_file_path, 'rb') as source_file:
-        data_to_copy = source_file.read(total_size)
+        data_to_copy = source_file.read(total_size1)
+        data_to_save = source_file.read(binary_size2 - binary_size1)
     with open(ragged_ljh_file_path, 'wb') as destination_file:
         destination_file.write(data_to_copy)
 
@@ -40,6 +42,13 @@ def test_ljh_fractional_record(tmp_path):
     assert ljh2.nPulses == npulses
     assert ljh2.header_size == ljh.header_size
     assert ljh2.pulse_size_bytes * ljh2.nPulses + ljh2.header_size < os.path.getsize(ragged_ljh_file_path)
+
+    with open(ragged_ljh_file_path, 'ab') as destination_file:
+        destination_file.write(data_to_save)
+    ljh2.reopen_binary(npulses)
+    assert ljh2.nPulses == npulses
+    assert ljh2.header_size == ljh.header_size
+    assert ljh2.pulse_size_bytes * 2 * ljh2.nPulses + ljh2.header_size == os.path.getsize(ragged_ljh_file_path)
 
 
 def test_follow_mass_filtering_rst():

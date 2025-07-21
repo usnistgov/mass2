@@ -13,14 +13,28 @@ class LJHFile():
         self.dtype = np.dtype([('rowcount', np.int64),
                                ('posix_usec', np.int64),
                                ('data', np.uint16, self.nSamples)])
+        self.__open_binary(0, _limit_pulses)
+
+    def __open_binary(self, pulsesToSkip: int, _limit_pulses=None):
+        self.binary_size = os.path.getsize(self.filename) - self.header_size
+        full_nPulses = self.binary_size // self.pulse_size_bytes
+        self.nPulses = full_nPulses - pulsesToSkip
         if _limit_pulses is not None:
             # this is used to demo the process of watching an
             # ljh file grow over time
             self.nPulses = min(_limit_pulses, self.nPulses)
+        offset = self.header_size + pulsesToSkip * self.pulse_size_bytes
         self._mmap = np.memmap(self.filename, self.dtype, mode="r",
-                               offset=self.header_size, shape=(self.nPulses,))
+                               offset=offset, shape=(self.nPulses,))
         self._cache_i = -1
         self._cache_data = None
+
+    def reopen_binary(self, pulsesToSkip: int, _limit_pulses=None):
+        try:
+            del self._mmap
+        except AttributeError:
+            pass
+        self.__open_binary(pulsesToSkip, _limit_pulses)
 
     def __read_header(self, filename):
         """Read in the text header of an LJH file.
@@ -84,11 +98,12 @@ class LJHFile():
         self.number_of_rows = header_dict["Number of rows"]
         self.timestamp_offset = float(header_dict.get("Timestamp offset (s)", "-1"))
         self.version_str = header_dict['Save File Format Version']
+
         # if Version(self.version_str.decode()) >= Version("2.2.0"):
         self.pulse_size_bytes = (16 + 2 * self.nSamples)  # dont bother with old ljh
         # else:
         #     self.pulse_size_bytes = (6 + 2 * self.nSamples)
-        self.binary_size = os.stat(filename).st_size - self.header_size
+        self.binary_size = os.path.getsize(filename) - self.header_size
         self.header_dict = header_dict
         self.nPulses = self.binary_size // self.pulse_size_bytes
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
