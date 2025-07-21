@@ -42,13 +42,20 @@ def test_ljh_fractional_record(tmp_path):
     assert ljh2.nPulses == npulses
     assert ljh2.header_size == ljh.header_size
     assert ljh2.pulse_size_bytes * ljh2.nPulses + ljh2.header_size < os.path.getsize(ragged_ljh_file_path)
+    for i in range(npulses):
+        assert np.all(ljh2.read_trace(i) == ljh.read_trace(i))
 
+    # Now extend the file to contain 2*npulses binary records
     with open(ragged_ljh_file_path, 'ab') as destination_file:
         destination_file.write(data_to_save)
+
+    # Reopen it, skipping the first `npulses` records. Test that it works .
     ljh2.reopen_binary(npulses)
     assert ljh2.nPulses == npulses
     assert ljh2.header_size == ljh.header_size
     assert ljh2.pulse_size_bytes * 2 * ljh2.nPulses + ljh2.header_size == os.path.getsize(ragged_ljh_file_path)
+    for i in range(npulses):
+        assert np.all(ljh2.read_trace(i) == ljh.read_trace(i + npulses))
 
 
 def test_follow_mass_filtering_rst():
