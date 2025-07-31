@@ -573,8 +573,8 @@ class Channel:
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
-            print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
-            print("This is likely a BUG in DASTARD.")
+            # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
+            # print("This is likely a BUG in DASTARD.")
         else:
             df = self.df
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
@@ -640,7 +640,7 @@ class Channel:
 
     def as_bad(self, error_type, error_msg, backtrace):
         return BadChannel(self, error_type, error_msg, backtrace)
-    
+
     def save_steps(self, filename):
         steps = {self.header.ch_num: self.steps[:]}
         moss.misc.pickle_object(steps, filename)

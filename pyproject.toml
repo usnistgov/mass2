@@ -41,3 +41,8 @@ testpaths = [
     "moss",
     "examples"
 ]
+
+# Excludes all .py files within the 'examples' directory, because these are all
+# marimo notebooks and don't follow the usual Python style.
+[tool.ruff]
+extend-exclude = ["examples/*.py"]
