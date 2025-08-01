@@ -20,12 +20,12 @@ class LJHFile:
     header_size: int
     binary_size: int
     _mmap: np.memmap
-    first_pulse: int = 0
     max_pulses: Optional[int] = None
+
     OVERLONG_HEADER: ClassVar[int] = 100
 
     @classmethod
-    def open(cls, filename: str, first_pulse: int = 0, max_pulses: Optional[int] = None) -> "LJHFile":
+    def open(cls, filename: str, max_pulses: Optional[int] = None) -> "LJHFile":
         header_dict, header_string, header_size = cls.read_header(filename)
         nsamples = header_dict["Total Samples"]
         timebase = header_dict["Timebase"]
@@ -44,17 +44,15 @@ class LJHFile:
         if "DASTARD" not in client:
             npresamples += 3
 
-        full_npulses = binary_size // pulse_size_bytes
-        npulses = full_npulses - first_pulse
+        npulses = binary_size // pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        offset = header_size + first_pulse * pulse_size_bytes
         mmap = np.memmap(filename, dtype, mode="r",
-                         offset=offset, shape=(npulses,))
+                         offset=header_size, shape=(npulses,))
 
         return LJHFile(filename, dtype, npulses, timebase, nsamples, npresamples, client,
                        header_dict, header_string, header_size, binary_size,
-                       mmap, first_pulse, max_pulses)
+                       mmap, max_pulses)
 
     @classmethod
     def read_header(cls, filename: str) -> Tuple[dict, str, int]:
@@ -104,29 +102,32 @@ class LJHFile:
         return header_dict, header_string, header_size
 
     @property
-    def pulse_size_bytes(self):
+    def pulse_size_bytes(self) -> int:
         return self.dtype.itemsize
 
-    def reopen_binary(self, first_pulse: int = 0, max_pulses: Optional[int] = None) -> Self:
+    def reopen_binary(self, max_pulses: Optional[int] = None) -> Self:
         current_binary_size = os.path.getsize(self.filename) - self.header_size
-        full_npulses = current_binary_size // self.pulse_size_bytes
-        npulses = full_npulses - first_pulse
+        npulses = current_binary_size // self.pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        offset = self.header_size + first_pulse * self.pulse_size_bytes
-        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=offset, shape=(npulses,))
-        return replace(self, _mmap=mmap, first_pulse=first_pulse, max_pulses=max_pulses, binary_size=current_binary_size)
 
     def read_trace(self, i) -> npt.ArrayLike:
         return self._mmap[i]["data"]
 
-    def to_polars(self, keep_posix_usec=False) -> Tuple[pl.DataFrame, pl.DataFrame]:
-        df = pl.DataFrame({"pulse": self._mmap["data"],
-                           "posix_usec": self._mmap["posix_usec"],
-                           "rowcount": self._mmap["rowcount"]},
-                          schema={"pulse": pl.Array(pl.UInt16, self.nsamples),
-                                  "posix_usec": pl.UInt64,
-                                  "rowcount": pl.UInt64})
+        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(npulses,))
+        return replace(self, npulses=npulses, _mmap=mmap, max_pulses=max_pulses, binary_size=current_binary_size)
+    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> Tuple[pl.DataFrame, pl.DataFrame]:
+        data = {
+            "pulse": self._mmap["data"][first_pulse:],
+            "posix_usec": self._mmap["posix_usec"][first_pulse:],
+            "rowcount": self._mmap["rowcount"][first_pulse:]
+        }
+        schema = {
+            "pulse": pl.Array(pl.UInt16, self.nsamples),
+            "posix_usec": pl.UInt64,
+            "rowcount": pl.UInt64
+        }
+        df = pl.DataFrame(data, schema=schema)
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
