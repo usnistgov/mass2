@@ -8,6 +8,18 @@ import polars as pl
 
 @dataclass(frozen=True)
 class LJHFile:
+    """Represents the header and binary information of a single LJH file.
+
+    Includes the complete ASCII header stored both as a dictionary and a string, and
+    key attributes including the number of pulses, number of samples (and presamples)
+    in each pulse record, client information stored by the LJH writer, and the filename.
+
+    Also includes a `np.memmap` to the raw binary data. This memmap always starts with
+    pulse zero and extends to the last full pulse given the file size at the time of object
+    creation. To extend the memmap for files that are growing, use `LJHFile.reopen_binary()`
+    to return a new object with a possibly longer memmap.
+    """
+
     filename: str
     dtype: np.dtype
     npulses: int
@@ -56,10 +68,12 @@ class LJHFile:
 
     @classmethod
     def read_header(cls, filename: str) -> Tuple[dict, str, int]:
-        """Read in the text header of an LJH file.
+        """Read in the text header of an LJH file. Return the header parsed into a dictionary,
+        the complete header string (in case you want to generate a new LJH file from this one),
+        and the size of the header in bytes. The file does not remain open after this method.
 
-        On success, several attributes will be set: self.timebase, .nSamples,
-        and .nPresamples
+        Returns:
+            (header_dict, header_string, header_size)
 
         Args:
             filename: path to the file to be opened.
@@ -103,20 +117,62 @@ class LJHFile:
 
     @property
     def pulse_size_bytes(self) -> int:
+        """The size in bytes of each binary pulse record (including the timestamps)"""
         return self.dtype.itemsize
 
     def reopen_binary(self, max_pulses: Optional[int] = None) -> Self:
+        """Reopen the underlying binary section of the LJH file, in case its size has changed,
+        without re-reading the LJH header section.
+
+        Parameters
+        ----------
+        max_pulses : Optional[int], optional
+            A limit to the number of pulses to memory map or None for no limit, by default None
+
+        Returns
+        -------
+        Self
+            A new `LJHFile` object with the same header but a new memmap and number of pulses.
+        """
         current_binary_size = os.path.getsize(self.filename) - self.header_size
         npulses = current_binary_size // self.pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-
-    def read_trace(self, i) -> npt.ArrayLike:
-        return self._mmap[i]["data"]
-
         mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(npulses,))
         return replace(self, npulses=npulses, _mmap=mmap, max_pulses=max_pulses, binary_size=current_binary_size)
+
+    def read_trace(self, i: int) -> npt.ArrayLike:
+        """Return a single pulse record from an LJH file.
+
+        Parameters
+        ----------
+        i : int
+            Pulse record number (0-indexed)
+
+        Returns
+        -------
+        npt.ArrayLike
+            A view into the pulse record.
+        """
+        return self._mmap["data"][i]
+
     def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> Tuple[pl.DataFrame, pl.DataFrame]:
+        """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
+
+        Parameters
+        ----------
+        first_pulse : int, optional
+            The pulse dataframe starts with this pulse record number, by default 0
+        keep_posix_usec : bool, optional
+            Whether to keep the raw `posix_usec` field in the pulse dataframe, by default False
+
+        Returns
+        -------
+        Tuple[pl.DataFrame, pl.DataFrame]
+            (df, header_df)
+            df: the dataframe containing raw pulse information, one row per pulse
+            header_df: a one-row dataframe containing the information from the LJH file header
+        """
         data = {
             "pulse": self._mmap["data"][first_pulse:],
             "posix_usec": self._mmap["posix_usec"][first_pulse:],
@@ -135,7 +191,16 @@ class LJHFile:
         return df, header_df
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
+        """Write an LJH copy of this file, with a limited number of pulses.
+
+        Parameters
+        ----------
+        filename : str
+            The path where a new LJH file will be created (or replaced).
+        npulses : int
+            Number of pulse records to write
+        """
+        npulses = max(npulses, self.npulses)
         with open(filename, "wb") as f:
             f.write(self.header_string)
-            for i in range(npulses):
-                f.write(self._mmap[i].tobytes())
+            f.write(self._mmap[:npulses].tobytes())
