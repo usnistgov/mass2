@@ -537,7 +537,7 @@ class Channel:
             noise_channel = None
         else:
             noise_channel = moss.NoiseChannel.from_ljh(noise_path)
-        ljh = moss.LJHFile(path)
+        ljh = moss.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = moss.ChannelHeader.from_ljh_header_df(header_df)
         channel = moss.Channel(df, header=header, noise=noise_channel)

@@ -7,9 +7,9 @@ import pytest
 
 def test_ljh_to_polars():
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
-    ljh_noise = moss.LJHFile(p.noise_folder/"20230626_run0000_chan4102.ljh")
+    ljh_noise = moss.LJHFile.open(p.noise_folder/"20230626_run0000_chan4102.ljh")
     df_noise, header_df_noise = ljh_noise.to_polars()
-    ljh = moss.LJHFile(p.pulse_folder/"20230626_run0001_chan4102.ljh")
+    ljh = moss.LJHFile.open(p.pulse_folder/"20230626_run0001_chan4102.ljh")
     df, header_df = ljh.to_polars()
 
 
@@ -21,10 +21,11 @@ def test_ljh_fractional_record(tmp_path):
 
     # Specifically, copy the LJH file through the first `npulses` binary records, plus exactly
     # half of the next record. Check that the resulting file can be opened.
+    # Then later add enough raw data to have `2*npulses` records. Make sure it can be re-opened.
     npulses = 10
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
-    ljh = moss.LJHFile(p.pulse_folder / "20230626_run0001_chan4102.ljh")
-    assert ljh.nPulses > npulses
+    ljh = moss.LJHFile.open(p.pulse_folder / "20230626_run0001_chan4102.ljh")
+    assert ljh.npulses >= 2 * npulses
     binary_size1 = int((npulses + 0.5) * ljh.pulse_size_bytes)
     binary_size2 = (2*npulses) * ljh.pulse_size_bytes
     total_size1 = binary_size1 + ljh.header_size
@@ -33,29 +34,29 @@ def test_ljh_fractional_record(tmp_path):
     ragged_ljh_file_path = tmp_path / "test_file.ljh"
 
     with open(input_file_path, 'rb') as source_file:
-        data_to_copy = source_file.read(total_size1)
-        data_to_save = source_file.read(binary_size2 - binary_size1)
+        data_to_copy_initially = source_file.read(total_size1)
+        data_to_append_later = source_file.read(binary_size2 - binary_size1)
     with open(ragged_ljh_file_path, 'wb') as destination_file:
-        destination_file.write(data_to_copy)
+        destination_file.write(data_to_copy_initially)
 
-    ljh2 = moss.LJHFile(ragged_ljh_file_path)
-    assert ljh2.nPulses == npulses
+    ljh2 = moss.LJHFile.open(ragged_ljh_file_path)
+    assert ljh2.npulses == npulses
     assert ljh2.header_size == ljh.header_size
-    assert ljh2.pulse_size_bytes * ljh2.nPulses + ljh2.header_size < os.path.getsize(ragged_ljh_file_path)
+    assert ljh2.pulse_size_bytes * ljh2.npulses + ljh2.header_size < os.path.getsize(ragged_ljh_file_path)
     for i in range(npulses):
         assert np.all(ljh2.read_trace(i) == ljh.read_trace(i))
 
     # Now extend the file to contain 2*npulses binary records
     with open(ragged_ljh_file_path, 'ab') as destination_file:
-        destination_file.write(data_to_save)
+        destination_file.write(data_to_append_later)
 
-    # Reopen it, skipping the first `npulses` records. Test that it works .
-    ljh2.reopen_binary(npulses)
-    assert ljh2.nPulses == npulses
-    assert ljh2.header_size == ljh.header_size
-    assert ljh2.pulse_size_bytes * 2 * ljh2.nPulses + ljh2.header_size == os.path.getsize(ragged_ljh_file_path)
+    # Reopen it.
+    ljh3 = ljh2.reopen_binary()
+    assert ljh3.npulses == 2 * npulses
+    assert ljh3.header_size == ljh.header_size
+    assert ljh3.pulse_size_bytes * ljh3.npulses + ljh3.header_size == os.path.getsize(ragged_ljh_file_path)
     for i in range(npulses):
-        assert np.all(ljh2.read_trace(i) == ljh.read_trace(i + npulses))
+        assert np.all(ljh3.read_trace(i) == ljh.read_trace(i))
 
 
 def test_follow_mass_filtering_rst():

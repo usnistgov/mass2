@@ -96,7 +96,7 @@ class NoiseChannel:
 
     @classmethod
     def from_ljh(cls, path):
-        ljh = moss.LJHFile(path)
+        ljh = moss.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         noise_channel = cls(df, header_df, header_df["Timebase"][0])
         return noise_channel

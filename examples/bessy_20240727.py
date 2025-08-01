@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.3"
+__generated_with = "0.14.10"
 app = marimo.App(width="medium", app_title="MOSS intro")
 
 
@@ -8,13 +8,13 @@ app = marimo.App(width="medium", app_title="MOSS intro")
 def _(mo):
     mo.md(
         """
-        #MOSS internals introdution
-        MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS. MOSS support many algorithms for pulse filtering, calibration, and corrections. MOSS is built on modern open source data science software, including pola.rs and marimo. MOSS supports some key features that MASS struggled with including:
+    #MOSS internals introdution
+    MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS. MOSS support many algorithms for pulse filtering, calibration, and corrections. MOSS is built on modern open source data science software, including pola.rs and marimo. MOSS supports some key features that MASS struggled with including:
 
-          * consecutive data set analysis
-          * online (aka realtime) analysis
-          * easily supporting different analysis chains
-        """
+      * consecutive data set analysis
+      * online (aka realtime) analysis
+      * easily supporting different analysis chains
+    """
     )
     return
 
@@ -39,9 +39,9 @@ def _():
 def _(mo):
     mo.md(
         """
-        # Load data
-        Here we load the data, then we explore the internals a bit to show how MOSS is built.
-        """
+    # Load data
+    Here we load the data, then we explore the internals a bit to show how MOSS is built.
+    """
     )
     return
 
@@ -60,13 +60,13 @@ def _(moss, pulsedata):
 def _(mo):
     mo.md(
         """
-        # basic analysis
-        The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
+    # basic analysis
+    The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
-        The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
+    The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
 
-        The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
-        """
+    The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
+    """
     )
     return
 
