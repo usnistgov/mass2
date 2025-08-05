@@ -4,6 +4,7 @@ import numpy.typing as npt
 import os
 import numpy as np
 import polars as pl
+from packaging.version import Version
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,10 @@ class LJHFile:
                           ('data', np.uint16, nsamples)])
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
+
+        version_str = header_dict["Save File Format Version"]
+        if Version(version_str.decode()) < Version("2.2.0"):
+            raise NotImplementedError("Mass 2 does not yet support LJH files version 2.1 and earlier")
 
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
         # It adds 3 to the "true value" of nPresamples. For now, assume that only
