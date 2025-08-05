@@ -57,7 +57,7 @@ class LJHFile:
             ])
         else:
             dtype = np.dtype([
-                ('rowcount', np.int64),
+                ('subframecount', np.int64),
                 ('posix_usec', np.int64),
                 ('data', np.uint16, nsamples)
             ])
@@ -193,12 +193,12 @@ class LJHFile:
         data = {
             "pulse": self._mmap["data"][first_pulse:],
             "posix_usec": self._mmap["posix_usec"][first_pulse:],
-            "rowcount": self._mmap["rowcount"][first_pulse:]
+            "subframecount": self._mmap["subframecount"][first_pulse:]
         }
         schema = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
-            "rowcount": pl.UInt64
+            "subframecount": pl.UInt64
         }
         df = pl.DataFrame(data, schema=schema)
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
