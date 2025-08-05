@@ -1,7 +1,7 @@
 [project]
-name = "mass"
+name = "mass2"
 dynamic = ["version"]
-description = "Microcalorimeter Analysis Software Suite"
+description = "Microcalorimeter Analysis Software Suite, version 2"
 authors = [
     {name = "Joe Fowler", email = "drjoefowler@gmail.com"},
     {name = "Galen O'Neil", email = "ggggggggg@github.com"},
@@ -45,13 +45,13 @@ docs = [
 ]
 
 [project.urls]
-Repository = "https://github.com/usnistgov/mass.git"
-Issues = "https://github.com/usnistgov/mass/issues"
+Repository = "https://github.com/usnistgov/mass2.git"
+Issues = "https://github.com/usnistgov/mass2/issues"
 
 [project.scripts]
-ljh_truncate = "mass.ljh_truncate:main"
-ljh2off = "mass.core.ljh2off:main"
-make_projectors = "mass.core.projectors_script:main"
+ljh_truncate = "mass2.ljh_truncate:main"
+ljh2off = "mass2.core.ljh2off:main"
+make_projectors = "mass2.core.projectors_script:main"
 
 
 [build-system]
@@ -59,11 +59,11 @@ requires = ["setuptools>=61", "setuptools_scm>=8", "wheel", "numpy>=1.14"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
-mass = [
+mass2 = [
     "bin/ljh_truncate",
     "calibration/nist_xray_data.dat",
     "calibration/low_z_xray_data.dat",
-    "calibration/nist_asd.pickle",
+    "calibration/nist_asd_2023.pickle.gz",
 ]
 
 [tool.setuptools_scm]
