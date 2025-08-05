@@ -8,7 +8,7 @@ Paul Szypryt
 """
 
 import numpy as np
-import mass.calibration.hci_lines
+import mass.calibration
 import xraydb
 
 
