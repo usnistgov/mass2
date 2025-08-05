@@ -27,7 +27,7 @@ The presence of uncertainties requires some special handling in a few places, th
 .. testcode::
 
   import mass
-  import mass.materials  # you have to explicitly import mass.materials
+  import mass2.materials  # you have to explicitly import mass2.materials
   import numpy as np
   import pylab as plt
   from uncertainties import unumpy as unp  # useful for working with arrays with uncertainties aka uarray

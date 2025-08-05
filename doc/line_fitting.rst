@@ -48,7 +48,7 @@ Objects of the type ``SpectralLine`` encode the line shape of a fluorescence lin
   import mass
   import numpy as np
   import pylab as plt
-  import mass.materials
+  import mass2.materials
 
 .. testcode::
 

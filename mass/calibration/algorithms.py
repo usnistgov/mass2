@@ -15,8 +15,8 @@ import matplotlib.transforms as mtrans
 from matplotlib.ticker import MaxNLocator
 
 from ..common import isstr
-from mass.calibration.energy_calibration import STANDARD_FEATURES
-import mass.calibration
+from mass.calibration.fluorescence_lines import STANDARD_FEATURES
+import mass2.calibration
 
 
 def line_names_and_energies(line_names):

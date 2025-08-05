@@ -33,7 +33,7 @@ a commonly injected gas at the NIST EBIT.
 .. testcode::
 
   import mass
-  import mass.calibration.hci_lines
+  import mass2.calibration.hci_lines
   import numpy as numpy
   import pylab as plt
 

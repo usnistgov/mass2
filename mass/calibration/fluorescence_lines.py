@@ -5,11 +5,11 @@ fluorescence_lines.py
 Tools for fitting and simulating X-ray fluorescence lines.
 """
 
+from mass.calibration.nist_xray_database import NISTXrayDBFile
 import numpy as np
 import scipy as sp
 import pylab as plt
 from . import line_models
-from .energy_calibration import STANDARD_FEATURES
 from collections import OrderedDict
 
 from mass.mathstat.special import voigt
@@ -19,6 +19,49 @@ LOG = logging.getLogger("mass")
 FWHM_OVER_SIGMA = (8 * np.log(2))**0.5
 
 _rng = np.random.default_rng()
+
+
+def LineEnergies() -> dict[str, float]:
+    """
+    A dictionary to know a lot of x-ray fluorescence line energies, based on Deslattes' database.
+
+    It is built on facts from mass.calibration.nist_xray_database module.
+
+    It is a dictionary from peak name to energy, with several alternate names
+    for the lines:
+
+    E = Energies()
+    print E["MnKAlpha"]
+    print E["MnKAlpha"], E["MnKA"], E["MnKA1"], E["MnKL3"]
+    """
+    db = NISTXrayDBFile()
+    alternate_line_names = {v: k for (k, v) in db.LINE_NICKNAMES.items()}
+    data = {}
+
+    for fullname, L in db.lines.items():
+        element, linename = fullname.split(" ", 1)
+        allnames = [linename]
+        if linename in alternate_line_names:
+            siegbahn_linename = alternate_line_names[linename]
+            long_linename = siegbahn_linename.replace("A", "Alpha"). \
+                replace("B", "Beta").replace("G", "Gamma")
+
+            allnames.append(siegbahn_linename)
+            allnames.append(long_linename)
+
+            if siegbahn_linename.endswith("1"):
+                allnames.append(siegbahn_linename[:-1])
+                allnames.append(long_linename[:-1])
+
+        for name in allnames:
+            key = "".join((element, name))
+            data[key] = L.peak
+
+    return data
+
+
+# Some commonly-used standard energy features.
+STANDARD_FEATURES = LineEnergies()
 
 
 class SpectralLine:

@@ -1,8 +1,8 @@
 # ruff: noqa: F403, F401
 
-import mass.core.analysis_algorithms
-import mass.core.optimal_filtering
-import mass.core.pulse_model
+import mass2.core.analysis_algorithms
+import mass2.core.optimal_filtering
+import mass2.core.pulse_model
 
 
 from .analysis_algorithms import *
@@ -13,6 +13,6 @@ from .experiment_state import ExperimentStateFile
 
 
 # Don't import the contents of these at the top level
-import mass.core.message_logging
-import mass.core.utilities
-import mass.core.phase_correct
+import mass2.core.message_logging
+import mass2.core.utilities
+import mass2.core.phase_correct

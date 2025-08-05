@@ -1,6 +1,6 @@
 import pylab as plt
 import numpy as np
-import mass.mathstat
+import mass2.mathstat
 from mass.common import tostr
 
 
