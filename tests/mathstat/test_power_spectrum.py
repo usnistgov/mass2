@@ -1,9 +1,9 @@
 import pytest
 import numpy as np
 import pylab as plt
-import mass
+import mass2 as mass
 
-from mass.mathstat.power_spectrum import computeSpectrum
+from mass2.mathstat.power_spectrum import computeSpectrum
 
 rng = np.random.default_rng(34234)
 

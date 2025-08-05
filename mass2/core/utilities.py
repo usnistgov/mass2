@@ -16,7 +16,7 @@ import logging
 import numpy as np
 import matplotlib.pylab as plt
 
-import mass
+import mass2 as mass
 
 
 class MouseClickReader:

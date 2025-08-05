@@ -34,7 +34,7 @@ import numpy as np
 import scipy as sp
 from scipy.interpolate import splev
 
-from mass.mathstat.derivative import Function, ConstantFunction
+from mass2.mathstat.derivative import Function, ConstantFunction
 
 
 class CubicSpline:

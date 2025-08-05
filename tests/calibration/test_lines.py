@@ -10,7 +10,7 @@ Joe Fowler
 import pytest
 from pytest import approx
 import numpy as np
-import mass
+import mass2 as mass
 import pylab as plt
 
 

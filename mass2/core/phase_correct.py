@@ -2,9 +2,9 @@ import numpy as np
 import scipy as sp
 import scipy.signal
 
-import mass2.mathstat.entropy
-from mass.mathstat.interpolate import CubicSpline
-from mass.common import tostr
+import mass2 as mass
+from mass2.mathstat.interpolate import CubicSpline
+from mass2.common import tostr
 import logging
 LOG = logging.getLogger("mass")
 

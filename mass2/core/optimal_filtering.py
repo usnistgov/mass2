@@ -10,7 +10,7 @@ from typing import Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from mass.mathstat.toeplitz import ToeplitzSolver
+from mass2.mathstat.toeplitz import ToeplitzSolver
 
 
 @dataclass(frozen=True)

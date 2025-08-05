@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import polars as pl
-import moss
+from mass2 import moss
 import numpy as np
 import pylab as plt
 

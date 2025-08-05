@@ -1,6 +1,6 @@
 import collections
 from typing import Union
-import mass
+import mass2 as mass
 import numpy as np
 
 

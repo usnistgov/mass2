@@ -3,12 +3,12 @@ from dataclasses import dataclass, field
 import polars as pl
 import pylab as plt
 import functools
-import moss
-from moss import NoiseChannel, CalSteps, DriftCorrectStep, SummarizeStep, Filter5LagStep
+from mass2 import moss
+from mass2.moss import NoiseChannel, CalSteps, DriftCorrectStep, SummarizeStep, Filter5LagStep
 from typing import Optional
 import numpy as np
 import time
-import mass
+import mass2 as mass
 import lmfit
 
 

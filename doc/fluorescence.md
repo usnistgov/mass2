@@ -12,7 +12,7 @@ Mass includes numerous features to help you analyze and model the fluorescence e
 
 Objects of the `SpectralLine` class are callable, and return their PDF given the energy as an array or scalar argument.
 ```python
-import mass
+import mass2 as mass
 import numpy as np
 import pylab as plt
 spectrum = mass.MnKAlpha()

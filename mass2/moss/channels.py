@@ -3,8 +3,8 @@ import polars as pl
 import pylab as plt
 import numpy as np
 import functools
-import mass
-import moss
+import mass2 as mass
+from mass2 import moss
 import joblib
 import traceback
 import lmfit
@@ -279,7 +279,7 @@ class Channels:
             steps[channum] = ch.steps[:]
         moss.misc.pickle_object(steps, filename)
         return steps
-    
+
     def load_steps(self, filename):
         steps = moss.misc.unpickle_object(filename)
         return self.with_steps_dict(steps)

@@ -8,7 +8,7 @@ Joe Fowler, NIST
 
 import pytest
 import numpy as np
-from mass.mathstat import special
+from mass2.mathstat import special
 
 
 class TestVoigtWidth:

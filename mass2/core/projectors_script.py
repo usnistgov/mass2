@@ -1,4 +1,4 @@
-import mass
+import mass2 as mass
 import os
 import logging
 import h5py

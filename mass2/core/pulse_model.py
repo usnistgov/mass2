@@ -1,7 +1,7 @@
 import pylab as plt
 import numpy as np
 import mass2.mathstat
-from mass.common import tostr
+from mass2.common import tostr
 
 
 class PulseModel:

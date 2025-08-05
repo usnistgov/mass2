@@ -1,9 +1,9 @@
 import numpy as np
 import pylab as plt
 from dataclasses import dataclass
-import moss
+from mass2 import moss
 import polars as pl
-import mass
+import mass2 as mass
 
 
 def mass_5lag_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):

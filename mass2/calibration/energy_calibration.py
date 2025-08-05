@@ -18,7 +18,7 @@ from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
 
-from mass.mathstat.interpolate import CubicSplineFunction, GPRSplineFunction
+from mass2.mathstat.interpolate import CubicSplineFunction, GPRSplineFunction
 from .fluorescence_lines import STANDARD_FEATURES
 
 
@@ -167,7 +167,7 @@ class EnergyCalibrationMaker:
                 energy = STANDARD_FEATURES[name]
             except Exception:
                 raise ValueError("2nd argument must be an energy or a known name"
-                                 + " from mass.energy_calibration.STANDARD_FEATURES")
+                                 + " from mass2.energy_calibration.STANDARD_FEATURES")
 
         if ph_error is None:
             ph_error = ph * 0.001

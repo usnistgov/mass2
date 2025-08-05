@@ -19,7 +19,7 @@ from .rough_cal import RoughCalibrationStep
 from . import phase_correct
 
 __all__ = ["LJHFile", "pulse_algorithms", "noise_algorithms", "ljhutil", "misc",
-           "good_series", "show", "NoisePSD", "NoiseChannel", "alSteps", "CalSteps",
+           "good_series", "show", "NoisePSD", "NoiseChannel", "CalSteps",
            "CalStep", "SummarizeStep", "PretrigMeanJumpFixStep", "FitSpec", "MultiFit",
            "MultiFitQuadraticGainCalStep", "MultiFitMassCalibrationStep", "filters",
            "mass_5lag_filter", "Filter", "Filter5LagStep", "drift_correct",

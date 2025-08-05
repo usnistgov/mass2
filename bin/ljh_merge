@@ -14,9 +14,9 @@ The output will then be "merged_chan1.ljh" in the directory of the first file fo
 import argparse
 import os
 import shutil
-import mass
-from mass.core.ljh_util import filename_glob_expand
-from mass.core.ljh_modify import ljh_append_traces
+import mass2 as mass
+from mass2.core.ljh_util import filename_glob_expand
+from mass2.core.ljh_modify import ljh_append_traces
 
 
 def merge(out_path, filenames, overwrite):

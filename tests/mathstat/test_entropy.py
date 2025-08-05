@@ -9,8 +9,8 @@ Joe Fowler
 
 import pytest
 import numpy as np
-import mass
-from mass.mathstat.entropy import laplace_entropy, _merge_orderedlists, \
+import mass2 as mass
+from mass2.mathstat.entropy import laplace_entropy, _merge_orderedlists, \
     laplace_cross_entropy, laplace_KL_divergence  # noqa
 
 

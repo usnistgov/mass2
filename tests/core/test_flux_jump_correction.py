@@ -1,5 +1,5 @@
 import numpy as np
-from mass.core.analysis_algorithms import unwrap_n, correct_flux_jumps
+from mass2.core.analysis_algorithms import unwrap_n, correct_flux_jumps
 
 import logging
 LOG = logging.getLogger("mass")

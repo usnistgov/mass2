@@ -1,6 +1,6 @@
-import moss
+from mass2 import moss
 import numpy as np
-import mass
+import mass2 as mass
 import polars as pl
 
 

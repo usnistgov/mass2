@@ -1,7 +1,7 @@
-import mass
+import mass2 as mass
 import polars as pl
 import pylab as plt
-import moss
+from mass2 import moss
 from dataclasses import dataclass
 
 

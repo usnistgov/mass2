@@ -22,8 +22,8 @@ import sys
 sys.path.insert(0, os.path.abspath('..'))
 
 try:
-    from mass._version import version as __version__
-    from mass._version import version_tuple
+    from mass2._version import version as __version__
+    from mass2._version import version_tuple
 except ImportError:
     __version__ = "unknown version"
     version_tuple = (0, 0, "unknown version")

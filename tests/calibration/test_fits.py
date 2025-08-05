@@ -7,7 +7,7 @@ Test that line work correctly.
 import pytest
 from pytest import approx
 import numpy as np
-import mass
+import mass2 as mass
 
 # ruff: noqa: PLR0917
 

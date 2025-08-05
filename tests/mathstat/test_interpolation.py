@@ -8,8 +8,8 @@ Joe Fowler
 """
 
 import numpy as np
-import mass
-from mass.mathstat.interpolate import k_spline, GPRSpline
+import mass2 as mass
+from mass2.mathstat.interpolate import k_spline, GPRSpline
 
 
 class Test_SmoothingSpline:

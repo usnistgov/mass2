@@ -1,8 +1,8 @@
 import numpy as np
 from dataclasses import dataclass
-import mass
-import moss
-from moss import CalStep
+import mass2 as mass
+from mass2 import moss
+from mass2.moss import CalStep
 import polars as pl
 import typing
 import pylab as plt

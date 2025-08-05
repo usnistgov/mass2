@@ -1,6 +1,6 @@
 import numpy as np
 
-import mass
+import mass2 as mass
 import logging
 LOG = logging.getLogger("mass")
 

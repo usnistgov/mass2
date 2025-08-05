@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 import lmfit
 import copy
-import mass
+import mass2 as mass
 import math
 import numpy as np
 import polars as pl
 from typing import Optional
-import moss
+from mass2 import moss
 import pylab as plt
 
 

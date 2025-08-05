@@ -26,7 +26,7 @@ The presence of uncertainties requires some special handling in a few places, th
 
 .. testcode::
 
-  import mass
+  import mass2 as mass
   import mass2.materials  # you have to explicitly import mass2.materials
   import numpy as np
   import pylab as plt

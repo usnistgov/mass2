@@ -1,4 +1,4 @@
-import moss
+from mass2 import moss
 import numpy as np
 
 

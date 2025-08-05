@@ -7,10 +7,10 @@ Galen O'Neil
 
 import pytest
 import numpy as np
-import mass
+import mass2 as mass
 import h5py
 import os
-from mass import EnergyCalibrationMaker
+from mass2 import EnergyCalibrationMaker
 
 
 def basic_nonlinearity(e: np.ndarray) -> np.ndarray:

@@ -10,7 +10,7 @@ March 30, 2011
 """
 
 import pytest
-from mass.mathstat.toeplitz import ToeplitzSolver
+from mass2.mathstat.toeplitz import ToeplitzSolver
 import numpy as np
 from scipy import linalg
 import time
@@ -133,7 +133,7 @@ class toeplitzSpeed:
 
     This is NOT a unit test. Usage:
 
->>> from mass.mathstat.test import test_toeplitz
+>>> from mass2.mathstat.test import test_toeplitz
 >>> t=test_toeplitz.toeplitzSpeed()
 >>> t.plot()
     """

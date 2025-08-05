@@ -1,4 +1,4 @@
-import moss
+from mass2 import moss
 import pulsedata
 import numpy as np
 import os
@@ -62,7 +62,7 @@ def test_ljh_fractional_record(tmp_path):
 def test_follow_mass_filtering_rst():
     # following https://github.com/usnistgov/mass/blob/master/doc/filtering.rst
     import numpy as np
-    import mass
+    import mass2 as mass
     import polars as pl
     np.random.seed(1)
 
@@ -123,7 +123,7 @@ def test_follow_mass_filtering_rst():
 
 def test_noise_autocorr():
     import polars as pl
-    import mass
+    import mass2 as mass
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     # 250 pulses of length 500
@@ -151,7 +151,7 @@ def test_noise_autocorr():
 
 def test_noise_psd():
     import polars as pl
-    import mass
+    import mass2 as mass
     np.random.seed(1)
     header_df = pl.DataFrame()
     frametime_s = 0.5
@@ -220,7 +220,7 @@ def test_ravel_behavior():
 
 def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     import polars as pl
-    import mass
+    import mass2 as mass
     np.random.seed(1)
     header_df = pl.DataFrame()
     frametime_s = 0.5

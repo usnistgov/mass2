@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import mass
+import mass2 as mass
 
 
 def ATSF(pulse, npre, noise, sample_time_sec, peak=0.0, f_3db=None, cut_pre=0, cut_post=0):

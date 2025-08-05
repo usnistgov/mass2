@@ -82,7 +82,7 @@ def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=Fal
 
 def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
     assert window is None, "windowing not implemented"
-    import mass
+    import mass2 as mass
     (n_pulses, len_pulse) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)

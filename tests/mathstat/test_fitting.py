@@ -1,7 +1,7 @@
 '''
 Tests for fit_kink_model
 '''
-import mass
+import mass2 as mass
 import numpy as np
 
 

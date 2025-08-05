@@ -1,9 +1,9 @@
 import numpy as np
 import uncertainties
 from uncertainties import unumpy as unp
-from mass.materials import uncertainties_helpers
+from mass2.materials import uncertainties_helpers
 
-import mass
+import mass2 as mass
 import mass2.materials
 import pylab as plt
 

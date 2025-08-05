@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 import numpy as np
 import pylab as plt  # type: ignore
-import moss
+import mass2 as mass
+from mass2 import moss
 import polars as pl
 from matplotlib.axes._axes import Axes
-from moss.channel import Channel
+from mass2.moss.channel import Channel
 from numpy import float32, float64, ndarray
 from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
@@ -675,7 +676,6 @@ class RoughCalibrationStep(moss.CalStep):
                            ph_smoothing_fwhm: int, n_extra: int,
                            use_expr: bool = True
                            ) -> "RoughCalibrationStep":
-        import mass  # type: ignore
 
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
@@ -702,7 +702,6 @@ class RoughCalibrationStep(moss.CalStep):
                                        ph_smoothing_fwhm: int, n_extra: int,
                                        use_expr: bool = True
                                        ) -> "RoughCalibrationStep":
-        import mass  # type: ignore
 
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
@@ -734,7 +733,6 @@ class RoughCalibrationStep(moss.CalStep):
                     fwhm_pulse_height_units: float = 75,
                     n_extra_peaks: int = 10,
                     acceptable_rms_residual_e: float = 10) -> "RoughCalibrationStep":
-        import mass  # type: ignore
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
         (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)

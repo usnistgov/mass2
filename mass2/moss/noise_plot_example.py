@@ -7,7 +7,7 @@ app = marimo.App(width="medium")
 @app.cell
 def __():
     import marimo as mo
-    import moss
+    from mass2 import moss
     import pylab as plt
     return mo, moss, plt
 

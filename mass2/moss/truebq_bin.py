@@ -4,7 +4,7 @@ import pylab as plt
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
-import moss
+from mass2 import moss
 
 header_dtype = np.dtype(
     [

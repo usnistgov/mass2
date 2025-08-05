@@ -4,9 +4,9 @@ Test code for mass.calibration.algorithms.
 
 from pytest import approx
 import numpy as np
-import mass
-from mass.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, \
-    build_fit_ranges_ph, multifit, EnergyCalibrationAutocal
+import mass2 as mass
+from mass2.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, \
+    build_fit_ranges_ph, multifit
 import itertools
 
 rng = np.random.default_rng(2)
@@ -116,28 +116,3 @@ def test_complete():
     results = multifit(ph, line_names, fit_lo_hi, np.ones_like(
         slopes_de_dph) * binsize_ev, slopes_de_dph, hide_deprecation=True)
     assert results is not None
-
-
-def test_autocal():
-    # generate pulseheights from known spectrum
-    num_samples = {k: 1000 * (k + 1) for k in range(5)}
-    line_names = ["MnKAlpha", "MnKBeta", "CuKAlpha", "TiKAlpha", "FeKAlpha"]
-    spect = {i: mass.spectra[n] for (i, n) in enumerate(line_names)}
-    e = []
-    for (k, s) in spect.items():
-        e.extend(s.rvs(size=num_samples[k], instrument_gaussian_fwhm=k + 3.0, rng=rng))
-    e = np.array(e)
-    e = e[e > 0]   # The wide-tailed distributions will occasionally produce negative e. Bad!
-    ph = 2 * e**0.9
-
-    auto_cal = EnergyCalibrationAutocal(ph, line_names)
-    auto_cal.autocal()
-    auto_cal.diagnose()
-
-    # test fitters are correct type, and ordered by line energy
-    e0 = 0
-    for r in auto_cal.results:
-        assert isinstance(r.model, mass.calibration.line_models.GenericLineModel)
-        peak = r.model.spect.peak_energy
-        assert e0 < peak
-        e0 = peak

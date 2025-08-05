@@ -13,7 +13,7 @@ import scipy as sp
 from numba import njit
 
 import mass2.mathstat.interpolate
-from mass.mathstat.entropy import laplace_entropy
+from mass2.mathstat.entropy import laplace_entropy
 import logging
 LOG = logging.getLogger("mass")
 

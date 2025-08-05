@@ -10,7 +10,7 @@ Created on Feb 9, 2012
 
 import pytest
 import numpy as np
-from mass.mathstat.robust import shorth_range, high_median, Qscale
+from mass2.mathstat.robust import shorth_range, high_median, Qscale
 
 
 class Test_Shorth:

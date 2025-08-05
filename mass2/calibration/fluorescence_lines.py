@@ -5,14 +5,14 @@ fluorescence_lines.py
 Tools for fitting and simulating X-ray fluorescence lines.
 """
 
-from mass.calibration.nist_xray_database import NISTXrayDBFile
+from mass2.calibration.nist_xray_database import NISTXrayDBFile
 import numpy as np
 import scipy as sp
 import pylab as plt
 from . import line_models
 from collections import OrderedDict
 
-from mass.mathstat.special import voigt
+from mass2.mathstat.special import voigt
 import logging
 LOG = logging.getLogger("mass")
 
@@ -25,7 +25,7 @@ def LineEnergies() -> dict[str, float]:
     """
     A dictionary to know a lot of x-ray fluorescence line energies, based on Deslattes' database.
 
-    It is built on facts from mass.calibration.nist_xray_database module.
+    It is built on facts from mass2.calibration.nist_xray_database module.
 
     It is a dictionary from peak name to energy, with several alternate names
     for the lines:

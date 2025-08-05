@@ -15,7 +15,7 @@ The user first creates a ``FilterMaker`` from the analyzed noise and signal, the
 .. testcode::
 
     import numpy as np
-    import mass
+    import mass2 as mass
 
     n = 500
     Maxsignal = 1000.0
@@ -55,7 +55,7 @@ A test of normalization and filter variance
 .. testcode::
 
     import numpy as np
-    import mass
+    import mass2 as mass
 
     def verify_close(x, y, rtol=1e-5, topic=None):
         if topic is not None:

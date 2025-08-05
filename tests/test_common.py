@@ -1,6 +1,6 @@
 import numpy as np
 
-from mass.common import isstr, tostr
+from mass2.common import isstr, tostr
 
 
 def test_isstr():

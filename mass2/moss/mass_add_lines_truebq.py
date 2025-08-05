@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import mass
+import mass2 as mass
 import numpy as np
 
 if "Am241Q" not in mass.spectra.keys():
@@ -27,7 +27,7 @@ if "Am243Q" not in mass.spectra.keys():
                  nominal_peak_energy=5.3641e6,
                  energies=np.array([5.3641e6, 5.4388e6, 5.395e6]),
                  lorentzian_fwhm=np.array(np.array([50, 50, 50])),
-                 reference_amplitude=np.array(np.array([10000,5400,720])),
+                 reference_amplitude=np.array(np.array([10000, 5400, 720])),
                  reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT,
                  ka12_energy_diff=60e3,
                  position_uncertainty=1.5
