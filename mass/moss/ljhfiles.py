@@ -33,6 +33,7 @@ class LJHFile:
     header_size: int
     binary_size: int
     _mmap: np.memmap
+    ljh_version: Version
     max_pulses: Optional[int] = None
 
     OVERLONG_HEADER: ClassVar[int] = 100
@@ -45,15 +46,23 @@ class LJHFile:
         nsamples = header_dict["Total Samples"]
         npresamples = header_dict["Presamples"]
         client = header_dict.get("Software Version", "UNKNOWN")
-        dtype = np.dtype([('rowcount', np.int64),
-                          ('posix_usec', np.int64),
-                          ('data', np.uint16, nsamples)])
+
+        ljh_version = Version(header_dict["Save File Format Version"])
+        if ljh_version < Version("2.2.0"):
+            dtype = np.dtype([
+                ("internal_us", np.uint8),
+                ("internal_unused", np.uint8),
+                ("internal_ms", np.uint32),
+                ("data", np.uint16, nsamples)
+            ])
+        else:
+            dtype = np.dtype([
+                ('rowcount', np.int64),
+                ('posix_usec', np.int64),
+                ('data', np.uint16, nsamples)
+            ])
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
-
-        version_str = header_dict["Save File Format Version"]
-        if Version(version_str.decode()) < Version("2.2.0"):
-            raise NotImplementedError("Mass 2 does not yet support LJH files version 2.1 and earlier")
 
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
         # It adds 3 to the "true value" of nPresamples. For now, assume that only
@@ -69,7 +78,7 @@ class LJHFile:
 
         return LJHFile(filename, dtype, npulses, timebase, nsamples, npresamples, client,
                        header_dict, header_string, header_size, binary_size,
-                       mmap, max_pulses)
+                       mmap, ljh_version, max_pulses)
 
     @classmethod
     def read_header(cls, filename: str) -> Tuple[dict, str, int]:
@@ -178,6 +187,9 @@ class LJHFile:
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
         """
+        if self.ljh_version < Version("2.2.0"):
+            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
+
         data = {
             "pulse": self._mmap["data"][first_pulse:],
             "posix_usec": self._mmap["posix_usec"][first_pulse:],
