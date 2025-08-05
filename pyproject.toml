@@ -67,7 +67,7 @@ mass2 = [
 ]
 
 [tool.setuptools_scm]
-version_file = "mass/_version.py"
+version_file = "mass2/_version.py"
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
