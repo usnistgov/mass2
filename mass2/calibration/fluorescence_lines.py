@@ -10,7 +10,6 @@ import numpy as np
 import scipy as sp
 import pylab as plt
 from . import line_models
-from collections import OrderedDict
 
 from mass2.mathstat.special import voigt
 import logging
@@ -274,7 +273,7 @@ class SpectralLine:
                    reference_measurement_type, is_default_material)
 
 
-lineshape_references = OrderedDict()
+lineshape_references = {}
 lineshape_references["Klauber 1993"] = """Data are from C. Klauber, Applied Surface Science 70/71 (1993) pages 35-39.
     "Magnesium Kalpha X-ray line structure revisited".  Also discussed in more
     detail in C. Klauber, Surface & Interface Analysis 20 (1993), 703-715.
@@ -397,8 +396,7 @@ https://doi.org/10.1088/1361-6455/abb1ff"""
 
 lineshape_references["Rough Estimate"] = "Line energies from the stanard database, relative intensities and widths are guesses."
 
-spectra = OrderedDict()
-spectrum_classes = OrderedDict()  # for backwards compatability
+spectra = {}
 
 LORENTZIAN_PEAK_HEIGHT = 999
 LORENTZIAN_INTEGRAL_INTENSITY = 9999
@@ -464,7 +462,6 @@ def addline(element, linetype, material, reference_short, reference_plot_instrum
 
     # Add this SpectralLine to spectra dict AND make it be a variable in the module
     spectra[name] = line
-    spectrum_classes[name] = lambda: line
     globals()[name] = line
 
     def mlf():
