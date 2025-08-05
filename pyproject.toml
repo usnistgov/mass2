@@ -25,8 +25,8 @@ dependencies = [
     "packaging",
     "progress",
     "scikit-learn",
-    "scipy>=0.19, !=1.11.2",
-    # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Weird, but remember it!
+    # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
+    "scipy>=1.12",
     "uncertainties",
     "xraydb",
 ]
@@ -55,7 +55,7 @@ make_projectors = "mass.core.projectors_script:main"
 
 
 [build-system]
-requires = ["setuptools>=61", "setuptools_scm>=8", "wheel", "Cython>=0.29", "numpy>=1.14"]
+requires = ["setuptools>=61", "setuptools_scm>=8", "wheel", "numpy>=1.14"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]

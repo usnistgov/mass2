@@ -2,37 +2,21 @@
 # J. Fowler, NIST
 # Updated May 2023
 
-TARGET_ZIP = mass.zip
-TARGET_TAR = mass.tgz
-PYSCRIPTS = bin/hdf5print bin/ljh_merge bin/ljh_truncate
+PYSCRIPTS = bin/ljh_merge bin/ljh_truncate
 PYFILES = $(shell find . -name "*.py") $(PYSCRIPTS)
-CYFILES = $(shell find . -name "*.pyx")
 FORMFILES := $(shell find mass -name "*_form_ui.py")
 
-.PHONY: all build clean clean_hdf5 test pep8 autopep8 lint ruff
+.PHONY: all build clean test pep8 autopep8 lint ruff
 
-all: build test
+all: test
 
-build:
-	python -m build
-
-clean: clean_hdf5
+clean:
 	rm -rf build || sudo rm -rf build
-	rm -f `find . -name "*.pyc"`
 
-clean_hdf5:
-	rm -f */regression_test/*_mass.hdf5
-
-test: clean_hdf5
+test:
 	pytest
 
-archive: $(TARGET_ZIP)
-
-$(TARGET_ZIP): $(PYFILES) $(CYFILES) Makefile
-	python setup.py sdist --format=gztar,zip
-
-.PHONY: autopep8 pep8 lint
-PEPFILES := $(PYFILES)  # Don't pep8 the $(CYFILES)
+PEPFILES := $(PYFILES)
 PEPFILES := $(filter-out $(FORMFILES), $(PEPFILES))  # Remove the UI.py forms
 
 pep8: pep8-report.txt
