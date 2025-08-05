@@ -4,12 +4,15 @@ hci_lines.py
 Uses pickle file containing NIST ASD levels data to generate some commonly used HCI lines in mass.
 Meant to be a replacement for _highly_charged_ion_lines.py, which hard codes in line parameters.
 
+The pickle file can be gzip-compressed, provided the compressed filename ends with ".gz".
+
 February 2020
 Paul Szypryt
 '''
 
 import numpy as np
 import pickle
+import gzip
 import scipy.constants as sp_const
 import os
 from . import fluorescence_lines
@@ -18,14 +21,14 @@ from . import LORENTZIAN_PEAK_HEIGHT
 import xraydb
 
 INVCM_TO_EV = sp_const.c * sp_const.physical_constants['Planck constant in eV s'][0] * 100.0
-DEFAULT_PICKLE_NAME = 'nist_asd_2023.pickle'
+DEFAULT_PICKLE_NAME = 'nist_asd_2023.pickle.gz'
 
 
 class NIST_ASD:
     '''Class for working with a pickled atomic spectra database'''
 
     def __init__(self, pickleFilename=None):
-        '''Loads ASD pickle file
+        '''Loads ASD pickle file (optionally gzipped)
 
         Args:
             pickleFilename: (default None) ASD pickle file name, as str, if not using default
@@ -33,8 +36,13 @@ class NIST_ASD:
 
         if pickleFilename is None:
             pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_NAME)
-        with open(pickleFilename, 'rb') as handle:
-            self.NIST_ASD_Dict = pickle.load(handle)
+
+        if pickleFilename.endswith(".gz"):
+            with gzip.GzipFile(pickleFilename, "rb") as handle:
+                self.NIST_ASD_Dict = pickle.load(handle)
+        else:
+            with open(pickleFilename, 'rb') as handle:
+                self.NIST_ASD_Dict = pickle.load(handle)
 
     def getAvailableElements(self):
         '''Returns a list of all available elements from the ASD pickle file'''
