@@ -1,6 +1,6 @@
 import pylab as plt
 import numpy as np
-import mass2.mathstat
+import mass2
 from mass2.common import tostr
 
 
@@ -125,7 +125,7 @@ class PulseModel:
         mpc = np.matmul(projectors, pulses_for_svd)  # modeled pulse coefs
         mp = np.matmul(basis, mpc)  # modeled pulse
         residuals = pulses_for_svd - mp
-        Q = mass.mathstat.utilities.find_range_randomly(residuals, n_basis - n_existing)
+        Q = mass2.mathstat.utilities.find_range_randomly(residuals, n_basis - n_existing)
 
         projectors2 = np.linalg.pinv(Q)  # = Q.T, perhaps??
         projectors2 -= projectors2.dot(basis).dot(projectors)

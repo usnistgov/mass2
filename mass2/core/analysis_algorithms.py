@@ -12,8 +12,8 @@ import numpy as np
 import scipy as sp
 from numba import njit
 
-import mass2.mathstat.interpolate
 from mass2.mathstat.entropy import laplace_entropy
+from mass2.mathstat.interpolate import CubicSpline
 import logging
 LOG = logging.getLogger("mass")
 
@@ -597,7 +597,7 @@ def time_drift_correct(time, uncorrected, w, sec_per_degree=2000,  # noqa: PLR09
     info["funccalls"] = fc
 
     xk = np.linspace(-1, 1, 1 + 2 * ndeg)
-    model2 = mass.mathstat.interpolate.CubicSpline(xk, model(xk))
+    model2 = CubicSpline(xk, model(xk))
     H1 = laplace_entropy(uncorrected, w=w)
     H2 = laplace_entropy(uncorrected * (1 + model(xnorm)), w=w)
     H3 = laplace_entropy(uncorrected * (1 + model2(xnorm)), w=w)
