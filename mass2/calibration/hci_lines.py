@@ -10,18 +10,19 @@ February 2020
 Paul Szypryt
 '''
 
+import importlib.resources as pkg_resources
 import numpy as np
 import pickle
 import gzip
 import scipy.constants as sp_const
 import os
 from . import fluorescence_lines
-from . import line_models
-from . import LORENTZIAN_PEAK_HEIGHT
+from . import AmplitudeType
 import xraydb
 
 INVCM_TO_EV = sp_const.c * sp_const.physical_constants['Planck constant in eV s'][0] * 100.0
-DEFAULT_PICKLE_NAME = 'nist_asd_2023.pickle.gz'
+DEFAULT_PICKLE_NAME = "nist_asd_2023.pickle.gz"
+DEFAULT_PICKLE_PATH = pkg_resources.files("mass2").joinpath("data", DEFAULT_PICKLE_NAME)
 
 
 class NIST_ASD:
@@ -35,7 +36,7 @@ class NIST_ASD:
         '''
 
         if pickleFilename is None:
-            pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_NAME)
+            pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_PATH)
 
         if pickleFilename.endswith(".gz"):
             with gzip.GzipFile(pickleFilename, "rb") as handle:
@@ -166,13 +167,12 @@ def add_hci_line(element, spectr_ch, line_identifier, energies, widths, ratios, 
         material="Highly Charged Ion",
         linetype=linetype,
         reference_short='NIST ASD',
-        fitter_type=line_models.GenericLineModel,
         reference_plot_instrument_gaussian_fwhm=0.5,
         nominal_peak_energy=nominal_peak_energy,
         energies=energies,
         lorentzian_fwhm=widths,
         reference_amplitude=ratios,
-        reference_amplitude_type=LORENTZIAN_PEAK_HEIGHT,
+        reference_amplitude_type=AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
         ka12_energy_diff=None
     )
     return spectrum_class

@@ -1,0 +1,176 @@
+# Enter reference background info by tag and description, with optional URL
+# Enter in alphabetical order of the tag
+#
+- tag: Chantler 2006
+  URL: http://link.aps.org/doi/10.1103/PhysRevA.73.012508
+  description: |
+    Chantler, C., Kinnane, M., Su, C.-H., & Kimpton, J. (2006).
+    "Characterization of K spectral profiles for vanadium, component redetermination for
+    scandium, titanium, chromium, and manganese, and development of satellite structure
+    for Z=21 to Z=25." Physical Review A, 73(1), 012508. doi:10.1103/PhysRevA.73.012508
+
+    Be sure to look at Table I, not the very similar Table II which lists parameters in
+    different parameterization.
+
+- tag: Chantler 2013
+  description: |
+    C Chantler, L Smale, J Kimpton, et al., J Phys B 46, 145601 (2013).
+  URL: http://iopscience.iop.org/0953-4075/46/14/145601
+
+- tag: Chantler 2013, Section 5
+  URL: http://iopscience.iop.org/0953-4075/46/14/145601
+  description: |
+    C Chantler, L Smale, J Kimpton, et al., J Phys B 46, 145601 (2013).
+    We were originally using L Smale, C Chantler, M Kinnane, J Kimpton, et al., Phys
+    Rev A 87 022512 (2013). http://pra.aps.org/abstract/PRA/v87/i2/e022512
+
+    BUT these were adjusted in C Chantler, L Smale, J Kimpton, et al., J Phys B
+    46, 145601 (2013).  http://iopscience.iop.org/0953-4075/46/14/145601
+    (see Section 5 "Redefinition of vanadium K-beta standard")  Both papers are
+    by the same group, of course.
+
+- tag: Clementson 2010
+  description: |
+    J. Clementson, P. Beiersdorfer, G. V. Brown, and M. F. Gu,
+    "Spectroscopy of M-shell x-ray transitions in Zn-like through Co-like W,"
+    Physica Scripta 81, 015301 (2010). 
+  URL: https://iopscience.iop.org/article/10.1088/0031-8949/81/01/015301/meta
+
+- tag: Dean 2019
+  description: |
+    Dean, J. W., Melia, H. A., Chantler, C. T., Smale, L. F. (2019)
+    High accuracy characterisation for the absolute energy of scandium Kα. J. Phys. B:
+    At. Mol. Opt. Phys. 52 165002
+  URL: https://doi.org/10.1088/1361-6455/ab29b1
+
+- tag: Dean 2020
+  description: |
+    Dean, J. W., Chantler, C. T., Smale, L. F., Melia, H. A. (2020)
+    An absolute energy characterisation of scandium Kβ to 2 parts per million. J. Phys. B:
+    At. Mol. Opt. Phys. 53 205004.
+  URL: https://doi.org/10.1088/1361-6455/abb1ff
+
+- tag: Deslattes Notebook Si
+  description: |
+    Scanned pages from Deslattes/Mooney's notebook provided by Csilla Szabo-Foster.
+    Added by GCO Oct 7 2019: Used the postion and width values from the from the lowest listed fit,
+    the one in energy units. Used the intensities from the Second lowest fit, the one labeled 
+    PLUS-POSITION SCAN (best-fit Voight profile). Also the notebook only included the Ka1 and Ka2,
+    not the higher energy satellites, so I made up numbers for the small feature at higher energy.
+
+- tag: Deslattes Notebook S, Cl, K
+  description: |
+    Scanned pages from Deslattes/Mooney's notebook
+    provided by Csilla Szabo-Foster. Added by GCO Oct 30 2019. Used
+    the postion and width values from the from the lowest listed fit, the one in energy units. Used the
+    intensities from the Second lowest fit, the one labeled PLUS-POSITION SCAN (best-fit Voight profile). The
+    detector resolution ("width of Gauss. res. func." in MINUS-POSITON scan) is less than the Gaussian Width
+    ("Gaussian width" in PLUS-POSITON scan) I haven't accounted for that, so our models still don't match
+    Deslattes. We would need a gaussian_atomic_physics component added to our models. Also the notebook only
+    included the Ka1 and Ka2, not the higher energy satellites, so I made up numbers for the small feature at
+    higher energy or estimated them from data in Mauron, O., Dousse, J. C., Hoszowska, J., Marques, J. P.,
+    Parente, F., & Polasik, M. (2000). L-shell shake processes resulting from 1s photoionization in elements
+    11≤Z≤17. Physical Review A - Atomic, Molecular, and Optical Physics, 62(6), 062508–062501.
+  URL: https://doi.org/10.1103/PhysRevA.62.062508
+
+- tag: Hoelzer 1997
+  description: |
+    Data are from Hoelzer, Fritsch, Deutsch, Haertwig, Foerster in
+    Phys Rev A56 (#6) pages 4554ff (1997 December).
+
+- tag: Hoelzer 1997, NISTfits.ipf
+  description: |
+    Data are from Hoelzer, Fritsch, Deutsch, Haertwig, Foerster in
+    Phys Rev A56 (#6) pages 4554ff (1997 December), ***as corrected***
+    by someone at LANL: see 11/30/2004 corrections in NISTfits.ipf (Igor code).
+
+- tag: Ito 2020
+  description: |
+    Ito, Y., Tochio, T., Yamashita, M., Fukushima, S., Vlaicu, A. M.,
+    Marques, J. P., ... Parente, F. (2020). Structure of Kα - and Kβ-emission x-ray spectra for Se, Y, and Zr.
+    Physical Review A, 102(5), 052820.
+  URL: https://doi.org/10.1103/PhysRevA.102.052820
+
+- tag: Joe Fowler
+  description: This is what Joe Fowler measured for tungsten L-lines in 2018.
+
+- tag: Klauber 1993
+  URL: https://doi.org/10.1016/0169-4332(93)90393-P
+  description: |
+    Data are from C. Klauber, Applied Surface Science 70/71 (1993) pages 35-39.
+    "Magnesium Kalpha X-ray line structure revisited".  Also discussed in more
+    detail in C. Klauber, Surface & Interface Analysis 20 (1993), 703-715.
+
+    Klauber offers only an energy shift relative to some absolute standard. For
+    an absolute standard, we use the value 1253.687 as the Ka1 peak as found by
+    J. Schweppe, R. D. Deslattes, T. Mooney, and C. J. Powell in J. Electron
+    Spectroscopy and Related Phenomena 67 (1994) 463-478 titled "Accurate measurement
+    of Mg and Al Kalpha_{1,2} X-ray energy profiles". See Table 5 "Average" column.
+    dated 1965-1993.
+
+- tag: Mendenhall 2019
+  description: |
+    Marcus H Mendenhall et al 2019 J. Phys. B: At. Mol. Opt. Phys. 52 215004.
+  URL: https://doi.org/10.1088/1361-6455/ab45d6
+
+- tag: Menesguen 2022
+  description: |
+    Ménesguen, Y., Lépy, M.-C., Ito, Y., Yamashita, M., Fukushima,
+    S., Tochio, T., ... Parente, F. (2022). Structure of single KL0–, double KL1–, and triple KL2 − ionization
+    in Mg, Al, and Si targets induced by photons, and their absorption spectra. Radiation Physics and Chemistry,
+    110048.
+  URL: https://doi.org/10.1016/j.radphyschem.2022.110048
+
+- tag: Nilsen 1995
+  description: |
+    Elliott, S. R., Beiersdorfer, P., Macgowan, B. J., & Nilsen, J. (1995).
+    Measurements of line overlap for resonant spoiling of x-ray lasing transitions in nickel-like tungsten, 52(4),
+    2689–2692.
+  URL: https://doi.org/10.1103/PhysRevA.52.2689
+
+- tag: NIST ASD
+  description: |
+    NIST Atomic Spectra Database
+    Kramida, A., Ralchenko, Yu., Reader, J., and NIST ASD Team (2018). NIST Atomic Spectra Database (ver. 5.6.1),
+    [Online]. Available: https://physics.nist.gov/asd [2018, December 12]. National Institute of Standards and
+    Technology, Gaithersburg, MD. 
+  URL: https://doi.org/10.18434/T4W30F
+
+- tag: Ravel 2018
+  description: Bruce Ravel et al., Phys. Rev. B 97 (2018) 125139
+  URL: https://doi.org/10.1103/PhysRevB.97.125139
+
+- tag: Rough Estimate
+  description: Line energies from the stanard database, relative intensities and widths are guesses.
+
+- tag: Schweppe 1992 Al
+  description: |
+    J. Schweppe, R. D. Deslattes, T. Mooney, and C. J. Powell
+    in J. Electron Spectroscopy and Related Phenomena 67
+    (1994) 463-478 titled "Accurate measurement of Mg and Al Kalpha_{1,2} X-ray energy profiles". See Table 5
+    "Average" column. They do not provide a full lineshape, GCO interperpreted the paper as follows: Ka1 and Ka2
+    positions are taken from Table 6 "This work" column Ka1 and Ka2 widths were fixed as equal, and we taken the
+    value 0.43 eV from the 2nd to last paragraph The higher energy satellite features are not measured by
+    Schweppe, and instead taken from an email from Caroline Kilbourne to Joel Ullom dated 28 Sept 2010 We expect
+    these higher energy satellites do not affect the fitting of the peak location very much.
+
+- tag: Steve Smith
+  description: This is what Steve Smith at NASA GSFC uses for Br K-alpha.
+
+- tag: Wollman 2000
+  URL: https://doi.org/10.1016/S0168-9002(99)01351-0
+  description: |
+    Data are from Wollman, Nam, Newbury, Hilton, Irwin, Berfren, Deiker, Rudman,
+    and Martinis, NIM A 444 (2000) page 145. They come from combining 8 earlier
+    references
+
+- tag: Zn Hack
+  description: |
+    This is a hack, a copy of the Hoelzer, Fritsch, Deutsch, Haertwig, Foerster
+    Phys Rev A56 (#6) pages 4554ff (1997 December) model, with the numbers
+    adjusted to get line energies of 8615.823, 8638.91 eV and widths 10% wider
+    than for Cu. Those widths are based on Zschornack's book.
+    The KBeta also appears to be a hack with scaled values.
+
+- tag: Zschornack
+  description: Zschornack, Günter H. (2007). Handbook of X-Ray Data. Springer-Verlag, Berlin.

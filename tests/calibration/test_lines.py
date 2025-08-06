@@ -7,6 +7,7 @@ Test that fluorescence line distributions work.
 Joe Fowler
 """
 
+import dataclasses
 import pytest
 from pytest import approx
 import numpy as np
@@ -82,13 +83,13 @@ class TestAddFitter:
                 linetype="KBeta",
                 material="dummy_material",
                 reference_short='NIST ASD',
-                fitter_type=mass.GenericLineModel,
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=(653.679946 * 2 + 653.493657 * 1) / 3,
                 energies=np.array([653.493657, 653.679946]), lorentzian_fwhm=np.array([0.1, 0.1]),
                 allow_replacement=replace,
                 reference_amplitude=np.array([1, 2]),
-                reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT, ka12_energy_diff=None
+                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                ka12_energy_diff=None
             )
         addline_example()
         # It should be okay to re-add the dummyKBeta line if but only if replace=True.
@@ -100,8 +101,7 @@ class TestAddFitter:
         mass.spectra["dummyKBeta"].model()
         mass.spectra["dummyKBeta"].model(has_tails=True)
         mass.spectra["dummyKBeta"].fitter()
-        mass.spectrum_classes["dummyKBeta"]().model()
-        mass.make_line_fitter(mass.spectra["dummyKBeta"])
+        mass.spectra["dummyKBeta"].model()
 
     @staticmethod
     def test_intrinsic_sigma():
@@ -109,15 +109,16 @@ class TestAddFitter:
         e = np.linspace(5880, 5910, 31)
         y1 = line(e, instrument_gaussian_fwhm=0)
         y2 = line(e, instrument_gaussian_fwhm=8)
-        line.intrinsic_sigma = 8 / 2.3548
-        y3 = line(e, instrument_gaussian_fwhm=0)
+        sigma8 = 8.0 / 2.3548
+        line2 = dataclasses.replace(line, intrinsic_sigma=sigma8)
+        y3 = line2(e, instrument_gaussian_fwhm=0)
+
         maxdiff = np.abs(y1 - y2).max()
         assert maxdiff > 1e-4, "Setting resolution=8 eV should change line"
         maxdiff = np.abs(y1 - y3).max()
         assert maxdiff > 1e-4, "Setting instrinsic_sigma to 3.40 eV should change line"
         maxdiff = np.abs(y2 - y3).max()
-        assert maxdiff < 1e-5, "Setting resolution=8 eV or intrinsic_sigma=3.40 eV should be equivalent"
-        line.intrinsic_sigma = 0.0
+        assert maxdiff < 1e-5 * y2.max(), "Setting resolution=8 eV or intrinsic_sigma=3.40 eV should be equivalent"
 
     @staticmethod
     def test_some_lines_make_sense():
