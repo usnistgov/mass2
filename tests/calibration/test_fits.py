@@ -358,12 +358,12 @@ class Test_Composites_lmfit:
                 material="dummy_material",
                 linetype="1",
                 reference_short='NIST ASD',
-                fitter_type=mass.GenericLineModel,
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=653.493657,
                 energies=np.array([653.493657]), lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT, ka12_energy_diff=None
+                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                ka12_energy_diff=None
             )
         if 'dummy2' not in mass.spectra.keys():
             mass.calibration.fluorescence_lines.addline(
@@ -371,12 +371,12 @@ class Test_Composites_lmfit:
                 material="dummy_material",
                 linetype="2",
                 reference_short='NIST ASD',
-                fitter_type=mass.GenericLineModel,
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=653.679946,
                 energies=np.array([653.679946]), lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT, ka12_energy_diff=None
+                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                ka12_energy_diff=None
             )
         rng = np.random.default_rng(131)
         bin_edges = np.arange(600, 700, 0.4)

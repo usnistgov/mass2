@@ -17,7 +17,7 @@ import scipy.constants as sp_const
 import os
 from . import fluorescence_lines
 from . import line_models
-from . import LORENTZIAN_PEAK_HEIGHT
+from . import AmplitudeType
 import xraydb
 
 INVCM_TO_EV = sp_const.c * sp_const.physical_constants['Planck constant in eV s'][0] * 100.0
@@ -166,13 +166,12 @@ def add_hci_line(element, spectr_ch, line_identifier, energies, widths, ratios, 
         material="Highly Charged Ion",
         linetype=linetype,
         reference_short='NIST ASD',
-        fitter_type=line_models.GenericLineModel,
         reference_plot_instrument_gaussian_fwhm=0.5,
         nominal_peak_energy=nominal_peak_energy,
         energies=energies,
         lorentzian_fwhm=widths,
         reference_amplitude=ratios,
-        reference_amplitude_type=LORENTZIAN_PEAK_HEIGHT,
+        reference_amplitude_type=AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
         ka12_energy_diff=None
     )
     return spectrum_class

@@ -82,13 +82,13 @@ class TestAddFitter:
                 linetype="KBeta",
                 material="dummy_material",
                 reference_short='NIST ASD',
-                fitter_type=mass.GenericLineModel,
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=(653.679946 * 2 + 653.493657 * 1) / 3,
                 energies=np.array([653.493657, 653.679946]), lorentzian_fwhm=np.array([0.1, 0.1]),
                 allow_replacement=replace,
                 reference_amplitude=np.array([1, 2]),
-                reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT, ka12_energy_diff=None
+                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                ka12_energy_diff=None
             )
         addline_example()
         # It should be okay to re-add the dummyKBeta line if but only if replace=True.

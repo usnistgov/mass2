@@ -75,7 +75,7 @@ class AmplitudeType(Enum):
     VOIGT_PEAK_HEIGHT = "Peak height of Voigts"
 
 
-@dataclass(frozen=True)
+# @dataclass(frozen=True)
 class SpectralLine:
     """An abstract base class for modeling spectral lines as a sum
     of Voigt profiles (i.e., Gaussian-convolved Lorentzians).
@@ -91,7 +91,7 @@ class SpectralLine:
 
     def __init__(self, element, material, linetype, energies, lorentzian_fwhm, intrinsic_sigma,  # noqa: PLR0917
                  reference_plot_instrument_gaussian_fwhm, reference_short, reference_amplitude, reference_amplitude_type,
-                 normalized_lorentzian_integral_intensity, nominal_peak_energy, fitter_type, position_uncertainty,
+                 normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
                  reference_measurement_type, is_default_material):
         """Constructor needs two Gaussian widths (both default to zero):
         `intrinsic_sigma` is the width (sigma) of any 'intrinsic Gaussian', as found (for example) in
@@ -110,7 +110,6 @@ class SpectralLine:
         self.reference_measurement_type = reference_measurement_type
         self.normalized_lorentzian_integral_intensity = normalized_lorentzian_integral_intensity
         self.nominal_peak_energy = nominal_peak_energy
-        self.fitter_type = fitter_type
         self.position_uncertainty = position_uncertainty
         self.reference_measurement_type = reference_measurement_type
         self.is_default_material = is_default_material
@@ -275,13 +274,12 @@ class SpectralLine:
         reference_amplitude_type = "unkown: quick_line"
         normalized_lorentzian_integral_intensity = np.array([1])
         nominal_peak_energy = energy
-        fitter_type = line_models.GenericLineModel  # dont float dph_de
         position_uncertainty = "unknown: quick_line"
         reference_measurement_type = "unkown: quick_line"
         is_default_material = True
         return cls(element, material, linetype, energies, lorentzian_fwhm, intrinsic_sigma,
                    reference_plot_instrument_gaussian_fwhm, reference_short, reference_amplitude, reference_amplitude_type,
-                   normalized_lorentzian_integral_intensity, nominal_peak_energy, fitter_type, position_uncertainty,
+                   normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
                    reference_measurement_type, is_default_material)
 
 
