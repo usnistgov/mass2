@@ -4,13 +4,12 @@ from .uncertainties_helpers import ensure_uncertain, with_fractional_uncertainty
 import numpy as np
 import pylab as plt
 import xraydb
-from collections import OrderedDict
 
 
 class FilterStack:
     def __init__(self, name):
         self.name = name
-        self.components = OrderedDict()
+        self.components = {}
 
     def add(self, c):
         assert isinstance(c, FilterStack)

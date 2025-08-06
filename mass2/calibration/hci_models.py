@@ -9,7 +9,7 @@ Paul Szypryt
 
 import numpy as np
 import mass2 as mass
-from mass2.calibration.fluorescence_lines import spectrum_classes
+from mass2.calibration.fluorescence_lines import spectra
 import xraydb
 
 
@@ -17,12 +17,12 @@ def initialize_hci_line_model(line_name, has_linear_background=False, has_tails=
     '''Initializes a single lorentzian hci lmfit model. Reformats line_name to create a lmfit valid prefix.
 
     Args:
-        line_name: name of line within mass.spectrum_classes
+        line_name: name of line within mass.spectra
         has_linear_background: (default False) include linear background in the model
         has_tails: (default False) include low energy tail in the model
     '''
 
-    line = spectrum_classes[line_name]()
+    line = spectra[line_name]()
     prefix = f'{line_name}_'.replace(' ', '_').replace(
         'J=', '').replace('/', '_').replace('*', '').replace('.', '')
     line_model = line.model(has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix)
@@ -93,8 +93,8 @@ def initialize_HLike_2P_model(element, conf, has_linear_background=False, has_ta
     prefix_3_2 = f'{line_name_3_2}_'.replace(' ', '_').replace(
         'J=', '').replace('/', '_').replace('*', '').replace('.', '')
     # Initialize individual lines and models
-    line_1_2 = spectrum_classes[line_name_1_2]()
-    line_3_2 = spectrum_classes[line_name_3_2]()
+    line_1_2 = spectra[line_name_1_2]()
+    line_3_2 = spectra[line_name_3_2]()
     model_1_2 = line_1_2.model(has_linear_background=False, has_tails=has_tails, prefix=prefix_1_2)
     model_3_2 = line_3_2.model(has_linear_background=False, has_tails=has_tails, prefix=prefix_3_2)
     # Initialize composite model and set addition H-like constraints
@@ -125,7 +125,7 @@ def initialize_HeLike_complex_model(element, has_linear_background=False, has_ta
     line_name_1s2p_1P = f'{element}{charge} 1s.2p 1P* J=1'
     line_names = np.hstack([[line_name_1s2s_3S, line_name_1s2p_3P, line_name_1s2p_1P], additional_line_names])
     # Set up lines and models based on line_names
-    # individual_lines = [spectrum_classes[i_line_name]() for i_line_name in line_names]
+    # individual_lines = [spectra[i_line_name]() for i_line_name in line_names]
     individual_models = [initialize_hci_line_model(
         i_line_name, has_linear_background=False, has_tails=has_tails) for i_line_name in line_names]
     # Set up composite model

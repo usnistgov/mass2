@@ -24,6 +24,7 @@ dependencies = [
     "numpy>=1.14, <2.2",
     "packaging",
     "progress",
+    "pyyaml",
     "scikit-learn",
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
     "scipy>=1.12",
