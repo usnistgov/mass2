@@ -73,6 +73,7 @@ STANDARD_FEATURES = LineEnergies()
 
 
 class AmplitudeType(Enum):
+    """AmplitudeType: which form of amplitude is used in the reference data."""
     LORENTZIAN_PEAK_HEIGHT = "Peak height of Lorentzians"
     LORENTZIAN_INTEGRAL_INTENSITY = "Integrated intensity of Lorentzians"
     VOIGT_PEAK_HEIGHT = "Peak height of Voigts"
@@ -86,13 +87,11 @@ class SpectralLine:
     """An abstract base class for modeling spectral lines as a sum
     of Voigt profiles (i.e., Gaussian-convolved Lorentzians).
 
-    Call addline to create a new subclass properly.
+    Call `SpectralLine.addline(...)` to create a new instance.
 
     The API follows scipy.stats.stats.rv_continuous and is kind of like rv_frozen.
     Calling this object with an argument evalutes the pdf at the argument, it does not
-    return an rv_frozen.
-
-    But so far we ony define `rvs` and `pdf`.
+    return an rv_frozen. So far, we ony define `rvs` and `pdf`.
     """
 
     element: str
@@ -371,7 +370,7 @@ class LineshapeReference:
 
     @classmethod
     def load(cls, filename: Optional[str] = None) -> dict:
-        references = {}
+        references = {"unknown": LineshapeReference("unknown", "unknown", "")}
         if filename is None:
             filename = pkg_resources.files("mass2").joinpath("data", "fluorescence_line_references.yaml")
         with open(filename, "r", encoding="utf-8") as file:
