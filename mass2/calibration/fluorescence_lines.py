@@ -7,7 +7,8 @@ Tools for fitting and simulating X-ray fluorescence lines.
 
 from dataclasses import dataclass
 from functools import cached_property
-# import numpy.typing as npt
+from typing import Optional
+import numpy.typing as npt
 from enum import Enum
 import importlib.resources as pkg_resources
 
@@ -80,7 +81,7 @@ class AmplitudeType(Enum):
 spectra = {}
 
 
-# @dataclass(frozen=True)
+@dataclass(frozen=True)
 class SpectralLine:
     """An abstract base class for modeling spectral lines as a sum
     of Voigt profiles (i.e., Gaussian-convolved Lorentzians).
@@ -94,32 +95,20 @@ class SpectralLine:
     But so far we ony define `rvs` and `pdf`.
     """
 
-    def __init__(self, element, material, linetype, energies, lorentzian_fwhm, intrinsic_sigma,  # noqa: PLR0917
-                 reference_plot_instrument_gaussian_fwhm, reference_short, reference_amplitude, reference_amplitude_type,
-                 normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
-                 reference_measurement_type, is_default_material):
-        """Constructor needs two Gaussian widths (both default to zero):
-        `intrinsic_sigma` is the width (sigma) of any 'intrinsic Gaussian', as found (for example) in
-            the Fowler et al 2020 metrology shape estimation for the lanthanide L lines. Normally zero.
-        """
-        self.element = element
-        self.material = material
-        self.linetype = linetype
-        self.energies = energies
-        self.lorentzian_fwhm = lorentzian_fwhm
-        self.intrinsic_sigma = intrinsic_sigma
-        self.reference_plot_instrument_gaussian_fwhm = reference_plot_instrument_gaussian_fwhm
-        self.reference_short = reference_short
-        self.reference_amplitude = reference_amplitude
-        self.reference_amplitude_type = reference_amplitude_type
-        self.reference_measurement_type = reference_measurement_type
-        self.normalized_lorentzian_integral_intensity = normalized_lorentzian_integral_intensity
-        self.nominal_peak_energy = nominal_peak_energy
-        self.position_uncertainty = position_uncertainty
-        self.reference_measurement_type = reference_measurement_type
-        self.is_default_material = is_default_material
-        self._peak_energy = np.nan
-        self.cumulative_amplitudes = self.normalized_lorentzian_integral_intensity.cumsum()
+    element: str
+    material: str
+    linetype: str
+    nominal_peak_energy: float
+    energies: npt.NDArray[np.float64]
+    lorentzian_fwhm: npt.NDArray[np.float64]
+    reference_amplitude: npt.NDArray[np.float64]
+    reference_amplitude_type: AmplitudeType = AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY
+    reference_measurement_type: str = "unknown"
+    intrinsic_sigma: float = 0.0
+    reference_plot_instrument_gaussian_fwhm: float = 0.0
+    reference_short: str = "unknown"
+    position_uncertainty: float = 0.0
+    is_default_material: bool = True
 
     @cached_property
     def peak_energy(self):
@@ -131,6 +120,33 @@ class SpectralLine:
             peak_energy = self.nominal_peak_energy
         return peak_energy
 
+    @property
+    def cumulative_amplitudes(self):
+        return self.lorentzian_integral_intensity.cumsum()
+
+    @cached_property
+    def lorentzian_integral_intensity(self):
+        if self.reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
+            sigma = self.reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
+            return np.array([
+                ph / voigt(0, 0, fwhm / 2.0, sigma)
+                for (ph, fwhm) in zip(self.reference_amplitude, self.lorentzian_fwhm)
+            ])
+        if self.reference_amplitude_type == AmplitudeType.LORENTZIAN_PEAK_HEIGHT:
+            return self.reference_amplitude * (0.5 * np.pi * self.lorentzian_fwhm)
+
+        if self.reference_amplitude_type == AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY:
+            return self.reference_amplitude
+
+    @cached_property
+    def normalized_lorentzian_integral_intensity(self):
+        x = self.lorentzian_integral_intensity
+        return x / np.sum(x)
+
+    @cached_property
+    def lorentz_amplitude(self):
+        return self.lorentzian_integral_intensity / self.lorentzian_fwhm
+
     def __call__(self, x, instrument_gaussian_fwhm):
         """Make the class callable, returning the same value as the self.pdf method."""
         return self.pdf(x, instrument_gaussian_fwhm)
@@ -141,7 +157,7 @@ class SpectralLine:
         x = np.asarray(x, dtype=float)
         result = np.zeros_like(x)
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm,
-                                      self.normalized_lorentzian_integral_intensity):
+                                      self.lorentz_amplitude):
             result += ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma)
             # mass.voigt() is normalized to have unit integrated intensity
         return result
@@ -152,7 +168,7 @@ class SpectralLine:
         x = np.asarray(x, dtype=float)
         components = []
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm,
-                                      self.normalized_lorentzian_integral_intensity):
+                                      self.lorentz_amplitude):
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
@@ -274,20 +290,24 @@ class SpectralLine:
         if lorentzian_fwhm <= 0 and intrinsic_sigma <= 0:
             intrinsic_sigma = 1e-4
         lorentzian_fwhm = np.array([lorentzian_fwhm])
-        linetype = "quick_line"
-        reference_plot_instrument_gaussian_fwhm = "unkown: quick_line"
+        linetype = "Gaussian"
         reference_short = "unkown: quick_line"
-        reference_amplitude = "unkown: quick_line"
-        reference_amplitude_type = "unkown: quick_line"
-        normalized_lorentzian_integral_intensity = np.array([1])
+        reference_amplitude = 1.0
         nominal_peak_energy = energy
-        position_uncertainty = "unknown: quick_line"
+        position_uncertainty = 0.0
         reference_measurement_type = "unkown: quick_line"
-        is_default_material = True
-        return cls(element, material, linetype, energies, lorentzian_fwhm, intrinsic_sigma,
-                   reference_plot_instrument_gaussian_fwhm, reference_short, reference_amplitude, reference_amplitude_type,
-                   normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
-                   reference_measurement_type, is_default_material)
+        return cls(
+            element=element,
+            material=material,
+            linetype=linetype,
+            energies=energies,
+            lorentzian_fwhm=lorentzian_fwhm,
+            intrinsic_sigma=intrinsic_sigma,
+            reference_short=reference_short,
+            reference_amplitude=reference_amplitude,
+            nominal_peak_energy=nominal_peak_energy,
+            position_uncertainty=position_uncertainty,
+            reference_measurement_type=reference_measurement_type)
 
     @classmethod
     def addline(cls, element, linetype, material, reference_short, reference_plot_instrument_gaussian_fwhm,  # noqa: PLR0917
@@ -312,39 +332,22 @@ class SpectralLine:
         assert reference_plot_instrument_gaussian_fwhm is None or isinstance(
             reference_plot_instrument_gaussian_fwhm, float)
 
-        # calculate normalized lorentzian_integral_intensity
-        if reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
-            reference_instrument_gaussian_sigma = reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
-            lorentzian_integral_intensity = [ph / voigt(0, 0, lw / 2.0, reference_instrument_gaussian_sigma)
-                                             for ph, lw in zip(reference_amplitude, lorentzian_fwhm)]
-        elif reference_amplitude_type == AmplitudeType.LORENTZIAN_PEAK_HEIGHT:
-            lorentzian_integral_intensity = (
-                0.5 * np.pi * lorentzian_fwhm) * np.array(reference_amplitude)
-        elif reference_amplitude_type == AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY is not None:
-            lorentzian_integral_intensity = reference_amplitude
-        normalized_lorentzian_integral_intensity = np.array(lorentzian_integral_intensity) / \
-            float(np.sum(lorentzian_integral_intensity))
-
         line = cls(
             element=element,
             material=material,
             linetype=linetype,
+            nominal_peak_energy=float(nominal_peak_energy),
             energies=np.array(energies),
             lorentzian_fwhm=np.array(lorentzian_fwhm),
+            reference_amplitude=reference_amplitude,
+            reference_amplitude_type=reference_amplitude_type,
+            reference_measurement_type=reference_measurement_type,
             intrinsic_sigma=intrinsic_sigma,
             reference_plot_instrument_gaussian_fwhm=reference_plot_instrument_gaussian_fwhm,
             reference_short=reference_short,
-            reference_amplitude=reference_amplitude,
-            reference_amplitude_type=reference_amplitude_type,
-            normalized_lorentzian_integral_intensity=np.array(normalized_lorentzian_integral_intensity),
-            nominal_peak_energy=float(nominal_peak_energy),
             position_uncertainty=float(position_uncertainty),
-            reference_measurement_type=reference_measurement_type,
             is_default_material=is_default_material,
         )
-        line.__doc__ = "Line auto-generated by calling addline(...) to create a SpectralLine"
-        if linetype.startswith("KAlpha"):
-            line.ka12_energy_diff = ka12_energy_diff
         name = line.shortname
         if name in spectra.keys() and (not allow_replacement):
             raise ValueError(f"spectrum {name} already exists")
