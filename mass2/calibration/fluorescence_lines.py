@@ -156,7 +156,7 @@ class SpectralLine:
         x = np.asarray(x, dtype=float)
         result = np.zeros_like(x)
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm,
-                                      self.lorentzian_integral_intensity):
+                                      self.normalized_lorentzian_integral_intensity):
             result += ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma)
             # mass.voigt() is normalized to have unit integrated intensity
         return result
@@ -286,8 +286,8 @@ class SpectralLine:
         element = name
         material = "unknown: quick_line"
         energies = np.array([energy])
-        if lorentzian_fwhm <= 0 and intrinsic_sigma <= 0:
-            intrinsic_sigma = 1e-4
+        if lorentzian_fwhm <= 0 and intrinsic_sigma <= 1e-6:
+            intrinsic_sigma = 1e-6
         lorentzian_fwhm = np.array([lorentzian_fwhm])
         linetype = "Gaussian"
         reference_short = "unkown: quick_line"
