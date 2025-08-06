@@ -352,7 +352,7 @@ def test_integral_parameter():
 class Test_Composites_lmfit:
     @pytest.fixture(autouse=True)
     def setUp(self):
-        if 'dummy1' not in mass.spectrum_classes.keys():
+        if 'dummy1' not in mass.spectra.keys():
             mass.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
@@ -365,7 +365,7 @@ class Test_Composites_lmfit:
                 reference_amplitude=np.array([1]),
                 reference_amplitude_type=mass.LORENTZIAN_PEAK_HEIGHT, ka12_energy_diff=None
             )
-        if 'dummy2' not in mass.spectrum_classes.keys():
+        if 'dummy2' not in mass.spectra.keys():
             mass.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
@@ -384,8 +384,8 @@ class Test_Composites_lmfit:
         n1 = 10000
         n2 = 20000
         self.n = n1 + n2
-        self.line1 = mass.spectrum_classes['dummy1']()
-        self.line2 = mass.spectrum_classes['dummy2']()
+        self.line1 = mass.spectra['dummy1']()
+        self.line2 = mass.spectra['dummy2']()
         self.nominal_separation = self.line2.nominal_peak_energy - self.line1.nominal_peak_energy
         values1 = self.line1.rvs(size=n1, instrument_gaussian_fwhm=resolution, rng=rng)
         values2 = self.line2.rvs(size=n2, instrument_gaussian_fwhm=resolution, rng=rng)

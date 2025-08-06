@@ -51,6 +51,6 @@ print("peak height = {} +/- {}".format(ph,ph_err))
 
 #### 4. Alternate Lookup Method
 ```python
-spectrum2 = mass.spectrum_classes["VKAlpha"]()
+spectrum2 = mass.spectra["VKAlpha"]()
 fitter2 = mass.fitter_classes["ScKAlpha"]()
 ```

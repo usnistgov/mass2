@@ -100,7 +100,7 @@ class TestAddFitter:
         mass.spectra["dummyKBeta"].model()
         mass.spectra["dummyKBeta"].model(has_tails=True)
         mass.spectra["dummyKBeta"].fitter()
-        mass.spectrum_classes["dummyKBeta"]().model()
+        mass.spectra["dummyKBeta"]().model()
         mass.make_line_fitter(mass.spectra["dummyKBeta"])
 
     @staticmethod
