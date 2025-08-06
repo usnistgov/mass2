@@ -109,7 +109,7 @@ class TestAddFitter:
         e = np.linspace(5880, 5910, 31)
         y1 = line(e, instrument_gaussian_fwhm=0)
         y2 = line(e, instrument_gaussian_fwhm=8)
-        line2 = dataclasses.replace(line, intrinsic_sigma=8/2.3548)
+        line2 = dataclasses.replace(line, intrinsic_sigma=8 / 2.3548)
         y3 = line2(e, instrument_gaussian_fwhm=0)
         maxdiff = np.abs(y1 - y2).max()
         assert maxdiff > 1e-4, "Setting resolution=8 eV should change line"
