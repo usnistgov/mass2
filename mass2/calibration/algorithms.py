@@ -8,13 +8,7 @@ import itertools
 import operator
 import numpy as np
 
-from collections.abc import Iterable
 
-import matplotlib.pyplot as plt
-import matplotlib.transforms as mtrans
-from matplotlib.ticker import MaxNLocator
-
-from ..common import isstr
 from mass2.calibration.fluorescence_lines import STANDARD_FEATURES
 import mass2 as mass
 
