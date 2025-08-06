@@ -76,6 +76,9 @@ class AmplitudeType(Enum):
     VOIGT_PEAK_HEIGHT = "Peak height of Voigts"
 
 
+spectra = {}
+
+
 # @dataclass(frozen=True)
 class SpectralLine:
     """An abstract base class for modeling spectral lines as a sum
@@ -239,7 +242,7 @@ class SpectralLine:
     def model(self, has_linear_background=True, has_tails=False, prefix="", qemodel=None):
         """Generate a LineModel instance from a SpectralLine"""
         model_class = line_models.GenericLineModel
-        name = self.element + self.linetype
+        name = f"{self.element}{self.linetype}"
         m = model_class(name=name, spect=self, has_linear_background=has_linear_background,
                         has_tails=has_tails, prefix=prefix, qemodel=qemodel)
         return m
@@ -285,21 +288,6 @@ class SpectralLine:
                    reference_plot_instrument_gaussian_fwhm, reference_short, reference_amplitude, reference_amplitude_type,
                    normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
                    reference_measurement_type, is_default_material)
-
-
-@dataclass(frozen=True)
-class LineshapeReference:
-    description: str
-    URL: str
-
-
-lineshape_references = {}
-with open("mass2/data/fluorescence_line_references.yaml", "r", encoding="utf-8") as file:
-    d = yaml.safe_load(file)
-    for item in d:
-        lineshape_references[item["tag"]] = LineshapeReference(item["description"], URL=item.get("URL", ""))
-
-spectra = {}
 
 
 def addline(element, linetype, material, reference_short, reference_plot_instrument_gaussian_fwhm,  # noqa: PLR0917
@@ -365,6 +353,19 @@ def addline(element, linetype, material, reference_short, reference_plot_instrum
     spectra[name] = line
     globals()[name] = line
     return line
+
+
+@dataclass(frozen=True)
+class LineshapeReference:
+    description: str
+    URL: str
+
+
+lineshape_references = {}
+with open("mass2/data/fluorescence_line_references.yaml", "r", encoding="utf-8") as file:
+    d = yaml.safe_load(file)
+    for item in d:
+        lineshape_references[item["tag"]] = LineshapeReference(item["description"], URL=item.get("URL", ""))
 
 
 addline(
