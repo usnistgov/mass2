@@ -76,10 +76,10 @@ class FilterStack:
 @dataclass(frozen=True)
 class Filter:
     name: str
-    material: NDArray[str]
-    atomic_number: NDArray[int]
-    density_g_per_cm3: NDArray[float]
-    thickness_cm: NDArray[float]
+    material: NDArray[np.str]
+    atomic_number: NDArray[np.int]
+    density_g_per_cm3: NDArray[np.float64]
+    thickness_cm: NDArray[np.float64]
     fill_fraction: ufloat = 1.0
     absorber: bool = False
 
@@ -143,7 +143,7 @@ class Filter:
 
 def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidized_surfaces=2,
                     oxide_density_g_per_cm3=None):
-    ''' Create an AlFilmWithOxide object
+    """Create a Filter made of an alumninum film with oxides on one or both surfaces
 
     Args:
         name: name given to filter object, e.g. '50K Filter'.
@@ -151,8 +151,7 @@ def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidiz
         Al_density_g_per_cm3: Al film density, in g/cm3, defaults to xraydb value
         num_oxidized_surfaces: Number of film surfaces that contain a native oxide, default 2
         oxide_density_g_per_cm3: Al2O3 oxide density, in g/cm3, defaults to bulk xraydb value
-
-    '''
+    """
     assert num_oxidized_surfaces in {1, 2}, 'only 1 or 2 oxidzed surfaces allowed'
     if Al_density_g_per_cm3 is None:
         Al_density_g_per_cm3 = xraydb.atomic_density('Al')
@@ -177,8 +176,8 @@ def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidiz
 
 def AlFilmWithPolymer(
         name, Al_thickness_nm, polymer_thickness_nm, Al_density_g_per_cm3=None, num_oxidized_surfaces=1,
-        oxide_density_g_per_cm3=None, polymer_fractions=None, polymer_density_g_per_cm3=None):
-    ''' Initialize AlFilmWithPolymer object
+        oxide_density_g_per_cm3=None, polymer_density_g_per_cm3=None):
+    """Create a Filter made of an alumninum film with polymer backing
 
     Args:
         name: name given to filter object, e.g. '50K Filter'.
@@ -187,9 +186,8 @@ def AlFilmWithPolymer(
         Al_density_g_per_cm3: Al film density, in g/cm3, defaults to xraydb value
         num_oxidized_surfaces: Number of film surfaces that contain a native oxide, default 2
         oxide_density_g_per_cm3: Al2O3 oxide density, in g/cm3, defaults to bulk xraydb value
-        polymer_fractions: elemental mass fractions of polymer used, defaults to Kapton
         polymer_density_g_per_cm3: Polymer density, in g/cm3, defaults to Kapton
-    '''
+    """
     assert num_oxidized_surfaces in {1, 2}, 'only 1 or 2 oxidzed surfaces allowed'
     if Al_density_g_per_cm3 is None:
         Al_density_g_per_cm3 = xraydb.atomic_density('Al')
@@ -223,13 +221,13 @@ def AlFilmWithPolymer(
 
 
 def LEX_HT(name):
-    ''' Create an Al film with polymer and stainless steel backing.
+    """Create an Al film with polymer and stainless steel backing.
 
-    Ideal modeling LEX-HT vacuum window.
+    Models the LEX-HT vacuum window.
 
     Args:
         name: name given to filter object, e.g. '50K Filter'.
-    '''
+    """
     # Set up Al + polyimide film
     film_material = ['C', 'H', 'N', 'O', 'Al']
     film_area_density_g_per_cm2_given = np.array([6.7e-5, 2.6e-6, 7.2e-6, 1.7e-5, 1.7e-5])
@@ -255,7 +253,13 @@ def LEX_HT(name):
 
 
 def get_filter_stacks_dict():
-    # Create models for TES instruments
+    """Create a dictionary with a few examples of FilterStack objects
+
+    Returns
+    -------
+    dict
+        A dictionary of named FilterStacks
+    """
     fs_dict = {}
 
     # EBIT Instrument
