@@ -10,6 +10,7 @@ February 2020
 Paul Szypryt
 '''
 
+import importlib.resources as pkg_resources
 import numpy as np
 import pickle
 import gzip
@@ -20,7 +21,8 @@ from . import AmplitudeType
 import xraydb
 
 INVCM_TO_EV = sp_const.c * sp_const.physical_constants['Planck constant in eV s'][0] * 100.0
-DEFAULT_PICKLE_NAME = 'nist_asd_2023.pickle.gz'
+DEFAULT_PICKLE_NAME = "nist_asd_2023.pickle.gz"
+DEFAULT_PICKLE_PATH = pkg_resources.files("mass2").joinpath("data", DEFAULT_PICKLE_NAME)
 
 
 class NIST_ASD:
@@ -34,7 +36,7 @@ class NIST_ASD:
         '''
 
         if pickleFilename is None:
-            pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_NAME)
+            pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_PATH)
 
         if pickleFilename.endswith(".gz"):
             with gzip.GzipFile(pickleFilename, "rb") as handle:
