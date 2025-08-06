@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from functools import cached_property
 # import numpy.typing as npt
 from enum import Enum
+import importlib.resources as pkg_resources
 
 import numpy as np
 import scipy as sp
@@ -356,18 +357,37 @@ class SpectralLine:
 
 @dataclass(frozen=True)
 class LineshapeReference:
+    """Description of our source of information on a line shape. Might be a reference to the literature,
+    or notes on conversations. They are stored in a YAML file mass2/data/fluorescence_line_references.yaml
+    """
+    tag: str
     description: str
-    URL: str
+    url: str
+
+    @classmethod
+    def load(cls, filename: Optional[str] = None) -> dict:
+        references = {}
+        if filename is None:
+            filename = pkg_resources.files("mass2").joinpath("data", "fluorescence_line_references.yaml")
+        with open(filename, "r", encoding="utf-8") as file:
+            d = yaml.safe_load(file)
+            for item in d:
+                url = item.get("URL", "")
+                references[item["tag"]] = LineshapeReference(item["tag"], item["description"], url)
+        return references
+
+    def __str__(self) -> str:
+        lines = [f'lineshape_references["{self.tag}"]:']
+        lines.append(self.description.rstrip("\n"))
+        if len(self.url) > 1:
+            lines.append(f"url: {self.url}")
+        return "\n".join(lines)
 
 
-lineshape_references = {}
-with open("mass2/data/fluorescence_line_references.yaml", "r", encoding="utf-8") as file:
-    d = yaml.safe_load(file)
-    for item in d:
-        lineshape_references[item["tag"]] = LineshapeReference(item["description"], URL=item.get("URL", ""))
-
+lineshape_references = LineshapeReference.load()
 
 addline = SpectralLine.addline
+
 
 addline(
     element="Fe",
