@@ -8,9 +8,6 @@ Joe Fowler, NIST
 
 import numpy as np
 import scipy as sp
-import logging
-
-LOG = logging.getLogger("mass")
 
 __all__ = ['kink_model', 'fit_kink_model']
 
