@@ -6,7 +6,7 @@ Tools for fitting and simulating X-ray fluorescence lines.
 """
 
 from dataclasses import dataclass
-# from functools import cached_property
+from functools import cached_property
 # import numpy.typing as npt
 from enum import Enum
 
@@ -120,16 +120,15 @@ class SpectralLine:
         self._peak_energy = np.nan
         self.cumulative_amplitudes = self.normalized_lorentzian_integral_intensity.cumsum()
 
-    @property
+    @cached_property
     def peak_energy(self):
-        # lazily calculate peak energy
-        if np.isnan(self._peak_energy):
-            try:
-                self._peak_energy = sp.optimize.brent(lambda x: -self.pdf(x, instrument_gaussian_fwhm=0),
-                                                      brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy)
-            except ValueError:
-                self._peak_energy = self.nominal_peak_energy
-        return self._peak_energy
+        try:
+            peak_energy = sp.optimize.brent(
+                lambda x: -self.pdf(x, instrument_gaussian_fwhm=0),
+                brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy)
+        except ValueError:
+            peak_energy = self.nominal_peak_energy
+        return peak_energy
 
     def __call__(self, x, instrument_gaussian_fwhm):
         """Make the class callable, returning the same value as the self.pdf method."""
@@ -289,70 +288,70 @@ class SpectralLine:
                    normalized_lorentzian_integral_intensity, nominal_peak_energy, position_uncertainty,
                    reference_measurement_type, is_default_material)
 
+    @classmethod
+    def addline(cls, element, linetype, material, reference_short, reference_plot_instrument_gaussian_fwhm,  # noqa: PLR0917
+                nominal_peak_energy, energies, lorentzian_fwhm, reference_amplitude,
+                reference_amplitude_type, ka12_energy_diff=None,
+                position_uncertainty=np.nan, intrinsic_sigma=0, reference_measurement_type=None,
+                is_default_material=True, allow_replacement=False):
 
-def addline(element, linetype, material, reference_short, reference_plot_instrument_gaussian_fwhm,  # noqa: PLR0917
-            nominal_peak_energy, energies, lorentzian_fwhm, reference_amplitude,
-            reference_amplitude_type, ka12_energy_diff=None,
-            position_uncertainty=np.nan, intrinsic_sigma=0, reference_measurement_type=None,
-            is_default_material=True, allow_replacement=False):
+        # require exactly one method of specifying the amplitude of each component
+        assert reference_amplitude_type in {
+            AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+            AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+            AmplitudeType.VOIGT_PEAK_HEIGHT
+        }
+        # require the reference exists in lineshape_references
+        assert reference_short in lineshape_references
 
-    # require exactly one method of specifying the amplitude of each component
-    assert reference_amplitude_type in {
-        AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
-        AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
-        AmplitudeType.VOIGT_PEAK_HEIGHT
-    }
-    # require the reference exists in lineshape_references
-    assert reference_short in lineshape_references
+        # require kalpha lines to have ka12_energy_diff
+        if linetype.startswith("KAlpha"):
+            ka12_energy_diff = float(ka12_energy_diff)
+        # require reference_plot_instrument_gaussian_fwhm to be a float or None
+        assert reference_plot_instrument_gaussian_fwhm is None or isinstance(
+            reference_plot_instrument_gaussian_fwhm, float)
 
-    # require kalpha lines to have ka12_energy_diff
-    if linetype.startswith("KAlpha"):
-        ka12_energy_diff = float(ka12_energy_diff)
-    # require reference_plot_instrument_gaussian_fwhm to be a float or None
-    assert reference_plot_instrument_gaussian_fwhm is None or isinstance(
-        reference_plot_instrument_gaussian_fwhm, float)
+        # calculate normalized lorentzian_integral_intensity
+        if reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
+            reference_instrument_gaussian_sigma = reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
+            lorentzian_integral_intensity = [ph / voigt(0, 0, lw / 2.0, reference_instrument_gaussian_sigma)
+                                             for ph, lw in zip(reference_amplitude, lorentzian_fwhm)]
+        elif reference_amplitude_type == AmplitudeType.LORENTZIAN_PEAK_HEIGHT:
+            lorentzian_integral_intensity = (
+                0.5 * np.pi * lorentzian_fwhm) * np.array(reference_amplitude)
+        elif reference_amplitude_type == AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY is not None:
+            lorentzian_integral_intensity = reference_amplitude
+        normalized_lorentzian_integral_intensity = np.array(lorentzian_integral_intensity) / \
+            float(np.sum(lorentzian_integral_intensity))
 
-    # calculate normalized lorentzian_integral_intensity
-    if reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
-        reference_instrument_gaussian_sigma = reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
-        lorentzian_integral_intensity = [ph / voigt(0, 0, lw / 2.0, reference_instrument_gaussian_sigma)
-                                         for ph, lw in zip(reference_amplitude, lorentzian_fwhm)]
-    elif reference_amplitude_type == AmplitudeType.LORENTZIAN_PEAK_HEIGHT:
-        lorentzian_integral_intensity = (
-            0.5 * np.pi * lorentzian_fwhm) * np.array(reference_amplitude)
-    elif reference_amplitude_type == AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY is not None:
-        lorentzian_integral_intensity = reference_amplitude
-    normalized_lorentzian_integral_intensity = np.array(lorentzian_integral_intensity) / \
-        float(np.sum(lorentzian_integral_intensity))
+        line = cls(
+            element=element,
+            material=material,
+            linetype=linetype,
+            energies=np.array(energies),
+            lorentzian_fwhm=np.array(lorentzian_fwhm),
+            intrinsic_sigma=intrinsic_sigma,
+            reference_plot_instrument_gaussian_fwhm=reference_plot_instrument_gaussian_fwhm,
+            reference_short=reference_short,
+            reference_amplitude=reference_amplitude,
+            reference_amplitude_type=reference_amplitude_type,
+            normalized_lorentzian_integral_intensity=np.array(normalized_lorentzian_integral_intensity),
+            nominal_peak_energy=float(nominal_peak_energy),
+            position_uncertainty=float(position_uncertainty),
+            reference_measurement_type=reference_measurement_type,
+            is_default_material=is_default_material,
+        )
+        line.__doc__ = "Line auto-generated by calling addline(...) to create a SpectralLine"
+        if linetype.startswith("KAlpha"):
+            line.ka12_energy_diff = ka12_energy_diff
+        name = line.shortname
+        if name in spectra.keys() and (not allow_replacement):
+            raise ValueError(f"spectrum {name} already exists")
 
-    line = SpectralLine(
-        element=element,
-        material=material,
-        linetype=linetype,
-        energies=np.array(energies),
-        lorentzian_fwhm=np.array(lorentzian_fwhm),
-        intrinsic_sigma=intrinsic_sigma,
-        reference_plot_instrument_gaussian_fwhm=reference_plot_instrument_gaussian_fwhm,
-        reference_short=reference_short,
-        reference_amplitude=reference_amplitude,
-        reference_amplitude_type=reference_amplitude_type,
-        normalized_lorentzian_integral_intensity=np.array(normalized_lorentzian_integral_intensity),
-        nominal_peak_energy=float(nominal_peak_energy),
-        position_uncertainty=float(position_uncertainty),
-        reference_measurement_type=reference_measurement_type,
-        is_default_material=is_default_material,
-    )
-    line.__doc__ = "Line auto-generated by calling addline(...) to create a SpectralLine"
-    if linetype.startswith("KAlpha"):
-        line.ka12_energy_diff = ka12_energy_diff
-    name = line.shortname
-    if name in spectra.keys() and (not allow_replacement):
-        raise ValueError(f"spectrum {name} already exists")
-
-    # Add this SpectralLine to spectra dict AND make it be a variable in the module
-    spectra[name] = line
-    globals()[name] = line
-    return line
+        # Add this SpectralLine to spectra dict AND make it be a variable in the module
+        spectra[name] = line
+        globals()[name] = line
+        return line
 
 
 @dataclass(frozen=True)
@@ -367,6 +366,8 @@ with open("mass2/data/fluorescence_line_references.yaml", "r", encoding="utf-8")
     for item in d:
         lineshape_references[item["tag"]] = LineshapeReference(item["description"], URL=item.get("URL", ""))
 
+
+addline = SpectralLine.addline
 
 addline(
     element="Fe",
