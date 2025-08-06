@@ -384,8 +384,8 @@ class Test_Composites_lmfit:
         n1 = 10000
         n2 = 20000
         self.n = n1 + n2
-        self.line1 = mass.spectra['dummy1']()
-        self.line2 = mass.spectra['dummy2']()
+        self.line1 = mass.spectra['dummy1']
+        self.line2 = mass.spectra['dummy2']
         self.nominal_separation = self.line2.nominal_peak_energy - self.line1.nominal_peak_energy
         values1 = self.line1.rvs(size=n1, instrument_gaussian_fwhm=resolution, rng=rng)
         values2 = self.line2.rvs(size=n2, instrument_gaussian_fwhm=resolution, rng=rng)

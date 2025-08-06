@@ -16,7 +16,6 @@ import gzip
 import scipy.constants as sp_const
 import os
 from . import fluorescence_lines
-from . import line_models
 from . import AmplitudeType
 import xraydb
 
