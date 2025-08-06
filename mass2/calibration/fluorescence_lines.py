@@ -245,7 +245,10 @@ class SpectralLine:
         return m
 
     def fitter(self):
-        return make_line_fitter(self)
+        fitter_class = line_models.GenericLineModel
+        f = fitter_class(self)
+        f.name = f"{self.element}{self.linetype}"
+        return f
 
     def minimum_fwhm(self, instrument_gaussian_fwhm):
         """for the narrowest lorentzian in the line model, calculate the combined fwhm including
@@ -361,20 +364,7 @@ def addline(element, linetype, material, reference_short, reference_plot_instrum
     # Add this SpectralLine to spectra dict AND make it be a variable in the module
     spectra[name] = line
     globals()[name] = line
-
-    def mlf():
-        f"Make a line fitter for {name}"
-        return make_line_fitter(line)
-    globals()[name + "Fitter"] = mlf
     return line
-
-
-def make_line_fitter(line):
-    """Generate a LineFitter instance from a SpectralLine (deprecated)"""
-    fitter_class = line_models.GenericLineModel
-    f = fitter_class(line)
-    f.name = line.element + line.linetype
-    return f
 
 
 addline(
