@@ -109,14 +109,16 @@ class TestAddFitter:
         e = np.linspace(5880, 5910, 31)
         y1 = line(e, instrument_gaussian_fwhm=0)
         y2 = line(e, instrument_gaussian_fwhm=8)
-        line2 = dataclasses.replace(line, intrinsic_sigma=8 / 2.3548)
+        sigma8 = 8.0 / 2.3548
+        line2 = dataclasses.replace(line, intrinsic_sigma=sigma8)
         y3 = line2(e, instrument_gaussian_fwhm=0)
+
         maxdiff = np.abs(y1 - y2).max()
         assert maxdiff > 1e-4, "Setting resolution=8 eV should change line"
         maxdiff = np.abs(y1 - y3).max()
         assert maxdiff > 1e-4, "Setting instrinsic_sigma to 3.40 eV should change line"
         maxdiff = np.abs(y2 - y3).max()
-        assert maxdiff < 1e-5, "Setting resolution=8 eV or intrinsic_sigma=3.40 eV should be equivalent"
+        assert maxdiff < 1e-5 * y2.max(), "Setting resolution=8 eV or intrinsic_sigma=3.40 eV should be equivalent"
 
     @staticmethod
     def test_some_lines_make_sense():
