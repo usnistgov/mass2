@@ -157,7 +157,7 @@ class SpectralLine:
         x = np.asarray(x, dtype=float)
         result = np.zeros_like(x)
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm,
-                                      self.lorentz_amplitude):
+                                      self.lorentzian_integral_intensity):
             result += ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma)
             # mass.voigt() is normalized to have unit integrated intensity
         return result
@@ -168,7 +168,7 @@ class SpectralLine:
         x = np.asarray(x, dtype=float)
         components = []
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm,
-                                      self.lorentz_amplitude):
+                                      self.lorentzian_integral_intensity):
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
@@ -292,7 +292,8 @@ class SpectralLine:
         lorentzian_fwhm = np.array([lorentzian_fwhm])
         linetype = "Gaussian"
         reference_short = "unkown: quick_line"
-        reference_amplitude = 1.0
+        reference_amplitude = np.array([1.0])
+        reference_amplitude_type = AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY
         nominal_peak_energy = energy
         position_uncertainty = 0.0
         reference_measurement_type = "unkown: quick_line"
@@ -305,6 +306,7 @@ class SpectralLine:
             intrinsic_sigma=intrinsic_sigma,
             reference_short=reference_short,
             reference_amplitude=reference_amplitude,
+            reference_amplitude_type=reference_amplitude_type,
             nominal_peak_energy=nominal_peak_energy,
             position_uncertainty=position_uncertainty,
             reference_measurement_type=reference_measurement_type)
