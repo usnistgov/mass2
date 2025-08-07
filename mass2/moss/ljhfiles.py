@@ -27,6 +27,7 @@ class LJHFile:
     timebase: float
     nsamples: int
     npresamples: int
+    subframediv: int
     client: str
     header: dict
     header_string: str
@@ -46,6 +47,12 @@ class LJHFile:
         nsamples = header_dict["Total Samples"]
         npresamples = header_dict["Presamples"]
         client = header_dict.get("Software Version", "UNKNOWN")
+        if "Subframe divisions" in header_dict:
+            subframediv = header_dict["Subframe divisions"]
+        elif "Number of rows" in header_dict:
+            subframediv = header_dict["Number of rows"]
+        else:
+            subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
         if ljh_version < Version("2.2.0"):
@@ -88,6 +95,7 @@ class LJHFile:
             timebase,
             nsamples,
             npresamples,
+            subframediv,
             client,
             header_dict,
             header_string,
@@ -145,6 +153,7 @@ class LJHFile:
             ("Presamples", int),
             ("Number of columns", int),
             ("Number of rows", int),
+            ("Subframe divisions", int),
         }:
             header_dict[name] = datatype(header_dict.get(name, -1))
         return header_dict, header_string, header_size
