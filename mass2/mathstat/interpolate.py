@@ -9,9 +9,6 @@ CubicSpline - Perform an exact cubic spline through the data, with either
     specified slope at the end of the interval or 'natural boundary conditions'
     (y''=0 at ends).
 
-LinterpCubicSpline - Create a new CubicSpline that's the linear interpolation
-    of two existing ones.
-
 GPRSpline - Create a smoothing spline based on the theory of Gaussian process regression.
     Finds the curvature penalty by maximizing the Bayesian marginal likelihood.
     Intended to supercede `SmoothingSpline`, but very similar. Differs in how the
@@ -34,8 +31,6 @@ Created Feb 2014
 import numpy as np
 import scipy as sp
 from scipy.interpolate import splev
-
-from mass2.mathstat.derivative import Function, ConstantFunction
 
 
 class CubicSpline:
@@ -180,52 +175,6 @@ class CubicSpline:
         if scalar:
             result = result[0]
         return result
-
-
-class CubicSplineFunction(CubicSpline, Function):
-    """A dubious class which lets you take derivatives of a cubic spline."""
-
-    def __init__(self, x, y, yprime1=None, yprimeN=None, der=0):
-        super().__init__(x, y, yprime1=yprime1, yprimeN=yprimeN)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-
-        return CubicSplineFunction(self._x, self._y, yprime1=self.yprime1, yprimeN=self.yprimeN, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    def __repr__(self):
-        return "CubicSpline" + "'" * self.der + "(x)"
-
-
-class LinterpCubicSpline(CubicSpline):
-    """A CubicSpline object which is a linear combination of CubicSpline objects
-    s1 and s2, effectively fraction*s1 + (1-fraction)*s2.
-    """
-
-    def __init__(self, s1, s2, fraction):
-        if s1._n != s2._n:
-            raise ValueError("Splines must be of the same length to be linearly interpolated")
-        if np.max(np.abs(s1._x - s2._x)) > 1e-3:
-            raise ValueError("Splines must have same abscissa values to be interpolated")
-
-        def wtsum(a, b, frac):
-            return a * frac + b * (1 - frac)
-
-        self._n = s1._n
-        self._x = s1._x
-        self._y = wtsum(s1._y, s2._y, fraction)
-        self._y2 = wtsum(s1._y2, s2._y2, fraction)
-        self.yprime1 = wtsum(s1.yprime1, s2.yprime1, fraction)
-        self.yprimeN = wtsum(s1.yprimeN, s2.yprimeN, fraction)
-        self.xstep = wtsum(s1.xstep, s2.xstep, fraction)
-        self.ystep = wtsum(s1.ystep, s2.ystep, fraction)
 
 
 def k_spline(x, y):
@@ -583,29 +532,6 @@ class SmoothingSpline:
         return self.__eval(x, der=der)
 
 
-class SmoothingSplineFunction(SmoothingSpline, Function):
-    def __init__(self, x, y, dy, dx=None, maxchisq=None, der=0):
-        super().__init__(x, y, dy, dx=dx, maxchisq=maxchisq)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-        return SmoothingSplineFunction(self.x, self.y, self.dy, self.dx, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    @staticmethod
-    def variance(xtest):
-        return np.zeros_like(xtest) + np.inf
-
-    def __repr__(self):
-        return "SmoothingSpline{}(x)".format("'" * self.der)
-
-
 class SmoothingSplineLog:
     def __init__(self, x, y, dy, dx=None, maxchisq=None):
         if np.any(x <= 0) or np.any(y <= 0):
@@ -616,22 +542,3 @@ class SmoothingSplineLog:
 
     def __call__(self, x, der=0):
         return np.exp(self.linear_model(np.log(x), der=der))
-
-
-class GPRSplineFunction(GPRSpline, Function):
-    def __init__(self, x, y, dy, dx=None, der=0):
-        super().__init__(x, y, dy, dx=dx)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-        return GPRSplineFunction(self.x, self.y, self.dy, self.dx, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    def __repr__(self):
-        return "GPRSpline{}(x)".format("'" * self.der)

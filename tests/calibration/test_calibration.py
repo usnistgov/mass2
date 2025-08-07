@@ -10,7 +10,7 @@ import numpy as np
 import mass2 as mass
 import h5py
 import os
-from mass2 import EnergyCalibrationMaker
+from mass2 import EnergyCalibrationMaker, Curvetypes
 
 
 def basic_nonlinearity(e: np.ndarray) -> np.ndarray:
@@ -64,7 +64,7 @@ class TestJoeStyleEnergyCalibration:
     def test_copy_equality():
         """Test that any deep-copied calibration object is equivalent."""
         factory = basic_factory()
-        for curvetype in factory.ALLOWED_CURVENAMES:
+        for curvetype in Curvetypes:
             for use_approximation in [True, False]:
                 print(curvetype, use_approximation, "DDDDDD")
                 cal1 = factory.make_calibration(curvetype, use_approximation)
@@ -80,9 +80,9 @@ class TestJoeStyleEnergyCalibration:
     def test_loglog_exact_diff():
         # loglog=True makes use_zerozero not matter
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog",
+            curvetype1=Curvetypes.LOGLOG,
             use_approximation1=False,
-            curvetype2="linear",
+            curvetype2=Curvetypes.LINEAR,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -92,9 +92,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_loglog_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog",
+            curvetype1=Curvetypes.LOGLOG,
             use_approximation1=False,
-            curvetype2="linear",
+            curvetype2=Curvetypes.LINEAR,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -104,9 +104,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_zerozero_exact_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0",
+            curvetype1=Curvetypes.LINEAR_PLUS_ZERO,
             use_approximation1=False,
-            curvetype2="linear",
+            curvetype2=Curvetypes.LINEAR,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -116,9 +116,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_zerozero_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0",
+            curvetype1=Curvetypes.LINEAR_PLUS_ZERO,
             use_approximation1=False,
-            curvetype2="linear",
+            curvetype2=Curvetypes.LINEAR,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -128,9 +128,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_loglog_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog",
+            curvetype1=Curvetypes.LOGLOG,
             use_approximation1=True,
-            curvetype2="loglog",
+            curvetype2=Curvetypes.LOGLOG,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -140,9 +140,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_zerozero_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0",
+            curvetype1=Curvetypes.LINEAR_PLUS_ZERO,
             use_approximation1=True,
-            curvetype2="linear+0",
+            curvetype2=Curvetypes.LINEAR_PLUS_ZERO,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -152,9 +152,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear",
+            curvetype1=Curvetypes.LINEAR,
             use_approximation1=True,
-            curvetype2="linear",
+            curvetype2=Curvetypes.LINEAR,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -164,9 +164,9 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_gain_invgain_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="gain",
+            curvetype1=Curvetypes.GAIN,
             use_approximation1=True,
-            curvetype2="invgain",
+            curvetype2=Curvetypes.INVGAIN,
             use_approximation2=False,
         )
         assert ph1 != ph2
@@ -176,7 +176,7 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_gain_loglog_2pts():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="gain", use_approximation1=True, curvetype2="loglog", use_approximation2=False, npoints=3
+            curvetype1=Curvetypes.GAIN, use_approximation1=True, curvetype2=Curvetypes.LOGLOG, use_approximation2=False, npoints=3
         )
         assert ph1 != ph2
         assert e1 != e2
@@ -194,7 +194,7 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_notlog_ph():
         factory = basic_factory()
-        cal1 = factory.make_calibration(curvename="linear+0", approximate=True)
+        cal1 = factory.make_calibration(curvename=Curvetypes.LINEAR_PLUS_ZERO, approximate=True)
         for energy in np.linspace(3500, 5500, 10):
             ph = basic_nonlinearity(energy)
             assert energy == pytest.approx(cal1.ph2energy(ph), abs=10)
@@ -208,7 +208,7 @@ class TestJoeStyleEnergyCalibration:
         names = len(ph) * [""]
         factory = EnergyCalibrationMaker(ph, energy, dph, de, names)
         assert np.all(np.diff(factory.ph) > 0)
-        cal1 = factory.make_calibration("gain", True)
+        cal1 = factory.make_calibration(Curvetypes.GAIN, True)
         cal1(np.array([2200, 4200, 4400], dtype=float))
 
     @staticmethod
@@ -221,13 +221,13 @@ class TestJoeStyleEnergyCalibration:
         names = len(ph) * [""]
         with pytest.raises(Exception):
             factory = EnergyCalibrationMaker(ph, energy, dph, de, names)
-            factory.make_calibration(curvename="gain", approximate=True)
+            factory.make_calibration(curvename=Curvetypes.GAIN, approximate=True)
 
     @staticmethod
     def test_save_and_load_to_hdf5():
         factory = basic_factory()
         fname = "to_be_deleted.hdf5"
-        for ctype in ("loglog", "gain"):
+        for ctype in (Curvetypes.LOGLOG, Curvetypes.GAIN):
             cal1 = factory.make_calibration(curvename=ctype)
             with h5py.File(fname, "w") as h5:
                 grp = h5.require_group("calibration")
@@ -248,8 +248,8 @@ class TestJoeStyleEnergyCalibration:
         factory = basic_factory()
 
         ph = np.arange(-10, 10, dtype=float) * 1000.0
-        for ct in EnergyCalibrationMaker.ALLOWED_CURVENAMES:
-            if ct == "loglog":
+        for ct in Curvetypes:
+            if ct == Curvetypes.LOGLOG:
                 continue
             cal = factory.make_calibration(ct, approximate=True)
             e = cal(ph)
@@ -313,7 +313,7 @@ class TestJoeStyleEnergyCalibration:
         ])
         de = np.array([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
         factory = mass.EnergyCalibrationMaker.init(ph, e, dph, de)
-        cal = factory.make_calibration(curvename="gain", approximate=True)
+        cal = factory.make_calibration(curvename=Curvetypes.GAIN, approximate=True)
         assert (np.abs(cal(ph) - e) < 0.9 * dph).all()
 
         # Test for a problem in extrapolated gain that I had: gain was extrapolated with zero slope!
@@ -332,7 +332,7 @@ class TestJoeStyleEnergyCalibration:
         ph2[5] *= (ph2[5] / ph2[4]) ** (-0.85)
         factory1 = mass.EnergyCalibrationMaker(ph1, e, ph1 * 1e-4, np.zeros_like(e), names)
         factory2 = mass.EnergyCalibrationMaker(ph2, e, ph2 * 1e-4, np.zeros_like(e), names)
-        cal1 = factory1.make_calibration("gain")
-        cal2 = factory2.make_calibration("gain")
+        cal1 = factory1.make_calibration(Curvetypes.GAIN)
+        cal2 = factory2.make_calibration(Curvetypes.GAIN)
         assert cal1.ismonotonic
         assert not cal2.ismonotonic

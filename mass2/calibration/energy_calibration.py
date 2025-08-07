@@ -11,6 +11,7 @@ import pylab as plt
 import h5py
 import numpy.typing as npt
 from typing import Any
+from enum import Enum, auto
 
 try:
     from typing import Self
@@ -20,8 +21,17 @@ from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
 
-from mass2.mathstat.interpolate import CubicSplineFunction, GPRSplineFunction
+from mass2.mathstat.interpolate import CubicSpline, GPRSpline
 from .fluorescence_lines import STANDARD_FEATURES
+
+
+class Curvetypes(Enum):
+    LINEAR = auto()
+    LINEAR_PLUS_ZERO = auto()
+    LOGLOG = auto()
+    GAIN = auto()
+    INVGAIN = auto()
+    LOGGAIN = auto()
 
 
 @dataclass(frozen=True)
@@ -214,15 +224,6 @@ class EnergyCalibrationMaker:
             new_names[update_index] = name
         return EnergyCalibrationMaker(new_ph, new_energy, new_dph, new_de, new_names)
 
-    ALLOWED_CURVENAMES = {
-        "linear",
-        "linear+0",
-        "loglog",
-        "gain",
-        "invgain",
-        "loggain",
-    }
-
     @staticmethod
     def heuristic_samplepoints(anchors: npt.ArrayLike) -> np.ndarray:
         """Given a set of calibration anchor points, return a few hundred
@@ -251,28 +252,28 @@ class EnergyCalibrationMaker:
         return np.hstack(x)
 
     def make_calibration_loglog(self, approximate: bool = False, powerlaw: float = 1.15, extra_info=None) -> EnergyCalibration:
-        return self.make_calibration("loglog", approximate=approximate, powerlaw=powerlaw, extra_info=extra_info)
+        return self.make_calibration(Curvetypes.LOGLOG, approximate=approximate, powerlaw=powerlaw, extra_info=extra_info)
 
     def make_calibration_gain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
-        return self.make_calibration("gain", approximate=approximate, extra_info=extra_info)
+        return self.make_calibration(Curvetypes.GAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_invgain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
-        return self.make_calibration("invgain", approximate=approximate, extra_info=extra_info)
+        return self.make_calibration(Curvetypes.INVGAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_loggain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
-        return self.make_calibration("loggain", approximate=approximate, extra_info=extra_info)
+        return self.make_calibration(Curvetypes.LOGGAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_linear(self, approximate: bool = False, addzero: bool = False, extra_info=None) -> EnergyCalibration:
-        curvename = "linear+0" if addzero else "linear"
+        curvename = Curvetypes.LINEAR_PLUS_ZERO if addzero else Curvetypes.LINEAR
         return self.make_calibration(curvename, approximate=approximate, extra_info=extra_info)
 
     def make_calibration(
-        self, curvename: str = "loglog", approximate: bool = False, powerlaw: float = 1.15, extra_info=None
+        self, curvename: Curvetypes = Curvetypes.LOGLOG, approximate: bool = False, powerlaw: float = 1.15, extra_info=None
     ) -> EnergyCalibration:
         if approximate and self.npts < 3:
             raise ValueError(f"approximating curves require 3 or more cal anchor points, have {self.npts}")
-        if curvename not in self.ALLOWED_CURVENAMES:
-            raise ValueError(f"curvename='{curvename}', must be in {self.ALLOWED_CURVENAMES}")
+        if curvename not in Curvetypes:
+            raise ValueError(f"curvename='{curvename}', must be in {Curvetypes}")
 
         # Use a heuristic to repair negative uncertainties.
         def regularize_uncertainties(x: npt.NDArray[np.float64]) -> np.ndarray:
@@ -286,7 +287,7 @@ class EnergyCalibrationMaker:
         dph = regularize_uncertainties(self.dph)
         de = regularize_uncertainties(self.de)
 
-        if curvename == "loglog":
+        if curvename == Curvetypes.LOGLOG:
             input_transform = EnergyCalibration._ecal_input_log
             output_transform = EnergyCalibration._ecal_output_log
             x = np.log(self.ph)
@@ -299,7 +300,7 @@ class EnergyCalibrationMaker:
             dx = dph / self.ph
             dy = de / self.energy
 
-        elif curvename == "gain":
+        elif curvename == Curvetypes.GAIN:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_gain
             x = self.ph
@@ -309,7 +310,7 @@ class EnergyCalibrationMaker:
             dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
 
-        elif curvename == "invgain":
+        elif curvename == Curvetypes.INVGAIN:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_invgain
             x = self.ph
@@ -319,14 +320,14 @@ class EnergyCalibrationMaker:
             dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
 
-        elif curvename in {"linear", "linear+0"}:
+        elif curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO}:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_identity
             x = self.ph
             y = self.energy
             dx = dph
             dy = de
-            if ("+0" in curvename) and (0.0 not in x):
+            if (curvename == Curvetypes.LINEAR_PLUS_ZERO) and (0.0 not in x):
                 # Add a "zero"-energy and -PH point. But to avoid numerical problems, actually just use
                 # 1e-3 times the lowest value, giving ±100% uncertainty on the values.
                 x = np.hstack(([x.min() * 1e-3], x))
@@ -334,7 +335,7 @@ class EnergyCalibrationMaker:
                 dx = np.hstack(([x[0] * 1e-3], dx))
                 dy = np.hstack((y[0] * 1e-3, dy))
 
-        elif curvename == "loggain":
+        elif curvename == Curvetypes.LOGGAIN:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_loggain
             x = self.ph
@@ -348,33 +349,33 @@ class EnergyCalibrationMaker:
             raise ValueError(f"curvename='{curvename}' not recognized")
 
         if approximate:
-            internal_spline = GPRSplineFunction(x, y, dy, dx)
+            internal_spline = GPRSpline(x, y, dy, dx)
         elif len(x) > 1:
-            internal_spline = CubicSplineFunction(x, y)
+            internal_spline = CubicSpline(x, y)
         else:
-            internal_spline = CubicSplineFunction(x * [1, 2], y * [1, 2])
+            internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
 
         ph_samplepoints = EnergyCalibrationMaker.heuristic_samplepoints(self.ph)
         E_samplepoints = output_transform(ph_samplepoints, internal_spline(input_transform(ph_samplepoints)))
-        energy2ph = CubicSplineFunction(E_samplepoints, ph_samplepoints)
+        energy2ph = CubicSpline(E_samplepoints, ph_samplepoints)
 
         if approximate:
             dspline = internal_spline.variance(ph_samplepoints) ** 0.5
-            if curvename == "loglog":
+            if curvename == Curvetypes.LOGLOG:
                 de_samplepoints = dspline * internal_spline(input_transform(ph_samplepoints))
-            elif curvename == "gain":
+            elif curvename == Curvetypes.GAIN:
                 de_samplepoints = dspline * E_samplepoints**2 / ph_samplepoints
-            elif curvename == "invgain":
+            elif curvename == Curvetypes.INVGAIN:
                 de_samplepoints = dspline * ph_samplepoints
-            elif curvename in {"linear", "linear+0"}:
+            elif curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO}:
                 de_samplepoints = dspline
-            elif curvename == "loggain":
+            elif curvename == Curvetypes.LOGGAIN:
                 abs_dfdp = np.abs(internal_spline(ph_samplepoints, der=1))
                 de_samplepoints = dspline * E_samplepoints * abs_dfdp
             else:
                 raise ValueError(f"curvename='{curvename}' not recognized")
 
-            uncertainty_spline = CubicSplineFunction(ph_samplepoints, de_samplepoints)
+            uncertainty_spline = CubicSpline(ph_samplepoints, de_samplepoints)
         else:
             uncertainty_spline = np.zeros_like
 
@@ -395,7 +396,7 @@ class EnergyCalibrationMaker:
         )
 
     def drop_one_errors(
-        self, curvename: str = "loglog", approximate: bool = False, powerlaw: float = 1.15
+        self, curvename: Curvetypes = Curvetypes.LOGLOG, approximate: bool = False, powerlaw: float = 1.15
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         # """For each calibration point, calculate the difference between the 'correct' energy
         # and the energy predicted by creating a calibration without that point and using
@@ -603,7 +604,7 @@ class EnergyCalibration:
         cal_group["energy"] = self.energy
         cal_group["dph"] = self.dph
         cal_group["de"] = self.de
-        cal_group.attrs["curvetype"] = self.curvename
+        cal_group.attrs["curvetype"] = self.curvename.name
         cal_group.attrs["approximate"] = self.approximating
 
     @staticmethod
@@ -611,9 +612,10 @@ class EnergyCalibration:
         cal_group = hdf5_group[name]
 
         # Fix a behavior of h5py for writing in py2, reading in py3.
-        curvetype = cal_group.attrs["curvetype"]
-        if isinstance(curvetype, bytes):
-            curvetype = curvetype.decode("utf-8")
+        ctype = cal_group.attrs["curvetype"]
+        if isinstance(ctype, bytes):
+            ctype = ctype.decode("utf-8")
+        curvetype = Curvetypes[ctype]
 
         maker = EnergyCalibrationMaker(
             cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], cal_group["name"][:]
