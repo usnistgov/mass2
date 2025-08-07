@@ -16,10 +16,10 @@ Experimental Energy:
 Blend               = 74 - 79
 Ref.                = 81 - 91
 
-All data copied by Joe Fowler from G. Zschornack _Handbook of x-ray data_, 
+All data copied by Joe Fowler from G. Zschornack _Handbook of x-ray data_,
 Springer, 2007.
 
-Ele. A   Trans.  Theory (eV)   Unc. (eV)    Direct (eV)     Unc. (eV)    Blend  Ref.       
+Ele. A   Trans.  Theory (eV)   Unc. (eV)    Direct (eV)     Unc. (eV)    Blend  Ref.
 C        KL3                                277.0           2.0          KL2,3  50
 N        KL3                                392.4           0.7          KL2,3  50
 O        KL3                                524.9           0.7          KL2,3  50

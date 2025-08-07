@@ -16,6 +16,7 @@ class NoiseChannel:
     ):
         def excursion2d(noise_trace):
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
+
         noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
         excursion = excursion2d(noise_traces)
         max_excursion = moss.misc.outlier_resistant_nsigma_above_mid(
@@ -24,12 +25,14 @@ class NoiseChannel:
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
-    def get_records_2d(self,
-                       trace_col_name="pulse",
-                       n_limit=10000,
-                       excursion_nsigma=5,
-                       trunc_front=0,
-                       trunc_back=0):
+    def get_records_2d(
+        self,
+        trace_col_name="pulse",
+        n_limit=10000,
+        excursion_nsigma=5,
+        trunc_front=0,
+        trunc_back=0,
+    ):
         """
         Return a 2D NumPy array of cleaned noise traces from the specified column.
 
@@ -59,10 +62,9 @@ class NoiseChannel:
         df_noise2, max_excursion = self.calc_max_excursion(
             trace_col_name, n_limit, excursion_nsigma
         )
-        noise_traces_clean = (
-            df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"]
-            .to_numpy()
-        )
+        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)[
+            "pulse"
+        ].to_numpy()
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -81,7 +83,9 @@ class NoiseChannel:
         trunc_front=0,
         trunc_back=0,
     ):
-        records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        records = self.get_records_2d(
+            trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back
+        )
         spectrum = moss.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
         return spectrum
 

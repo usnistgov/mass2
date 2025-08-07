@@ -4,12 +4,14 @@ Objects to assist with calibration from pulse heights to absolute energies.
 Created on May 16, 2011
 Completely redesigned January 2025
 """
+
 from __future__ import annotations
 import numpy as np
 import pylab as plt
 import h5py
 import numpy.typing as npt
 from typing import Any
+
 try:
     from typing import Self
 except ImportError:
@@ -37,6 +39,7 @@ class EnergyCalibrationMaker:
     ValueError
         When calibration data arrays have unequal length, or `ph` is not monotone in `energy`.
     """
+
     ph: npt.NDArray[np.float64]
     energy: npt.NDArray[np.float64]
     dph: npt.NDArray[np.float64]
@@ -44,13 +47,14 @@ class EnergyCalibrationMaker:
     names: list[str]
 
     @classmethod
-    def init(cls,
-             ph: npt.ArrayLike | None = None,
-             energy: npt.ArrayLike | None = None,
-             dph: npt.ArrayLike | None = None,
-             de: npt.ArrayLike | None = None,
-             names: list[str] | None = None,
-             ) -> Self:
+    def init(
+        cls,
+        ph: npt.ArrayLike | None = None,
+        energy: npt.ArrayLike | None = None,
+        dph: npt.ArrayLike | None = None,
+        de: npt.ArrayLike | None = None,
+        names: list[str] | None = None,
+    ) -> Self:
         if ph is None:
             ph = np.array([], dtype=float)
         else:
@@ -134,9 +138,15 @@ class EnergyCalibrationMaker:
         # Also recursive and less efficient. See previous method's comment.
         return self._remove_cal_point_idx(idxs[0]).remove_cal_point_energy(energy, de)
 
-    def add_cal_point(self, ph: float, energy: float | str, name: str = "",
-                      ph_error: float | None = None, e_error: float | None = None,
-                      replace: bool = True) -> Self:
+    def add_cal_point(
+        self,
+        ph: float,
+        energy: float | str,
+        name: str = "",
+        ph_error: float | None = None,
+        e_error: float | None = None,
+        replace: bool = True,
+    ) -> Self:
         """Add a single energy calibration point.
 
         Can call as .add_cal_point(ph, energy, name) or if the "energy" is a line name, then
@@ -166,8 +176,7 @@ class EnergyCalibrationMaker:
                 name = energy
                 energy = STANDARD_FEATURES[name]
             except Exception:
-                raise ValueError("2nd argument must be an energy or a known name"
-                                 + " from mass2.energy_calibration.STANDARD_FEATURES")
+                raise ValueError("2nd argument must be an energy or a known name" + " from mass2.energy_calibration.STANDARD_FEATURES")
 
         if ph_error is None:
             ph_error = ph * 0.001
@@ -178,17 +187,15 @@ class EnergyCalibrationMaker:
         if self.npts > 0:
             if name and name in self.names:  # Update an existing point by name
                 if not replace:
-                    raise ValueError(
-                        f"Calibration point '{name}' is already known and overwrite is False")
+                    raise ValueError(f"Calibration point '{name}' is already known and overwrite is False")
                 update_index = self.names.index(name)
 
             elif np.abs(energy - self.energy).min() <= e_error:  # Update existing point
                 if not replace:
-                    raise ValueError(
-                        f"Calibration point at energy {energy:.2f} eV is already known and overwrite is False")
+                    raise ValueError(f"Calibration point at energy {energy:.2f} eV is already known and overwrite is False")
                 update_index = np.abs(energy - self.energy).argmin()
 
-        if update_index is None:   # Add a new calibration anchor point
+        if update_index is None:  # Add a new calibration anchor point
             new_ph = np.hstack((self.ph, ph))
             new_energy = np.hstack((self.energy, energy))
             new_dph = np.hstack((self.dph, ph_error))
@@ -208,8 +215,12 @@ class EnergyCalibrationMaker:
         return EnergyCalibrationMaker(new_ph, new_energy, new_dph, new_de, new_names)
 
     ALLOWED_CURVENAMES = {
-        "linear", "linear+0", "loglog",
-        "gain", "invgain", "loggain",
+        "linear",
+        "linear+0",
+        "loglog",
+        "gain",
+        "invgain",
+        "loggain",
     }
 
     @staticmethod
@@ -232,36 +243,32 @@ class EnergyCalibrationMaker:
         x = [np.linspace(0, anchors.min(), 51)[1:]]
         # Then one points, plus one extra per 1% spacing between (and at) each anchor
         for i in range(len(anchors) - 1):
-            low, high = anchors[i:i + 2]
+            low, high = anchors[i : i + 2]
             n = 1 + int(100 * (high / low - 1) + 0.5)
             x.append(np.linspace(low, high, n + 1)[1:])
         # Finally, 100 more points between the highest anchor and 2x that.
         x.append(anchors.max() * np.linspace(1, 2, 101)[1:])
         return np.hstack(x)
 
-    def make_calibration_loglog(
-            self, approximate: bool = False, powerlaw: float = 1.15, extra_info=None) -> EnergyCalibration:
+    def make_calibration_loglog(self, approximate: bool = False, powerlaw: float = 1.15, extra_info=None) -> EnergyCalibration:
         return self.make_calibration("loglog", approximate=approximate, powerlaw=powerlaw, extra_info=extra_info)
 
-    def make_calibration_gain(
-            self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_gain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
         return self.make_calibration("gain", approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_invgain(
-            self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_invgain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
         return self.make_calibration("invgain", approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_loggain(
-            self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_loggain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
         return self.make_calibration("loggain", approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_linear(
-            self, approximate: bool = False, addzero: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_linear(self, approximate: bool = False, addzero: bool = False, extra_info=None) -> EnergyCalibration:
         curvename = "linear+0" if addzero else "linear"
         return self.make_calibration(curvename, approximate=approximate, extra_info=extra_info)
 
-    def make_calibration(self, curvename: str = "loglog", approximate: bool = False,
-                         powerlaw: float = 1.15, extra_info=None) -> EnergyCalibration:
+    def make_calibration(
+        self, curvename: str = "loglog", approximate: bool = False, powerlaw: float = 1.15, extra_info=None
+    ) -> EnergyCalibration:
         if approximate and self.npts < 3:
             raise ValueError(f"approximating curves require 3 or more cal anchor points, have {self.npts}")
         if curvename not in self.ALLOWED_CURVENAMES:
@@ -275,6 +282,7 @@ class EnergyCalibrationMaker:
             x = x.copy()
             x[x < 0] = target
             return x
+
         dph = regularize_uncertainties(self.dph)
         de = regularize_uncertainties(self.de)
 
@@ -298,7 +306,7 @@ class EnergyCalibrationMaker:
             y = self.ph / self.energy
             # Estimate spline uncertainties using slope of best-fit line
             slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.energy - 1) * dph / x)**2 + (de / self.energy)**2)**0.5
+            dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
 
         elif curvename == "invgain":
@@ -308,7 +316,7 @@ class EnergyCalibrationMaker:
             y = self.energy / self.ph
             # Estimate spline uncertainties using slope of best-fit line
             slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.ph / y + 1) * dph / x)**2 + (de / self.energy)**2)**0.5
+            dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
 
         elif curvename in {"linear", "linear+0"}:
@@ -333,7 +341,7 @@ class EnergyCalibrationMaker:
             y = np.log(self.ph / self.energy)
             # Estimate spline uncertainties using slope of best-fit line
             slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * x - 1) * dph / x)**2 + (de / self.energy)**2)**0.5
+            dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
 
         else:
@@ -347,14 +355,11 @@ class EnergyCalibrationMaker:
             internal_spline = CubicSplineFunction(x * [1, 2], y * [1, 2])
 
         ph_samplepoints = EnergyCalibrationMaker.heuristic_samplepoints(self.ph)
-        E_samplepoints = output_transform(
-            ph_samplepoints,
-            internal_spline(input_transform(ph_samplepoints))
-        )
+        E_samplepoints = output_transform(ph_samplepoints, internal_spline(input_transform(ph_samplepoints)))
         energy2ph = CubicSplineFunction(E_samplepoints, ph_samplepoints)
 
         if approximate:
-            dspline = internal_spline.variance(ph_samplepoints)**0.5
+            dspline = internal_spline.variance(ph_samplepoints) ** 0.5
             if curvename == "loglog":
                 de_samplepoints = dspline * internal_spline(input_transform(ph_samplepoints))
             elif curvename == "gain":
@@ -374,7 +379,11 @@ class EnergyCalibrationMaker:
             uncertainty_spline = np.zeros_like
 
         return EnergyCalibration(
-            self.ph, self.energy, self.dph, self.de, self.names,
+            self.ph,
+            self.energy,
+            self.dph,
+            self.de,
+            self.names,
             curvename=curvename,
             approximating=approximate,
             spline=internal_spline,
@@ -385,9 +394,9 @@ class EnergyCalibrationMaker:
             extra_info=extra_info,
         )
 
-    def drop_one_errors(self, curvename: str = "loglog",
-                        approximate: bool = False,
-                        powerlaw: float = 1.15) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def drop_one_errors(
+        self, curvename: str = "loglog", approximate: bool = False, powerlaw: float = 1.15
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         # """For each calibration point, calculate the difference between the 'correct' energy
         # and the energy predicted by creating a calibration without that point and using
         # ph2energy to calculate the predicted energy, return (energies, drop_one_energy_diff)"""
@@ -420,6 +429,7 @@ class EnergyCalibration:
     ValueError
         _description_
     """
+
     ph: npt.NDArray[np.float64]
     energy: npt.NDArray[np.float64]
     dph: npt.NDArray[np.float64]
@@ -465,8 +475,7 @@ class EnergyCalibration:
         raise ValueError(f"der={der}, should be one of (0,1)")
 
     @staticmethod
-    def _ecal_output_identity(ph: npt.ArrayLike, yspline: npt.ArrayLike,
-                              der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
+    def _ecal_output_identity(ph: npt.ArrayLike, yspline: npt.ArrayLike, der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
         "Use the spline result as E itself"
         assert der >= 0 and dery >= 0
         if der > 0:
@@ -479,8 +488,7 @@ class EnergyCalibration:
             return np.zeros_like(ph)
 
     @staticmethod
-    def _ecal_output_log(ph: npt.ArrayLike, yspline: npt.ArrayLike,
-                         der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
+    def _ecal_output_log(ph: npt.ArrayLike, yspline: npt.ArrayLike, der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
         "Use the spline result as log(E)"
         assert der >= 0 and dery >= 0
         if der == 0:
@@ -490,8 +498,7 @@ class EnergyCalibration:
             return np.zeros_like(ph)
 
     @staticmethod
-    def _ecal_output_gain(ph: npt.ArrayLike, yspline: npt.ArrayLike,
-                          der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
+    def _ecal_output_gain(ph: npt.ArrayLike, yspline: npt.ArrayLike, der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
         "Use the spline result as gain = ph/E"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -505,8 +512,7 @@ class EnergyCalibration:
         return -ph / yspline**2
 
     @staticmethod
-    def _ecal_output_invgain(ph: npt.ArrayLike, yspline: npt.ArrayLike,
-                             der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
+    def _ecal_output_invgain(ph: npt.ArrayLike, yspline: npt.ArrayLike, der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
         "Use the spline result as the inverse gain = E/ph"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -520,8 +526,7 @@ class EnergyCalibration:
         return ph
 
     @staticmethod
-    def _ecal_output_loggain(ph: npt.ArrayLike, yspline: npt.ArrayLike,
-                             der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
+    def _ecal_output_loggain(ph: npt.ArrayLike, yspline: npt.ArrayLike, der: int = 0, dery: int = 0) -> np.ndarray[np.float64]:
         "Use the spline result as the log of the gain, or log(ph/E)"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -598,26 +603,22 @@ class EnergyCalibration:
         cal_group["energy"] = self.energy
         cal_group["dph"] = self.dph
         cal_group["de"] = self.de
-        cal_group.attrs['curvetype'] = self.curvename
-        cal_group.attrs['approximate'] = self.approximating
+        cal_group.attrs["curvetype"] = self.curvename
+        cal_group.attrs["approximate"] = self.approximating
 
     @staticmethod
     def load_from_hdf5(hdf5_group: h5py.Group, name: str) -> EnergyCalibration:
         cal_group = hdf5_group[name]
 
         # Fix a behavior of h5py for writing in py2, reading in py3.
-        curvetype = cal_group.attrs['curvetype']
+        curvetype = cal_group.attrs["curvetype"]
         if isinstance(curvetype, bytes):
             curvetype = curvetype.decode("utf-8")
 
         maker = EnergyCalibrationMaker(
-            cal_group["ph"][:],
-            cal_group["energy"][:],
-            cal_group["dph"][:],
-            cal_group["de"][:],
-            cal_group["name"][:]
+            cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], cal_group["name"][:]
         )
-        approximate = cal_group.attrs['approximate']
+        approximate = cal_group.attrs["approximate"]
         return maker.make_calibration(curvetype, approximate=approximate)
 
     def plotgain(self, **kwargs: Any) -> None:
@@ -632,20 +633,22 @@ class EnergyCalibration:
         kwargs["plottype"] = "loggain"
         self.plot(**kwargs)
 
-    def plot(self,  # noqa: PLR0917
-             axis: plt.Axes | None = None,
-             color: str = "blue",
-             markercolor: str = "red",
-             plottype: str = "linear",
-             ph_rescale_power: float = 0.0,
-             removeslope: bool = False,
-             energy_x: bool = False,
-             showtext: bool = True,
-             showerrors: bool = True,
-             min_energy: float | None = None,
-             max_energy: float | None = None) -> None:
+    def plot(  # noqa: PLR0917
+        self,
+        axis: plt.Axes | None = None,
+        color: str = "blue",
+        markercolor: str = "red",
+        plottype: str = "linear",
+        ph_rescale_power: float = 0.0,
+        removeslope: bool = False,
+        energy_x: bool = False,
+        showtext: bool = True,
+        showerrors: bool = True,
+        min_energy: float | None = None,
+        max_energy: float | None = None,
+    ) -> None:
         # Plot smooth curve
-        minph, maxph = self.ph.min() * .9, self.ph.max() * 1.1
+        minph, maxph = self.ph.min() * 0.9, self.ph.max() * 1.1
         if min_energy is not None:
             minph = self.energy2ph(min_energy)
         if max_energy is not None:
@@ -712,7 +715,7 @@ class EnergyCalibration:
                 dyplot = self.ph2uncertainty(phplot) / eplot
             y = np.log(self.energy)
             x = np.log(self.ph)
-            xerr = (self.dph / self.ph)
+            xerr = self.dph / self.ph
             ylabel = "Log energy/1 eV"
             axis.set_xlabel("log(Pulse height/arbs)")
             axis.set_title("Energy calibration curve, log gain")
@@ -729,13 +732,12 @@ class EnergyCalibration:
             axis.plot(xplot, yplot - dyplot, color=color, alpha=0.35)
 
         # Plot and label cal points
-        dy = ((self.de / self.energy)**2 + (self.dph / self.ph)**2)**0.5 * y
-        axis.errorbar(x, y - slope * x, yerr=dy, xerr=xerr, fmt='o',
-                      mec='black', mfc=markercolor, capsize=0)
+        dy = ((self.de / self.energy) ** 2 + (self.dph / self.ph) ** 2) ** 0.5 * y
+        axis.errorbar(x, y - slope * x, yerr=dy, xerr=xerr, fmt="o", mec="black", mfc=markercolor, capsize=0)
         axis.grid(True)
         if removeslope:
             ylabel = f"{ylabel} slope removed"
         axis.set_ylabel(ylabel)
         if showtext:
             for xval, name, yval in zip(x, self.names, y):
-                axis.text(xval, yval - slope * xval, name + '  ', ha='right')
+                axis.text(xval, yval - slope * xval, name + "  ", ha="right")

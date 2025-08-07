@@ -41,7 +41,6 @@ def compare_curves(curvetype1, use_approximation1, curvetype2, use_approximation
 
 
 class TestLineDatabase:
-
     @staticmethod
     def test_synonyms():
         """Test that there are multiple equivalent synonyms for the K-alpha1 line."""
@@ -61,7 +60,6 @@ class TestLineDatabase:
 
 @pytest.mark.filterwarnings("ignore:divide by zero encountered")
 class TestJoeStyleEnergyCalibration:
-
     @staticmethod
     def test_copy_equality():
         """Test that any deep-copied calibration object is equivalent."""
@@ -82,8 +80,11 @@ class TestJoeStyleEnergyCalibration:
     def test_loglog_exact_diff():
         # loglog=True makes use_zerozero not matter
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog", use_approximation1=False,
-            curvetype2="linear", use_approximation2=False,)
+            curvetype1="loglog",
+            use_approximation1=False,
+            curvetype2="linear",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -91,8 +92,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_loglog_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog", use_approximation1=False,
-            curvetype2="linear", use_approximation2=False,)
+            curvetype1="loglog",
+            use_approximation1=False,
+            curvetype2="linear",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -100,8 +104,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_zerozero_exact_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0", use_approximation1=False,
-            curvetype2="linear", use_approximation2=False,)
+            curvetype1="linear+0",
+            use_approximation1=False,
+            curvetype2="linear",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -109,8 +116,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_zerozero_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0", use_approximation1=False,
-            curvetype2="linear", use_approximation2=False,)
+            curvetype1="linear+0",
+            use_approximation1=False,
+            curvetype2="linear",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -118,8 +128,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_loglog_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="loglog", use_approximation1=True,
-            curvetype2="loglog", use_approximation2=False,)
+            curvetype1="loglog",
+            use_approximation1=True,
+            curvetype2="loglog",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -127,8 +140,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_zerozero_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear+0", use_approximation1=True,
-            curvetype2="linear+0", use_approximation2=False,)
+            curvetype1="linear+0",
+            use_approximation1=True,
+            curvetype2="linear+0",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -136,8 +152,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="linear", use_approximation1=True,
-            curvetype2="linear", use_approximation2=False,)
+            curvetype1="linear",
+            use_approximation1=True,
+            curvetype2="linear",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -145,8 +164,11 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_gain_invgain_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="gain", use_approximation1=True,
-            curvetype2="invgain", use_approximation2=False,)
+            curvetype1="gain",
+            use_approximation1=True,
+            curvetype2="invgain",
+            use_approximation2=False,
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -154,8 +176,8 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_gain_loglog_2pts():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1="gain", use_approximation1=True,
-            curvetype2="loglog", use_approximation2=False, npoints=3)
+            curvetype1="gain", use_approximation1=True, curvetype2="loglog", use_approximation2=False, npoints=3
+        )
         assert ph1 != ph2
         assert e1 != e2
         assert not all(drop1err == drop2err)
@@ -225,7 +247,7 @@ class TestJoeStyleEnergyCalibration:
         """Negative or zero pulse-heights shouldn't produce NaN or Inf energies, except in loglog cal."""
         factory = basic_factory()
 
-        ph = np.arange(-10, 10, dtype=float) * 1000.
+        ph = np.arange(-10, 10, dtype=float) * 1000.0
         for ct in EnergyCalibrationMaker.ALLOWED_CURVENAMES:
             if ct == "loglog":
                 continue
@@ -238,18 +260,58 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_pre_gprcal():
         "Test the pre-2021 calibration still works"
-        ph = np.array([17157.08056038, 18532.35241609, 18667.38206583, 19942.89858008,
-                       20181.77187566, 21382.23254964, 21727.54556571, 22848.99053659,
-                       23300.78419074, 24340.78447936, 24899.9448867, 25239.423792,
-                       26526.9605488, 28420.90655636, 29111.86088393])
-        e = np.array([5414.8045, 5898.801, 5946.823, 6404.0062, 6490.585, 6930.378,
-                      7058.175, 7478.2521, 7649.445, 8047.8227, 8264.775, 8398.242,
-                      8905.413, 9672.575, 9964.133])
-        dph = np.array([0.07974264, 0.12733291, 0.1818605, 0.10211174, 0.25735167,
-                        0.05803863, 0.28282476, 0.07275278, 0.17837849, 0.0820041,
-                        0.22199391, 0.54440676, 0.26877157, 2.36176241, 1.74482802])
-        de = np.array([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01,
-                       0.01, 0.01, 0.01, 0.01])
+        ph = np.array([
+            17157.08056038,
+            18532.35241609,
+            18667.38206583,
+            19942.89858008,
+            20181.77187566,
+            21382.23254964,
+            21727.54556571,
+            22848.99053659,
+            23300.78419074,
+            24340.78447936,
+            24899.9448867,
+            25239.423792,
+            26526.9605488,
+            28420.90655636,
+            29111.86088393,
+        ])
+        e = np.array([
+            5414.8045,
+            5898.801,
+            5946.823,
+            6404.0062,
+            6490.585,
+            6930.378,
+            7058.175,
+            7478.2521,
+            7649.445,
+            8047.8227,
+            8264.775,
+            8398.242,
+            8905.413,
+            9672.575,
+            9964.133,
+        ])
+        dph = np.array([
+            0.07974264,
+            0.12733291,
+            0.1818605,
+            0.10211174,
+            0.25735167,
+            0.05803863,
+            0.28282476,
+            0.07275278,
+            0.17837849,
+            0.0820041,
+            0.22199391,
+            0.54440676,
+            0.26877157,
+            2.36176241,
+            1.74482802,
+        ])
+        de = np.array([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
         factory = mass.EnergyCalibrationMaker.init(ph, e, dph, de)
         cal = factory.make_calibration(curvename="gain", approximate=True)
         assert (np.abs(cal(ph) - e) < 0.9 * dph).all()
@@ -267,7 +329,7 @@ class TestJoeStyleEnergyCalibration:
         e = np.array([mass.STANDARD_FEATURES[n] for n in names])
         ph1 = e * 10 / (1 + e / 2500)
         ph2 = ph1.copy()
-        ph2[5] *= (ph2[5] / ph2[4])**(-0.85)
+        ph2[5] *= (ph2[5] / ph2[4]) ** (-0.85)
         factory1 = mass.EnergyCalibrationMaker(ph1, e, ph1 * 1e-4, np.zeros_like(e), names)
         factory2 = mass.EnergyCalibrationMaker(ph2, e, ph2 * 1e-4, np.zeros_like(e), names)
         cal1 = factory1.make_calibration("gain")

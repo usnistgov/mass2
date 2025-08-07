@@ -5,16 +5,14 @@ Test code for mass.calibration.algorithms.
 from pytest import approx
 import numpy as np
 import mass2 as mass
-from mass2.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, \
-    build_fit_ranges_ph, multifit
+from mass2.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, build_fit_ranges_ph, multifit
 import itertools
 
 rng = np.random.default_rng(2)
 
 
 def test_find_opt_assignment():
-    known_energies = np.array([3100, 3200, 3300, 3600, 4000, 4500, 5200, 5800,
-                               6500, 8300, 9200, 10200])
+    known_energies = np.array([3100, 3200, 3300, 3600, 4000, 4500, 5200, 5800, 6500, 8300, 9200, 10200])
     ph = known_energies**0.95
     combos = itertools.combinations(range(len(ph)), 8)
     tries = 0
@@ -93,10 +91,10 @@ def test_complete():
     line_names = ["MnKAlpha", "MnKBeta", "CuKAlpha", "TiKAlpha", "FeKAlpha"]
     spect = {i: mass.spectra[n] for (i, n) in enumerate(line_names)}
     e = []
-    for (k, s) in spect.items():
+    for k, s in spect.items():
         e.extend(s.rvs(size=num_samples[k], instrument_gaussian_fwhm=k + 3.0, rng=rng))
     e = np.array(e)
-    e = e[e > 0]   # The wide-tailed distributions will occasionally produce negative e. Bad!
+    e = e[e > 0]  # The wide-tailed distributions will occasionally produce negative e. Bad!
     ph = 2 * e**0.9
 
     smoothing_res_ph = 20
@@ -113,6 +111,5 @@ def test_complete():
 
     _energies, fit_lo_hi, slopes_de_dph = build_fit_ranges_ph(energies_opt, [], approxcal, 100)
     binsize_ev = 1.0
-    results = multifit(ph, line_names, fit_lo_hi, np.ones_like(
-        slopes_de_dph) * binsize_ev, slopes_de_dph, hide_deprecation=True)
+    results = multifit(ph, line_names, fit_lo_hi, np.ones_like(slopes_de_dph) * binsize_ev, slopes_de_dph, hide_deprecation=True)
     assert results is not None

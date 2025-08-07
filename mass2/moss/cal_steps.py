@@ -29,8 +29,12 @@ class PretrigMeanJumpFixStep(CalStep):
 
     def dbg_plot(self, df_after, **kwargs):
         plt.figure()
-        plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0])
-        plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0])
+        plt.plot(
+            df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0]
+        )
+        plt.plot(
+            df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0]
+        )
         plt.legend()
         plt.xlabel("timestamp")
         plt.ylabel("pretrig mean")

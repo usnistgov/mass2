@@ -42,29 +42,23 @@ def merge(out_path, filenames, overwrite):
 def main():
     parser = argparse.ArgumentParser(
         description="Merge a set of LJH files",
-        epilog="Beware! Python glob does not perform brace-expansion, so braces must be expanded by the shell.")
-    parser.add_argument("patterns",
-                        type=str,
-                        nargs="+",
-                        help='glob pattern of files to process, e.g. "20171116_*_chan1.ljh" (suggest double quotes)')
+        epilog="Beware! Python glob does not perform brace-expansion, so braces must be expanded by the shell.",
+    )
+    parser.add_argument(
+        "patterns", type=str, nargs="+", help='glob pattern of files to process, e.g. "20171116_*_chan1.ljh" (suggest double quotes)'
+    )
 
     parser.add_argument(
-        "-d", "--outdir",
-        type=str, default="",
-        help="directory to place output file (default: same as directory of first file to be merged")
+        "-d",
+        "--outdir",
+        type=str,
+        default="",
+        help="directory to place output file (default: same as directory of first file to be merged",
+    )
     # TODO: add way to control the output _filename_
-    parser.add_argument(
-        "-F", "--force",
-        action="store_true",
-        help="force overwrite of existing target? (default: False)")
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="list files found before merging (default: False)")
-    parser.add_argument(
-        "-n", "--dry-run",
-        action="store_true",
-        help="list files found, then quit without merging (default: False)")
+    parser.add_argument("-F", "--force", action="store_true", help="force overwrite of existing target? (default: False)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="list files found before merging (default: False)")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="list files found, then quit without merging (default: False)")
 
     args = parser.parse_args()
 

@@ -13,12 +13,12 @@ def show(fig=None):
 
 
 def pickle_object(obj, filename):
-    with open(filename, 'wb') as file:
+    with open(filename, "wb") as file:
         dill.dump(obj, file)
 
 
 def unpickle_object(filename):
-    with open(filename, 'rb') as file:
+    with open(filename, "rb") as file:
         obj = dill.load(file)
         return obj
 
@@ -26,6 +26,7 @@ def unpickle_object(filename):
 def smallest_positive_real(arr):
     def is_positive_real(x):
         return x > 0 and np.isreal(x)
+
     positive_real_numbers = np.array(list(filter(is_positive_real, arr)))
     return np.min(positive_real_numbers)
 
@@ -62,7 +63,7 @@ def outlier_resistant_nsigma_range_from_mid(x, nsigma=5):
     mid = np.median(x)
     mad = np.median(np.abs(x - mid))
     sigma_mad = mad * 1.4826
-    return mid-nsigma*sigma_mad, mid + nsigma * sigma_mad
+    return mid - nsigma * sigma_mad, mid + nsigma * sigma_mad
 
 
 def midpoints_and_step_size(x):
@@ -108,7 +109,7 @@ def launch_examples():
     import sys
     import pathlib
 
-    examples_folder = pathlib.Path(__file__).parent.parent/"examples"
+    examples_folder = pathlib.Path(__file__).parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
     examples_folder_relative = examples_folder.relative_to(pathlib.Path.cwd())
     # Prepare the command
@@ -139,7 +140,9 @@ def root_mean_squared(x, axis=None):
     return np.sqrt(np.mean(x**2, axis))
 
 
-def merge_dicts_ordered_by_keys(dict1: Dict[int, Any], dict2: Dict[int, Any]) -> Dict[int, Any]:
+def merge_dicts_ordered_by_keys(
+    dict1: Dict[int, Any], dict2: Dict[int, Any]
+) -> Dict[int, Any]:
     # Combine both dictionaries' items (key, value) into a list of tuples
     combined_items = list(dict1.items()) + list(dict2.items())
 

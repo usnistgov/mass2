@@ -173,7 +173,7 @@ Realtime analysis is implemented by writing filtered values as well as "SVD comp
 
 ## Configuring iPython and Matplotlib
 
-I like to have Matplotlib start automatic in "interactive mode" and to use the Qt5 backend. Therefore I have a file `~/.matplotlib/matplotlibrc` whose contents are 
+I like to have Matplotlib start automatic in "interactive mode" and to use the Qt5 backend. Therefore I have a file `~/.matplotlib/matplotlibrc` whose contents are
 ```yaml
 # Also see defaults, which live in a file whose partial path is
 # .../site-packages/matplotlib/mpl-data/matplotlibrc
@@ -199,7 +199,7 @@ plt.ion()  # Make pylab start in interactive mode
 ip = get_ipython()
 ip.run_line_magic('load_ext', 'autoreload')
 ip.run_line_magic('autoreload', '2')
-print("Imported autoreload. (Use magic '%autoreload 0' to disable,)")%                  
+print("Imported autoreload. (Use magic '%autoreload 0' to disable,)")%
 ```
 
 File `~/.ipython/profile_default/startup/60-favorites.py`:

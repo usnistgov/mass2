@@ -31,7 +31,7 @@ Objects of the `SpectralLine` class roughly copy the API of the scipy type `scip
 
 ```python
 energies0 = spectrum.rvs(size=20000, instrument_gaussian_fwhm=0)
-energies3 = spectrum.rvs(size=20000, instrument_gaussian_fwhm=3) 
+energies3 = spectrum.rvs(size=20000, instrument_gaussian_fwhm=3)
 
 plt.clf()
 contents0, bin_edges0, _ = plt.hist(energies0, 200, [5820,5960], histtype="step")

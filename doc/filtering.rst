@@ -82,7 +82,7 @@ A test of normalization and filter variance
         f = F5.values
         verify_close(Maxsignal, f.dot(truncated_signal), rtol=1e-5, topic = "Filter normalization")
 
-        # Check filter's variance 
+        # Check filter's variance
         expected_dV = sigma_noise / n**0.5 * signal.max()/truncated_signal.std()
         verify_close(expected_dV, F5.variance**0.5, rtol=1e-5, topic="Expected variance")
 

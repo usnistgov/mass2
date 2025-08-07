@@ -9,7 +9,7 @@ dependencies = [
     "polars",
     "scipy",
     "numpy","ipympl","matplotlib","itables",
-    "marimo", 
+    "marimo",
     # for matplotlib plots in marimo
     "tornado",
     "numba",
@@ -36,7 +36,7 @@ requires = ["flit_core >=3.2,<4"]
 # pyproject.toml
 [tool.pytest.ini_options]
 # error on warnings
-# addopts = "-W error" 
+# addopts = "-W error"
 testpaths = [
     "moss",
     "examples"

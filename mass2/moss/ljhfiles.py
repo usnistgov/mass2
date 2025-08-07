@@ -49,18 +49,22 @@ class LJHFile:
 
         ljh_version = Version(header_dict["Save File Format Version"])
         if ljh_version < Version("2.2.0"):
-            dtype = np.dtype([
-                ("internal_us", np.uint8),
-                ("internal_unused", np.uint8),
-                ("internal_ms", np.uint32),
-                ("data", np.uint16, nsamples)
-            ])
+            dtype = np.dtype(
+                [
+                    ("internal_us", np.uint8),
+                    ("internal_unused", np.uint8),
+                    ("internal_ms", np.uint32),
+                    ("data", np.uint16, nsamples),
+                ]
+            )
         else:
-            dtype = np.dtype([
-                ('subframecount', np.int64),
-                ('posix_usec', np.int64),
-                ('data', np.uint16, nsamples)
-            ])
+            dtype = np.dtype(
+                [
+                    ("subframecount", np.int64),
+                    ("posix_usec", np.int64),
+                    ("data", np.uint16, nsamples),
+                ]
+            )
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
@@ -73,12 +77,26 @@ class LJHFile:
         npulses = binary_size // pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(filename, dtype, mode="r",
-                         offset=header_size, shape=(npulses,))
+        mmap = np.memmap(
+            filename, dtype, mode="r", offset=header_size, shape=(npulses,)
+        )
 
-        return LJHFile(filename, dtype, npulses, timebase, nsamples, npresamples, client,
-                       header_dict, header_string, header_size, binary_size,
-                       mmap, ljh_version, max_pulses)
+        return LJHFile(
+            filename,
+            dtype,
+            npulses,
+            timebase,
+            nsamples,
+            npresamples,
+            client,
+            header_dict,
+            header_string,
+            header_size,
+            binary_size,
+            mmap,
+            ljh_version,
+            max_pulses,
+        )
 
     @classmethod
     def read_header(cls, filename: str) -> Tuple[dict, str, int]:
@@ -106,7 +124,9 @@ class LJHFile:
                 elif line == "":
                     raise Exception("reached EOF before #End of Header")
                 elif i > cls.OVERLONG_HEADER:
-                    raise Exception(f"header is too long--seems not to contain '#End of Header'\nin file {filename}")
+                    raise Exception(
+                        f"header is too long--seems not to contain '#End of Header'\nin file {filename}"
+                    )
                 # ignore lines without ":"
                 elif ":" in line:
                     a, b = line.split(":", maxsplit=1)
@@ -118,7 +138,7 @@ class LJHFile:
 
         # Convert values from header_dict into numeric types, when appropriate
         header_dict["Filename"] = filename
-        for (name, datatype) in {
+        for name, datatype in {
             ("Channel", int),
             ("Timebase", float),
             ("Total Samples", int),
@@ -152,8 +172,20 @@ class LJHFile:
         npulses = current_binary_size // self.pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(npulses,))
-        return replace(self, npulses=npulses, _mmap=mmap, max_pulses=max_pulses, binary_size=current_binary_size)
+        mmap = np.memmap(
+            self.filename,
+            self.dtype,
+            mode="r",
+            offset=self.header_size,
+            shape=(npulses,),
+        )
+        return replace(
+            self,
+            npulses=npulses,
+            _mmap=mmap,
+            max_pulses=max_pulses,
+            binary_size=current_binary_size,
+        )
 
     def read_trace(self, i: int) -> npt.ArrayLike:
         """Return a single pulse record from an LJH file.
@@ -170,7 +202,9 @@ class LJHFile:
         """
         return self._mmap["data"][i]
 
-    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False
+    ) -> Tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -188,20 +222,24 @@ class LJHFile:
             header_df: a one-row dataframe containing the information from the LJH file header
         """
         if self.ljh_version < Version("2.2.0"):
-            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
+            raise NotImplementedError(
+                "cannot convert LJH pre-2.2 files to Polars dataframes yet"
+            )
 
         data = {
             "pulse": self._mmap["data"][first_pulse:],
             "posix_usec": self._mmap["posix_usec"][first_pulse:],
-            "subframecount": self._mmap["subframecount"][first_pulse:]
+            "subframecount": self._mmap["subframecount"][first_pulse:],
         }
         schema = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
-            "subframecount": pl.UInt64
+            "subframecount": pl.UInt64,
         }
         df = pl.DataFrame(data, schema=schema)
-        df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
+        df = df.select(
+            pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")
+        ).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
         header_df = pl.DataFrame(self.header)

@@ -4,4 +4,3 @@ Install
 
 Examples
 1. From that same directory `marimo edit examples`
-

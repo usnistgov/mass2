@@ -25,15 +25,111 @@ class Test_ratio_weighted_averages:
     @pytest.fixture(autouse=True)
     def set_up_weighted_average_tests(self):
         self.counts = np.array([
-            0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
-            0, 0, 1, 1, 0, 2, 0, 2, 1, 1, 3, 2, 2, 6, 2, 5, 3,
-            6, 5, 15, 17, 9, 18, 12, 9, 17, 17, 14, 11, 22, 28, 21, 16, 14,
-            19, 16, 14, 24, 16, 7, 15, 8, 5, 15, 12, 13, 6, 8, 6, 6, 7,
-            7, 4, 2, 3, 5, 2, 1, 1, 1, 1, 0, 0, 1, 2, 0, 0, 0,
-            0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0,
+            2,
+            0,
+            2,
+            1,
+            1,
+            3,
+            2,
+            2,
+            6,
+            2,
+            5,
+            3,
+            6,
+            5,
+            15,
+            17,
+            9,
+            18,
+            12,
+            9,
+            17,
+            17,
+            14,
+            11,
+            22,
+            28,
+            21,
+            16,
+            14,
+            19,
+            16,
+            14,
+            24,
+            16,
+            7,
+            15,
+            8,
+            5,
+            15,
+            12,
+            13,
+            6,
+            8,
+            6,
+            6,
+            7,
+            7,
+            4,
+            2,
+            3,
+            5,
+            2,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            2,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ])
         self.x = np.linspace(-1.98, 1.98, 100) + 10
         line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line(
-            "testline", energy=10, lorentzian_fwhm=0.0, intrinsic_sigma=0.0)
+            "testline", energy=10, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
+        )
         self.model = line.model()
         self.params = self.model.guess(self.counts, bin_centers=self.x, dph_de=1)
         self.params["fwhm"].set(1.09)
@@ -133,7 +229,8 @@ class Test_gaussian_basic:
         nfits = 30
 
         line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line(
-            "testline", energy=ctr, lorentzian_fwhm=0.0, intrinsic_sigma=0.0)
+            "testline", energy=ctr, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
+        )
         self.model = line.model()
 
         self.run_several_fits(Nsignal, nfits, fwhm, ctr, nbins, N_bg=100)
@@ -142,16 +239,15 @@ class Test_gaussian_basic:
 
 
 class Test_Gaussian:
-
     @pytest.fixture(autouse=True)
     def setUp(self):
         sigma = 1.5
-        self.fwhm = sigma * (8 * np.log(2))**0.5
+        self.fwhm = sigma * (8 * np.log(2)) ** 0.5
         self.center = 15
         self.integral = 1000
         Nbg = 0
         self.x = np.linspace(10, 20, 200)
-        self.y = np.exp(-0.5 * (self.x - self.center)**2 / (sigma**2))
+        self.y = np.exp(-0.5 * (self.x - self.center) ** 2 / (sigma**2))
         self.y *= self.integral / self.y.sum()
 
         line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", self.center, 0, 0)
@@ -189,7 +285,7 @@ class Test_Gaussian:
 
     def test_negative_background_issue126(self):
         """This fit gives negative BG in all bins before the fix of issue #126."""
-        obs = np.exp(-0.5 * (self.x - self.center)**2 / (self.fwhm / 2.3548)**2) + 0
+        obs = np.exp(-0.5 * (self.x - self.center) ** 2 / (self.fwhm / 2.3548) ** 2) + 0
         result = self.model.fit(obs, self.params, bin_centers=self.x)
         param = result.best_values
         assert result.success
@@ -200,8 +296,19 @@ class Test_Gaussian:
 
 
 class TestMnKA_fitter:
-    def do_test(self, n=50000, resolution=2.5, tailfrac=0, tailtau=17, bg=10,
-                nbins=150, vary_bg_slope=False, vary_tail=False, expect_good_redchi=True, shift_peak_ev=0):
+    def do_test(
+        self,
+        n=50000,
+        resolution=2.5,
+        tailfrac=0,
+        tailtau=17,
+        bg=10,
+        nbins=150,
+        vary_bg_slope=False,
+        vary_tail=False,
+        expect_good_redchi=True,
+        shift_peak_ev=0,
+    ):
         bin_edges = np.arange(5850, 5950, 0.5)
         # generate random x-ray pulse energies following MnKAlpha distribution
         line = mass.calibration.fluorescence_lines.MnKAlpha
@@ -226,7 +333,7 @@ class TestMnKA_fitter:
         bin_centers = 0.5 * bin_width + bin_edges[:-1]
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         if vary_tail:
-            params["tail_frac"].set(.1, vary=True)
+            params["tail_frac"].set(0.1, vary=True)
             params["tail_tau"].set(30, vary=True)
         if vary_bg_slope:
             params["bg_slope"].set(0, vary=True)
@@ -261,8 +368,9 @@ class TestMnKA_fitter:
         self.do_test(bg=30, tailfrac=0, expect_good_redchi=True)
         self.do_test(n=200000, tailtau=10, tailfrac=0.08, vary_tail=True, expect_good_redchi=True)
         self.do_test(n=200000, tailtau=10, tailfrac=0.08, vary_tail=False, vary_bg_slope=True, expect_good_redchi=False)
-        self.do_test(n=200000, tailtau=10, tailfrac=0.08, shift_peak_ev=1.5, vary_tail=True,
-                     vary_bg_slope=True, expect_good_redchi=True)
+        self.do_test(
+            n=200000, tailtau=10, tailfrac=0.08, shift_peak_ev=1.5, vary_tail=True, vary_bg_slope=True, expect_good_redchi=True
+        )
 
 
 def test_MnKA_float32():
@@ -294,7 +402,7 @@ def test_MnKA_narrowbins():
     rng = np.random.default_rng(238)
     energies = line.rvs(size=N, instrument_gaussian_fwhm=4.0, rng=rng)  # draw from the distribution
 
-    for SCALE in (0.1, 1, 10.):
+    for SCALE in (0.1, 1, 10.0):
         sim, bin_edges = np.histogram(energies * SCALE, 60, [5865 * SCALE, 5925 * SCALE])
         binsize = bin_edges[1] - bin_edges[0]
         bctr = bin_edges[:-1] + 0.5 * binsize
@@ -338,7 +446,9 @@ def test_integral_parameter():
         # And check that integral _times QE_ = Nsignal for a nontrivial QE model.
         QE = 0.4
 
-        def flat_qemodel(e): return QE + np.zeros_like(e)
+        def flat_qemodel(e):
+            return QE + np.zeros_like(e)
+
         model = line.model(qemodel=flat_qemodel)
         params = model.guess(s, bin_centers=e, dph_de=1)
         result = model.fit(s, params, bin_centers=e)
@@ -349,31 +459,33 @@ def test_integral_parameter():
 class Test_Composites_lmfit:
     @pytest.fixture(autouse=True)
     def setUp(self):
-        if 'dummy1' not in mass.spectra.keys():
+        if "dummy1" not in mass.spectra.keys():
             mass.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
                 linetype="1",
-                reference_short='NIST ASD',
+                reference_short="NIST ASD",
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=653.493657,
-                energies=np.array([653.493657]), lorentzian_fwhm=np.array([0.1]),
+                energies=np.array([653.493657]),
+                lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
                 reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
-                ka12_energy_diff=None
+                ka12_energy_diff=None,
             )
-        if 'dummy2' not in mass.spectra.keys():
+        if "dummy2" not in mass.spectra.keys():
             mass.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
                 linetype="2",
-                reference_short='NIST ASD',
+                reference_short="NIST ASD",
                 reference_plot_instrument_gaussian_fwhm=0.5,
                 nominal_peak_energy=653.679946,
-                energies=np.array([653.679946]), lorentzian_fwhm=np.array([0.1]),
+                energies=np.array([653.679946]),
+                lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
                 reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
-                ka12_energy_diff=None
+                ka12_energy_diff=None,
             )
         rng = np.random.default_rng(131)
         bin_edges = np.arange(600, 700, 0.4)
@@ -381,8 +493,8 @@ class Test_Composites_lmfit:
         n1 = 10000
         n2 = 20000
         self.n = n1 + n2
-        self.line1 = mass.spectra['dummy1']
-        self.line2 = mass.spectra['dummy2']
+        self.line1 = mass.spectra["dummy1"]
+        self.line2 = mass.spectra["dummy2"]
         self.nominal_separation = self.line2.nominal_peak_energy - self.line1.nominal_peak_energy
         values1 = self.line1.rvs(size=n1, instrument_gaussian_fwhm=resolution, rng=rng)
         values2 = self.line2.rvs(size=n2, instrument_gaussian_fwhm=resolution, rng=rng)
@@ -395,9 +507,8 @@ class Test_Composites_lmfit:
         model1_noprefix = self.line1.model()
         assert len(model1_noprefix.prefix) == 0
         params1_noprefix = model1_noprefix.guess(self.counts1, bin_centers=self.bin_centers, dph_de=1)
-        params1_noprefix['dph_de'].set(value=1.0, vary=False)
-        result1_noprefix = model1_noprefix.fit(
-            self.counts1, params=params1_noprefix, bin_centers=self.bin_centers)
+        params1_noprefix["dph_de"].set(value=1.0, vary=False)
+        result1_noprefix = model1_noprefix.fit(self.counts1, params=params1_noprefix, bin_centers=self.bin_centers)
         for iComp in result1_noprefix.components:
             assert len(iComp.prefix) == 0
         result1_noprefix._validate_bins_per_fwhm(minimum_bins_per_fwhm=3)
@@ -409,36 +520,35 @@ class Test_Composites_lmfit:
             _ = model1_noprefix + model2_noprefix
 
     def test_CompositeModelFit_with_prefix_and_background(self):
-        prefix1 = 'p1_'
-        prefix2 = 'p2_'
+        prefix1 = "p1_"
+        prefix2 = "p2_"
         model1 = self.line1.model(prefix=prefix1)
         model2 = self.line2.model(prefix=prefix2, has_linear_background=False)
-        assert (model1.prefix == prefix1)
-        assert (model2.prefix == prefix2)
+        assert model1.prefix == prefix1
+        assert model2.prefix == prefix2
         params1 = model1.guess(self.counts1, bin_centers=self.bin_centers, dph_de=1)
         params2 = model2.guess(self.counts2, bin_centers=self.bin_centers, dph_de=1)
-        params1[f'{prefix1}dph_de'].set(value=1.0, vary=False)
-        params2[f'{prefix2}dph_de'].set(value=1.0, vary=False)
+        params1[f"{prefix1}dph_de"].set(value=1.0, vary=False)
+        params2[f"{prefix2}dph_de"].set(value=1.0, vary=False)
         result1 = model1.fit(self.counts1, params=params1, bin_centers=self.bin_centers)
         result2 = model2.fit(self.counts2, params=params2, bin_centers=self.bin_centers)
         compositeModel = model1 + model2
         modelComponentPrefixes = [iComp.prefix for iComp in compositeModel.components]
-        assert (np.logical_and(prefix1 in modelComponentPrefixes, prefix2 in modelComponentPrefixes))
+        assert np.logical_and(prefix1 in modelComponentPrefixes, prefix2 in modelComponentPrefixes)
         compositeParams = result1.params + result2.params
-        compositeParams[f'{prefix1}fwhm'].expr = f'{prefix2}fwhm'
-        compositeParams[f'{prefix1}peak_ph'].expr = f'{prefix2}peak_ph - {self.nominal_separation}'
-        compositeParams.add(name='ampRatio', value=0.5, vary=False)
-        compositeParams[f'{prefix1}integral'].expr = f'{prefix2}integral * ampRatio'
-        compositeResult = compositeModel.fit(
-            self.counts, params=compositeParams, bin_centers=self.bin_centers)
+        compositeParams[f"{prefix1}fwhm"].expr = f"{prefix2}fwhm"
+        compositeParams[f"{prefix1}peak_ph"].expr = f"{prefix2}peak_ph - {self.nominal_separation}"
+        compositeParams.add(name="ampRatio", value=0.5, vary=False)
+        compositeParams[f"{prefix1}integral"].expr = f"{prefix2}integral * ampRatio"
+        compositeResult = compositeModel.fit(self.counts, params=compositeParams, bin_centers=self.bin_centers)
         resultComponentPrefixes = [iComp.prefix for iComp in compositeResult.components]
-        assert (np.logical_and(prefix1 in resultComponentPrefixes, prefix2 in resultComponentPrefixes))
+        assert np.logical_and(prefix1 in resultComponentPrefixes, prefix2 in resultComponentPrefixes)
         compositeResult._validate_bins_per_fwhm(minimum_bins_per_fwhm=3)
 
 
 def test_BackgroundMLEModel():
     class BackgroundMLEModel(mass.calibration.line_models.MLEModel):
-        def __init__(self, independent_vars=['bin_centers'], prefix='', nan_policy='raise', **kwargs):
+        def __init__(self, independent_vars=["bin_centers"], prefix="", nan_policy="raise", **kwargs):
             def modelfunc(bin_centers, background, bg_slope):
                 bg = np.zeros_like(bin_centers) + background
                 bg += bg_slope * np.arange(len(bin_centers))
@@ -446,21 +556,20 @@ def test_BackgroundMLEModel():
                 if any(np.isnan(bg)) or any(bg < 0):
                     raise ValueError("some entry in r is nan or negative")
                 return bg
-            kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                           'independent_vars': independent_vars})
-            super().__init__(modelfunc, **kwargs)
-            self.set_param_hint('background', value=1, min=0)
-            self.set_param_hint('bg_slope', value=0)
 
-    test_model = BackgroundMLEModel(name='LinearTestModel', prefix='p1_')
+            kwargs.update({"prefix": prefix, "nan_policy": nan_policy, "independent_vars": independent_vars})
+            super().__init__(modelfunc, **kwargs)
+            self.set_param_hint("background", value=1, min=0)
+            self.set_param_hint("bg_slope", value=0)
+
+    test_model = BackgroundMLEModel(name="LinearTestModel", prefix="p1_")
     test_params = test_model.make_params(background=1.0, bg_slope=0.0)
     x_data = np.arange(1000, 2000, 1)
     test_background = 127.3
     test_background_error = np.sqrt(test_background)
     test_bg_slope = 0.17
     rng = np.random.default_rng()
-    y_data = np.zeros_like(x_data) + test_background + \
-        rng.normal(scale=test_background_error, size=len(x_data))
+    y_data = np.zeros_like(x_data) + test_background + rng.normal(scale=test_background_error, size=len(x_data))
     y_data += test_bg_slope * np.arange(len(x_data))
     y_data[y_data < 0] = 0
     test_model.fit(y_data, test_params, bin_centers=x_data)
@@ -469,8 +578,7 @@ def test_BackgroundMLEModel():
 def test_negatives():
     "Test for issue 217."
     counts = np.array([2, 4, 2, 4], dtype=np.int64)
-    bin_centers = np.array([8009.07622011, 8009.57622011,
-                            8010.07622011, 8010.57622011])
+    bin_centers = np.array([8009.07622011, 8009.57622011, 8010.07622011, 8010.57622011])
 
     model = mass.spectra["CuKAlpha"].model()
     params = model.guess(bin_centers=bin_centers, data=counts, dph_de=1)
@@ -491,11 +599,86 @@ def test_issue_125():
     e = np.linspace(5870.25, 5909.25, 80)
     e = e[:-1] + 0.5 * (e[1] - e[0])
     contents = np.array([
-        36, 49, 39, 41, 46, 46, 42, 42, 46, 52, 51, 53, 54, 48, 58, 46, 57, 51,
-        61, 68, 63, 68, 73, 79, 66, 84, 78, 94, 84, 84, 74, 85, 76, 81, 83, 84,
-        100, 95, 93, 82, 74, 83, 93, 102, 98, 79, 100, 113, 95, 88, 104, 94, 95, 110,
-        112, 81, 106, 104, 110, 97, 105, 95, 103, 97, 95, 103, 84, 97, 79, 85, 84, 87,
-        80, 71, 77, 89, 83, 81, 59])
+        36,
+        49,
+        39,
+        41,
+        46,
+        46,
+        42,
+        42,
+        46,
+        52,
+        51,
+        53,
+        54,
+        48,
+        58,
+        46,
+        57,
+        51,
+        61,
+        68,
+        63,
+        68,
+        73,
+        79,
+        66,
+        84,
+        78,
+        94,
+        84,
+        84,
+        74,
+        85,
+        76,
+        81,
+        83,
+        84,
+        100,
+        95,
+        93,
+        82,
+        74,
+        83,
+        93,
+        102,
+        98,
+        79,
+        100,
+        113,
+        95,
+        88,
+        104,
+        94,
+        95,
+        110,
+        112,
+        81,
+        106,
+        104,
+        110,
+        97,
+        105,
+        95,
+        103,
+        97,
+        95,
+        103,
+        84,
+        97,
+        79,
+        85,
+        84,
+        87,
+        80,
+        71,
+        77,
+        89,
+        83,
+        81,
+        59,
+    ])
     line = mass.MnKAlpha
     model = line.model()
     params = model.guess(contents, bin_centers=e, dph_de=1)
@@ -511,7 +694,7 @@ def test_issue_125():
     params["peak_ph"].set(5898)
     params["dph_de"].set(1.0, vary=False)
     params["background"].set(20.0)
-    params["tail_frac"].set(.1)
+    params["tail_frac"].set(0.1)
     _ = model.fit(contents, params, bin_centers=e)
 
 
@@ -537,28 +720,131 @@ def test_tail_tau_behaves_same_vs_energy_scale():
 
 
 def test_a_fit_that_was_failing_with_too_small_a_fwhm():
-    counts = np.array([
-        1, 4, 2, 1, 5, 12, 4, 2, 7, 3, 4, 8, 1,
-        1, 5, 8, 8, 6, 9, 16, 20, 23, 28, 36, 55, 99,
-        114, 152, 189, 224, 199, 191, 143, 108, 83, 71, 30, 34, 15,
-        8, 13, 7, 7, 7, 14, 7, 11, 8, 5, 4, 3, 3,
-        5, 4, 5, 3, 3, 3, 1], dtype="int64")
+    counts = np.array(
+        [
+            1,
+            4,
+            2,
+            1,
+            5,
+            12,
+            4,
+            2,
+            7,
+            3,
+            4,
+            8,
+            1,
+            1,
+            5,
+            8,
+            8,
+            6,
+            9,
+            16,
+            20,
+            23,
+            28,
+            36,
+            55,
+            99,
+            114,
+            152,
+            189,
+            224,
+            199,
+            191,
+            143,
+            108,
+            83,
+            71,
+            30,
+            34,
+            15,
+            8,
+            13,
+            7,
+            7,
+            7,
+            14,
+            7,
+            11,
+            8,
+            5,
+            4,
+            3,
+            3,
+            5,
+            4,
+            5,
+            3,
+            3,
+            3,
+            1,
+        ],
+        dtype="int64",
+    )
     bin_centers = np.array([
-        4341.24137311, 4342.15001601, 4343.05865891, 4343.96730181,
-        4344.87594471, 4345.78458761, 4346.69323051, 4347.60187342,
-        4348.51051632, 4349.41915922, 4350.32780212, 4351.23644502,
-        4352.14508792, 4353.05373082, 4353.96237372, 4354.87101663,
-        4355.77965953, 4356.68830243, 4357.59694533, 4358.50558823,
-        4359.41423113, 4360.32287403, 4361.23151693, 4362.14015983,
-        4363.04880274, 4363.95744564, 4364.86608854, 4365.77473144,
-        4366.68337434, 4367.59201724, 4368.50066014, 4369.40930304,
-        4370.31794594, 4371.22658885, 4372.13523175, 4373.04387465,
-        4373.95251755, 4374.86116045, 4375.76980335, 4376.67844625,
-        4377.58708915, 4378.49573206, 4379.40437496, 4380.31301786,
-        4381.22166076, 4382.13030366, 4383.03894656, 4383.94758946,
-        4384.85623236, 4385.76487526, 4386.67351817, 4387.58216107,
-        4388.49080397, 4389.39944687, 4390.30808977, 4391.21673267,
-        4392.12537557, 4393.03401847, 4393.94266137])
+        4341.24137311,
+        4342.15001601,
+        4343.05865891,
+        4343.96730181,
+        4344.87594471,
+        4345.78458761,
+        4346.69323051,
+        4347.60187342,
+        4348.51051632,
+        4349.41915922,
+        4350.32780212,
+        4351.23644502,
+        4352.14508792,
+        4353.05373082,
+        4353.96237372,
+        4354.87101663,
+        4355.77965953,
+        4356.68830243,
+        4357.59694533,
+        4358.50558823,
+        4359.41423113,
+        4360.32287403,
+        4361.23151693,
+        4362.14015983,
+        4363.04880274,
+        4363.95744564,
+        4364.86608854,
+        4365.77473144,
+        4366.68337434,
+        4367.59201724,
+        4368.50066014,
+        4369.40930304,
+        4370.31794594,
+        4371.22658885,
+        4372.13523175,
+        4373.04387465,
+        4373.95251755,
+        4374.86116045,
+        4375.76980335,
+        4376.67844625,
+        4377.58708915,
+        4378.49573206,
+        4379.40437496,
+        4380.31301786,
+        4381.22166076,
+        4382.13030366,
+        4383.03894656,
+        4383.94758946,
+        4384.85623236,
+        4385.76487526,
+        4386.67351817,
+        4387.58216107,
+        4388.49080397,
+        4389.39944687,
+        4390.30808977,
+        4391.21673267,
+        4392.12537557,
+        4393.03401847,
+        4393.94266137,
+    ])
     model = mass.get_model(49127.24)
     dph_de_guess = np.mean(bin_centers) / model.spect.nominal_peak_energy
     params = model.guess(counts, bin_centers=bin_centers, dph_de=dph_de_guess)

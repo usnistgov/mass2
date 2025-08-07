@@ -11,7 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import scipy as sp
 
-__all__ = ['kink_model', 'fit_kink_model']
+__all__ = ["kink_model", "fit_kink_model"]
 
 
 def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, float]:
@@ -70,13 +70,11 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     sj = dxj.sum()
     si2 = (dxi**2).sum()
     sj2 = (dxj**2).sum()
-    A = np.array([[N, si, sj],
-                  [si, si2, 0],
-                  [sj, 0, sj2]])
+    A = np.array([[N, si, sj], [si, si2, 0], [sj, 0, sj2]])
     v = np.array([y.sum(), (yi * dxi).sum(), (yj * dxj).sum()])
     abc = np.linalg.solve(A, v)
     model = np.hstack([abc[0] + abc[1] * dxi, abc[0] + abc[2] * dxj])
-    X2 = ((model - y)**2).sum()
+    X2 = ((model - y) ** 2).sum()
     return model, abc, X2
 
 
@@ -134,6 +132,7 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: Optional[tuple[float, fl
     plt.plot(xj, a+c*(xj-kbest), "--k")
     plt.legend()
     """
+
     def penalty(k, x, y):
         _, _, X2 = kink_model(k, x, y)
         return X2
@@ -142,8 +141,7 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: Optional[tuple[float, fl
         kbounds = (x.min(), x.max())
     elif kbounds[0] < x.min() or kbounds[1] > x.max():
         raise ValueError(f"kbounds ({kbounds}) must be within the range of x data")
-    optimum = sp.optimize.minimize_scalar(penalty, args=(x, y), method="Bounded",
-                                          bounds=kbounds)
+    optimum = sp.optimize.minimize_scalar(penalty, args=(x, y), method="Bounded", bounds=kbounds)
     kbest = optimum.x
     model, abc, X2 = kink_model(kbest, x, y)
     return model, np.hstack([kbest, abc]), X2

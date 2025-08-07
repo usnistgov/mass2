@@ -8,6 +8,7 @@ Created on Jun 9, 2014
 
 @author: fowlerj
 """
+
 import numpy as np
 import scipy as sp
 from numba import njit
@@ -15,11 +16,13 @@ from numba import njit
 from mass2.mathstat.entropy import laplace_entropy
 from mass2.mathstat.interpolate import CubicSpline
 import logging
+
 LOG = logging.getLogger("mass")
 
 
 ########################################################################################
 # Pulse summary quantities
+
 
 @njit
 def estimateRiseTime(pulse_data, timebase, nPretrig):
@@ -67,8 +70,7 @@ def estimateRiseTime(pulse_data, timebase, nPretrig):
 
     npulses = pulse_data.shape[0]
     try:
-        rising_data = ((pulse_data[:, nPretrig:idx_last_pk + 1] - baseline_value[:, np.newaxis]) /
-                       value_at_peak[:, np.newaxis])
+        rising_data = (pulse_data[:, nPretrig : idx_last_pk + 1] - baseline_value[:, np.newaxis]) / value_at_peak[:, np.newaxis]
         # Find the last and first indices at which the data are in (0.1, 0.9] times the
         # peak value. Then make sure last is at least 1 past first.
         last_idx = (rising_data > MAXTHRESH).argmax(axis=1) - 1
@@ -77,8 +79,7 @@ def estimateRiseTime(pulse_data, timebase, nPretrig):
         last_idx[last_idx == rising_data.shape[1]] = rising_data.shape[1] - 1
 
         pulsenum = np.arange(npulses)
-        y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx],
-                            dtype=float)
+        y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
         y_diff[y_diff < timebase] = timebase
         time_diff = timebase * (last_idx - first_idx)
         rise_time = time_diff / y_diff
@@ -125,7 +126,7 @@ def compute_max_deriv(pulse_data, ignore_leading, spike_reject=True, kernel=None
     NSamp = pulse_view.shape[1]
 
     # The default filter:
-    filter_coef = np.array([+.2, +.1, 0, -.1, -.2])
+    filter_coef = np.array([+0.2, +0.1, 0, -0.1, -0.2])
     if kernel == "SG":
         # This filter is the Savitzky-Golay filter of n_L=1, n_R=3 and M=3, to use the
         # language of Numerical Recipes 3rd edition.  It amounts to least-squares fitting
@@ -150,8 +151,7 @@ def compute_max_deriv(pulse_data, ignore_leading, spike_reject=True, kernel=None
             t_max_deriv = t2 if t2 < t0 else t0
 
             for j in range(7, NSamp):
-                t3 = f4 * pulses[j - 4] + f3 * pulses[j - 3] + \
-                    f2 * pulses[j - 2] + f1 * pulses[j - 1] + f0 * pulses[j]
+                t3 = f4 * pulses[j - 4] + f3 * pulses[j - 3] + f2 * pulses[j - 2] + f1 * pulses[j - 1] + f0 * pulses[j]
                 t4 = t3 if t3 < t1 else t1
                 t_max_deriv = max(t4, t_max_deriv)
 
@@ -165,8 +165,7 @@ def compute_max_deriv(pulse_data, ignore_leading, spike_reject=True, kernel=None
             t_max_deriv = t0
 
             for j in range(5, NSamp):
-                t0 = f4 * pulses[j - 4] + f3 * pulses[j - 3] + \
-                    f2 * pulses[j - 2] + f1 * pulses[j - 1] + f0 * pulses[j]
+                t0 = f4 * pulses[j - 4] + f3 * pulses[j - 3] + f2 * pulses[j - 2] + f1 * pulses[j - 1] + f0 * pulses[j]
                 t_max_deriv = max(t0, t_max_deriv)
             max_deriv[i] = t_max_deriv
 
@@ -175,6 +174,7 @@ def compute_max_deriv(pulse_data, ignore_leading, spike_reject=True, kernel=None
 
 ########################################################################################
 # Drift correction and related algorithms
+
 
 class HistogramSmoother:
     """Object that can repeatedly smooth histograms with the same bin count and
@@ -200,7 +200,7 @@ class HistogramSmoother:
         self.stepsize = dlimits / self.nbins
 
         # Compute the Fourier-space smoothing kernel
-        kernel = np.exp(-0.5 * (np.arange(self.nbins) * self.stepsize / self.smooth_sigma)**2)
+        kernel = np.exp(-0.5 * (np.arange(self.nbins) * self.stepsize / self.smooth_sigma) ** 2)
         kernel[1:] += kernel[-1:0:-1]  # Handle the negative frequencies
         kernel /= kernel.sum()
         self.kernel_ft = np.fft.rfft(kernel)
@@ -274,11 +274,9 @@ def drift_correct(indicator, uncorrected, limit=None):
         w = hsmooth > 0
         return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
 
-    drift_corr_param = sp.optimize.brent(entropy, (indicator, uncorrected, smoother), brack=[0, .001])
+    drift_corr_param = sp.optimize.brent(entropy, (indicator, uncorrected, smoother), brack=[0, 0.001])
 
-    drift_correct_info = {'type': 'ptmean_gain',
-                                  'slope': drift_corr_param,
-                                  'median_pretrig_mean': ptm_offset}
+    drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
     return drift_corr_param, drift_correct_info
 
 
@@ -347,7 +345,7 @@ def filter_signal_lowpass(sig, fs, fcut):
 
 
 def correct_flux_jumps_original(vals, mask, flux_quant):
-    '''Remove 'flux' jumps' from pretrigger mean.
+    """Remove 'flux' jumps' from pretrigger mean.
 
     When using umux readout, if a pulse is recorded that has a very fast rising
     edge (e.g. a cosmic ray), the readout system will "slip" an integer number
@@ -364,7 +362,7 @@ def correct_flux_jumps_original(vals, mask, flux_quant):
 
     Returns:
     Array with values corrected
-    '''
+    """
     # The naive thing is to simply replace each value with its value mod
     # the flux quantum. But of the baseline value turns out to fluctuate
     # about an integer number of flux quanta, this will introduce new
@@ -382,14 +380,14 @@ def correct_flux_jumps_original(vals, mask, flux_quant):
         if (np.amax(corrected[mask]) - np.amin(corrected[mask])) > 0.75 * flux_quant:
             corrected = (vals + flux_quant / 4) % (flux_quant)
             corrected = corrected - flux_quant / 4 + flux_quant
-        corrected -= (corrected[0] - vals[0])
+        corrected -= corrected[0] - vals[0]
         return corrected
     else:
         return vals
 
 
 def correct_flux_jumps(vals, mask, flux_quant):
-    '''Remove 'flux' jumps' from pretrigger mean.
+    """Remove 'flux' jumps' from pretrigger mean.
 
     When using umux readout, if a pulse is recorded that has a very fast rising
     edge (e.g. a cosmic ray), the readout system will "slip" an integer number
@@ -406,7 +404,7 @@ def correct_flux_jumps(vals, mask, flux_quant):
 
     Returns:
     Array with values corrected
-    '''
+    """
     return unwrap_n(vals, flux_quant, mask)
 
 
@@ -434,7 +432,7 @@ def unwrap_n(data, period, mask, n=3):
     mask (optional) -- mask indentifying "good" pulses
     """
     udata = data.copy()
-    if (n <= 0):
+    if n <= 0:
         return udata
 
     # Iterate through each data point and offset it by
@@ -489,8 +487,7 @@ def filter_data_5lag_cython(rawdata, filter_values):
             conv4 += sample * f0
             f0, f1, f2, f3 = f1, f2, f3, f4
 
-        conv4 += pulse[nSamples - 4] * f0 + pulse[nSamples - 3] * f1 +\
-            pulse[nSamples - 2] * f2 + pulse[nSamples - 1] * f3
+        conv4 += pulse[nSamples - 4] * f0 + pulse[nSamples - 3] * f1 + pulse[nSamples - 2] * f2 + pulse[nSamples - 1] * f3
         conv3 += pulse[nSamples - 4] * f1 + pulse[nSamples - 3] * f2 + pulse[nSamples - 2] * f3
         conv2 += pulse[nSamples - 4] * f2 + pulse[nSamples - 3] * f3
         conv1 += pulse[nSamples - 4] * f3
@@ -504,8 +501,16 @@ def filter_data_5lag_cython(rawdata, filter_values):
     return filt_value, filt_phase
 
 
-def time_drift_correct(time, uncorrected, w, sec_per_degree=2000,  # noqa: PLR0914
-                       pulses_per_degree=2000, max_degrees=20, ndeg=None, limit=None):
+def time_drift_correct(  # noqa: PLR0914
+    time,
+    uncorrected,
+    w,
+    sec_per_degree=2000,
+    pulses_per_degree=2000,
+    max_degrees=20,
+    ndeg=None,
+    limit=None,
+):
     """Compute a time-based drift correction that minimizes the spectral entropy.
 
     Args:
@@ -589,7 +594,8 @@ def time_drift_correct(time, uncorrected, w, sec_per_degree=2000,  # noqa: PLR09
     info["coefficients"] = np.zeros(ndeg, dtype=float)
     for i in range(ndeg):
         result, _fval, _iter, funcalls = sp.optimize.brent(
-            cost1, (i, param, uncorrected, w, basis), [-.001, .001], tol=1e-5, full_output=True)
+            cost1, (i, param, uncorrected, w, basis), [-0.001, 0.001], tol=1e-5, full_output=True
+        )
         param[i] = result
         fc += funcalls
         model += sp.special.legendre(i + 1) * result
@@ -603,7 +609,7 @@ def time_drift_correct(time, uncorrected, w, sec_per_degree=2000,  # noqa: PLR09
     H3 = laplace_entropy(uncorrected * (1 + model2(xnorm)), w=w)
     if H2 <= 0 or H2 - H1 > 0.0:
         model = np.poly1d([0])
-    elif H3 <= 0 or H3 - H2 > .00001:
+    elif H3 <= 0 or H3 - H2 > 0.00001:
         model2 = model
 
     info["entropies"] = (H1, H2, H3)

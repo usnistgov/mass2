@@ -2,13 +2,13 @@ import numpy as np
 from mass2.core.analysis_algorithms import unwrap_n, correct_flux_jumps
 
 import logging
+
 LOG = logging.getLogger("mass")
 
 rng = np.random.default_rng(7923533)  # make tests not fail randomly
 
 
 class Test_unwrap_n:
-
     def setup_method(self):
         self.noise_size = 10.0
         self.dlength = 1000
@@ -65,14 +65,14 @@ class TestBothAlgorithms:
     def make_trend_linear(sz):
         b = rng.integers(0, 2**16 - 1)
         m = 4 * rng.uniform() - 2
-        trend = b + m * (sz / 2.**12) * np.arange(sz)
+        trend = b + m * (sz / 2.0**12) * np.arange(sz)
         return trend
 
     @staticmethod
     def make_trend_poly(sz, deg):
         max_phi0 = 2
         p = np.zeros(deg + 1)
-        p[:-1] = (2 * max_phi0 * rng.uniform(deg) - max_phi0) * 2.**12 * (1. / sz)**(np.arange(deg, 0, -1))
+        p[:-1] = (2 * max_phi0 * rng.uniform(deg) - max_phi0) * 2.0**12 * (1.0 / sz) ** (np.arange(deg, 0, -1))
         p[-1] = 2**14 + rng.integers(0, 2 * 2**14)
         trend = np.polyval(p, np.arange(sz))
         return trend
@@ -81,7 +81,7 @@ class TestBothAlgorithms:
     def make_trend_poly_plus_sine(sz, deg):
         max_phi0 = 2
         p = np.zeros(deg + 1)
-        p[:-1] = (0.1 * max_phi0 * rng.uniform() * deg - 0.05 * max_phi0) * 2.**12 * (1. / sz)**(np.arange(deg, 0, -1))
+        p[:-1] = (0.1 * max_phi0 * rng.uniform() * deg - 0.05 * max_phi0) * 2.0**12 * (1.0 / sz) ** (np.arange(deg, 0, -1))
         p[-1] = 2**14 + rng.integers(0, 2 * 2**14)
         trend = np.polyval(p, np.arange(sz))
 
