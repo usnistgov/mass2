@@ -9,9 +9,6 @@ CubicSpline - Perform an exact cubic spline through the data, with either
     specified slope at the end of the interval or 'natural boundary conditions'
     (y''=0 at ends).
 
-LinterpCubicSpline - Create a new CubicSpline that's the linear interpolation
-    of two existing ones.
-
 GPRSpline - Create a smoothing spline based on the theory of Gaussian process regression.
     Finds the curvature penalty by maximizing the Bayesian marginal likelihood.
     Intended to supercede `SmoothingSpline`, but very similar. Differs in how the
@@ -202,30 +199,6 @@ class CubicSplineFunction(CubicSpline, Function):
 
     def __repr__(self):
         return "CubicSpline" + "'" * self.der + "(x)"
-
-
-class LinterpCubicSpline(CubicSpline):
-    """A CubicSpline object which is a linear combination of CubicSpline objects
-    s1 and s2, effectively fraction*s1 + (1-fraction)*s2.
-    """
-
-    def __init__(self, s1, s2, fraction):
-        if s1._n != s2._n:
-            raise ValueError("Splines must be of the same length to be linearly interpolated")
-        if np.max(np.abs(s1._x - s2._x)) > 1e-3:
-            raise ValueError("Splines must have same abscissa values to be interpolated")
-
-        def wtsum(a, b, frac):
-            return a * frac + b * (1 - frac)
-
-        self._n = s1._n
-        self._x = s1._x
-        self._y = wtsum(s1._y, s2._y, fraction)
-        self._y2 = wtsum(s1._y2, s2._y2, fraction)
-        self.yprime1 = wtsum(s1.yprime1, s2.yprime1, fraction)
-        self.yprimeN = wtsum(s1.yprimeN, s2.yprimeN, fraction)
-        self.xstep = wtsum(s1.xstep, s2.xstep, fraction)
-        self.ystep = wtsum(s1.ystep, s2.ystep, fraction)
 
 
 def k_spline(x, y):
