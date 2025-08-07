@@ -20,7 +20,7 @@ from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
 
-from mass2.mathstat.interpolate import CubicSplineFunction, GPRSplineFunction
+from mass2.mathstat.interpolate import CubicSpline, GPRSplineFunction
 from .fluorescence_lines import STANDARD_FEATURES
 
 
@@ -350,13 +350,13 @@ class EnergyCalibrationMaker:
         if approximate:
             internal_spline = GPRSplineFunction(x, y, dy, dx)
         elif len(x) > 1:
-            internal_spline = CubicSplineFunction(x, y)
+            internal_spline = CubicSpline(x, y)
         else:
-            internal_spline = CubicSplineFunction(x * [1, 2], y * [1, 2])
+            internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
 
         ph_samplepoints = EnergyCalibrationMaker.heuristic_samplepoints(self.ph)
         E_samplepoints = output_transform(ph_samplepoints, internal_spline(input_transform(ph_samplepoints)))
-        energy2ph = CubicSplineFunction(E_samplepoints, ph_samplepoints)
+        energy2ph = CubicSpline(E_samplepoints, ph_samplepoints)
 
         if approximate:
             dspline = internal_spline.variance(ph_samplepoints) ** 0.5
@@ -374,7 +374,7 @@ class EnergyCalibrationMaker:
             else:
                 raise ValueError(f"curvename='{curvename}' not recognized")
 
-            uncertainty_spline = CubicSplineFunction(ph_samplepoints, de_samplepoints)
+            uncertainty_spline = CubicSpline(ph_samplepoints, de_samplepoints)
         else:
             uncertainty_spline = np.zeros_like
 

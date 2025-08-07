@@ -179,28 +179,6 @@ class CubicSpline:
         return result
 
 
-class CubicSplineFunction(CubicSpline, Function):
-    """A dubious class which lets you take derivatives of a cubic spline."""
-
-    def __init__(self, x, y, yprime1=None, yprimeN=None, der=0):
-        super().__init__(x, y, yprime1=yprime1, yprimeN=yprimeN)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-
-        return CubicSplineFunction(self._x, self._y, yprime1=self.yprime1, yprimeN=self.yprimeN, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    def __repr__(self):
-        return "CubicSpline" + "'" * self.der + "(x)"
-
-
 def k_spline(x, y):
     """Compute the spline covariance kernel, R&W eq 6.28."""
     v = np.minimum(x, y)
