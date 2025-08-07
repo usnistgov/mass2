@@ -6,6 +6,7 @@ import mass2 as mass
 from mass2.mathstat.interpolate import CubicSpline
 from mass2.common import tostr
 import logging
+
 LOG = logging.getLogger("mass")
 
 
@@ -18,8 +19,7 @@ class PhaseCorrector:
         self.phase_uniformifier_y = np.array(phase_uniformifier_y)
         self.indicatorName = tostr(indicatorName)
         self.uncorrectedName = tostr(uncorrectedName)
-        self.phase_uniformifier = CubicSpline(
-            self.phase_uniformifier_x, self.phase_uniformifier_y)
+        self.phase_uniformifier = CubicSpline(self.phase_uniformifier_x, self.phase_uniformifier_y)
 
     def toHDF5(self, hdf5_group, name="phase_correction", overwrite=False):
         """Write to the given HDF5 group for later recovery from disk (by fromHDF5 class method)."""
@@ -32,12 +32,13 @@ class PhaseCorrector:
                 else:
                     raise AttributeError(f"Cannot overwrite phase correction dataset '{name}'")
             group[name] = vector
+
         h5group_update("phase_uniformifier_x", self.phase_uniformifier_x)
         h5group_update("phase_uniformifier_y", self.phase_uniformifier_y)
         h5group_update("uncorrected_name", self.uncorrectedName)
         h5group_update("indicator_name", self.indicatorName)
         h5group_update("version", self.version)
-        for (i, correction) in enumerate(self.corrections):
+        for i, correction in enumerate(self.corrections):
             h5group_update(f"correction_{i}_x", correction._x)
             h5group_update(f"correction_{i}_y", correction._y)
 
@@ -67,7 +68,7 @@ class PhaseCorrector:
             _y = hdf5_group[f"{name}/correction_{i}_y"][()]
             corrections.append(CubicSpline(_x, _y))
             i += 1
-        assert (version == cls.version)
+        assert version == cls.version
         return cls(x, y, corrections, indicatorName, uncorrectedName)
 
     def __repr__(self):
@@ -80,8 +81,7 @@ class PhaseCorrector:
         return s
 
 
-def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=None,
-                  indicatorName="", uncorrectedName=""):
+def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=None, indicatorName="", uncorrectedName=""):
     if ph_peaks is None:
         ph_peaks = _find_peaks_heuristic(pheight)
     if len(ph_peaks) <= 0:
@@ -96,8 +96,8 @@ def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=N
         kernel_width = np.max(ph_peaks) / 1000.0
     for pk in ph_peaks:
         nextcorr, mphase = _phasecorr_find_alignment(
-            phase, pheight, pk, .012 * np.mean(ph_peaks),
-            method2017=method2017, kernel_width=kernel_width)
+            phase, pheight, pk, 0.012 * np.mean(ph_peaks), method2017=method2017, kernel_width=kernel_width
+        )
         corrections.append(nextcorr)
         median_phase.append(mphase)
     median_phase = np.array(median_phase)
@@ -122,28 +122,32 @@ def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=N
             x[i] = np.median(pheight[bin == i])
             y[i] = np.median(phase[bin == i])
 
-        nonempty = (w > 0)
+        nonempty = w > 0
         # Use sp.interpolate.UnivariateSpline because it can make an approximating
         # spline. But then use its x/y data and knots to create a Mass CubicSpline,
         # because that one can have natural boundary conditions instead of insane
         # cubic functions in the extrapolation.
         if nonempty.sum() > 1:
             spline_order = min(3, nonempty.sum() - 1)
-            crazy_spline = sp.interpolate.UnivariateSpline(
-                x[nonempty], y[nonempty], w=w[nonempty] * (12**-0.5),
-                k=spline_order)
+            crazy_spline = sp.interpolate.UnivariateSpline(x[nonempty], y[nonempty], w=w[nonempty] * (12**-0.5), k=spline_order)
             phase_uniformifier_x = crazy_spline._data[0]
             phase_uniformifier_y = crazy_spline._data[1]
         else:
             phase_uniformifier_x = np.array([0, 0, 0, 0])
             phase_uniformifier_y = np.array([0, 0, 0, 0])
 
-    return PhaseCorrector(phase_uniformifier_x, phase_uniformifier_y, corrections,
-                          indicatorName, uncorrectedName)
+    return PhaseCorrector(phase_uniformifier_x, phase_uniformifier_y, corrections, indicatorName, uncorrectedName)
 
 
-def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  # noqa: PLR0914
-                              method2017=False, nf=10, kernel_width=2.0):
+def _phasecorr_find_alignment(  # noqa: PLR0914
+    phase_indicator,
+    pulse_heights,
+    peak,
+    delta_ph,
+    method2017=False,
+    nf=10,
+    kernel_width=2.0,
+):
     """Find the way to align (flatten) `pulse_heights` as a function of `phase_indicator`
     working only within the range [peak-delta_ph, peak+delta_ph].
 
@@ -154,10 +158,8 @@ def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  #
     there are not a lot of counts in the peak.
     """
     phrange = np.array([-delta_ph, delta_ph]) + peak
-    use = np.logical_and(np.abs(pulse_heights[:] - peak) < delta_ph,
-                         np.abs(phase_indicator) < 2)
-    low_phase, median_phase, high_phase = \
-        np.percentile(phase_indicator[use], [3, 50, 97])
+    use = np.logical_and(np.abs(pulse_heights[:] - peak) < delta_ph, np.abs(phase_indicator) < 2)
+    low_phase, median_phase, high_phase = np.percentile(phase_indicator[use], [3, 50, 97])
 
     if method2017:
         x = phase_indicator[use]
@@ -182,9 +184,9 @@ def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  #
                 yadj = y.copy()
                 yadj[bins == i] += shift
                 return mass.mathstat.entropy.laplace_entropy(yadj, kernel_width)
+
             brack = 0.003 * np.array([-1, 1], dtype=float)
-            sbest, _KLbest, niter, _ = sp.optimize.brent(
-                target, (), brack=brack, full_output=True, tol=3e-4)
+            sbest, _KLbest, niter, _ = sp.optimize.brent(target, (), brack=brack, full_output=True, tol=3e-4)
             iter1 += niter
             yknot[i] = sbest
 
@@ -195,21 +197,23 @@ def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  #
         iter2 = 0
         yknot2 = np.zeros(NBINS, dtype=float)
         for i in range(NBINS):
+
             def target(shift):
                 yadj = ycorr.copy()
                 yadj[bins == i] += shift
                 return mass.mathstat.entropy.laplace_entropy(yadj, kernel_width)
+
             brack = 0.002 * np.array([-1, 1], dtype=float)
-            sbest, _KLbest, niter, _ = sp.optimize.brent(
-                target, (), brack=brack, full_output=True, tol=1e-4)
+            sbest, _KLbest, niter, _ = sp.optimize.brent(target, (), brack=brack, full_output=True, tol=1e-4)
             iter2 += niter
             yknot2[i] = sbest
         correction = CubicSpline(knots, yknot + yknot2)
         H0 = mass.mathstat.entropy.laplace_entropy(y, kernel_width)
         H1 = mass.mathstat.entropy.laplace_entropy(ycorr, kernel_width)
         H2 = mass.mathstat.entropy.laplace_entropy(y + correction(x), kernel_width)
-        LOG.debug("Laplace entropy before/middle/after: %.4f, %.4f %.4f (%d+%d iterations, %d phase groups)",
-                  H0, H1, H2, iter1, iter2, NBINS)
+        LOG.debug(
+            "Laplace entropy before/middle/after: %.4f, %.4f %.4f (%d+%d iterations, %d phase groups)", H0, H1, H2, iter1, iter2, NBINS
+        )
 
         curve = CubicSpline(knots - median_phase, peak - (yknot + yknot2))
         return curve, median_phase
@@ -223,7 +227,7 @@ def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  #
     NBINS = 200
     hists = np.zeros((nf, NBINS), dtype=float)
     for i, P in enumerate(Pctrs):
-        use = (Pbin == i)
+        use = Pbin == i
         c, b = np.histogram(pulse_heights[use], NBINS, phrange)
         hists[i] = c
     bctr = 0.5 * (b[1] - b[0]) + b[:-1]
@@ -233,11 +237,11 @@ def _phasecorr_find_alignment(phase_indicator, pulse_heights, peak, delta_ph,  #
     for i in range(nf):
         # Find the PH of this ridge by fitting quadratic to the correlation
         # of histogram #i and the mean histogram, then finding its local max.
-        conv = sp.signal.fftconvolve(kernel, hists[i], 'same')
+        conv = sp.signal.fftconvolve(kernel, hists[i], "same")
         m = conv.argmax()
         if conv[m] <= 0:
             continue
-        p = np.poly1d(np.polyfit(bctr[m - 2:m + 3], conv[m - 2:m + 3], 2))
+        p = np.poly1d(np.polyfit(bctr[m - 2 : m + 3], conv[m - 2 : m + 3], 2))
         # p = np.poly1d(np.polyfit(b[m-2:m+3], conv[m-2:m+3], 2))
         peak = p.deriv(m=1).r[0]
         # if peak < bctr[m-2]: peak = bctr[m]
@@ -275,9 +279,9 @@ def _phase_corrected_filtvals(phase, uncorrected, corrections):
     binnum = np.digitize(uncorrected, ph)
     for b in range(NC):
         # Don't correct binnum=0, which would be negative PH
-        use = (binnum == 1 + b)
+        use = binnum == 1 + b
         if b + 1 == NC:  # For the last bin, extrapolate
-            use = (binnum >= 1 + b)
+            use = binnum >= 1 + b
         if use.sum() == 0:
             continue
         frac = (uncorrected[use] - ph[b]) / (ph[b + 1] - ph[b])

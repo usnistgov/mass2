@@ -19,9 +19,8 @@ def test_basic():
 
 
 def test_values():
-    f, psd = mass.mathstat.power_spectrum.computeSpectrum(
-        np.arange(10), segfactor=1, dt=1)
-    expected = [405., 52.36067977, 14.47213595, 7.63932023, 5.52786405, 5.]
+    f, psd = mass.mathstat.power_spectrum.computeSpectrum(np.arange(10), segfactor=1, dt=1)
+    expected = [405.0, 52.36067977, 14.47213595, 7.63932023, 5.52786405, 5.0]
     for a, b in zip(psd, expected):
         assert a == pytest.approx(b)
     expected = np.linspace(0, 0.5, 6)
@@ -54,8 +53,7 @@ def test_creating_filter_from_non_LJH_data():
     plt.close()
     noise_psd = noise_psd_calculator.spectrum()
 
-    maker = mass.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr,
-                             noise_psd=noise_psd, sample_time_sec=frametime_s)
+    maker = mass.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr, noise_psd=noise_psd, sample_time_sec=frametime_s)
     filter_obj = maker.compute_5lag()
     print("predicted resolutions")
     filter_obj.report(std_energy=1000)

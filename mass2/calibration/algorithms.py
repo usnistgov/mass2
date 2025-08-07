@@ -8,13 +8,7 @@ import itertools
 import operator
 import numpy as np
 
-from collections.abc import Iterable
 
-import matplotlib.pyplot as plt
-import matplotlib.transforms as mtrans
-from matplotlib.ticker import MaxNLocator
-
-from ..common import isstr
 from mass2.calibration.fluorescence_lines import STANDARD_FEATURES
 import mass2 as mass
 
@@ -27,8 +21,7 @@ def line_names_and_energies(line_names):
     if len(line_names) <= 0:
         return [], []
 
-    energies = [STANDARD_FEATURES.get(name_or_energy, name_or_energy)
-                for name_or_energy in line_names]
+    energies = [STANDARD_FEATURES.get(name_or_energy, name_or_energy) for name_or_energy in line_names]
     # names = [str(name_or_energy) for name_or_energy in line_names]
     return zip(*sorted(zip(line_names, energies), key=operator.itemgetter(1)))
 
@@ -52,7 +45,7 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     hi = np.max(pulse_heights) + 3 * gaussian_fwhm
     hist, bins = np.histogram(pulse_heights, np.linspace(lo, hi, n + 1))
     tx = np.fft.rfftfreq(n, (lo - hi) / n)
-    ty = np.exp(-tx**2 / 2 / tbw**2)
+    ty = np.exp(-(tx**2) / 2 / tbw**2)
     x = (bins[1:] + bins[:-1]) / 2
     y = np.fft.irfft(np.fft.rfft(hist) * ty)
 
@@ -91,8 +84,7 @@ def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, next
         assign.sort(axis=1)
         fracs = np.divide(energies[1:-1] - energies[:-2], energies[2:] - energies[:-2])
         est_pos = assign[:, :-2] * (1 - fracs) + assign[:, 2:] * fracs
-        acc_est = np.linalg.norm(np.divide(est_pos - assign[:, 1:-1],
-                                           assign[:, 2:] - assign[:, :-2]), axis=1)
+        acc_est = np.linalg.norm(np.divide(est_pos - assign[:, 1:-1], assign[:, 2:] - assign[:, :-2]), axis=1)
 
         opt_assign_i = np.argmin(acc_est)
         acc = acc_est[opt_assign_i]
@@ -101,8 +93,7 @@ def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, next
         if acc > maxacc * np.sqrt(len(energies)):
             n_sel_pp += nincrement
             if n_sel_pp > nmax:
-                msg = f"no peak assignment succeeded: acc {acc:g}, maxacc*sqrt(len(energies)) "\
-                    f"{maxacc * np.sqrt(len(energies)):g}"
+                msg = f"no peak assignment succeeded: acc {acc:g}, maxacc*sqrt(len(energies)) {maxacc * np.sqrt(len(energies)):g}"
                 raise ValueError(msg)
             else:
                 continue
@@ -113,8 +104,7 @@ def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, next
 def build_fit_ranges_ph(line_names, excluded_line_names, approx_ecal, fit_width_ev):
     """Call build_fit_ranges() to get (lo,hi) for fitranges in energy units,
     then convert to ph using approx_ecal"""
-    e_e, fit_lo_hi_energy, slopes_de_dph = build_fit_ranges(
-        line_names, excluded_line_names, approx_ecal, fit_width_ev)
+    e_e, fit_lo_hi_energy, slopes_de_dph = build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev)
     fit_lo_hi_ph = []
     for lo, hi in fit_lo_hi_energy:
         lo_ph = approx_ecal.energy2ph(lo)
@@ -139,7 +129,7 @@ def build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev)
     _excl_names, excl_e_e = line_names_and_energies(excluded_line_names)
     half_width_ev = fit_width_ev / 2.0
     all_e = np.sort(np.hstack((e_e, excl_e_e)))
-    assert (len(all_e) == len(np.unique(all_e)))
+    assert len(all_e) == len(np.unique(all_e))
     fit_lo_hi_energy = []
     slopes_de_dph = []
 
@@ -183,17 +173,15 @@ def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
             energy = mass.STANDARD_FEATURES[lineNameOrEnergy]
             line = mass.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
         else:
-            raise FailedToGetModelException(
-                f"failed to get line from lineNameOrEnergy={lineNameOrEnergy}")
+            raise FailedToGetModelException(f"failed to get line from lineNameOrEnergy={lineNameOrEnergy}")
     else:
         try:
             energy = float(lineNameOrEnergy)
         except Exception:
             raise FailedToGetModelException(
-                f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable to float or "
-                "a str in mass.spectra or mass.STANDARD_FEATURES")
-        line = mass.SpectralLine.quick_monochromatic_line(
-            f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
+                f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable to float or a str in mass.spectra or mass.STANDARD_FEATURES"
+            )
+        line = mass.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
     return line.model(has_linear_background=has_linear_background, has_tails=has_tails)
 
 
@@ -225,8 +213,7 @@ def multifit(ph, line_names, fit_lo_hi, binsize_ev, slopes_de_dph, hide_deprecat
         results.append(result)
         peak_ph.append(result.best_values["peak_ph"])
         eres.append(result.best_values["fwhm"])
-    return {"results": results, "peak_ph": peak_ph,
-            "eres": eres, "line_names": name_e, "energies": e_e}
+    return {"results": results, "peak_ph": peak_ph, "eres": eres, "line_names": name_e, "energies": e_e}
 
 
 def singlefit(ph, name, lo, hi, binsize_ph, approx_dP_dE):

@@ -50,16 +50,14 @@ class Channels:
         dlo=50,
         dhi=50,
         binsize=0.5,
-        params_update=lmfit.Parameters()
+        params_update=lmfit.Parameters(),
     ):
-        model = mass.get_model(line,
-                               has_linear_background=has_linear_background,
-                               has_tails=has_tails)
+        model = mass.get_model(
+            line, has_linear_background=has_linear_background, has_tails=has_tails
+        )
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
-        df_small = (
-            self.dfg().lazy().filter(use_expr).select(col).collect()
-        )
+        df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
@@ -84,8 +82,9 @@ class Channels:
         ax = moss.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
 
-    def plot_hists(self, col, bin_edges, group_by_col, axis=None,
-                   use_expr=None, skip_none=True):
+    def plot_hists(
+        self, col, bin_edges, group_by_col, axis=None, use_expr=None, skip_none=True
+    ):
         """
         Plots histograms for the given column, grouped by the specified column.
 
@@ -101,23 +100,31 @@ class Channels:
             ax = axis
 
         if use_expr is None:
-            df_small = (self.dfg().lazy().
-                        select(col, group_by_col)
-                        ).collect().sort(group_by_col, descending=False)
+            df_small = (
+                (self.dfg().lazy().select(col, group_by_col))
+                .collect()
+                .sort(group_by_col, descending=False)
+            )
         else:
-            df_small = (self.dfg().lazy().filter(use_expr).
-                        select(col, group_by_col)
-                        ).collect().sort(group_by_col, descending=False)
+            df_small = (
+                (self.dfg().lazy().filter(use_expr).select(col, group_by_col))
+                .collect()
+                .sort(group_by_col, descending=False)
+            )
 
         # Plot a histogram for each group
-        for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
+        for (group_name,), group_data in df_small.group_by(
+            group_by_col, maintain_order=True
+        ):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
             # Plot the histogram for the current group
             if group_name == "EBIT":
-                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+                ax.hist(
+                    values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name)
+                )
             else:
                 ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
             # bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
@@ -125,7 +132,7 @@ class Channels:
 
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel('Frequency')
+        ax.set_ylabel("Frequency")
         ax.set_title(f"Coadded Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
@@ -150,8 +157,12 @@ class Channels:
                 print(f"{key=} {channel=} failed this step")
                 print(f"{error_type=}")
                 print(f"{error_message=}")
-                new_bad_channels[key] = channel.as_bad(error_type, error_message, backtrace)
-        new_bad_channels = moss.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
+                new_bad_channels[key] = channel.as_bad(
+                    error_type, error_message, backtrace
+                )
+        new_bad_channels = moss.misc.merge_dicts_ordered_by_keys(
+            self.bad_channels, new_bad_channels
+        )
 
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
@@ -159,7 +170,9 @@ class Channels:
         new_channels = {}
         new_bad_channels = {}
         if require_ch_num_exists:
-            assert ch_num in self.channels.keys(), f"{ch_num} can't be set bad because it does not exist"
+            assert ch_num in self.channels.keys(), (
+                f"{ch_num} can't be set bad because it does not exist"
+            )
         for key, channel in self.channels.items():
             if key == ch_num:
                 new_bad_channels[key] = channel.as_bad(None, msg, None)
@@ -209,13 +222,16 @@ class Channels:
     @classmethod
     def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None):
         import os
+
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
             paths = moss.ljhutil.find_ljh_files(pulse_folder)
             pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
-            pairs = moss.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit)
+            pairs = moss.ljhutil.match_files_by_channel(
+                pulse_folder, noise_folder, limit=limit
+            )
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"in from_ljh_folder has {len(pairs)} pairs")
@@ -228,22 +244,32 @@ class Channels:
 
     def get_path_in_output_folder(self, filename):
         ljh_path = self.get_an_ljh_path()
-        base_name, post_chan = ljh_path.name.split('_chan')
-        date, run_num = base_name.split("_run")        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = ljh_path.parent.parent/f"{run_num}moss_output"
+        base_name, post_chan = ljh_path.name.split("_chan")
+        date, run_num = base_name.split(
+            "_run"
+        )  # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = ljh_path.parent.parent / f"{run_num}moss_output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir/filename
+        return output_dir / filename
 
     def get_experiment_state_df(self, experiment_state_path=None):
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
-            experiment_state_path = moss.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
+            experiment_state_path = moss.ljhutil.experiment_state_path_from_ljh_path(
+                ljh_path
+            )
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         # _col0, _col1 = df.columns
-        df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+        df_es = df.select(
+            pl.from_epoch("unixnano", time_unit="ns")
+            .dt.cast_time_unit("us")
+            .alias("timestamp")
+        )
         # strip whitespace from state_label column
         sl_series = df.select(pl.col("state_label").str.strip_chars()).to_series()
-        df_es = df_es.with_columns(state_label=pl.Series(values=sl_series, dtype=pl.Categorical))
+        df_es = df_es.with_columns(
+            state_label=pl.Series(values=sl_series, dtype=pl.Categorical)
+        )
         return df_es
 
     def with_experiment_state_by_path(self, experiment_state_path=None):
@@ -271,6 +297,7 @@ class Channels:
             except KeyError:
                 raise Exception("steps dict did not contain steps for this ch_num")
             return channel.with_steps(steps)
+
         return self.map(load_steps)
 
     def save_steps(self, filename):
@@ -286,33 +313,50 @@ class Channels:
 
     def parent_folder_path(self):
         import pathlib
-        parent_folder_path = pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
+
+        parent_folder_path = pathlib.Path(
+            self.ch0.header.df["Filename"][0]
+        ).parent.parent
         print(f"{parent_folder_path=}")
         return parent_folder_path
 
     def concat_data(self, other_data):
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
-        ch_nums = sorted(list(set(self.channels.keys()).intersection(other_data.channels.keys())))
+        ch_nums = sorted(
+            list(set(self.channels.keys()).intersection(other_data.channels.keys()))
+        )
         channels2 = {}
         for ch_num in ch_nums:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
             ch2 = ch.concat_ch(other_ch)
             channels2[ch_num] = ch2
-        return moss.Channels(channels2, self.description+other_data.description)
+        return moss.Channels(channels2, self.description + other_data.description)
 
     @classmethod
-    def from_df(cls, df, frametime_s=np.nan, n_presamples=None, n_samples=None, description="from Channels.channels_from_df"):
+    def from_df(
+        cls,
+        df,
+        frametime_s=np.nan,
+        n_presamples=None,
+        n_samples=None,
+        description="from Channels.channels_from_df",
+    ):
         # requres a column named "ch_num" containing the channel number
         keys_df = df.partition_by(by=["ch_num"], as_dict=True)
         dfs = {keys[0]: df for (keys, df) in keys_df.items()}
         channels = {}
         for ch_num, df in dfs.items():
-            channels[ch_num] = moss.Channel(df, header=moss.ChannelHeader(description="from df",
-                                                                          ch_num=ch_num,
-                                                                          frametime_s=frametime_s,
-                                                                          n_presamples=n_presamples,
-                                                                          n_samples=n_samples,
-                                                                          df=df))
+            channels[ch_num] = moss.Channel(
+                df,
+                header=moss.ChannelHeader(
+                    description="from df",
+                    ch_num=ch_num,
+                    frametime_s=frametime_s,
+                    n_presamples=n_presamples,
+                    n_samples=n_samples,
+                    df=df,
+                ),
+            )
         return Channels(channels, description)

@@ -5,7 +5,6 @@ Several math and plotting utilities:
 * plot_as_stepped_hist
 * plot_stepped_hist_poisson_errors
 * savitzky_golay
-* CheckForMissingLibrary class
 
 Joe Fowler, NIST
 
@@ -14,30 +13,11 @@ Started March 24, 2011
 
 import numpy as np
 
-__all__ = ['plot_as_stepped_hist', 'plot_stepped_hist_poisson_errors', 'savitzky_golay',
-           'find_svd_randomly', 'find_range_randomly']
+__all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "savitzky_golay", "find_svd_randomly", "find_range_randomly"]
 
 # Create a module-local RNG. If you need to seed it to achieve repeatable tests,
 # you can replace this.
 rng = np.random.default_rng()
-
-
-class CheckForMissingLibrary:
-    """Class to raise ImportError only after python tries to use the import.
-
-    Intended for use with shared objects built from Fortran or Cython source.
-    """
-
-    def __init__(self, libname):
-        self.libname = libname
-        self.error = ImportError(f"""This copy of Mass could not import the compiled '{self.libname}'
-This happens when you run from a source tree, among other possibilities.  You can
-either try using an installed version or do a 'python setup.py build' and copy
-the .so file from build/lib*/mass/mathstat/ to mass/mathstat/  Note that this is
-a delayed error.  If it is raised, then you know that you needed the library!""")
-
-    def __getattr__(self, attr):
-        raise self.error
 
 
 def plot_as_stepped_hist(axis, data, bins, **kwargs):
@@ -60,9 +40,9 @@ def plot_as_stepped_hist(axis, data, bins, **kwargs):
     else:
         x = np.zeros(2 + 2 * len(bins), dtype=float)
         dx = bins[1] - bins[0]
-        x[0:-2:2] = bins - dx * .5
-        x[1:-2:2] = bins - dx * .5
-        x[-2:] = bins[-1] + dx * .5
+        x[0:-2:2] = bins - dx * 0.5
+        x[1:-2:2] = bins - dx * 0.5
+        x[-2:] = bins[-1] + dx * 0.5
 
     y = np.zeros_like(x)
     y[1:-1:2] = data
@@ -165,10 +145,10 @@ def savitzky_golay(y, window_size, order, deriv=0):
     m = np.linalg.pinv(b).A[deriv]
     # pad the signal at the extremes with
     # values taken from the signal itself
-    firstvals = y[0] - np.abs(y[1:half_window + 1][::-1] - y[0])
-    lastvals = y[-1] + np.abs(y[-half_window - 1:-1][::-1] - y[-1])
+    firstvals = y[0] - np.abs(y[1 : half_window + 1][::-1] - y[0])
+    lastvals = y[-1] + np.abs(y[-half_window - 1 : -1][::-1] - y[-1])
     y = np.concatenate((firstvals, y, lastvals))
-    return np.convolve(m, y, mode='valid')
+    return np.convolve(m, y, mode="valid")
 
 
 def find_range_randomly(A, nl, q=1):

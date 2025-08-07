@@ -33,7 +33,7 @@
   description: |
     J. Clementson, P. Beiersdorfer, G. V. Brown, and M. F. Gu,
     "Spectroscopy of M-shell x-ray transitions in Zn-like through Co-like W,"
-    Physica Scripta 81, 015301 (2010). 
+    Physica Scripta 81, 015301 (2010).
   URL: https://iopscience.iop.org/article/10.1088/0031-8949/81/01/015301/meta
 
 - tag: Dean 2019
@@ -54,7 +54,7 @@
   description: |
     Scanned pages from Deslattes/Mooney's notebook provided by Csilla Szabo-Foster.
     Added by GCO Oct 7 2019: Used the postion and width values from the from the lowest listed fit,
-    the one in energy units. Used the intensities from the Second lowest fit, the one labeled 
+    the one in energy units. Used the intensities from the Second lowest fit, the one labeled
     PLUS-POSITION SCAN (best-fit Voight profile). Also the notebook only included the Ka1 and Ka2,
     not the higher energy satellites, so I made up numbers for the small feature at higher energy.
 
@@ -133,7 +133,7 @@
     NIST Atomic Spectra Database
     Kramida, A., Ralchenko, Yu., Reader, J., and NIST ASD Team (2018). NIST Atomic Spectra Database (ver. 5.6.1),
     [Online]. Available: https://physics.nist.gov/asd [2018, December 12]. National Institute of Standards and
-    Technology, Gaithersburg, MD. 
+    Technology, Gaithersburg, MD.
   URL: https://doi.org/10.18434/T4W30F
 
 - tag: Ravel 2018

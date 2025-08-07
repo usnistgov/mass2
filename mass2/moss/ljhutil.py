@@ -31,8 +31,9 @@ def find_folders_with_extension(root_path: str, extensions: List[str]) -> List[s
     return list(matching_folders)
 
 
-def find_ljh_files(folder: str, ext: str = ".ljh",
-                   search_subdirectories: bool = False) -> List[str]:
+def find_ljh_files(
+    folder: str, ext: str = ".ljh", search_subdirectories: bool = False
+) -> List[str]:
     """
     Finds all .ljh files in the given folder and its subfolders.
 
@@ -64,14 +65,16 @@ def extract_channel_number(file_path: str) -> int:
     Returns:
     - int: The channel number.
     """
-    match = re.search(r'_chan(\d+)\.ljh$', file_path)
+    match = re.search(r"_chan(\d+)\.ljh$", file_path)
     if match:
         return int(match.group(1))
     else:
         raise ValueError(f"File path does not match expected pattern: {file_path}")
 
 
-def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Iterator[Tuple[str, str]]]:
+def match_files_by_channel(
+    folder1: str, folder2: str, limit=None
+) -> List[Iterator[Tuple[str, str]]]:
     """
     Matches .ljh files from two folders by channel number.
 
@@ -96,7 +99,9 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
             channel = extract_channel_number(file)
             if channel in files_by_channel.keys():
                 existing_file = files_by_channel[channel]
-                raise ValueError(f"Duplicate channel number found: {channel} in file {file} and already in {existing_file}")
+                raise ValueError(
+                    f"Duplicate channel number found: {channel} in file {file} and already in {existing_file}"
+                )
             files_by_channel[channel] = file
         return files_by_channel
 
@@ -107,22 +112,28 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None) -> List[Itera
     matching_pairs = []
     for channel in sorted(files1_by_channel.keys()):
         if channel in files2_by_channel.keys():
-            matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
+            matching_pairs.append(
+                (files1_by_channel[channel], files2_by_channel[channel])
+            )
     # print(f"in match_files_by_channel found {len(matching_pairs)} channel pairs, {limit=}")
     matching_pairs_limited = matching_pairs[:limit]
     # print(f"in match_files_by_channel found {len(matching_pairs)=} after limit of {limit=}")
     return matching_pairs_limited
 
 
-def experiment_state_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> pathlib.Path:
+def experiment_state_path_from_ljh_path(
+    ljh_path: Union[str, pathlib.Path],
+) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
-    base_name = ljh_path.name.split('_chan')[0]
+    base_name = ljh_path.name.split("_chan")[0]
     new_file_name = f"{base_name}_experiment_state.txt"
     return ljh_path.parent / new_file_name
 
 
-def external_trigger_bin_path_from_ljh_path(ljh_path: Union[str, pathlib.Path]) -> pathlib.Path:
+def external_trigger_bin_path_from_ljh_path(
+    ljh_path: Union[str, pathlib.Path],
+) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
-    base_name = ljh_path.name.split('_chan')[0]
+    base_name = ljh_path.name.split("_chan")[0]
     new_file_name = f"{base_name}_external_trigger.bin"
     return ljh_path.parent / new_file_name

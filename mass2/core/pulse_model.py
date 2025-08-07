@@ -13,16 +13,29 @@ class PulseModel:
 
     version = 2
 
-    def __init__(self, projectors_so_far, basis_so_far, n_basis, pulses_for_svd,  # noqa: PLR0917
-                 v_dv, pretrig_rms_median, pretrig_rms_sigma, file_name,
-                 extra_n_basis_5lag, f_5lag, average_pulse_for_5lag, noise_psd, noise_psd_delta_f,
-                 noise_autocorr, _from_hdf5=False):
+    def __init__(  # noqa: PLR0917
+        self,
+        projectors_so_far,
+        basis_so_far,
+        n_basis,
+        pulses_for_svd,
+        v_dv,
+        pretrig_rms_median,
+        pretrig_rms_sigma,
+        file_name,
+        extra_n_basis_5lag,
+        f_5lag,
+        average_pulse_for_5lag,
+        noise_psd,
+        noise_psd_delta_f,
+        noise_autocorr,
+        _from_hdf5=False,
+    ):
         self.pulses_for_svd = pulses_for_svd
         self.n_basis = n_basis
         dn = n_basis - extra_n_basis_5lag
         if projectors_so_far.shape[0] < dn:
-            self.projectors, self.basis = self._additional_projectors_tsvd(
-                projectors_so_far, basis_so_far, dn, pulses_for_svd)
+            self.projectors, self.basis = self._additional_projectors_tsvd(projectors_so_far, basis_so_far, dn, pulses_for_svd)
         elif (projectors_so_far.shape[0] == dn) or _from_hdf5:
             self.projectors, self.basis = projectors_so_far, basis_so_far
         else:  # don't throw error on
@@ -33,11 +46,10 @@ class PulseModel:
             filters_5lag = np.zeros((len(f_5lag) + 4, 5))
             for i in range(5):
                 if i < 4:
-                    filters_5lag[i:-4 + i, i] = projectors_so_far[2, 2:-2]
+                    filters_5lag[i : -4 + i, i] = projectors_so_far[2, 2:-2]
                 else:
                     filters_5lag[i:, i] = projectors_so_far[2, 2:-2]
-            self.projectors, self.basis = self._additional_projectors_tsvd(
-                self.projectors, self.basis, n_basis, filters_5lag)
+            self.projectors, self.basis = self._additional_projectors_tsvd(self.projectors, self.basis, n_basis, filters_5lag)
 
         self.v_dv = v_dv
         self.pretrig_rms_median = pretrig_rms_median
@@ -95,9 +107,23 @@ class PulseModel:
 
         if version != cls.version:
             raise Exception(f"loading not implemented for other versions, version={version}")
-        return cls(projectors, basis, n_basis, pulses_for_svd, v_dv, pretrig_rms_median,
-                   pretrig_rms_sigma, file_name, extra_n_basis_5lag, f_5lag, average_pulse_for_5lag,
-                   noise_psd, noise_psd_delta_f, noise_autocorr, _from_hdf5=True)
+        return cls(
+            projectors,
+            basis,
+            n_basis,
+            pulses_for_svd,
+            v_dv,
+            pretrig_rms_median,
+            pretrig_rms_sigma,
+            file_name,
+            extra_n_basis_5lag,
+            f_5lag,
+            average_pulse_for_5lag,
+            noise_psd,
+            noise_psd_delta_f,
+            noise_autocorr,
+            _from_hdf5=True,
+        )
 
     @staticmethod
     def _additional_projectors_tsvd(projectors, basis, n_basis, pulses_for_svd):

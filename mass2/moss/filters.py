@@ -6,17 +6,33 @@ import polars as pl
 import mass2 as mass
 
 
-def mass_5lag_filter(avg_signal, n_pretrigger, noise_psd, noise_autocorr_vec, dt, fmax=None, f_3db=None, peak_signal=1.0):
-    peak_signal = np.amax(avg_signal)-avg_signal[0]
-    maker = mass.FilterMaker(avg_signal, n_pretrigger, noise_psd=noise_psd,
-                             noise_autocorr=noise_autocorr_vec,
-                             sample_time_sec=dt, peak=peak_signal)
+def mass_5lag_filter(
+    avg_signal,
+    n_pretrigger,
+    noise_psd,
+    noise_autocorr_vec,
+    dt,
+    fmax=None,
+    f_3db=None,
+    peak_signal=1.0,
+):
+    peak_signal = np.amax(avg_signal) - avg_signal[0]
+    maker = mass.FilterMaker(
+        avg_signal,
+        n_pretrigger,
+        noise_psd=noise_psd,
+        noise_autocorr=noise_autocorr_vec,
+        sample_time_sec=dt,
+        peak=peak_signal,
+    )
     mass_filter = maker.compute_5lag(fmax=fmax, f_3db=f_3db)
-    return Filter(filter=mass_filter.values,
-                  v_over_dv=mass_filter.predicted_v_over_dv,
-                  dt=dt,
-                  filter_type="mass 5lag",
-                  mass_filter=mass_filter)
+    return Filter(
+        filter=mass_filter.values,
+        v_over_dv=mass_filter.predicted_v_over_dv,
+        dt=dt,
+        filter_type="mass 5lag",
+        mass_filter=mass_filter,
+    )
 
 
 @dataclass(frozen=True)
@@ -31,7 +47,9 @@ class Filter:
         if axis is None:
             plt.figure()
             axis = plt.gca()
-        axis.plot(self.frequencies(), self.filter, label="mass 5lag filter", **plotkwarg)
+        axis.plot(
+            self.frequencies(), self.filter, label="mass 5lag filter", **plotkwarg
+        )
         axis.grid()
         axis.set_title(f"{self.filter_type=} v_dv_known_wrong={self.v_over_dv:.2f}")
         axis.set_ylabel("filter value")

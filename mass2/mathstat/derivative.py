@@ -261,16 +261,21 @@ class Multiplication(BinaryOperation, Function):
         if der == 0:
             return self
 
-        return Summation(Multiplication(self.g.derivative(der=1), self.h),
-                         Multiplication(self.g, self.h.derivative(der=1))).derivative(der=der - 1)
+        return Summation(
+            Multiplication(self.g.derivative(der=1), self.h), Multiplication(self.g, self.h.derivative(der=1))
+        ).derivative(der=der - 1)
 
     def __call__(self, x, der=0):
         if der == 0:
             return self.g(x) * self.h(x)
 
-        return np.sum([self.g(x, der=n) * self.h(x, der=der - n)
-                       * math.factorial(der) / math.factorial(der - n) / math.factorial(n)
-                       for n in range(der + 1)], axis=0)
+        return np.sum(
+            [
+                self.g(x, der=n) * self.h(x, der=der - n) * math.factorial(der) / math.factorial(der - n) / math.factorial(n)
+                for n in range(der + 1)
+            ],
+            axis=0,
+        )
 
     def __repr__(self):
         if isinstance(self.g, ConstantFunction) and self.g.v == -1:

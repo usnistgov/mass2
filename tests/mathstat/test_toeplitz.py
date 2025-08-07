@@ -23,7 +23,7 @@ class TestToeplitzSolverSmallSymmetric:
     """Test ToeplitzSolver on a 5x5 symmetric matrix."""
 
     def setup_method(self):
-        self.autocorr = np.array((6., 4., 2., 1., 0.))
+        self.autocorr = np.array((6.0, 4.0, 2.0, 1.0, 0.0))
         self.n = len(self.autocorr)
         self.solver = ToeplitzSolver(self.autocorr, symmetric=True)
         self.R = linalg.toeplitz(self.autocorr)
@@ -50,10 +50,10 @@ class TestToeplitzSolverSmallAsymmetric:
     """Test ToeplitzSolver on a 5x5 non-symmetric matrix."""
 
     def setup_method(self):
-        self.autocorr = np.asarray((-1, -2, 0, 3, 6., 4., 2., 1., 0.))
+        self.autocorr = np.asarray((-1, -2, 0, 3, 6.0, 4.0, 2.0, 1.0, 0.0))
         self.n = (len(self.autocorr) + 1) // 2
         self.solver = ToeplitzSolver(self.autocorr, symmetric=False)
-        self.R = linalg.toeplitz(self.autocorr[self.n - 1:], self.autocorr[self.n - 1::-1])
+        self.R = linalg.toeplitz(self.autocorr[self.n - 1 :], self.autocorr[self.n - 1 :: -1])
 
     def test_all_unit_vectors(self):
         for i in range(self.n):
@@ -84,7 +84,7 @@ class TestToeplitzSolver_32:
         T = 1.0 * self.n
         self.autocorr = np.sin(pi * t / T) / (pi * t / T)
         self.autocorr[0] = 1
-        self.autocorr[:5] *= np.arange(5, .5, -1)
+        self.autocorr[:5] *= np.arange(5, 0.5, -1)
         self.solver = ToeplitzSolver(self.autocorr, symmetric=True)
         self.R = linalg.toeplitz(self.autocorr)
 
@@ -95,7 +95,7 @@ class TestToeplitzSolver_32:
             y = np.dot(self.R, x_in)
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
-            assert 0 == pytest.approx(big_dif, abs=1e-10), f'Unit vector trial i={i:2d} gives x_out={x_out}'
+            assert 0 == pytest.approx(big_dif, abs=1e-10), f"Unit vector trial i={i:2d} gives x_out={x_out}"
 
 
 class TestToeplitzSolver_512:
@@ -104,7 +104,7 @@ class TestToeplitzSolver_512:
     def setup_method(self):
         self.n = 512
         t = np.arange(self.n)
-        self.autocorr = 1.0 + 3.2 * np.exp(-t / 100.)
+        self.autocorr = 1.0 + 3.2 * np.exp(-t / 100.0)
         self.autocorr[0] = 9
         self.solver = ToeplitzSolver(self.autocorr, symmetric=True)
         self.R = linalg.toeplitz(self.autocorr)
@@ -116,7 +116,7 @@ class TestToeplitzSolver_512:
             y = np.dot(self.R, x_in)
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
-            assert 0 == pytest.approx(big_dif, abs=1e-10), f'Unit vector trial i={i:2d} gives x_out={x_out}'
+            assert 0 == pytest.approx(big_dif, abs=1e-10), f"Unit vector trial i={i:2d} gives x_out={x_out}"
 
     def test_arb_vectors(self):
         for _i in range(5):
@@ -124,25 +124,23 @@ class TestToeplitzSolver_512:
             y = np.dot(self.R, x_in)
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
-            assert 0 == pytest.approx(big_dif, abs=1e-10), \
-                f'Random vector trial gives rms diff={(x_out - x_in).std()}'
+            assert 0 == pytest.approx(big_dif, abs=1e-10), f"Random vector trial gives rms diff={(x_out - x_in).std()}"
 
 
 class toeplitzSpeed:
     """Test the speed of the Toeplitz solver.
 
-    This is NOT a unit test. Usage:
+        This is NOT a unit test. Usage:
 
->>> from mass2.mathstat.test import test_toeplitz
->>> t=test_toeplitz.toeplitzSpeed()
->>> t.plot()
+    >>> from mass2.mathstat.test import test_toeplitz
+    >>> t=test_toeplitz.toeplitzSpeed()
+    >>> t.plot()
     """
 
     def __init__(self, maxsize=8192):
-        self.sizes = np.hstack((100, 200, np.arange(500, 5500, 500), 6144, 8192, 10000,
-                                20000, 30000, 50000))
+        self.sizes = np.hstack((100, 200, np.arange(500, 5500, 500), 6144, 8192, 10000, 20000, 30000, 50000))
         t = np.arange(100000)
-        self.autocorr = 1.0 + 3.2 * np.exp(-t / 100.)
+        self.autocorr = 1.0 + 3.2 * np.exp(-t / 100.0)
         self.autocorr[0] = 9
 
         self.ts_time = np.zeros(len(self.sizes), dtype=float)
@@ -152,8 +150,7 @@ class toeplitzSpeed:
         self.lu_time = np.zeros_like(self.ts_time)
         for i, s in enumerate(self.sizes):
             times = self.test(s, maxsize)
-            (self.ts_time[i], self.build_time[i], self.mult_time[i],
-             self.solve_time[i], self.lu_time[i]) = times
+            (self.ts_time[i], self.build_time[i], self.mult_time[i], self.solve_time[i], self.lu_time[i]) = times
 
     def test(self, size, maxsize=8192):
         if size > 150000:
@@ -187,22 +184,22 @@ class toeplitzSpeed:
             lu_piv = linalg.lu_factor(R)
             x3 = linalg.lu_solve(lu_piv, v, overwrite_b=False)
             dt.append(time.time() - t0)
-            print(f'rms rhs diff: {(v - v2).std():.3g}, solution diff: {(x - x2).std():.3g} {(x - x3).std():.3g}')
+            print(f"rms rhs diff: {(v - v2).std():.3g}, solution diff: {(x - x2).std():.3g} {(x - x3).std():.3g}")
 
         else:
             dt.extend(4 * [np.nan])
-        print(size, [f'{t:6.3f}' for t in dt])
+        print(size, [f"{t:6.3f}" for t in dt])
         return dt
 
     def plot(self):
         plt.clf()
-        plt.plot(self.sizes, self.ts_time, label='Toeplitz solver')
-        plt.plot(self.sizes, self.build_time, label='Matrix build')
-        plt.plot(self.sizes, self.mult_time, label='Matrix-vector mult')
-        plt.plot(self.sizes, self.solve_time, label='Matrix solve')
-        plt.plot(self.sizes, self.lu_time, label='LU solve')
-        plt.legend(loc='upper left')
-        plt.xlabel('Vector size')
-        plt.ylabel('Time (sec)')
+        plt.plot(self.sizes, self.ts_time, label="Toeplitz solver")
+        plt.plot(self.sizes, self.build_time, label="Matrix build")
+        plt.plot(self.sizes, self.mult_time, label="Matrix-vector mult")
+        plt.plot(self.sizes, self.solve_time, label="Matrix solve")
+        plt.plot(self.sizes, self.lu_time, label="LU solve")
+        plt.legend(loc="upper left")
+        plt.xlabel("Vector size")
+        plt.ylabel("Time (sec)")
         plt.grid()
         plt.loglog()

@@ -3,14 +3,14 @@ Highly Charged Ion (HCI) Lines from NIST ASD
 
 Motivation
 ----------
-We often find ourselves hard coding line center positions into mass, 
+We often find ourselves hard coding line center positions into mass,
 which is prone to errors and can be tedious when there are many lines of interest to insert.
 In addition, the line positions would need to be manually updated for any changes in established results.
 In the case of highly charged ions, such as those produced in an electron beam ion trap (EBIT),
 there is a vast number of potential lines coming from almost any charge state of almost any element.
-Luckily, these lines are well documented through the NIST Atomic Spectral Database (ASD). 
+Luckily, these lines are well documented through the NIST Atomic Spectral Database (ASD).
 Here, we have parsed a NIST ASD SQL dump and converted it into an easily Python readable pickle file.
-The ``hci_lines.py`` module implements the ``NIST_ASD`` class, 
+The ``hci_lines.py`` module implements the ``NIST_ASD`` class,
 which loads that pickle file and contains useful functions for working with the ASD data.
 It also automatically adds in some of the more common HCI lines that we commonly use in our EBIT data analyses.
 
@@ -23,7 +23,7 @@ A custom pickle file can be used by passing in the ``pickleFilename`` argument d
 The methods of the ``NIST_ASD`` class are described below:
 
 .. autoclass:: mass.calibration.hci_lines.NIST_ASD
-  :members: 
+  :members:
 
 Usage examples
 --------------
@@ -63,10 +63,10 @@ a commonly injected gas at the NIST EBIT.
 Functions for generating ``SpectralLine`` objects from ASD data
 ---------------------------------------------------------------
 The module also contains some functions outside of the ``NIST_ASD`` class that are useful for integration with MASS.
-First, the ``add_hci_line`` function which, takes arguments that are relevant in HCI work, including as 
+First, the ``add_hci_line`` function which, takes arguments that are relevant in HCI work, including as
 ``element``, ``spectr_ch``, ``energies``, ``widths``, and ``ratios``.
-The function calls ``mass.calibration.fluorescence_lines.addline``, generates a line name with the given parameters, 
-and populates the various fields. 
+The function calls ``mass.calibration.fluorescence_lines.addline``, generates a line name with the given parameters,
+and populates the various fields.
 As an example, let us create a H-like Be line. Here, we assume a lorentzian width of 0.1 eV.
 
 .. testcode::
@@ -77,9 +77,9 @@ As an example, let us create a H-like Be line. Here, we assume a lorentzian widt
   test_term = '2P*'
   test_JVal = '3/2'
   test_level = f'{test_conf} {test_term} J={test_JVal}'
-  test_energy = test_asd.getSingleLevel(element=test_element, spectralCharge=test_charge, 
+  test_energy = test_asd.getSingleLevel(element=test_element, spectralCharge=test_charge,
   conf=test_conf, term=test_term, JVal=test_JVal, getUncertainty=False)
-  test_line = mass.calibration.hci_lines.add_hci_line(element=test_element, spectr_ch=test_charge, 
+  test_line = mass.calibration.hci_lines.add_hci_line(element=test_element, spectr_ch=test_charge,
   line_identifier=test_level, energies=[test_energy], widths=[0.1], ratios=[1.0])
   assert test_line.peak_energy == test_energy
 
@@ -105,14 +105,14 @@ Below, we show what this line looks like assuming a zero-width Gaussian componen
   plt.savefig("img/Be4_line_example.png");plt.close()
 
 .. image:: img/Be4_line_example.png
-  :width: 40%  
+  :width: 40%
 
-The module contains two other functions which are used to easily generate some lines from levels that are commonly observed at the NIST EBIT. 
+The module contains two other functions which are used to easily generate some lines from levels that are commonly observed at the NIST EBIT.
 These functions are ``add_H_like_lines_from_asd`` and ``add_He_like_lines_from_asd``.
 As the names imply, these functions add H- and He-like lines to mass using the data in the ASD pickle.
 These functions require the ``asd`` and ``element`` arguments and also contain the optional maxLevels argument,
 which works similarly as the argument in the class methods.
-The module also automatically adds H- and He-like lines for the most commonly used elements, 
+The module also automatically adds H- and He-like lines for the most commonly used elements,
 which includes 'N', 'O', 'Ne', and 'Ar'.
 Below, we check that common elements are being added as spectralLine objects
 and then add some of the lower order H- and He-like Ga lines.

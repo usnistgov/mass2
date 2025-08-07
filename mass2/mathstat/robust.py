@@ -64,14 +64,16 @@ def bisquare_weighted_mean(x, k, center=None, tol=None):
         tol = 1e-5 * median_abs_dev(x, normalize=True)
 
     for _iteration in range(100):
-        weights = (1 - ((x - center) / k)**2.0)**2.0
+        weights = (1 - ((x - center) / k) ** 2.0) ** 2.0
         weights[np.abs(x - center) > k] = 0.0
         newcenter = (weights * x).sum() / weights.sum()
         if abs(newcenter - center) < tol:
             return newcenter
         center = newcenter
-    raise RuntimeError("bisquare_weighted_mean used too many iterations.\n" +
-                       "Consider using higher <tol> or better <center>, or change to trimean(x).")
+    raise RuntimeError(
+        "bisquare_weighted_mean used too many iterations.\n"
+        + "Consider using higher <tol> or better <center>, or change to trimean(x)."
+    )
 
 
 def huber_weighted_mean(x, k, center=None, tol=None):
@@ -108,8 +110,9 @@ def huber_weighted_mean(x, k, center=None, tol=None):
         if abs(newcenter - center) < tol:
             return newcenter
         center = newcenter
-    raise RuntimeError("huber_weighted_mean used too many iterations.\n" +
-                       "Consider using higher <tol> or better <center>, or change to trimean(x).")
+    raise RuntimeError(
+        "huber_weighted_mean used too many iterations.\n" + "Consider using higher <tol> or better <center>, or change to trimean(x)."
+    )
 
 
 def trimean(x):
@@ -173,9 +176,9 @@ def shorth_range(x, normalize=False, sort_inplace=False, location=False):
     just how useless they are.
     """
 
-    n = len(x)                  # Number of data values
+    n = len(x)  # Number of data values
     nhalves = int((n + 1) / 2)  # Number of minimal intervals containing at least half the data
-    nobs = 1 + int(n / 2)       # Number of data values in each minimal interval
+    nobs = 1 + int(n / 2)  # Number of data values in each minimal interval
 
     if not sort_inplace:
         x = np.array(x)
@@ -183,7 +186,7 @@ def shorth_range(x, normalize=False, sort_inplace=False, location=False):
         raise ValueError("sort_inplace cannot be True unless the data set x is a np.ndarray.")
     x.sort()
 
-    range_each_half = x[n - nhalves:n] - x[0:nhalves]
+    range_each_half = x[n - nhalves : n] - x[0:nhalves]
     idxa = range_each_half.argmin()
     a, b = x[idxa], x[idxa + nobs - 1]
     shorth_range = b - a
@@ -207,7 +210,7 @@ def shorth_range(x, normalize=False, sort_inplace=False, location=False):
             shorth_range *= (n + 1.0) / (n - 1.0)
 
     if location:
-        return shorth_range, x[idxa:idxa + nobs].mean(), 0.5 * (a + b)
+        return shorth_range, x[idxa : idxa + nobs].mean(), 0.5 * (a + b)
     return shorth_range
 
 

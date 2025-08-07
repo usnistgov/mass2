@@ -1,16 +1,16 @@
-'''
+"""
 toeplitz - General-purpose solver of Toeplitz matrices
 
 Created on Nov 7, 2011
 
 @author: fowlerj
-'''
+"""
 
 import numpy as np
 import numpy.typing as npt
 
 
-__all__ = ['ToeplitzSolver']
+__all__ = ["ToeplitzSolver"]
 
 
 class ToeplitzSolver:
@@ -96,7 +96,7 @@ class ToeplitzSolver:
         y[0] = np.dot(self.T, x)
         for i in range(1, N):
             y[i] = np.dot(self.T[:-i], x[i:])
-            y[i] += np.dot(self.T[1:1 + i], x[i - 1::-1])
+            y[i] += np.dot(self.T[1 : 1 + i], x[i - 1 :: -1])
         return y
 
     def __call__(self, y: npt.ArrayLike) -> np.ndarray:
@@ -123,21 +123,21 @@ class ToeplitzSolver:
 
         for K in range(1, n):  # i = m+1
             # Steps b, c, and d (exit test)
-            xh_denom[K] = (self.T[n:K + n] * g[:K]).sum() - T0
-            x[K] = ((self.T[K + n - 1:n - 1:-1] * x[:K]).sum() - y[K]) / xh_denom[K]
-            x[:K] -= x[K] * g[K - 1::-1]
+            xh_denom[K] = (self.T[n : K + n] * g[:K]).sum() - T0
+            x[K] = ((self.T[K + n - 1 : n - 1 : -1] * x[:K]).sum() - y[K]) / xh_denom[K]
+            x[:K] -= x[K] * g[K - 1 :: -1]
             if K == n - 1:
                 return x
 
             # Step e
-            g_denom = (self.T[n - K - 1:n - 1] * h[K - 1::-1]).sum() - T0
-            h[K] = ((self.T[n + K - 1:n - 1:-1] * h[:K]).sum() - self.T[K + n]) / xh_denom[K]
-            g[K] = ((self.T[n - K - 1:n - 1] * g[:K]).sum() - self.T[n - K - 2]) / g_denom
+            g_denom = (self.T[n - K - 1 : n - 1] * h[K - 1 :: -1]).sum() - T0
+            h[K] = ((self.T[n + K - 1 : n - 1 : -1] * h[:K]).sum() - self.T[K + n]) / xh_denom[K]
+            g[K] = ((self.T[n - K - 1 : n - 1] * g[:K]).sum() - self.T[n - K - 2]) / g_denom
 
             # Step f (careful not to clobber the prev iteration of g)
             gsave = g[:K].copy()
-            g[:K] -= g[K] * h[K - 1::-1]
-            h[:K] -= h[K] * gsave[K - 1::-1]
+            g[:K] -= g[K] * h[K - 1 :: -1]
+            h[:K] -= h[K] * gsave[K - 1 :: -1]
         raise ValueError("unreachable")
 
     def __precompute_symmetric(self):
@@ -156,12 +156,12 @@ class ToeplitzSolver:
         g[0] = self.T[1] / T0
 
         for K in range(1, n):  # K = M+1
-            self.xg_denom[K] = (self.T[1:K + 1] * g[:K]).sum() - T0
+            self.xg_denom[K] = (self.T[1 : K + 1] * g[:K]).sum() - T0
             if K == n - 1:
                 return
             g[K] = ((self.T[K:0:-1] * g[:K]).sum() - self.T[K + 1]) / self.xg_denom[K]
             self.gK_leading[K] = g[K]
-            g[:K] -= g[K] * g[K - 1::-1]
+            g[:K] -= g[K] * g[K - 1 :: -1]
         raise ValueError("unreachable")
 
     def __solve_symmetric(self, y: npt.ArrayLike) -> np.ndarray:
@@ -188,11 +188,11 @@ class ToeplitzSolver:
         for K in range(1, n):  # K = M+1
             # Steps b, c, and d (the exit test)
             x[K] = ((T[K:0:-1] * x[:K]).sum() - y[K]) / self.xg_denom[K]
-            x[:K] -= x[K] * g[K - 1::-1]
+            x[:K] -= x[K] * g[K - 1 :: -1]
             if K == n - 1:
                 return x
 
             # Steps e and f
             g[K] = self.gK_leading[K]
-            g[:K] -= g[K] * g[K - 1::-1]
+            g[:K] -= g[K] * g[K - 1 :: -1]
         raise ValueError("unreachable")

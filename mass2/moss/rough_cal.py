@@ -33,10 +33,7 @@ def rank_3peak_assignments(
 
     # 1st assignments ####
     # e0 and ph0 are the first assignment
-    df0 = (
-        dfe.join(dfph, how="cross")
-        .with_columns(gain0=pl.col("ph0") / pl.col("e0"))
-    )
+    df0 = dfe.join(dfph, how="cross").with_columns(gain0=pl.col("ph0") / pl.col("e0"))
     # 2nd assignments ####
     # e1 and ph1 are the 2nd assignment
     df1 = (
@@ -94,23 +91,27 @@ class BestAssignmentPfitGainResult:
     assignment_inds: np.ndarray
     pfit_gain: np.polynomial.Polynomial
     energy_target: np.ndarray
-    names_target: list[str]  # list of strings with names for the energies in energy_target
+    names_target: list[
+        str
+    ]  # list of strings with names for the energies in energy_target
     ph_target: np.ndarray  # longer than energy target by 0-3
 
     def ph_unassigned(self) -> ndarray:
-        return np.array(list(set(self.ph_target)-set(self.ph_assigned)))
+        return np.array(list(set(self.ph_target) - set(self.ph_assigned)))
 
     def plot(self, ax: Optional[Axes] = None):
         if ax is None:
             plt.figure()
             ax = plt.gca()
-        gain = self.ph_assigned/self.energy_target
-        ax.plot(self.ph_assigned, self.ph_assigned/self.energy_target, "o")
-        ph_large_range = np.linspace(0, self.ph_assigned[-1]*1.1, 51)
+        gain = self.ph_assigned / self.energy_target
+        ax.plot(self.ph_assigned, self.ph_assigned / self.energy_target, "o")
+        ph_large_range = np.linspace(0, self.ph_assigned[-1] * 1.1, 51)
         ax.plot(ph_large_range, self.pfit_gain(ph_large_range))
         ax.set_xlabel("pulse_height")
         ax.set_ylabel("gain")
-        ax.set_title(f"BestAssignmentPfitGainResult rms_residual={self.rms_residual:.2f} eV")
+        ax.set_title(
+            f"BestAssignmentPfitGainResult rms_residual={self.rms_residual:.2f} eV"
+        )
         assert len(self.names_target) == len(self.ph_assigned)
         for name, x, y in zip(self.names_target, self.ph_assigned, gain):
             ax.annotate(str(name), (x, y))
@@ -122,7 +123,7 @@ class BestAssignmentPfitGainResult:
         return self.pfit_gain.roots()[1]
 
     def ph2energy(self, ph: Union[ndarray, float]) -> Union[float64, ndarray]:
-        return ph/self.pfit_gain(ph)
+        return ph / self.pfit_gain(ph)
 
     def energy2ph(self, energy):
         if self.pfit_gain.degree() == 2:
@@ -142,9 +143,9 @@ class BestAssignmentPfitGainResult:
         # and given that we've selected for well formed calibrations,
         # we know which root we want
         cba = self.pfit_gain.convert().coef
-        c, bb, a = cba*energy
-        b = bb-1
-        ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
+        c, bb, a = cba * energy
+        b = bb - 1
+        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
         return ph
 
     def _energy2ph_deg1(self, energy):
@@ -156,7 +157,7 @@ class BestAssignmentPfitGainResult:
         # we know which root we want
         b, a = self.pfit_gain.convert().coef
         y = energy
-        ph = y*b/(1-y*a)
+        ph = y * b / (1 - y * a)
         return ph
 
     def _energy2ph_deg0(self, energy):
@@ -164,9 +165,9 @@ class BestAssignmentPfitGainResult:
         # y = x/(a)
         # so
         # x = y*a
-        a, = self.pfit_gain.convert().coef
+        (a,) = self.pfit_gain.convert().coef
         y = energy
-        ph = y*a
+        ph = y * a
         return ph
 
     def predicted_energies(self):
@@ -198,18 +199,25 @@ class SmoothedLocalMaximaResult:
         return self.smoothed_counts[self.local_maxima_inds]
 
     def prominence(self) -> ndarray:
-        assert len(self.local_minima_inds) == len(self.local_maxima_inds)+1, "peakfind_local_maxima_of_smoothed_hist must ensure this "
+        assert len(self.local_minima_inds) == len(self.local_maxima_inds) + 1, (
+            "peakfind_local_maxima_of_smoothed_hist must ensure this "
+        )
         prominence = np.zeros_like(self.local_maxima_inds, dtype=float64)
         for i in range(len(self.local_maxima_inds)):
             sc_max = self.smoothed_counts[self.local_maxima_inds[i]]
             sc_min_before = self.smoothed_counts[self.local_minima_inds[i]]
-            sc_min_after = self.smoothed_counts[self.local_minima_inds[i+1]]
-            prominence[i] = (2*sc_max - sc_min_before - sc_min_after)/2
+            sc_min_after = self.smoothed_counts[self.local_minima_inds[i + 1]]
+            prominence[i] = (2 * sc_max - sc_min_before - sc_min_after) / 2
         assert np.all(prominence >= 0), "prominence should be non-negative"
         return prominence
 
-    def plot(self, assignment_result: Optional[BestAssignmentPfitGainResult] = None, n_highlight: int = 10,
-             plot_counts: bool = False, ax: Optional[Axes] = None) -> Axes:
+    def plot(
+        self,
+        assignment_result: Optional[BestAssignmentPfitGainResult] = None,
+        n_highlight: int = 10,
+        plot_counts: bool = False,
+        ax: Optional[Axes] = None,
+    ) -> Axes:
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -218,29 +226,55 @@ class SmoothedLocalMaximaResult:
         if plot_counts:
             ax.plot(self.bin_centers, self.counts, label="counts")
         ax.plot(self.bin_centers, self.smoothed_counts, label="smoothed_counts")
-        ax.plot(self.bin_centers[self.local_maxima_inds],
-                self.smoothed_counts[self.local_maxima_inds], ".",
-                label="peaks")
+        ax.plot(
+            self.bin_centers[self.local_maxima_inds],
+            self.smoothed_counts[self.local_maxima_inds],
+            ".",
+            label="peaks",
+        )
         if assignment_result is not None:
-            inds_assigned = np.searchsorted(self.bin_centers, assignment_result.ph_assigned)
-            inds_unassigned = np.searchsorted(self.bin_centers, assignment_result.ph_unassigned())
+            inds_assigned = np.searchsorted(
+                self.bin_centers, assignment_result.ph_assigned
+            )
+            inds_unassigned = np.searchsorted(
+                self.bin_centers, assignment_result.ph_unassigned()
+            )
             bin_centers_assigned = self.bin_centers[inds_assigned]
             bin_centers_unassigned = self.bin_centers[inds_unassigned]
             smoothed_counts_assigned = self.smoothed_counts[inds_assigned]
             smoothed_counts_unassigned = self.smoothed_counts[inds_unassigned]
-            ax.plot(bin_centers_assigned, smoothed_counts_assigned, "o", label="assigned")
-            ax.plot(bin_centers_unassigned, smoothed_counts_unassigned, "o", label="unassigned")
-            for name, x, y in zip(assignment_result.names_target, bin_centers_assigned, smoothed_counts_assigned):
+            ax.plot(
+                bin_centers_assigned, smoothed_counts_assigned, "o", label="assigned"
+            )
+            ax.plot(
+                bin_centers_unassigned,
+                smoothed_counts_unassigned,
+                "o",
+                label="unassigned",
+            )
+            for name, x, y in zip(
+                assignment_result.names_target,
+                bin_centers_assigned,
+                smoothed_counts_assigned,
+            ):
                 ax.annotate(str(name), (x, y), rotation=30)
-            ax.set_title(f"SmoothedLocalMaximaResult rms_residual={assignment_result.rms_residual:.2f} eV")
+            ax.set_title(
+                f"SmoothedLocalMaximaResult rms_residual={assignment_result.rms_residual:.2f} eV"
+            )
 
         else:
-            ax.plot(self.bin_centers[inds_prominence],
-                    self.smoothed_counts[inds_prominence], "o",
-                    label=f"{n_highlight} most prominent")
-            ax.plot(self.bin_centers[inds_peak_height],
-                    self.smoothed_counts[inds_peak_height], "v",
-                    label=f"{n_highlight} highest")
+            ax.plot(
+                self.bin_centers[inds_prominence],
+                self.smoothed_counts[inds_prominence],
+                "o",
+                label=f"{n_highlight} most prominent",
+            )
+            ax.plot(
+                self.bin_centers[inds_peak_height],
+                self.smoothed_counts[inds_peak_height],
+                "v",
+                label=f"{n_highlight} highest",
+            )
             ax.set_title("SmoothedLocalMaximaResult")
 
         ax.legend()
@@ -252,22 +286,31 @@ class SmoothedLocalMaximaResult:
         return ax
 
 
-def smooth_hist_with_gauassian_by_fft(hist: ndarray, fwhm_in_bin_number_units: float64) -> ndarray:
-    kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
+def smooth_hist_with_gauassian_by_fft(
+    hist: ndarray, fwhm_in_bin_number_units: float64
+) -> ndarray:
+    kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(
+        len(hist), fwhm_in_bin_number_units
+    )
     y = np.fft.irfft(np.fft.rfft(hist) * kernel)
     return y
 
 
-def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_number_units: float64) -> ndarray:
+def smooth_hist_with_gauassian_by_fft_compute_kernel(
+    nbins: int, fwhm_in_bin_number_units: float64
+) -> ndarray:
     sigma = fwhm_in_bin_number_units / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
     tx = np.fft.rfftfreq(nbins)
-    kernel = np.exp(-tx**2 / 2 / tbw**2)
+    kernel = np.exp(-(tx**2) / 2 / tbw**2)
     return kernel
 
 
-def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int,
-                  bin_edges: Optional[ndarray] = None) -> Tuple[ndarray, ndarray, ndarray]:
+def hist_smoothed(
+    pulse_heights: ndarray,
+    fwhm_pulse_height_units: int,
+    bin_edges: Optional[ndarray] = None,
+) -> Tuple[ndarray, ndarray, ndarray]:
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
@@ -280,8 +323,10 @@ def hist_smoothed(pulse_heights: ndarray, fwhm_pulse_height_units: int,
 
     _, step_size = moss.misc.midpoints_and_step_size(bin_edges)
     counts, _ = np.histogram(pulse_heights, bin_edges)
-    fwhm_in_bin_number_units = fwhm_pulse_height_units/step_size
-    smoothed_counts = smooth_hist_with_gauassian_by_fft(counts, fwhm_in_bin_number_units)
+    fwhm_in_bin_number_units = fwhm_pulse_height_units / step_size
+    smoothed_counts = smooth_hist_with_gauassian_by_fft(
+        counts, fwhm_in_bin_number_units
+    )
     return smoothed_counts, bin_edges, counts
 
 
@@ -289,21 +334,26 @@ def local_maxima(y: ndarray) -> ndarray:
     local_maxima_inds = []
     local_minima_inds = []
     increasing = False
-    for i in range(len(y)-1):
-        if increasing and (y[i+1] < y[i]):
+    for i in range(len(y) - 1):
+        if increasing and (y[i + 1] < y[i]):
             local_maxima_inds.append(i)
             increasing = False
-        if not increasing and (y[i+1] > y[i]):
+        if not increasing and (y[i + 1] > y[i]):
             local_minima_inds.append(i)
             increasing = True
     # increasing starts false, so we always start with a miniumum
     return np.array(local_maxima_inds), np.array(local_minima_inds)
 
 
-def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_height_units: int,
-                                           bin_edges: Optional[ndarray] = None) -> SmoothedLocalMaximaResult:
+def peakfind_local_maxima_of_smoothed_hist(
+    pulse_heights: ndarray,
+    fwhm_pulse_height_units: int,
+    bin_edges: Optional[ndarray] = None,
+) -> SmoothedLocalMaximaResult:
     assert len(pulse_heights > 10), "not enough pulses"
-    smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
+    smoothed_counts, bin_edges, counts = hist_smoothed(
+        pulse_heights, fwhm_pulse_height_units, bin_edges
+    )
     bin_centers, _step_size = moss.misc.midpoints_and_step_size(bin_edges)
     local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
     # require a minimum before and after a maximum (the first check is redundant with behavior of local_maxima)
@@ -311,9 +361,14 @@ def peakfind_local_maxima_of_smoothed_hist(pulse_heights: ndarray, fwhm_pulse_he
         local_maxima_inds = local_maxima_inds[1:]
     if local_maxima_inds[-1] > local_minima_inds[-1]:
         local_maxima_inds = local_maxima_inds[:-1]
-    return SmoothedLocalMaximaResult(fwhm_pulse_height_units, bin_centers,
-                                     counts, smoothed_counts, local_maxima_inds,
-                                     local_minima_inds)
+    return SmoothedLocalMaximaResult(
+        fwhm_pulse_height_units,
+        bin_centers,
+        counts,
+        smoothed_counts,
+        local_maxima_inds,
+        local_minima_inds,
+    )
 
 
 def find_local_maxima(pulse_heights, gaussian_fwhm):
@@ -335,7 +390,7 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     hi = np.max(pulse_heights) + 3 * gaussian_fwhm
     hist, bins = np.histogram(pulse_heights, np.linspace(lo, hi, n + 1))
     tx = np.fft.rfftfreq(n, (lo - hi) / n)
-    ty = np.exp(-tx**2 / 2 / tbw**2)
+    ty = np.exp(-(tx**2) / 2 / tbw**2)
     x = (bins[1:] + bins[:-1]) / 2
     y = np.fft.irfft(np.fft.rfft(hist) * ty)
 
@@ -364,10 +419,10 @@ def rank_assignments(ph, e):
     x1 = pha[:, 2:]
     y0 = e[:-2]
     y1 = e[2:]
-    x_m_x0_over_x1_m_x0 = (x-x0)/(x1-x0)
-    y = y0+(y1-y0)*x_m_x0_over_x1_m_x0
+    x_m_x0_over_x1_m_x0 = (x - x0) / (x1 - x0)
+    y = y0 + (y1 - y0) * x_m_x0_over_x1_m_x0
     y_expected = e[1:-1]
-    rms_e_residual = moss.misc.root_mean_squared(y-y_expected, axis=1)
+    rms_e_residual = moss.misc.root_mean_squared(y - y_expected, axis=1)
     # prefer negative slopes for gain
     # gain_first = ph[0]/e[0]
     # gain_last = ph[-1]/e[-1]
@@ -382,7 +437,7 @@ def find_optimal_assignment(ph, e):
     # when given 3 or less energies to match, use the largest peaks in peak order
     assert len(e) >= 1
     if len(e) <= 2:
-        return 0, np.array(sorted(ph[:len(e)]))
+        return 0, np.array(sorted(ph[: len(e)]))
 
     rms_e_residual, pha, _pha_inds = rank_assignments(ph, e)
     ind = np.argmin(rms_e_residual)
@@ -397,7 +452,7 @@ def find_optimal_assignment_height_info(ph, e, line_heights_allowed):
     # when given 3 or less energies to match, use the largest peaks in peak order
     assert len(e) >= 1
     if len(e) <= 2:
-        return 0, np.array(sorted(ph[:len(e)]))
+        return 0, np.array(sorted(ph[: len(e)]))
 
     rms_e_residual, pha, pha_inds = rank_assignments(ph, e)
     best_ind = None
@@ -433,14 +488,12 @@ def find_optimal_assignment_height_info(ph, e, line_heights_allowed):
 
 def find_optimal_assignment2(ph, e, line_names):
     rms_e_residual, pha = find_optimal_assignment(ph, e)
-    gain = pha/e
-    deg = min(len(e)-1, 2)
+    gain = pha / e
+    deg = min(len(e) - 1, 2)
     if deg == 0:
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
-        pfit_gain = np.polynomial.Polynomial.fit(pha,
-                                                 gain,
-                                                 deg=min(len(e)-1, 2))
+        pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
@@ -455,15 +508,15 @@ def find_optimal_assignment2(ph, e, line_names):
 
 
 def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed):
-    rms_e_residual, pha = find_optimal_assignment_height_info(ph, e, line_heights_allowed)
-    gain = pha/e
-    deg = min(len(e)-1, 2)
+    rms_e_residual, pha = find_optimal_assignment_height_info(
+        ph, e, line_heights_allowed
+    )
+    gain = pha / e
+    deg = min(len(e) - 1, 2)
     if deg == 0:
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
-        pfit_gain = np.polynomial.Polynomial.fit(pha,
-                                                 gain,
-                                                 deg=min(len(e)-1, 2))
+        pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
     result = moss.rough_cal.BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
@@ -477,27 +530,46 @@ def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed
     return result
 
 
-def find_pfit_gain_residual(ph: ndarray, e: Tuple[float, float, float, float, float, float]) -> Tuple[ndarray, Polynomial]:
+def find_pfit_gain_residual(
+    ph: ndarray, e: Tuple[float, float, float, float, float, float]
+) -> Tuple[ndarray, Polynomial]:
     assert len(ph) == len(e)
-    gain = ph/e
+    gain = ph / e
     pfit_gain = np.polynomial.Polynomial.fit(ph, gain, deg=2)
 
     def ph2energy(ph):
-        return ph/pfit_gain(ph)
+        return ph / pfit_gain(ph)
+
     predicted_e = ph2energy(ph)
-    residual_e = e-predicted_e
+    residual_e = e - predicted_e
     return residual_e, pfit_gain
 
 
-def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, names: list[str]) -> BestAssignmentPfitGainResult:
-    best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit = \
-        find_best_residual_among_all_possible_assignments(ph, e)
-    return BestAssignmentPfitGainResult(float(best_rms_residual), best_ph_assigned, best_residual_e,
-                                        best_assignment_inds, best_pfit, e, names, ph)
+def find_best_residual_among_all_possible_assignments2(
+    ph: ndarray, e: ndarray, names: list[str]
+) -> BestAssignmentPfitGainResult:
+    (
+        best_rms_residual,
+        best_ph_assigned,
+        best_residual_e,
+        best_assignment_inds,
+        best_pfit,
+    ) = find_best_residual_among_all_possible_assignments(ph, e)
+    return BestAssignmentPfitGainResult(
+        float(best_rms_residual),
+        best_ph_assigned,
+        best_residual_e,
+        best_assignment_inds,
+        best_pfit,
+        e,
+        names,
+        ph,
+    )
 
 
-def find_best_residual_among_all_possible_assignments(ph: ndarray, e: Tuple[float, float, float, float, float, float]
-                                                      ) -> Tuple[float64, ndarray, ndarray, ndarray, Polynomial]:
+def find_best_residual_among_all_possible_assignments(
+    ph: ndarray, e: Tuple[float, float, float, float, float, float]
+) -> Tuple[float64, ndarray, ndarray, ndarray, Polynomial]:
     assert len(ph) >= len(e)
     ph = np.sort(ph)
     assignments_inds = itertools.combinations(np.arange(len(ph)), len(e))
@@ -516,25 +588,45 @@ def find_best_residual_among_all_possible_assignments(ph: ndarray, e: Tuple[floa
             best_residual_e = residual_e
             best_assignment_inds = assignment_inds
             best_pfit = pfit_gain
-    return best_rms_residual, best_ph_assigned, best_residual_e, best_assignment_inds, best_pfit
+    return (
+        best_rms_residual,
+        best_ph_assigned,
+        best_residual_e,
+        best_assignment_inds,
+        best_pfit,
+    )
 
 
-def drift_correct_entropy(slope: float64, indicator_zero_mean: ndarray, uncorrected: ndarray,
-                          bin_edges: ndarray, fwhm_in_bin_number_units: int) -> float64:
+def drift_correct_entropy(
+    slope: float64,
+    indicator_zero_mean: ndarray,
+    uncorrected: ndarray,
+    bin_edges: ndarray,
+    fwhm_in_bin_number_units: int,
+) -> float64:
     corrected = uncorrected * (1 + indicator_zero_mean * slope)
-    smoothed_counts, bin_edges, _counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
+    smoothed_counts, bin_edges, _counts = hist_smoothed(
+        corrected, fwhm_in_bin_number_units, bin_edges
+    )
     w = smoothed_counts > 0
     return -(np.log(smoothed_counts[w]) * smoothed_counts[w]).sum()
 
 
-def minimize_entropy_linear(indicator: ndarray, uncorrected: ndarray, bin_edges: ndarray,
-                            fwhm_in_bin_number_units: int) -> Tuple[OptimizeResult, float32]:
+def minimize_entropy_linear(
+    indicator: ndarray,
+    uncorrected: ndarray,
+    bin_edges: ndarray,
+    fwhm_in_bin_number_units: int,
+) -> Tuple[OptimizeResult, float32]:
     import scipy.optimize
+
     indicator_mean = np.mean(indicator)
-    indicator_zero_mean = indicator-indicator_mean
+    indicator_zero_mean = indicator - indicator_mean
 
     def entropy_fun(slope):
-        return drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units)
+        return drift_correct_entropy(
+            slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units
+        )
 
     result = scipy.optimize.minimize_scalar(entropy_fun, bracket=[0, 0.1])
     return result, indicator_mean
@@ -572,9 +664,9 @@ def eval_3peak_assignment_pfit_gain(
         # y*c + (y*b-1)*x + a*x^2 = 0
         # and given that we've selected for well formed calibrations,
         # we know which root we want
-        c, bb, a = cba*energy
-        b = bb-1
-        ph = (-b-np.sqrt(b**2-4*a*c))/(2*a)
+        c, bb, a = cba * energy
+        b = bb - 1
+        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
         return ph
 
     predicted_ph = predicted_ph = [energy2ph(_e) for _e in line_energies]
@@ -638,14 +730,18 @@ class RoughCalibrationStep(moss.CalStep):
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
 
-    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
-        series = moss.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
+    def dbg_plot_old(
+        self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}
+    ):
+        series = moss.good_series(
+            df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr
+        )
         axis = moss.misc.plot_hist_of_series(series, bin_edges)
         axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
         for line_name, energy in zip(self.line_names, self.line_energies):
             axis.annotate(line_name, (energy, 0), rotation=90)
         np.set_printoptions(precision=2)
-        energy_residuals = self.predicted_energies-self.line_energies
+        energy_residuals = self.predicted_energies - self.line_energies
         axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
         return axis
 
@@ -672,18 +768,25 @@ class RoughCalibrationStep(moss.CalStep):
         return self.assignment_result.energy2ph(energy)
 
     @classmethod
-    def learn_combinatoric(cls, ch: Channel, line_names: List[str], uncalibrated_col: str, calibrated_col: str,
-                           ph_smoothing_fwhm: int, n_extra: int,
-                           use_expr: bool = True
-                           ) -> "RoughCalibrationStep":
-
+    def learn_combinatoric(
+        cls,
+        ch: Channel,
+        line_names: List[str],
+        uncalibrated_col: str,
+        calibrated_col: str,
+        ph_smoothing_fwhm: int,
+        n_extra: int,
+        use_expr: bool = True,
+    ) -> "RoughCalibrationStep":
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated,
-                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+            uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm
+        )
         assignment_result = moss.rough_cal.find_optimal_assignment2(
-            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names)
+            pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names
+        )
 
         step = cls(
             [uncalibrated_col],
@@ -693,23 +796,34 @@ class RoughCalibrationStep(moss.CalStep):
             pfresult=pfresult,
             assignment_result=assignment_result,
             ph2energy=assignment_result.ph2energy,
-            success=True)
+            success=True,
+        )
         return step
 
     @classmethod
-    def learn_combinatoric_height_info(cls, ch: Channel, line_names: List[str], line_heights_allowed: List[List[int]],
-                                       uncalibrated_col: str, calibrated_col: str,
-                                       ph_smoothing_fwhm: int, n_extra: int,
-                                       use_expr: bool = True
-                                       ) -> "RoughCalibrationStep":
-
+    def learn_combinatoric_height_info(
+        cls,
+        ch: Channel,
+        line_names: List[str],
+        line_heights_allowed: List[List[int]],
+        uncalibrated_col: str,
+        calibrated_col: str,
+        ph_smoothing_fwhm: int,
+        n_extra: int,
+        use_expr: bool = True,
+    ) -> "RoughCalibrationStep":
         (names, ee) = mass.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated,
-                                                                         fwhm_pulse_height_units=ph_smoothing_fwhm)
+        pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+            uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm
+        )
         assignment_result = moss.rough_cal.find_optimal_assignment2_height_info(
-            pfresult.ph_sorted_by_prominence()[:len(ee)+n_extra], ee, names, line_heights_allowed)
+            pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra],
+            ee,
+            names,
+            line_heights_allowed,
+        )
 
         step = cls(
             [uncalibrated_col],
@@ -719,28 +833,36 @@ class RoughCalibrationStep(moss.CalStep):
             pfresult=pfresult,
             assignment_result=assignment_result,
             ph2energy=assignment_result.ph2energy,
-            success=True)
+            success=True,
+        )
         return step
 
     @classmethod
-    def learn_3peak(cls, ch: Channel,
-                    line_names: list[str | float64],
-                    uncalibrated_col: str = "filtValue",
-                    calibrated_col: Optional[str] = None,
-                    use_expr: bool | pl.Expr = True,
-                    max_fractional_energy_error_3rd_assignment: float = 0.1,
-                    min_gain_fraction_at_ph_30k: float = 0.25,
-                    fwhm_pulse_height_units: float = 75,
-                    n_extra_peaks: int = 10,
-                    acceptable_rms_residual_e: float = 10) -> "RoughCalibrationStep":
+    def learn_3peak(
+        cls,
+        ch: Channel,
+        line_names: list[str | float64],
+        uncalibrated_col: str = "filtValue",
+        calibrated_col: Optional[str] = None,
+        use_expr: bool | pl.Expr = True,
+        max_fractional_energy_error_3rd_assignment: float = 0.1,
+        min_gain_fraction_at_ph_30k: float = 0.25,
+        fwhm_pulse_height_units: float = 75,
+        n_extra_peaks: int = 10,
+        acceptable_rms_residual_e: float = 10,
+    ) -> "RoughCalibrationStep":
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
-        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        (line_names, line_energies) = mass.algorithms.line_names_and_energies(
+            line_names
+        )
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         pfresult = moss.rough_cal.peakfind_local_maxima_of_smoothed_hist(
             uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
         )
-        possible_phs = pfresult.ph_sorted_by_prominence()[:len(line_names)+n_extra_peaks]
+        possible_phs = pfresult.ph_sorted_by_prominence()[
+            : len(line_names) + n_extra_peaks
+        ]
         df3peak, _dfe = rank_3peak_assignments(
             possible_phs,
             line_energies,
@@ -750,7 +872,9 @@ class RoughCalibrationStep(moss.CalStep):
         )
         best_rms_residual = np.inf
         best_assignment_result = None
-        for assignment_row in df3peak.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").iter_rows():
+        for assignment_row in df3peak.select(
+            "e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2"
+        ).iter_rows():
             e0, ph0, e1, ph1, e2, ph2, _e_err_at_ph2 = assignment_row
             rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
                 [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
@@ -769,6 +893,7 @@ class RoughCalibrationStep(moss.CalStep):
 
             def nanenergy(ph):
                 return ph * np.nana
+
             ph2energy = nanenergy
             # df3peak_on_failure = df3peak
         # df3peak_on_failure = df3peak
@@ -781,5 +906,6 @@ class RoughCalibrationStep(moss.CalStep):
             pfresult=pfresult,
             assignment_result=best_assignment_result,
             ph2energy=ph2energy,
-            success=success)
+            success=success,
+        )
         return step

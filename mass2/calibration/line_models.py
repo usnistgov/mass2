@@ -9,8 +9,7 @@ import pylab as plt
 VALIDATE_BIN_SIZE = True
 
 
-def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tailtau,
-                            P_tailshare_hi=0.0, P_tailtau_hi=1):
+def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tailtau, P_tailshare_hi=0.0, P_tailtau_hi=1):
     """Evaluate `cleanspectrum_fn(x)`, but padded and smeared to add a low-E and/or high-E tail.
 
     This is done by convolution, which is computed using DFT methods. The spectrum is padded
@@ -70,7 +69,7 @@ def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tai
     # In pathological cases, convolution can cause negative values.
     # Here is a hacky way to prevent that.
     smoothspectrum[smoothspectrum < 0] = 0
-    return smoothspectrum[nlow:nlow + len(x)]
+    return smoothspectrum[nlow : nlow + len(x)]
 
 
 def _scale_add_bg(spectrum, P_integral, P_bg=0, P_bgslope=0):
@@ -125,7 +124,7 @@ class MLEModel(lmfit.Model):
             for k, v in self.opts.items():
                 opts.append(f"{k}='{v}'")
         if len(opts) > 0:
-            out = "{}, {}".format(out, ', '.join(opts))
+            out = "{}, {}".format(out, ", ".join(opts))
         return f"{type(self).__name__}({out})"
 
     def __add__(self, other):
@@ -249,25 +248,48 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
 
 
 class GenericLineModel(MLEModel):
-    def __init__(self, spect, independent_vars=['bin_centers'], prefix='', nan_policy='raise',
-                 has_linear_background=True, has_tails=False, qemodel=None, **kwargs):
+    def __init__(
+        self,
+        spect,
+        independent_vars=["bin_centers"],
+        prefix="",
+        nan_policy="raise",
+        has_linear_background=True,
+        has_tails=False,
+        qemodel=None,
+        **kwargs,
+    ):
         self.spect = spect
         self._has_tails = has_tails
         self._has_linear_background = has_linear_background
         if has_tails:
-            def modelfunc(bin_centers, fwhm, peak_ph, dph_de, integral,  # noqa: PLR0917
-                          background=0, bg_slope=0, tail_frac=0, tail_tau=8, tail_share_hi=0, tail_tau_hi=8):
+
+            def modelfunc(  # noqa: PLR0917
+                bin_centers,
+                fwhm,
+                peak_ph,
+                dph_de,
+                integral,
+                background=0,
+                bg_slope=0,
+                tail_frac=0,
+                tail_tau=8,
+                tail_share_hi=0,
+                tail_tau_hi=8,
+            ):
                 bin_centers = np.asarray(bin_centers, dtype=float)
                 bin_width = bin_centers[1] - bin_centers[0]
                 energy = (bin_centers - peak_ph) / dph_de + self.spect.peak_energy
 
-                def cleanspectrum_fn(x): return self.spect.pdf(x, instrument_gaussian_fwhm=fwhm)
+                def cleanspectrum_fn(x):
+                    return self.spect.pdf(x, instrument_gaussian_fwhm=fwhm)
 
                 # tail_tau* is in energy units but has to be converted to the same units as `bin_centers`
                 tail_arbs_lo = tail_tau * dph_de
                 tail_arbs_hi = tail_tau_hi * dph_de
                 spectrum = _smear_exponential_tail(
-                    cleanspectrum_fn, energy, fwhm, tail_frac, tail_arbs_lo, tail_share_hi, tail_arbs_hi)
+                    cleanspectrum_fn, energy, fwhm, tail_frac, tail_arbs_lo, tail_share_hi, tail_arbs_hi
+                )
                 scale_factor = integral * bin_width * dph_de
                 r = _scale_add_bg(spectrum, scale_factor, background, bg_slope)
                 if any(np.isnan(r)) or any(r < 0):
@@ -275,7 +297,9 @@ class GenericLineModel(MLEModel):
                 if qemodel is None:
                     return r
                 return r * qemodel(energy)
+
         else:
+
             def modelfunc(bin_centers, fwhm, peak_ph, dph_de, integral, background=0, bg_slope=0):
                 bin_centers = np.asarray(bin_centers, dtype=float)
                 bin_width = bin_centers[1] - bin_centers[0]
@@ -288,30 +312,30 @@ class GenericLineModel(MLEModel):
                 if qemodel is None:
                     return r
                 return r * qemodel(energy)
+
         param_names = ["fwhm", "peak_ph", "dph_de", "integral"]
         if self._has_linear_background:
             param_names += ["background", "bg_slope"]
         if self._has_tails:
             param_names += ["tail_frac", "tail_tau", "tail_share_hi", "tail_tau_hi"]
-        kwargs.update({'prefix': prefix, 'nan_policy': nan_policy,
-                       'independent_vars': independent_vars, "param_names": param_names})
+        kwargs.update({"prefix": prefix, "nan_policy": nan_policy, "independent_vars": independent_vars, "param_names": param_names})
         super().__init__(modelfunc, **kwargs)
         self._set_paramhints_prefix()
 
     def _set_paramhints_prefix(self):
         nominal_peak_energy = self.spect.nominal_peak_energy
-        self.set_param_hint('fwhm', value=nominal_peak_energy / 1000, min=nominal_peak_energy / 10000, max=nominal_peak_energy)
-        self.set_param_hint('peak_ph', value=nominal_peak_energy, min=0)
-        self.set_param_hint("dph_de", value=1, min=.01, max=100)
+        self.set_param_hint("fwhm", value=nominal_peak_energy / 1000, min=nominal_peak_energy / 10000, max=nominal_peak_energy)
+        self.set_param_hint("peak_ph", value=nominal_peak_energy, min=0)
+        self.set_param_hint("dph_de", value=1, min=0.01, max=100)
         self.set_param_hint("integral", value=100, min=0)
         if self._has_linear_background:
-            self.set_param_hint('background', value=1, min=0)
-            self.set_param_hint('bg_slope', value=0, vary=False)
+            self.set_param_hint("background", value=1, min=0)
+            self.set_param_hint("bg_slope", value=0, vary=False)
         if self._has_tails:
-            self.set_param_hint('tail_frac', value=0.05, min=0, max=1, vary=True)
-            self.set_param_hint('tail_tau', value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=True)
-            self.set_param_hint('tail_share_hi', value=0, min=0, max=1, vary=False)
-            self.set_param_hint('tail_tau_hi', value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=False)
+            self.set_param_hint("tail_frac", value=0.05, min=0, max=1, vary=True)
+            self.set_param_hint("tail_tau", value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=True)
+            self.set_param_hint("tail_share_hi", value=0, min=0, max=1, vary=False)
+            self.set_param_hint("tail_tau_hi", value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=False)
 
     def guess(self, data, bin_centers, dph_de, **kwargs):
         "Guess values for the peak_ph, integral, and background."
@@ -319,6 +343,7 @@ class GenericLineModel(MLEModel):
 
         def percentiles(p):
             return bin_centers[(order_stat > p).argmax()]
+
         fwhm_arb = 0.7 * (percentiles(0.75) - percentiles(0.25))
         peak_ph = bin_centers[data.argmax()]
         if len(data) > 20:
@@ -329,9 +354,7 @@ class GenericLineModel(MLEModel):
         tcounts_above_bg = data.sum() - baseline * len(data)
         if tcounts_above_bg < 0:
             tcounts_above_bg = data.sum()  # lets avoid negative estimates for the integral
-        pars = self.make_params(peak_ph=peak_ph, background=baseline,
-                                integral=tcounts_above_bg, fwhm=fwhm_arb / dph_de,
-                                dph_de=dph_de)
+        pars = self.make_params(peak_ph=peak_ph, background=baseline, integral=tcounts_above_bg, fwhm=fwhm_arb / dph_de, dph_de=dph_de)
         return lmfit.models.update_param_vals(pars, self.prefix, **kwargs)
 
 
@@ -363,12 +386,18 @@ class LineModelResult(lmfit.model.ModelResult):
         if ax is None:
             plt.figure()
             ax = plt.gca()
-        ax = lmfit.model.ModelResult.plot_fit(self, ax=ax,
-                                              xlabel=xlabel, ylabel=ylabel)
+        ax = lmfit.model.ModelResult.plot_fit(self, ax=ax, xlabel=xlabel, ylabel=ylabel)
         if title is not None:
             plt.title(title)
-        ax.text(0.05, 0.95, self._compact_fit_report(), transform=ax.transAxes,
-                verticalalignment="top", bbox=dict(facecolor='w', alpha=0.5), family="monospace")
+        ax.text(
+            0.05,
+            0.95,
+            self._compact_fit_report(),
+            transform=ax.transAxes,
+            verticalalignment="top",
+            bbox=dict(facecolor="w", alpha=0.5),
+            family="monospace",
+        )
         # ax.legend(["data", self._compact_fit_report()],loc='best', frameon=True, framealpha = 0.5)
         ax.legend(loc="upper right")
 

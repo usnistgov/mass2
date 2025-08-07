@@ -57,9 +57,7 @@ on different data segments, though honestly that would be really weird.
 import numpy as np
 import pylab as plt
 
-__all__ = ['PowerSpectrum', 'PowerSpectrumOverlap',
-           'bartlett', 'welch', 'hann', 'hamming',
-           'computeSpectrum']
+__all__ = ["PowerSpectrum", "PowerSpectrumOverlap", "bartlett", "welch", "hann", "hamming", "computeSpectrum"]
 
 
 class PowerSpectrum:
@@ -109,13 +107,13 @@ class PowerSpectrum:
             wksp = w * data
             sum_window = (w**2).sum()
 
-        scale_factor = 2. / (sum_window * self.m2)
+        scale_factor = 2.0 / (sum_window * self.m2)
         if True:  # we want real units
             scale_factor *= self.dt * self.m2
         wksp = np.fft.rfft(wksp)
 
         # The first line adds 2x too much to the first/last bins.
-        ps = np.abs(wksp)**2
+        ps = np.abs(wksp) ** 2
         self.specsum += scale_factor * ps
         self.nsegments += 1
 
@@ -125,9 +123,7 @@ class PowerSpectrum:
         nk = nt // self.m2
         for k in range(nk):
             noff = k * self.m2
-            PowerSpectrum.addDataSegment(self,
-                                         data[noff:noff + self.m2],
-                                         window=window)
+            PowerSpectrum.addDataSegment(self, data[noff : noff + self.m2], window=window)
 
     def spectrum(self, nbins=None):
         """If <nbins> is given, the data are averaged into <nbins> bins."""
@@ -188,12 +184,10 @@ class PowerSpectrumOverlap(PowerSpectrum):
         "Process a data segment of length m using window."
         if self.first:
             self.first = False
-            self.fullseg = np.concatenate((
-                np.zeros_like(data),
-                np.array(data)))
+            self.fullseg = np.concatenate((np.zeros_like(data), np.array(data)))
         else:
-            self.fullseg[0:self.m] = self.fullseg[self.m:]
-            self.fullseg[self.m:] = data
+            self.fullseg[0 : self.m] = self.fullseg[self.m :]
+            self.fullseg[self.m :] = data
             PowerSpectrum.addDataSegment(self, self.fullseg, window=window)
 
     def addLongData(self, data, window=None):
@@ -207,9 +201,8 @@ class PowerSpectrumOverlap(PowerSpectrum):
             delta_el = 0.0
         for k in range(nk):
             noff = int(k * delta_el + 0.5)
-            PowerSpectrum.addDataSegment(self,
-                                         data[noff:noff + self.m2],
-                                         window=window)
+            PowerSpectrum.addDataSegment(self, data[noff : noff + self.m2], window=window)
+
 
 # Commonly used window functions
 
@@ -221,7 +214,7 @@ def bartlett(n):
 
 def welch(n):
     """A Welch window (parabolic) of length n"""
-    return 1 - (2 * np.arange(n, dtype=float) / (n - 1.) - 1)**2
+    return 1 - (2 * np.arange(n, dtype=float) / (n - 1.0) - 1) ** 2
 
 
 def hann(n):
@@ -254,7 +247,7 @@ def autocorrelation_broken_from_pulses(noise_pulses):
     for i in range(npulses):
         pulse = noise_pulses[:, i]
         pulse -= pulse.mean()
-        ac += np.correlate(pulse, pulse, 'full')[nsamples - 1:]
+        ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
 
     ac /= npulses
     ac /= nsamples - np.arange(nsamples, dtype=float)
@@ -290,11 +283,11 @@ def computeSpectrum(data, segfactor=1, dt=None, window=None):
     if segfactor == 1:
         spec = PowerSpectrum(M, dt=dt)
         # Ensure that the datasegment has even length
-        spec.addDataSegment(data[:2 * (len(data) // 2)], window=window)
+        spec.addDataSegment(data[: 2 * (len(data) // 2)], window=window)
     else:
         spec = PowerSpectrumOverlap(M, dt=dt)
         for i in range(2 * segfactor - 1):
-            spec.addDataSegment(data[i * M:(i + 1) * M], window=window)
+            spec.addDataSegment(data[i * M : (i + 1) * M], window=window)
 
     if dt is None:
         return spec.spectrum()

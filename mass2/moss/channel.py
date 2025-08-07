@@ -4,7 +4,13 @@ import polars as pl
 import pylab as plt
 import functools
 from mass2 import moss
-from mass2.moss import NoiseChannel, CalSteps, DriftCorrectStep, SummarizeStep, Filter5LagStep
+from mass2.moss import (
+    NoiseChannel,
+    CalSteps,
+    DriftCorrectStep,
+    SummarizeStep,
+    Filter5LagStep,
+)
 from typing import Optional
 import numpy as np
 import time
@@ -47,6 +53,7 @@ class Channel:
 
     def mo_stepplots(self):
         import marimo as mo
+
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
@@ -54,26 +61,29 @@ class Channel:
                 continue
             first_non_summarize_step = step
             break
-        mo_ui = mo.ui.dropdown(desc_ind,
-                               value=first_non_summarize_step.description,
-                               label=f"choose step for ch {self.header.ch_num}")
+        mo_ui = mo.ui.dropdown(
+            desc_ind,
+            value=first_non_summarize_step.description,
+            label=f"choose step for ch {self.header.ch_num}",
+        )
 
         def show():
             return self._mo_stepplots_explicit(mo_ui)
 
         def step_ind():
             return mo_ui.value
+
         mo_ui.show = show
         mo_ui.step_ind = step_ind
         return mo_ui
 
     def _mo_stepplots_explicit(self, mo_ui):
         import marimo as mo
+
         step_ind = mo_ui.step_ind()
         self.step_plot(step_ind)
         fig = plt.gcf()
-        return mo.vstack([mo_ui,
-                          moss.show(fig)])
+        return mo.vstack([mo_ui, moss.show(fig)])
 
     def get_step(self, index):
         if index < 0:
@@ -118,8 +128,16 @@ class Channel:
     #     # Collect the result to evaluate the lazy expression
     #     df_grouped_collected = df_grouped.collect()
 
-    def plot_hists(self, col, bin_edges, group_by_col, axis=None, use_good_expr=True,
-                   use_expr=True, skip_none=True):
+    def plot_hists(
+        self,
+        col,
+        bin_edges,
+        group_by_col,
+        axis=None,
+        use_good_expr=True,
+        use_expr=True,
+        skip_none=True,
+    ):
         """
         Plots histograms for the given column, grouped by the specified column.
 
@@ -142,19 +160,25 @@ class Channel:
             filter_expr = use_expr
 
         # Group by the specified column and filter using good_expr
-        df_small = (self.df.lazy().filter(filter_expr).
-                    select(col, group_by_col)
-                    ).collect().sort(group_by_col, descending=False)
+        df_small = (
+            (self.df.lazy().filter(filter_expr).select(col, group_by_col))
+            .collect()
+            .sort(group_by_col, descending=False)
+        )
 
         # Plot a histogram for each group
-        for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
+        for (group_name,), group_data in df_small.group_by(
+            group_by_col, maintain_order=True
+        ):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
             # Plot the histogram for the current group
             if group_name == "EBIT":
-                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+                ax.hist(
+                    values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name)
+                )
             else:
                 ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
             # bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
@@ -162,7 +186,7 @@ class Channel:
 
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel('Frequency')
+        ax.set_ylabel("Frequency")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
@@ -170,7 +194,16 @@ class Channel:
 
         plt.tight_layout()
 
-    def plot_scatter(self, x_col, y_col, color_col=None, use_expr=True, use_good_expr=True, skip_none=True, ax=None):
+    def plot_scatter(
+        self,
+        x_col,
+        y_col,
+        color_col=None,
+        use_expr=True,
+        use_good_expr=True,
+        skip_none=True,
+        ax=None,
+    ):
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -181,11 +214,18 @@ class Channel:
             filter_expr = self.good_expr.and_(use_expr)
         else:
             filter_expr = use_expr
-        df_small = (self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect())
+        df_small = (
+            self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
+        )
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
                 continue
-            plt.plot(data.select(x_col).to_series(), data.select(y_col).to_series(), ".", label=name)
+            plt.plot(
+                data.select(x_col).to_series(),
+                data.select(y_col).to_series(),
+                ".",
+                label=name,
+            )
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
         title_str = f"""{self.header.description}
@@ -200,8 +240,12 @@ class Channel:
         return moss.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_gain_cal(
-        self, line_names, uncalibrated_col, calibrated_col, ph_smoothing_fwhm,
-        use_expr=True
+        self,
+        line_names,
+        uncalibrated_col,
+        calibrated_col,
+        ph_smoothing_fwhm,
+        use_expr=True,
     ) -> "Channel":
         # this is meant to filter the data, then select down to the columsn we need, then materialize them,
         # all without copying our pulse records again
@@ -233,50 +277,76 @@ class Channel:
             line_names=name_e,
             line_energies=energies_out,
             predicted_energies=predicted_energies,
-            ph2energy=ph2energy
+            ph2energy=ph2energy,
         )
         return self.with_step(step)
 
     def rough_cal_combinatoric(
-        self, line_names, uncalibrated_col, calibrated_col,
-        ph_smoothing_fwhm, n_extra=3,
-        use_expr=True
+        self,
+        line_names,
+        uncalibrated_col,
+        calibrated_col,
+        ph_smoothing_fwhm,
+        n_extra=3,
+        use_expr=True,
     ) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_combinatoric(self, line_names,
-                                                            uncalibrated_col=uncalibrated_col,
-                                                            calibrated_col=calibrated_col,
-                                                            ph_smoothing_fwhm=ph_smoothing_fwhm,
-                                                            n_extra=n_extra,
-                                                            use_expr=use_expr)
+        step = moss.RoughCalibrationStep.learn_combinatoric(
+            self,
+            line_names,
+            uncalibrated_col=uncalibrated_col,
+            calibrated_col=calibrated_col,
+            ph_smoothing_fwhm=ph_smoothing_fwhm,
+            n_extra=n_extra,
+            use_expr=use_expr,
+        )
         return self.with_step(step)
 
     def rough_cal_combinatoric_height_info(
-        self, line_names, line_heights_allowed, uncalibrated_col, calibrated_col,
-        ph_smoothing_fwhm, n_extra=3,
-        use_expr=True
+        self,
+        line_names,
+        line_heights_allowed,
+        uncalibrated_col,
+        calibrated_col,
+        ph_smoothing_fwhm,
+        n_extra=3,
+        use_expr=True,
     ) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_combinatoric_height_info(self, line_names,
-                                                                        line_heights_allowed,
-                                                                        uncalibrated_col=uncalibrated_col,
-                                                                        calibrated_col=calibrated_col,
-                                                                        ph_smoothing_fwhm=ph_smoothing_fwhm,
-                                                                        n_extra=n_extra,
-                                                                        use_expr=use_expr)
+        step = moss.RoughCalibrationStep.learn_combinatoric_height_info(
+            self,
+            line_names,
+            line_heights_allowed,
+            uncalibrated_col=uncalibrated_col,
+            calibrated_col=calibrated_col,
+            ph_smoothing_fwhm=ph_smoothing_fwhm,
+            n_extra=n_extra,
+            use_expr=use_expr,
+        )
         return self.with_step(step)
 
-    def rough_cal(self, line_names: list[str | float],
-                  uncalibrated_col: str = "filtValue",
-                  calibrated_col: Optional[str] = None,
-                  use_expr: bool | pl.Expr = True,
-                  max_fractional_energy_error_3rd_assignment: float = 0.1,
-                  min_gain_fraction_at_ph_30k: float = 0.25,
-                  fwhm_pulse_height_units: float = 75,
-                  n_extra_peaks: int = 10,
-                  acceptable_rms_residual_e: float = 10) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_3peak(self, line_names, uncalibrated_col, calibrated_col,
-                                                     use_expr, max_fractional_energy_error_3rd_assignment,
-                                                     min_gain_fraction_at_ph_30k, fwhm_pulse_height_units, n_extra_peaks,
-                                                     acceptable_rms_residual_e)
+    def rough_cal(
+        self,
+        line_names: list[str | float],
+        uncalibrated_col: str = "filtValue",
+        calibrated_col: Optional[str] = None,
+        use_expr: bool | pl.Expr = True,
+        max_fractional_energy_error_3rd_assignment: float = 0.1,
+        min_gain_fraction_at_ph_30k: float = 0.25,
+        fwhm_pulse_height_units: float = 75,
+        n_extra_peaks: int = 10,
+        acceptable_rms_residual_e: float = 10,
+    ) -> "Channel":
+        step = moss.RoughCalibrationStep.learn_3peak(
+            self,
+            line_names,
+            uncalibrated_col,
+            calibrated_col,
+            use_expr,
+            max_fractional_energy_error_3rd_assignment,
+            min_gain_fraction_at_ph_30k,
+            fwhm_pulse_height_units,
+            n_extra_peaks,
+            acceptable_rms_residual_e,
+        )
         return self.with_step(step)
 
     def with_step(self, step) -> "Channel":
@@ -318,8 +388,9 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
-    def with_good_expr_pretrig_rms_and_postpeak_deriv(self, n_sigma_pretrig_rms=20,
-                                                      n_sigma_postpeak_deriv=20, replace=False) -> "Channel":
+    def with_good_expr_pretrig_rms_and_postpeak_deriv(
+        self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False
+    ) -> "Channel":
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
         )
@@ -333,14 +404,23 @@ class Channel:
 
     def with_range_around_median(self, col, range_up, range_down):
         med = np.median(self.df[col].to_numpy())
-        return self.with_good_expr(pl.col(col).is_between(med-range_down, med+range_up))
+        return self.with_good_expr(
+            pl.col(col).is_between(med - range_down, med + range_up)
+        )
 
-    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
+    def with_good_expr_below_nsigma_outlier_resistant(
+        self, col_nsigma_pairs, replace=False, use_prev_good_expr=True
+    ) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+            df = (
+                self.df.lazy()
+                .select(pl.exclude("pulse"))
+                .filter(self.good_expr)
+                .collect()
+            )
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
@@ -354,17 +434,26 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
+    def with_good_expr_nsigma_range_outlier_resistant(
+        self, col_nsigma_pairs, replace=False, use_prev_good_expr=True
+    ) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+            df = (
+                self.df.lazy()
+                .select(pl.exclude("pulse"))
+                .filter(self.good_expr)
+                .collect()
+            )
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
-            min_for_col, max_for_col = moss.misc.outlier_resistant_nsigma_range_from_mid(
-                df[col].to_numpy(), nsigma=nsigma
+            min_for_col, max_for_col = (
+                moss.misc.outlier_resistant_nsigma_range_from_mid(
+                    df[col].to_numpy(), nsigma=nsigma
+                )
             )
             this_iter_good_expr = pl.col(col).is_between(min_for_col, max_for_col)
             if i == 0:
@@ -377,7 +466,9 @@ class Channel:
     def typical_peak_ind(self, col="pulse"):
         return int(np.median(self.df.limit(100)[col].to_numpy().argmax(axis=1)))
 
-    def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
+    def summarize_pulses(
+        self, col="pulse", pretrigger_ignore_samples=0, peak_index=None
+    ) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
         step = SummarizeStep(
@@ -393,12 +484,16 @@ class Channel:
         )
         return self.with_step(step)
 
-    def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = moss.PretrigMeanJumpFixStep(inputs=[uncorrected],
-                                           output=[corrected],
-                                           good_expr=self.good_expr,
-                                           use_expr=True,
-                                           period=period)
+    def correct_pretrig_mean_jumps(
+        self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096
+    ):
+        step = moss.PretrigMeanJumpFixStep(
+            inputs=[uncorrected],
+            output=[corrected],
+            good_expr=self.good_expr,
+            use_expr=True,
+            period=period,
+        )
         return self.with_step(step)
 
     def filter5lag(
@@ -441,18 +536,22 @@ class Channel:
         return self.with_step(step)
 
     def good_df(self, cols=pl.all(), use_expr=True):
-        return (self.df.lazy()
-                .filter(self.good_expr)
-                .filter(use_expr)
-                .select(cols)
-                .collect())
+        return (
+            self.df.lazy()
+            .filter(self.good_expr)
+            .filter(use_expr)
+            .select(cols)
+            .collect()
+        )
 
     def bad_df(self, cols=pl.all(), use_expr=True):
-        return (self.df.lazy()
-                .filter(self.good_expr.not_())
-                .filter(use_expr)
-                .select(cols)
-                .collect())
+        return (
+            self.df.lazy()
+            .filter(self.good_expr.not_())
+            .filter(use_expr)
+            .select(cols)
+            .collect()
+        )
 
     def good_serieses(self, cols, use_expr):
         df2 = self.good_df(cols, use_expr)
@@ -467,11 +566,13 @@ class Channel:
     ) -> "Channel":
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
-        step = DriftCorrectStep.learn(ch=self,
-                                      indicator_col=indicator_col,
-                                      uncorrected_col=uncorrected_col,
-                                      corrected_col=corrected_col,
-                                      use_expr=use_expr)
+        step = DriftCorrectStep.learn(
+            ch=self,
+            indicator_col=indicator_col,
+            uncorrected_col=uncorrected_col,
+            corrected_col=corrected_col,
+            use_expr=use_expr,
+        )
         return self.with_step(step)
 
     def linefit(
@@ -484,11 +585,11 @@ class Channel:
         dlo=50,
         dhi=50,
         binsize=0.5,
-        params_update=lmfit.Parameters()
+        params_update=lmfit.Parameters(),
     ):
-        model = mass.get_model(line,
-                               has_linear_background=has_linear_background,
-                               has_tails=has_tails)
+        model = mass.get_model(
+            line, has_linear_background=has_linear_background, has_tails=has_tails
+        )
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = (
@@ -570,9 +671,13 @@ class Channel:
         channel = cls(df, header)
         return channel
 
-    def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
+    def with_experiment_state_df(
+        self, df_es, force_timestamp_monotonic=False
+    ) -> "Channel":
         if not self.df["timestamp"].is_sorted():
-            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
+            df = self.df.select(
+                pl.col("timestamp").cum_max().alias("timestamp")
+            ).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
             # print("This is likely a BUG in DASTARD.")
         else:
@@ -599,29 +704,41 @@ class Channel:
         return self.with_replacement_df(df3)
 
     def multifit_quadratic_gain_cal(
-        self, multifit: moss.MultiFit, previous_cal_step_index,
-        calibrated_col, use_expr=True
+        self,
+        multifit: moss.MultiFit,
+        previous_cal_step_index,
+        calibrated_col,
+        use_expr=True,
     ) -> "Channel":
-        step = moss.MultiFitQuadraticGainCalStep.learn(self, multifit_spec=multifit,
-                                                       previous_cal_step_index=previous_cal_step_index,
-                                                       calibrated_col=calibrated_col,
-                                                       use_expr=use_expr)
+        step = moss.MultiFitQuadraticGainCalStep.learn(
+            self,
+            multifit_spec=multifit,
+            previous_cal_step_index=previous_cal_step_index,
+            calibrated_col=calibrated_col,
+            use_expr=use_expr,
+        )
         return self.with_step(step)
 
-    def multifit_mass_cal(self, multifit: moss.MultiFit,
-                          previous_cal_step_index, calibrated_col, use_expr=True) -> "Channel":
-        step = moss.MultiFitMassCalibrationStep.learn(self, multifit_spec=multifit,
-                                                      previous_cal_step_index=previous_cal_step_index,
-                                                      calibrated_col=calibrated_col,
-                                                      use_expr=use_expr)
+    def multifit_mass_cal(
+        self,
+        multifit: moss.MultiFit,
+        previous_cal_step_index,
+        calibrated_col,
+        use_expr=True,
+    ) -> "Channel":
+        step = moss.MultiFitMassCalibrationStep.learn(
+            self,
+            multifit_spec=multifit,
+            previous_cal_step_index=previous_cal_step_index,
+            calibrated_col=calibrated_col,
+            use_expr=use_expr,
+        )
         return self.with_step(step)
 
     def concat_df(self, df) -> "Channel":
-        ch2 = moss.Channel(pl.concat([self.df, df]),
-                           self.header,
-                           self.noise,
-                           self.good_expr
-                           )
+        ch2 = moss.Channel(
+            pl.concat([self.df, df]), self.header, self.noise, self.good_expr
+        )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
@@ -629,13 +746,26 @@ class Channel:
         ch2 = self.concat_df(ch.df)
         return ch2
 
-    def phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col, line_names,
-                                          previous_cal_step_index, corrected_col=None,
-                                          use_expr=True) -> "Channel":
+    def phase_correct_mass_specific_lines(
+        self,
+        indicator_col,
+        uncorrected_col,
+        line_names,
+        previous_cal_step_index,
+        corrected_col=None,
+        use_expr=True,
+    ) -> "Channel":
         if corrected_col is None:
-            corrected_col = uncorrected_col+"_pc"
-        step = moss.phase_correct.phase_correct_mass_specific_lines(self, indicator_col, uncorrected_col,
-                                                                    corrected_col, previous_cal_step_index, line_names, use_expr)
+            corrected_col = uncorrected_col + "_pc"
+        step = moss.phase_correct.phase_correct_mass_specific_lines(
+            self,
+            indicator_col,
+            uncorrected_col,
+            corrected_col,
+            previous_cal_step_index,
+            line_names,
+            use_expr,
+        )
         return self.with_step(step)
 
     def as_bad(self, error_type, error_msg, backtrace):

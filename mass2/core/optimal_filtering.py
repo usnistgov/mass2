@@ -50,6 +50,7 @@ class ToeplitzWhitener:
     ValueError
         If the operative methods are passed an array of dimension higher than 2.
     """
+
     theta: np.ndarray
     phi: np.ndarray
 
@@ -145,9 +146,9 @@ class ToeplitzWhitener:
         y[N - 1] /= self.phi[0]
         for i in range(N - 2, -1, -1):
             f = min(self.p + 1, N - i)
-            y[i] -= np.dot(y[i + 1:i + f], self.phi[1:f])
+            y[i] -= np.dot(y[i + 1 : i + f], self.phi[1:f])
             y[i] /= self.phi[0]
-        return np.correlate(y, self.theta, "full")[self.q:]
+        return np.correlate(y, self.theta, "full")[self.q :]
 
     def applyWT(self, v: npt.ArrayLike) -> np.ndarray:
         """Return vector (or matrix of column vectors) W'v"""
@@ -165,9 +166,9 @@ class ToeplitzWhitener:
         y[N - 1] /= self.theta[0]
         for i in range(N - 2, -1, -1):
             f = min(self.q + 1, N - i)
-            y[i] -= np.dot(y[i + 1:i + f], self.theta[1:f])
+            y[i] -= np.dot(y[i + 1 : i + f], self.theta[1:f])
             y[i] /= self.theta[0]
-        return np.correlate(y, self.phi, "full")[self.p:]
+        return np.correlate(y, self.phi, "full")[self.p :]
 
     def W(self, N: int) -> np.ndarray:
         """Return the full, approximate whitening matrix.
@@ -216,11 +217,11 @@ def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: Optional[f
     filt_length = len(vector)
     sig_ft = np.fft.rfft(vector)
     freq = np.fft.fftfreq(filt_length, d=sample_time_sec)
-    freq = np.abs(freq[:len(sig_ft)])
+    freq = np.abs(freq[: len(sig_ft)])
     if fmax is not None:
         sig_ft[freq > fmax] = 0.0
     if f_3db is not None:
-        sig_ft /= (1. + (1.0 * freq / f_3db)**2)
+        sig_ft /= 1.0 + (1.0 * freq / f_3db) ** 2
 
     # n=filt_length is needed when filt_length is ODD
     vector[:] = np.fft.irfft(sig_ft, n=filt_length)
@@ -249,7 +250,8 @@ class Filter(ABC):
         the ratio of the filtered pulse height to the (FWHM) noise, in pulse height units. Both
         of these values assume pulses of the same size as that used to generate the filter: `nominal_peak`.
 
-"""
+    """
+
     values: np.ndarray
     nominal_peak: float
     variance: float
@@ -332,11 +334,17 @@ class Filter5Lag(Filter):
         return "5lag"
 
     # These parameters fit a parabola to any 5 evenly-spaced points
-    FIVELAG_FITTER = np.array((
-        (-6, 24, 34, 24, -6),
-        (-14, -7, 0, 7, 14),
-        (10, -5, -10, -5, 10),
-    ), dtype=float) / 70.0
+    FIVELAG_FITTER = (
+        np.array(
+            (
+                (-6, 24, 34, 24, -6),
+                (-14, -7, 0, 7, 14),
+                (10, -5, -10, -5, 10),
+            ),
+            dtype=float,
+        )
+        / 70.0
+    )
 
     def filter_records(self, x: npt.ArrayLike) -> tuple[np.ndarray, np.ndarray]:
         """Filter one microcalorimeter record or an array of records.
@@ -373,7 +381,7 @@ class Filter5Lag(Filter):
         # Order is row 0 = constant ... row 2 = quadratic coefficients.
         param = np.dot(self.FIVELAG_FITTER, conv)
         peak_x = -0.5 * param[1, :] / param[2, :]
-        peak_y = param[0, :] - 0.25 * param[1, :]**2 / param[2, :]
+        peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
         return peak_y, peak_x
 
 
@@ -494,8 +502,7 @@ class FilterMaker:
     sample_time_sec: float = 0.0
     peak: float = 0.0
 
-    def compute_5lag(self, fmax: Optional[float] = None, f_3db: Optional[float] = None,
-                     cut_pre: int = 0, cut_post: int = 0) -> Filter:
+    def compute_5lag(self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
         """Compute a single filter, with optional low-pass filtering, and with optional zero
         weights at the pre-trigger or post-trigger end of the filter.
 
@@ -528,8 +535,7 @@ class FilterMaker:
         avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
 
         if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
-            raise ValueError(
-                "FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
 
@@ -554,12 +560,14 @@ class FilterMaker:
         if cut_pre > 0 or cut_post > 0:
             filt_noconst = np.hstack([np.zeros(cut_pre), filt_noconst, np.zeros(cut_post)])
 
-        vdv = peak / (8 * np.log(2) * variance)**0.5
-        return Filter5Lag(filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten,
-                          fmax, f_3db, cut_pre, cut_post)
+        vdv = peak / (8 * np.log(2) * variance) ** 0.5
+        return Filter5Lag(
+            filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
+        )
 
-    def compute_fourier(self, fmax: Optional[float] = None, f_3db: Optional[float] = None,
-                        cut_pre: int = 0, cut_post: int = 0) -> Filter:
+    def compute_fourier(
+        self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0
+    ) -> Filter:
         """Compute a single Fourier-domain filter, with optional low-pass filtering, and with optional
         zero weights at the pre-trigger or post-trigger end of the filter. Fourier domain calculation
         implicitly assumes periodic boundary conditions.
@@ -615,8 +623,7 @@ class FilterMaker:
         # truncating the middle, and going back to Fourier space
         if reduction > 0:
             noise_autocorr = np.fft.irfft(noise_psd)
-            noise_autocorr = np.hstack((noise_autocorr[:len_reduced_psd - 1],
-                                        noise_autocorr[-len_reduced_psd:]))
+            noise_autocorr = np.hstack((noise_autocorr[: len_reduced_psd - 1], noise_autocorr[-len_reduced_psd:]))
             noise_psd = np.abs(np.fft.rfft(noise_autocorr))
         sig_ft_weighted = sig_ft / noise_psd
 
@@ -627,7 +634,7 @@ class FilterMaker:
             if fmax is not None:
                 sig_ft_weighted[freq > fmax] = 0.0
             if f_3db is not None:
-                sig_ft_weighted /= (1 + (freq * 1.0 / f_3db)**2)
+                sig_ft_weighted /= 1 + (freq * 1.0 / f_3db) ** 2
 
         sig_ft_weighted[0] = 0.0
         filt_fourier = np.fft.irfft(sig_ft_weighted) / window
@@ -636,18 +643,30 @@ class FilterMaker:
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
         if self.noise_autocorr is None:
             noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
-            kappa = (np.abs(sig_ft)**2 / noise_ft_squared)[1:].sum()
-            variance_fourier = 1. / kappa
+            kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()
+            variance_fourier = 1.0 / kappa
             print(kappa, noise_ft_squared)
         else:
-            ac = np.array(self.noise_autocorr)[:len(filt_fourier)]
+            ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)
-        vdv = peak / (8 * np.log(2) * variance_fourier)**0.5
-        return Filter5Lag(filt_fourier, peak, variance_fourier, vdv, None, None, truncated_avg_signal, None, 1 + 2 * shorten,
-                          fmax, f_3db, cut_pre, cut_post)
+        vdv = peak / (8 * np.log(2) * variance_fourier) ** 0.5
+        return Filter5Lag(
+            filt_fourier,
+            peak,
+            variance_fourier,
+            vdv,
+            None,
+            None,
+            truncated_avg_signal,
+            None,
+            1 + 2 * shorten,
+            fmax,
+            f_3db,
+            cut_pre,
+            cut_post,
+        )
 
-    def compute_ats(self, fmax: Optional[float] = None, f_3db: Optional[float] = None,
-                    cut_pre: int = 0, cut_post: int = 0) -> Filter:  # noqa: PLR0914
+    def compute_ats(self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:  # noqa: PLR0914
         """Compute a single "arrival-time-safe" filter, with optional low-pass filtering,
         and with optional zero weights at the pre-trigger or post-trigger end of the filter.
 
@@ -679,8 +698,7 @@ class FilterMaker:
         if self.dt_model is None:
             raise ValueError("FilterMaker must have dt_model to generate ATS filters")
         if self.sample_time_sec is None and not (fmax is None and f_3db is None):
-            raise ValueError(
-                "FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
 
         noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
         avg_signal, peak, dt_model = self._normalize_signal(cut_pre, cut_post)
@@ -715,18 +733,17 @@ class FilterMaker:
 
         if cut_pre > 0 or cut_post > 0:
             nfilt = filt.shape[0]
-            filt = np.hstack([np.zeros((nfilt, cut_pre), dtype=float),
-                              filt,
-                              np.zeros((nfilt, cut_post), dtype=float)])
+            filt = np.hstack([np.zeros((nfilt, cut_pre), dtype=float), filt, np.zeros((nfilt, cut_post), dtype=float)])
 
         filt_noconst = filt[0]
         filt_dt = filt[1]
         filt_baseline = filt[2]
 
         variance = bracketR(filt_noconst, self.noise_autocorr)
-        vdv = peak / (np.log(2) * 8 * variance)**0.5
-        return FilterATS(filt_noconst, peak, variance, vdv, filt_dt, filt_baseline, avg_signal, dt_model, 1,
-                         fmax, f_3db, cut_pre, cut_post)
+        vdv = peak / (np.log(2) * 8 * variance) ** 0.5
+        return FilterATS(
+            filt_noconst, peak, variance, vdv, filt_dt, filt_baseline, avg_signal, dt_model, 1, fmax, f_3db, cut_pre, cut_post
+        )
 
     def _compute_autocorr(self, cut_pre: int = 0, cut_post: int = 0) -> np.ndarray:
         """Return the noise autocorrelation, if any, cut down by the requested number of values at the start and end.
@@ -747,7 +764,7 @@ class FilterMaker:
         if self.noise_autocorr is None:
             return np.array([], dtype=float)
         N = len(np.asarray(self.signal_model))
-        return np.asarray(self.noise_autocorr)[:N - (cut_pre + cut_post)]
+        return np.asarray(self.noise_autocorr)[: N - (cut_pre + cut_post)]
 
     def _normalize_signal(self, cut_pre: int = 0, cut_post: int = 0) -> tuple[np.ndarray, float, np.ndarray]:
         """Compute the normalized signal, peak value, and first-order arrival-time model.
@@ -773,7 +790,7 @@ class FilterMaker:
         """
         avg_signal = np.array(self.signal_model)
         ns = len(avg_signal)
-        pre_avg = avg_signal[cut_pre:self.n_pretrigger - 1].mean()
+        pre_avg = avg_signal[cut_pre : self.n_pretrigger - 1].mean()
 
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
@@ -785,8 +802,8 @@ class FilterMaker:
         if self.peak > 0.0:
             peak_signal = self.peak
         else:
-            a = avg_signal[cut_pre:ns - cut_post].min()
-            b = avg_signal[cut_pre:ns - cut_post].max()
+            a = avg_signal[cut_pre : ns - cut_post].min()
+            b = avg_signal[cut_pre : ns - cut_post].max()
             is_negative = pre_avg - a > b - pre_avg
             if is_negative:
                 peak_signal = a - pre_avg
@@ -798,13 +815,13 @@ class FilterMaker:
 
         rescale = 1 / np.max(avg_signal)
         avg_signal *= rescale
-        avg_signal[:self.n_pretrigger] = 0.0
-        avg_signal = avg_signal[cut_pre:ns - cut_post]
+        avg_signal[: self.n_pretrigger] = 0.0
+        avg_signal = avg_signal[cut_pre : ns - cut_post]
         if self.dt_model is None:
             dt_model = np.array([], dtype=float)
         else:
             dt_model = self.dt_model * rescale
-            dt_model = dt_model[cut_pre:ns - cut_post]
+            dt_model = dt_model[cut_pre : ns - cut_post]
         return avg_signal, peak_signal, dt_model
 
     @staticmethod
@@ -821,7 +838,7 @@ class FilterMaker:
         assert len(f) <= len(avg_signal) - 4
         conv = np.zeros(5, dtype=float)
         for i in range(5):
-            conv[i] = np.dot(f, avg_signal[i:i + len(f)])
+            conv[i] = np.dot(f, avg_signal[i : i + len(f)])
         x = np.linspace(-2, 2, 5)
         fit = np.polyfit(x, conv, 2)
         fit_ctr = -0.5 * fit[1] / fit[0]
@@ -854,9 +871,9 @@ def bracketR(q, noise):
         raise ValueError(f"Vector q (length {len(q)}) cannot be longer than the noise (length {len(noise)})")
     n = len(q)
     r = np.zeros(2 * n - 1, dtype=float)
-    r[n - 1:] = noise[:n]
-    r[n - 1::-1] = noise[:n]
+    r[n - 1 :] = noise[:n]
+    r[n - 1 :: -1] = noise[:n]
     dot = 0.0
     for i in range(n):
-        dot += q[i] * r[n - i - 1:2 * n - i - 1].dot(q)
+        dot += q[i] * r[n - i - 1 : 2 * n - i - 1].dot(q)
     return dot

@@ -46,15 +46,30 @@ class PhaseCorrectMassStep(moss.CalStep):
         return plt.gca()
 
 
-def phase_correct_mass_specific_lines(ch, indicator_col, uncorrected_col, corrected_col,
-                                      previous_step_index, line_names, use_expr):
+def phase_correct_mass_specific_lines(
+    ch,
+    indicator_col,
+    uncorrected_col,
+    corrected_col,
+    previous_step_index,
+    line_names,
+    use_expr,
+):
     previous_step, previous_step_index = ch.get_step(previous_step_index)
     (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
-    line_positions = [previous_step.energy2ph(line_energy) for line_energy in line_energies]
-    [indicator, uncorrected] = ch.good_serieses([indicator_col, uncorrected_col], use_expr=use_expr)
+    line_positions = [
+        previous_step.energy2ph(line_energy) for line_energy in line_energies
+    ]
+    [indicator, uncorrected] = ch.good_serieses(
+        [indicator_col, uncorrected_col], use_expr=use_expr
+    )
     phase_corrector = mass.core.phase_correct.phase_correct(
-        indicator.to_numpy(), uncorrected.to_numpy(),
-        line_positions, indicatorName=indicator_col, uncorrectedName=uncorrected_col)
+        indicator.to_numpy(),
+        uncorrected.to_numpy(),
+        line_positions,
+        indicatorName=indicator_col,
+        uncorrectedName=uncorrected_col,
+    )
     return PhaseCorrectMassStep(
         inputs=[indicator_col, uncorrected_col],
         output=[corrected_col],
@@ -63,5 +78,5 @@ def phase_correct_mass_specific_lines(ch, indicator_col, uncorrected_col, correc
         line_names=line_names,
         line_energies=line_energies,
         previous_step_index=previous_step_index,
-        phase_corrector=phase_corrector
+        phase_corrector=phase_corrector,
     )

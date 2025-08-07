@@ -2,6 +2,7 @@ import numpy as np
 
 import mass2 as mass
 import logging
+
 LOG = logging.getLogger("mass")
 
 rng = np.random.default_rng(19324234)  # make tests not fail randomly
@@ -35,7 +36,6 @@ def make_drifting_data(distrib, res_fwhm_ev, cps, duration_s, gain_of_t):
 
 
 class TestTimeDriftCorrection:
-
     @staticmethod
     def test_make_arrival_times():
         for cps in [0.1, 1, 10, 100]:
@@ -49,7 +49,7 @@ class TestTimeDriftCorrection:
 
     @staticmethod
     def gain_of_t(t):
-        return 1 + 0.005 * np.sin(2 * np.pi * t / 10000.)
+        return 1 + 0.005 * np.sin(2 * np.pi * t / 10000.0)
 
     def test_make_drifting_data(self):
         distrib = mass.calibration.MnKAlpha
@@ -57,5 +57,4 @@ class TestTimeDriftCorrection:
         cps = 1
         duration_s = 10000
 
-        _t, _energy = make_drifting_data(distrib, res_fwhm_ev, cps, duration_s,
-                                         self.gain_of_t)
+        _t, _energy = make_drifting_data(distrib, res_fwhm_ev, cps, duration_s, self.gain_of_t)

@@ -10,8 +10,7 @@ def test_phase_correct(plot=False):
     line_names = ["MnKAlpha", "FeKAlpha", "CuKAlpha", "CrKAlpha"]
     for i, name in enumerate(line_names):
         spect = mass.spectra[name]
-        energies[i * 1000:(i + 1) * 1000] = spect.rvs(size=1000, rng=rng,
-                                                      instrument_gaussian_fwhm=3)
+        energies[i * 1000 : (i + 1) * 1000] = spect.rvs(size=1000, rng=rng, instrument_gaussian_fwhm=3)
         ph_peaks.append(spect.nominal_peak_energy)
     phase = np.linspace(-0.6, 0.6, len(energies))
     rng.shuffle(energies)

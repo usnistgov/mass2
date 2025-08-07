@@ -23,6 +23,7 @@ dependencies = [
     "numba",
     "numpy>=1.14, <2.2",
     "packaging",
+    "pre-commit",
     "progress",
     "pyyaml",
     "scikit-learn",

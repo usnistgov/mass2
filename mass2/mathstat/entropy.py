@@ -150,10 +150,7 @@ def _merge_orderedlists(x1_in, x2_in):
 
 
 @njit
-def _merge_orderedlists_arrays(out,
-                               wasfirst,
-                               x1,
-                               x2):
+def _merge_orderedlists_arrays(out, wasfirst, x1, x2):
     N1 = len(x1)
     N2 = len(x2)
     i = j = k = 0
@@ -190,8 +187,7 @@ def laplace_KL_divergence(x, y, w: float = 1.0, approx_mode: str = "size") -> fl
                that, and using Simpson's rule on the PDF samples that result.
     ``size``   Uses "approx" if len(x)+len(y)>200000, or "exact" otherwise.
     """
-    return laplace_cross_entropy(x, y, w, approx_mode=approx_mode) - \
-        laplace_entropy(x, w, approx_mode=approx_mode)
+    return laplace_cross_entropy(x, y, w, approx_mode=approx_mode) - laplace_entropy(x, w, approx_mode=approx_mode)
 
 
 def laplace_cross_entropy(x, y, w: float = 1.0, approx_mode: str = "size") -> float:
@@ -237,12 +233,10 @@ def laplace_cross_entropy(x, y, w: float = 1.0, approx_mode: str = "size") -> fl
         ysorted = np.asarray(np.sort(y) / w, dtype=DTYPE)
         return laplace_cross_entropy_arrays(xsorted, ysorted) + np.log(w)
     else:
-        return laplace_cross_entropy_approx(np.asarray(x, dtype=DTYPE),
-                                            np.asarray(y, dtype=DTYPE), w)
+        return laplace_cross_entropy_approx(np.asarray(x, dtype=DTYPE), np.asarray(y, dtype=DTYPE), w)
 
 
 def laplace_cross_entropy_arrays(x, y) -> float:
-
     # List of all places where q(u) increases or decreases because of a y-point.
     Qstepwidth = 2 * np.sqrt(6)
     ynodes, qstep_is_up = _merge_orderedlists(y - 0.5 * Qstepwidth, y + 0.5 * Qstepwidth)

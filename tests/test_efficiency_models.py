@@ -18,8 +18,7 @@ def test_dict():
     for k in expected_models:
         assert k in mass.materials.filterstack_models
     for k, model in mass.materials.filterstack_models.items():
-        assert isinstance(
-            model, mass.materials.FilterStack), f"mass.filterstack_models['{k}'] not a mass.FilterStack"
+        assert isinstance(model, mass.materials.FilterStack), f"mass.filterstack_models['{k}'] not a mass.FilterStack"
 
 
 def test_ensure_uncertain():
@@ -36,9 +35,9 @@ def test_ensure_uncertain():
     assert c[1].std_dev == 1
     assert len(c) == 5
 
-    d = uncertainties_helpers.ensure_uncertain(unp.uarray(np.arange(5), .1 * np.arange(5)))
+    d = uncertainties_helpers.ensure_uncertain(unp.uarray(np.arange(5), 0.1 * np.arange(5)))
     assert d[1].nominal_value == 1
-    assert d[1].std_dev == .1
+    assert d[1].std_dev == 0.1
     assert len(d) == 5
 
 
@@ -53,7 +52,7 @@ def test_filter():
     assert maxQE > 0.21, r"Horton filter model QE < 21% everywhere"
     assert maxQE < 0.25, r"Horton filter model QE > 25% somewhere"
 
-    assert np.abs(qe[0].nominal_value / 0.07742066727279993 - 1) < .001
+    assert np.abs(qe[0].nominal_value / 0.07742066727279993 - 1) < 0.001
 
     def remove_whitespace(s):
         for k in " \n\r\t":

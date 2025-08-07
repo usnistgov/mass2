@@ -16,7 +16,7 @@ February 3, 2012
 import numpy as np
 import scipy.special
 
-__all__ = ['voigt', 'voigt_approx_fwhm']
+__all__ = ["voigt", "voigt_approx_fwhm"]
 
 _sqrt2 = np.sqrt(2.0)
 _sqrt2pi = np.sqrt(2.0 * np.pi)
@@ -60,11 +60,11 @@ def voigt(x, xctr, hwhm, sigma):
 
     # Handle the pure Gaussian limit by itself
     if hwhm == 0.0:
-        return np.exp(-0.5 * ((x - xctr) / sigma)**2) / (sigma * _sqrt2pi)
+        return np.exp(-0.5 * ((x - xctr) / sigma) ** 2) / (sigma * _sqrt2pi)
 
     # Handle the pure Lorentzian limit by itself
     if sigma == 0.0:
-        return (hwhm / np.pi) / ((x - xctr)**2 + hwhm**2)
+        return (hwhm / np.pi) / ((x - xctr) ** 2 + hwhm**2)
 
     # General Voigt function
     z = (x - xctr + 1j * hwhm) / (sigma * _sqrt2)
