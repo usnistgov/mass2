@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 from typing import Optional
 from mass2 import moss
+from mass2.calibration.energy_calibration import Curvetypes
 import pylab as plt
 
 
@@ -208,7 +209,9 @@ class MultiFit:
         )
         return pfit_gain, rms_residual_energy
 
-    def to_mass_cal(self, previous_energy2ph, curvetype="gain", approximate=False):
+    def to_mass_cal(
+        self, previous_energy2ph, curvetype=Curvetypes.GAIN, approximate=False
+    ):
         df = self.results_params_as_df()
         maker = mass.calibration.EnergyCalibrationMaker(
             ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]),
@@ -344,7 +347,7 @@ class MultiFitMassCalibrationStep(moss.CalStep):
         calibrated_col,
         use_expr=True,
     ):
-        """multifit then make a mass calibration object with curve_type="gain" and approx=False
+        """multifit then make a mass calibration object with curve_type=Curvetypes.GAIN and approx=False
         TODO: support more options"""
         previous_cal_step = ch.steps[previous_cal_step_index]
         rough_energy_col = previous_cal_step.output[0]
