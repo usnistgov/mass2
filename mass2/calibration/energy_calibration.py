@@ -21,7 +21,7 @@ from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
 
-from mass2.mathstat.interpolate import CubicSpline, GPRSplineFunction
+from mass2.mathstat.interpolate import CubicSpline, GPRSpline
 from .fluorescence_lines import STANDARD_FEATURES
 
 
@@ -349,7 +349,7 @@ class EnergyCalibrationMaker:
             raise ValueError(f"curvename='{curvename}' not recognized")
 
         if approximate:
-            internal_spline = GPRSplineFunction(x, y, dy, dx)
+            internal_spline = GPRSpline(x, y, dy, dx)
         elif len(x) > 1:
             internal_spline = CubicSpline(x, y)
         else:

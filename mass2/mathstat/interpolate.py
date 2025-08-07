@@ -32,8 +32,6 @@ import numpy as np
 import scipy as sp
 from scipy.interpolate import splev
 
-from mass2.mathstat.derivative import Function, ConstantFunction
-
 
 class CubicSpline:
     """An exact cubic spline, with either a specified slope or 'natural boundary
@@ -534,29 +532,6 @@ class SmoothingSpline:
         return self.__eval(x, der=der)
 
 
-class SmoothingSplineFunction(SmoothingSpline, Function):
-    def __init__(self, x, y, dy, dx=None, maxchisq=None, der=0):
-        super().__init__(x, y, dy, dx=dx, maxchisq=maxchisq)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-        return SmoothingSplineFunction(self.x, self.y, self.dy, self.dx, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    @staticmethod
-    def variance(xtest):
-        return np.zeros_like(xtest) + np.inf
-
-    def __repr__(self):
-        return "SmoothingSpline{}(x)".format("'" * self.der)
-
-
 class SmoothingSplineLog:
     def __init__(self, x, y, dy, dx=None, maxchisq=None):
         if np.any(x <= 0) or np.any(y <= 0):
@@ -567,22 +542,3 @@ class SmoothingSplineLog:
 
     def __call__(self, x, der=0):
         return np.exp(self.linear_model(np.log(x), der=der))
-
-
-class GPRSplineFunction(GPRSpline, Function):
-    def __init__(self, x, y, dy, dx=None, der=0):
-        super().__init__(x, y, dy, dx=dx)
-        self.der = der
-
-    def derivative(self, der=1):
-        if self.der + der > 3:
-            return ConstantFunction(0)
-        return GPRSplineFunction(self.x, self.y, self.dy, self.dx, der=self.der + der)
-
-    def __call__(self, x, der=0):
-        if self.der + der > 3:
-            return np.zeros_like(x)
-        return super().__call__(x, der=self.der + der)
-
-    def __repr__(self):
-        return "GPRSpline{}(x)".format("'" * self.der)
