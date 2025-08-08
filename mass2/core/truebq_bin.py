@@ -5,8 +5,13 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
-from mass2 import moss
 # import pyarrow as pa
+
+from .channel import Channel, ChannelHeader
+from .noise_channel import NoiseChannel
+from . import misc
+from . import pulse_algorithms
+
 
 header_dtype = np.dtype([
     ("format", np.uint32),
@@ -90,7 +95,7 @@ class TriggerResult:
             inds=noise_trigger_inds,
         )
         df = pl.DataFrame({"pulse": pulses})
-        noise = moss.NoiseChannel(
+        noise = NoiseChannel(
             df,
             header_df=self.data_source.header_df,
             frametime_s=self.data_source.frametime_s,
@@ -108,7 +113,7 @@ class TriggerResult:
             df = pl.DataFrame({"pulse": pulses * -1, "framecount": self.trig_inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": self.trig_inds})
-        ch_header = moss.ChannelHeader(
+        ch_header = ChannelHeader(
             self.data_source.description,
             self.data_source.channel_number,
             self.data_source.frametime_s,
@@ -116,7 +121,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = moss.Channel(df, ch_header, noise)
+        ch = Channel(df, ch_header, noise)
         return ch
 
     def to_channel_mmap(
@@ -144,7 +149,7 @@ class TriggerResult:
             df = pl.DataFrame({"pulse": pulses * -1, "framecount": self.trig_inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": self.trig_inds})
-        ch_header = moss.ChannelHeader(
+        ch_header = ChannelHeader(
             self.data_source.description,
             self.data_source.channel_number,
             self.data_source.frametime_s,
@@ -152,7 +157,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = moss.Channel(df, ch_header, noise)
+        ch = Channel(df, ch_header, noise)
         return ch
 
     def to_summarized_channel(
@@ -185,7 +190,7 @@ class TriggerResult:
             assert isinstance(peak_index, int), "peak_index must be an integer"
             print(f"summarizing batch {i_batch=}/{n_batches=}")
             print(f"{self.data_source.frametime_s=}, {peak_index=}, {pretrigger_ignore=}, {npre=}")
-            summary_np = moss.pulse_algorithms.summarize_data_numba(
+            summary_np = pulse_algorithms.summarize_data_numba(
                 pulses,
                 self.data_source.frametime_s,
                 peak_samplenumber=peak_index,
@@ -196,7 +201,7 @@ class TriggerResult:
             df_batch = df_batch.with_columns(pl.DataFrame({"framecount": used_pulse_inds + npre}))
             dfs.append(df_batch)
         df = pl.concat(dfs)
-        ch_header = moss.ChannelHeader(
+        ch_header = ChannelHeader(
             self.data_source.description,
             self.data_source.channel_number,
             self.data_source.frametime_s,
@@ -209,9 +214,10 @@ class TriggerResult:
             npre + npost,
             max_noise_triggers=1000,
         )
-        pulse_storage = moss.PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
-        ch = moss.Channel(df, ch_header, noise, pulse_storage=pulse_storage)
-        return ch
+        # The following lines are broken August 8, 2025. Replace them with something non-broken.
+        # pulse_storage = PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
+        # ch = Channel(df, ch_header, noise, pulse_storage=pulse_storage)
+        return Channel(df, ch_header, noise)
 
 
 @dataclass(frozen=True)
@@ -363,7 +369,7 @@ def filter_and_residual_rms(data, chosen_filter, avg_pulse, trig_inds, npre, nsa
         filt_value[i] = np.dot(chosen_filter, pulse)
         filt_value_template[i] = np.dot(template, pulse)
         residual = pulse - template * filt_value_template[i]
-        residual_rms_val = moss.misc.root_mean_squared(residual)
+        residual_rms_val = misc.root_mean_squared(residual)
         residual_rms[i] = residual_rms_val
     return filt_value, residual_rms, filt_value_template
 

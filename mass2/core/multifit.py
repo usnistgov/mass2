@@ -1,14 +1,16 @@
 from dataclasses import dataclass, field
+from typing import Optional
 import lmfit
 import copy
-import mass2 as mass
 import math
 import numpy as np
 import polars as pl
-from typing import Optional
-from mass2 import moss
-from mass2.calibration.energy_calibration import Curvetypes
 import pylab as plt
+
+import mass2 as mass
+from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
+from mass2.calibration.line_models import GenericLineModel
+from mass2.core.cal_steps import CalStep
 
 
 def handle_none(val, default):
@@ -19,7 +21,7 @@ def handle_none(val, default):
 
 @dataclass(frozen=True)
 class FitSpec:
-    model: mass.GenericLineModel
+    model: GenericLineModel
     bin_edges: np.ndarray
     use_expr: pl.Expr
     params_update: lmfit.parameter.Parameters
@@ -32,9 +34,9 @@ class FitSpec:
         return params
 
     def fit_series_without_use_expr(self, series):
-        bin_centers, counts = moss.misc.hist_of_series(series, self.bin_edges)
+        bin_centers, counts = mass.misc.hist_of_series(series, self.bin_edges)
         params = self.params(bin_centers, counts)
-        bin_centers, bin_size = moss.misc.midpoints_and_step_size(self.bin_edges)
+        bin_centers, bin_size = mass.misc.midpoints_and_step_size(self.bin_edges)
         result = self.model.fit(counts, params, bin_centers=bin_centers)
         result.set_label_hints(
             binsize=bin_size,
@@ -47,7 +49,7 @@ class FitSpec:
         return result
 
     def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr):
-        series = moss.good_series(df, col, good_expr, use_expr=self.use_expr)
+        series = mass.good_series(df, col, good_expr, use_expr=self.use_expr)
         return self.fit_series_without_use_expr(series)
 
     def fit_ch(self, ch, col: str):
@@ -188,12 +190,12 @@ class MultiFit:
             return ph / gain
 
         e_predicted = ph2energy(peaks_uncalibrated)
-        rms_residual_energy = moss.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
+        rms_residual_energy = mass.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
         return pfit_gain, rms_residual_energy
 
     def to_mass_cal(self, previous_energy2ph, curvetype=Curvetypes.GAIN, approximate=False):
         df = self.results_params_as_df()
-        maker = mass.calibration.EnergyCalibrationMaker(
+        maker = EnergyCalibrationMaker(
             ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]),
             energy=df["peak_energy_ref"].to_numpy(),
             dph=df["peak_ph_stderr"].to_numpy(),
@@ -205,7 +207,7 @@ class MultiFit:
 
 
 @dataclass(frozen=True)
-class MultiFitQuadraticGainCalStep(moss.CalStep):
+class MultiFitQuadraticGainCalStep(CalStep):
     pfit_gain: np.polynomial.Polynomial
     multifit: MultiFit
     rms_residual_energy: float
@@ -268,8 +270,8 @@ class MultiFitQuadraticGainCalStep(moss.CalStep):
 
 
 @dataclass(frozen=True)
-class MultiFitMassCalibrationStep(moss.CalStep):
-    cal: mass.EnergyCalibration
+class MultiFitMassCalibrationStep(CalStep):
+    cal: EnergyCalibration
     multifit: MultiFit
 
     def calc_from_df(self, df):

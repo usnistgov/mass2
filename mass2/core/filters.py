@@ -1,9 +1,12 @@
 import numpy as np
 import pylab as plt
-from dataclasses import dataclass
-from mass2 import moss
 import polars as pl
+
+from dataclasses import dataclass
 import mass2 as mass
+from mass2.core.cal_steps import CalStep
+from mass2.core.noise_algorithms import NoisePSD
+from mass.core.optimal_filtering import Filter5Lag
 
 
 def mass_5lag_filter(
@@ -41,15 +44,13 @@ class Filter:
     v_over_dv: float
     dt: float
     filter_type: str
-    mass_filter: mass.Filter5Lag
+    mass_filter: Filter5Lag
 
     def plot(self, axis=None, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()
-        axis.plot(
-            self.frequencies(), self.filter, label="mass 5lag filter", **plotkwarg
-        )
+        axis.plot(self.frequencies(), self.filter, label="mass 5lag filter", **plotkwarg)
         axis.grid()
         axis.set_title(f"{self.filter_type=} v_dv_known_wrong={self.v_over_dv:.2f}")
         axis.set_ylabel("filter value")
@@ -91,16 +92,14 @@ def filter_data_5lag(filter_values, pulses):
 
 
 @dataclass(frozen=True)
-class Filter5LagStep(moss.CalStep):
+class Filter5LagStep(CalStep):
     filter: Filter
-    spectrum: moss.NoisePSD
+    spectrum: NoisePSD
 
     def calc_from_df(self, df):
         dfs = []
         for df_iter in df.iter_slices(10000):
-            peak_x, peak_y = moss.filters.filter_data_5lag(
-                self.filter.filter, df_iter[self.inputs[0]].to_numpy()
-            )
+            peak_x, peak_y = mass.filters.filter_data_5lag(self.filter.filter, df_iter[self.inputs[0]].to_numpy())
             dfs.append(pl.DataFrame({"peak_x": peak_x, "peak_y": peak_y}))
         df2 = pl.concat(dfs).with_columns(df)
         df2 = df2.rename({"peak_x": self.output[0], "peak_y": self.output[1]})

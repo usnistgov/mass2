@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 import polars as pl
-from mass2 import moss
 import numpy as np
 import pylab as plt
+from . import pulse_algorithms
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class SummarizeStep(CalStep):
     def calc_from_df(self, df):
         df2 = pl.concat(
             pl.from_numpy(
-                moss.pulse_algorithms.summarize_data_numba(
+                pulse_algorithms.summarize_data_numba(
                     df_iter[self.pulse_col].to_numpy(),
                     self.frametime_s,
                     peak_samplenumber=self.peak_index,

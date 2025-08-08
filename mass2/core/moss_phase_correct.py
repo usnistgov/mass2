@@ -1,16 +1,17 @@
-import mass2 as mass
 import polars as pl
 import pylab as plt
-from mass2 import moss
 from dataclasses import dataclass
+import mass2 as mass
+from .cal_steps import CalStep
+from .phase_correct import PhaseCorrector
 
 
 @dataclass(frozen=True)
-class PhaseCorrectMassStep(moss.CalStep):
+class PhaseCorrectMassStep(CalStep):
     line_names: list[str]
     line_energies: list[float]
     previous_step_index: int
-    phase_corrector: mass.core.phase_correct.PhaseCorrector
+    phase_corrector: PhaseCorrector
 
     def calc_from_df(self, df):
         # since we only need to load two columns I'm assuming we can fit them in memory and just
@@ -28,15 +29,9 @@ class PhaseCorrectMassStep(moss.CalStep):
 
     def dbg_plot(self, df):
         indicator_col, uncorrected_col = self.inputs
-        df_small = (
-            df.lazy()
-            .filter(self.good_expr)
-            .filter(self.use_expr)
-            .select(self.inputs + self.output)
-            .collect()
-        )
-        moss.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
-        moss.misc.plot_a_vs_b_series(
+        df_small = df.lazy().filter(self.good_expr).filter(self.use_expr).select(self.inputs + self.output).collect()
+        mass.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
+        mass.misc.plot_a_vs_b_series(
             df_small[indicator_col],
             df_small[self.output[0]],
             plt.gca(),
@@ -57,12 +52,8 @@ def phase_correct_mass_specific_lines(
 ):
     previous_step, previous_step_index = ch.get_step(previous_step_index)
     (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
-    line_positions = [
-        previous_step.energy2ph(line_energy) for line_energy in line_energies
-    ]
-    [indicator, uncorrected] = ch.good_serieses(
-        [indicator_col, uncorrected_col], use_expr=use_expr
-    )
+    line_positions = [previous_step.energy2ph(line_energy) for line_energy in line_energies]
+    [indicator, uncorrected] = ch.good_serieses([indicator_col, uncorrected_col], use_expr=use_expr)
     phase_corrector = mass.core.phase_correct.phase_correct(
         indicator.to_numpy(),
         uncorrected.to_numpy(),

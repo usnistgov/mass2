@@ -5,17 +5,16 @@ import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from mass2 import moss
-from mass2.moss import (
-    NoiseChannel,
-    CalSteps,
-    DriftCorrectStep,
-    SummarizeStep,
-    Filter5LagStep,
-)
 from typing import Optional
 import numpy as np
 import time
+
+from .noise_channel import NoiseChannel
+from .cal_steps import CalSteps, SummarizeStep
+from .drift_correction import DriftCorrectStep
+from .filters import Filter5LagStep
+from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
+from . import misc
 import mass2 as mass
 
 
@@ -54,7 +53,7 @@ class Channel:
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
-            if isinstance(step, moss.SummarizeStep):
+            if isinstance(step, SummarizeStep):
                 continue
             first_non_summarize_step = step
             break
@@ -78,7 +77,7 @@ class Channel:
         step_ind = mo_ui.step_ind()
         self.step_plot(step_ind)
         fig = plt.gcf()
-        return mo.vstack([mo_ui, moss.show(fig)])
+        return mo.vstack([mo_ui, misc.show(fig)])
 
     def get_step(self, index):
         if index < 0:
@@ -96,7 +95,7 @@ class Channel:
         return step.dbg_plot(df_after, **kwargs)
 
     def plot_hist(self, col, bin_edges, axis=None):
-        axis = moss.misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
+        axis = misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
         axis.set_title(f"ch {self.header.ch_num} plot_hist")
         return axis
 
@@ -168,7 +167,7 @@ class Channel:
                 ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
             else:
                 ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
-            # bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
+            # bin_centers, counts = misc.hist_of_series(values, bin_edges)
             # plt.plot(bin_centers, counts, label=group_name)
 
         # Customize the plot
@@ -222,7 +221,7 @@ class Channel:
         plt.tight_layout()
 
     def good_series(self, col, use_expr=True):
-        return moss.good_series(self.df, col, self.good_expr, use_expr)
+        return mass.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_gain_cal(
         self,
@@ -252,7 +251,7 @@ class Channel:
         # energy_residuals = predicted_energies - energies_out
         # if any(np.abs(energy_residuals) > max_residual_ev):
         #     raise Exception(f"too large residuals: {energy_residuals=} eV")
-        step = moss.RoughCalibrationGainStep(
+        step = mass.RoughCalibrationGainStep(
             [uncalibrated_col],
             [calibrated_col],
             self.good_expr,
@@ -273,7 +272,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_combinatoric(
+        step = mass.RoughCalibrationStep.learn_combinatoric(
             self,
             line_names,
             uncalibrated_col=uncalibrated_col,
@@ -294,7 +293,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_combinatoric_height_info(
+        step = mass.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
             line_names,
             line_heights_allowed,
@@ -318,7 +317,7 @@ class Channel:
         n_extra_peaks: int = 10,
         acceptable_rms_residual_e: float = 10,
     ) -> "Channel":
-        step = moss.RoughCalibrationStep.learn_3peak(
+        step = mass.RoughCalibrationStep.learn_3peak(
             self,
             line_names,
             uncalibrated_col,
@@ -371,10 +370,10 @@ class Channel:
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
         self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False
     ) -> "Channel":
-        max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
+        max_postpeak_deriv = misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
         )
-        max_pretrig_rms = moss.misc.outlier_resistant_nsigma_above_mid(self.df["pretrig_rms"].to_numpy(), nsigma=n_sigma_pretrig_rms)
+        max_pretrig_rms = misc.outlier_resistant_nsigma_above_mid(self.df["pretrig_rms"].to_numpy(), nsigma=n_sigma_pretrig_rms)
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(pl.col("pretrig_rms") < max_pretrig_rms)
         return self.with_good_expr(good_expr, replace)
 
@@ -391,7 +390,7 @@ class Channel:
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
-            max_for_col = moss.misc.outlier_resistant_nsigma_above_mid(df[col].to_numpy(), nsigma=nsigma)
+            max_for_col = misc.outlier_resistant_nsigma_above_mid(df[col].to_numpy(), nsigma=nsigma)
             this_iter_good_expr = pl.col(col).is_between(0, max_for_col)
             if i == 0:
                 good_expr = this_iter_good_expr
@@ -408,7 +407,7 @@ class Channel:
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
-            min_for_col, max_for_col = moss.misc.outlier_resistant_nsigma_range_from_mid(df[col].to_numpy(), nsigma=nsigma)
+            min_for_col, max_for_col = misc.outlier_resistant_nsigma_range_from_mid(df[col].to_numpy(), nsigma=nsigma)
             this_iter_good_expr = pl.col(col).is_between(min_for_col, max_for_col)
             if i == 0:
                 good_expr = this_iter_good_expr
@@ -437,7 +436,7 @@ class Channel:
         return self.with_step(step)
 
     def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = moss.PretrigMeanJumpFixStep(
+        step = mass.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,
@@ -466,7 +465,7 @@ class Channel:
             .mean(axis=0)
         )
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
-        filter5lag = moss.mass_5lag_filter(
+        filter5lag = mass.mass_5lag_filter(
             avg_signal=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
@@ -529,7 +528,7 @@ class Channel:
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
-        bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
+        bin_centers, counts = misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
         print(f"before update {params=}")
@@ -567,11 +566,11 @@ class Channel:
         if noise_path is None:
             noise_channel = None
         else:
-            noise_channel = moss.NoiseChannel.from_ljh(noise_path)
-        ljh = moss.LJHFile.open(path)
+            noise_channel = NoiseChannel.from_ljh(noise_path)
+        ljh = mass.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
-        header = moss.ChannelHeader.from_ljh_header_df(header_df)
-        channel = moss.Channel(df, header=header, noise=noise_channel)
+        header = ChannelHeader.from_ljh_header_df(header_df)
+        channel = Channel(df, header=header, noise=noise_channel)
         return channel
 
     @classmethod
@@ -584,7 +583,7 @@ class Channel:
         )
         df_header = pl.DataFrame(off.header)
         df_header = df_header.with_columns(pl.Series("Filename", [off.filename]))
-        header = moss.ChannelHeader(
+        header = ChannelHeader(
             f"{os.path.split(off.filename)[1]}",
             off.header["ChannelNumberMatchingName"],
             off.framePeriodSeconds,
@@ -625,12 +624,12 @@ class Channel:
 
     def multifit_quadratic_gain_cal(
         self,
-        multifit: moss.MultiFit,
+        multifit: MultiFit,
         previous_cal_step_index,
         calibrated_col,
         use_expr=True,
     ) -> "Channel":
-        step = moss.MultiFitQuadraticGainCalStep.learn(
+        step = MultiFitQuadraticGainCalStep.learn(
             self,
             multifit_spec=multifit,
             previous_cal_step_index=previous_cal_step_index,
@@ -641,12 +640,12 @@ class Channel:
 
     def multifit_mass_cal(
         self,
-        multifit: moss.MultiFit,
+        multifit: MultiFit,
         previous_cal_step_index,
         calibrated_col,
         use_expr=True,
     ) -> "Channel":
-        step = moss.MultiFitMassCalibrationStep.learn(
+        step = MultiFitMassCalibrationStep.learn(
             self,
             multifit_spec=multifit,
             previous_cal_step_index=previous_cal_step_index,
@@ -656,7 +655,7 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df) -> "Channel":
-        ch2 = moss.Channel(pl.concat([self.df, df]), self.header, self.noise, self.good_expr)
+        ch2 = Channel(pl.concat([self.df, df]), self.header, self.noise, self.good_expr)
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
@@ -675,7 +674,7 @@ class Channel:
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
-        step = moss.phase_correct.phase_correct_mass_specific_lines(
+        step = mass.phase_correct.phase_correct_mass_specific_lines(
             self,
             indicator_col,
             uncorrected_col,
@@ -691,7 +690,7 @@ class Channel:
 
     def save_steps(self, filename):
         steps = {self.header.ch_num: self.steps[:]}
-        moss.misc.pickle_object(steps, filename)
+        misc.pickle_object(steps, filename)
         return steps
 
 

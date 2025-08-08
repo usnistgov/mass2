@@ -16,7 +16,13 @@ except ImportError:
     __version__ = "unknown version"
     version_tuple = (0, 0, "unknown version")
 
-from .core import *
+from . import calibration
+from . import common
+from . import mathstat
+from . import core
 from .calibration import *
 from .mathstat import *
 from .common import *
+from .core import *
+
+__all__ = ["calibration", "common", "mathstat", "core"]

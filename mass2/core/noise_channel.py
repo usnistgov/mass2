@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import polars as pl
-from mass2 import moss
+import mass2 as mass
 import numpy as np
 
 
@@ -11,17 +11,13 @@ class NoiseChannel:
     frametime_s: float
 
     # @functools.cache
-    def calc_max_excursion(
-        self, trace_col_name="pulse", n_limit=10000, excursion_nsigma=5
-    ):
+    def calc_max_excursion(self, trace_col_name="pulse", n_limit=10000, excursion_nsigma=5):
         def excursion2d(noise_trace):
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
         noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
         excursion = excursion2d(noise_traces)
-        max_excursion = moss.misc.outlier_resistant_nsigma_above_mid(
-            excursion, nsigma=excursion_nsigma
-        )
+        max_excursion = mass.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
@@ -59,12 +55,8 @@ class NoiseChannel:
 
             Shape: (n_pulses, len(pulse))
         """
-        df_noise2, max_excursion = self.calc_max_excursion(
-            trace_col_name, n_limit, excursion_nsigma
-        )
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)[
-            "pulse"
-        ].to_numpy()
+        df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
+        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"].to_numpy()
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -83,10 +75,8 @@ class NoiseChannel:
         trunc_front=0,
         trunc_back=0,
     ):
-        records = self.get_records_2d(
-            trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back
-        )
-        spectrum = moss.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
+        records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        spectrum = mass.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
         return spectrum
 
     def __hash__(self):
@@ -100,7 +90,7 @@ class NoiseChannel:
 
     @classmethod
     def from_ljh(cls, path):
-        ljh = moss.LJHFile.open(path)
+        ljh = mass.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         noise_channel = cls(df, header_df, header_df["Timebase"][0])
         return noise_channel

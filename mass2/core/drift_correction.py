@@ -1,11 +1,11 @@
 import numpy as np
 from dataclasses import dataclass
-import mass2 as mass
-from mass2 import moss
-from mass2.moss import CalStep
 import polars as pl
 import typing
 import pylab as plt
+
+import mass2 as mass
+from mass2.core.cal_steps import CalStep
 
 
 def drift_correct_mass(indicator, uncorrected):
@@ -15,7 +15,7 @@ def drift_correct_mass(indicator, uncorrected):
 
 
 def drift_correct_wip(indicator, uncorrected):
-    opt_result, offset = moss.rough_cal.minimize_entropy_linear(
+    opt_result, offset = mass.rough_cal.minimize_entropy_linear(
         indicator,
         uncorrected,
         bin_edges=np.arange(0, 60000, 1),
@@ -43,8 +43,8 @@ class DriftCorrectStep(CalStep):
         indicator_col, uncorrected_col = self.inputs
         # breakpoint()
         df_small = df.lazy().filter(self.good_expr).filter(self.use_expr).select(self.inputs + self.output).collect()
-        moss.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
-        moss.misc.plot_a_vs_b_series(
+        mass.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
+        mass.misc.plot_a_vs_b_series(
             df_small[indicator_col],
             df_small[self.output[0]],
             plt.gca(),
@@ -58,7 +58,7 @@ class DriftCorrectStep(CalStep):
         if corrected_col is None:
             corrected_col = uncorrected_col + "_dc"
         indicator_s, uncorrected_s = ch.good_serieses([indicator_col, uncorrected_col], use_expr)
-        dc = moss.drift_correct(
+        dc = mass.drift_correct(
             indicator=indicator_s.to_numpy(),
             uncorrected=uncorrected_s.to_numpy(),
         )

@@ -1,10 +1,8 @@
 from dataclasses import dataclass
 import numpy as np
 import pylab as plt  # type: ignore
-import mass2 as mass
 import polars as pl
 from matplotlib.axes._axes import Axes
-from .channel import Channel
 from numpy import float32, float64, ndarray
 from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
@@ -13,6 +11,10 @@ import scipy as sp
 import typing
 from typing import Optional, Union
 import itertools
+
+import mass2 as mass
+from .channel import Channel
+from .cal_steps import CalStep
 
 
 def rank_3peak_assignments(
@@ -658,7 +660,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
 
 
 @dataclass(frozen=True)
-class RoughCalibrationStep(mass.CalStep):
+class RoughCalibrationStep(CalStep):
     pfresult: SmoothedLocalMaximaResult
     assignment_result: BestAssignmentPfitGainResult
     ph2energy: typing.Callable
