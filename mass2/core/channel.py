@@ -45,9 +45,7 @@ class Channel:
     header: ChannelHeader = field(repr=True)
     noise: Optional[NoiseChannel] = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
-    df_history: list[pl.DataFrame | pl.LazyFrame] = field(
-        default_factory=list, repr=False
-    )
+    df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
 
@@ -160,25 +158,17 @@ class Channel:
             filter_expr = use_expr
 
         # Group by the specified column and filter using good_expr
-        df_small = (
-            (self.df.lazy().filter(filter_expr).select(col, group_by_col))
-            .collect()
-            .sort(group_by_col, descending=False)
-        )
+        df_small = (self.df.lazy().filter(filter_expr).select(col, group_by_col)).collect().sort(group_by_col, descending=False)
 
         # Plot a histogram for each group
-        for (group_name,), group_data in df_small.group_by(
-            group_by_col, maintain_order=True
-        ):
+        for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
             # Plot the histogram for the current group
             if group_name == "EBIT":
-                ax.hist(
-                    values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name)
-                )
+                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
             else:
                 ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
             # bin_centers, counts = moss.misc.hist_of_series(values, bin_edges)
@@ -214,9 +204,7 @@ class Channel:
             filter_expr = self.good_expr.and_(use_expr)
         else:
             filter_expr = use_expr
-        df_small = (
-            self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
-        )
+        df_small = self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
                 continue
@@ -250,9 +238,7 @@ class Channel:
         # this is meant to filter the data, then select down to the columsn we need, then materialize them,
         # all without copying our pulse records again
         uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        peak_ph_vals, _peak_heights = mass.algorithms.find_local_maxima(
-            uncalibrated, gaussian_fwhm=ph_smoothing_fwhm
-        )
+        peak_ph_vals, _peak_heights = mass.algorithms.find_local_maxima(uncalibrated, gaussian_fwhm=ph_smoothing_fwhm)
         name_e, energies_out, opt_assignments = mass.algorithms.find_opt_assignment(
             peak_ph_vals,
             line_names=line_names,
@@ -373,11 +359,10 @@ class Channel:
     def with_good_expr(self, good_expr, replace=False) -> "Channel":
         if replace:
             good_expr = good_expr
-        else:
-            # the default value of self.good_expr is True
-            # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-            if good_expr is not True:
-                good_expr = good_expr.and_(self.good_expr)
+        # the default value of self.good_expr is True
+        # and_(True) will just add visual noise when looking at good_expr and not affect behavior
+        elif good_expr is not True:
+            good_expr = good_expr.and_(self.good_expr)
         return Channel(
             df=self.df,
             header=self.header,
@@ -394,39 +379,24 @@ class Channel:
         max_postpeak_deriv = moss.misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
         )
-        max_pretrig_rms = moss.misc.outlier_resistant_nsigma_above_mid(
-            self.df["pretrig_rms"].to_numpy(), nsigma=n_sigma_pretrig_rms
-        )
-        good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(
-            pl.col("pretrig_rms") < max_pretrig_rms
-        )
+        max_pretrig_rms = moss.misc.outlier_resistant_nsigma_above_mid(self.df["pretrig_rms"].to_numpy(), nsigma=n_sigma_pretrig_rms)
+        good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(pl.col("pretrig_rms") < max_pretrig_rms)
         return self.with_good_expr(good_expr, replace)
 
     def with_range_around_median(self, col, range_up, range_down):
         med = np.median(self.df[col].to_numpy())
-        return self.with_good_expr(
-            pl.col(col).is_between(med - range_down, med + range_up)
-        )
+        return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
-    def with_good_expr_below_nsigma_outlier_resistant(
-        self, col_nsigma_pairs, replace=False, use_prev_good_expr=True
-    ) -> "Channel":
+    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = (
-                self.df.lazy()
-                .select(pl.exclude("pulse"))
-                .filter(self.good_expr)
-                .collect()
-            )
+            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
-            max_for_col = moss.misc.outlier_resistant_nsigma_above_mid(
-                df[col].to_numpy(), nsigma=nsigma
-            )
+            max_for_col = moss.misc.outlier_resistant_nsigma_above_mid(df[col].to_numpy(), nsigma=nsigma)
             this_iter_good_expr = pl.col(col).is_between(0, max_for_col)
             if i == 0:
                 good_expr = this_iter_good_expr
@@ -434,27 +404,16 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    def with_good_expr_nsigma_range_outlier_resistant(
-        self, col_nsigma_pairs, replace=False, use_prev_good_expr=True
-    ) -> "Channel":
+    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = (
-                self.df.lazy()
-                .select(pl.exclude("pulse"))
-                .filter(self.good_expr)
-                .collect()
-            )
+            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
-            min_for_col, max_for_col = (
-                moss.misc.outlier_resistant_nsigma_range_from_mid(
-                    df[col].to_numpy(), nsigma=nsigma
-                )
-            )
+            min_for_col, max_for_col = moss.misc.outlier_resistant_nsigma_range_from_mid(df[col].to_numpy(), nsigma=nsigma)
             this_iter_good_expr = pl.col(col).is_between(min_for_col, max_for_col)
             if i == 0:
                 good_expr = this_iter_good_expr
@@ -466,9 +425,7 @@ class Channel:
     def typical_peak_ind(self, col="pulse"):
         return int(np.median(self.df.limit(100)[col].to_numpy().argmax(axis=1)))
 
-    def summarize_pulses(
-        self, col="pulse", pretrigger_ignore_samples=0, peak_index=None
-    ) -> "Channel":
+    def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
         step = SummarizeStep(
@@ -484,9 +441,7 @@ class Channel:
         )
         return self.with_step(step)
 
-    def correct_pretrig_mean_jumps(
-        self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096
-    ):
+    def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
         step = moss.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
@@ -536,22 +491,10 @@ class Channel:
         return self.with_step(step)
 
     def good_df(self, cols=pl.all(), use_expr=True):
-        return (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(cols)
-            .collect()
-        )
+        return self.df.lazy().filter(self.good_expr).filter(use_expr).select(cols).collect()
 
     def bad_df(self, cols=pl.all(), use_expr=True):
-        return (
-            self.df.lazy()
-            .filter(self.good_expr.not_())
-            .filter(use_expr)
-            .select(cols)
-            .collect()
-        )
+        return self.df.lazy().filter(self.good_expr.not_()).filter(use_expr).select(cols).collect()
 
     def good_serieses(self, cols, use_expr):
         df2 = self.good_df(cols, use_expr)
@@ -587,23 +530,17 @@ class Channel:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass.get_model(
-            line, has_linear_background=has_linear_background, has_tails=has_tails
-        )
+        model = mass.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
-        df_small = (
-            self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
-        )
+        df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
         bin_centers, counts = moss.misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
         print(f"before update {params=}")
         params = params.update(params_update)
         print(f"after update {params=}")
-        result = model.fit(
-            counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3
-        )
+        result = model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
         result.set_label_hints(
             binsize=bin_centers[1] - bin_centers[0],
             ds_shortname=self.header.description,
@@ -615,9 +552,7 @@ class Channel:
         return result
 
     def step_summary(self):
-        return [
-            (type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)
-        ]
+        return [(type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)]
 
     def __hash__(self):
         # needed to make functools.cache work
@@ -650,11 +585,7 @@ class Channel:
 
         df = pl.from_numpy(off._mmap)
         df = (
-            df.select(
-                pl.from_epoch("unixnano", time_unit="ns")
-                .dt.cast_time_unit("us")
-                .alias("timestamp")
-            )
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -671,13 +602,9 @@ class Channel:
         channel = cls(df, header)
         return channel
 
-    def with_experiment_state_df(
-        self, df_es, force_timestamp_monotonic=False
-    ) -> "Channel":
+    def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
         if not self.df["timestamp"].is_sorted():
-            df = self.df.select(
-                pl.col("timestamp").cum_max().alias("timestamp")
-            ).with_columns(self.df.select(pl.exclude("timestamp")))
+            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
             # print("This is likely a BUG in DASTARD.")
         else:
@@ -736,9 +663,7 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df) -> "Channel":
-        ch2 = moss.Channel(
-            pl.concat([self.df, df]), self.header, self.noise, self.good_expr
-        )
+        ch2 = moss.Channel(pl.concat([self.df, df]), self.header, self.noise, self.good_expr)
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
