@@ -13,7 +13,7 @@ from .noise_channel import NoiseChannel
 from .cal_steps import CalSteps, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
-from .filters import Filter5LagStep
+from .filter_steps import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
 from . import misc
 import mass2 as mass

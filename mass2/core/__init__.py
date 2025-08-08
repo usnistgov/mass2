@@ -26,8 +26,8 @@ from .multifit import (
     MultiFitQuadraticGainCalStep,
     MultiFitMassCalibrationStep,
 )
-from . import filters
-from .filters import Filter5LagStep
+from . import filter_steps
+from .filter_steps import Filter5LagStep
 from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
 from .drift_correction import drift_correct, DriftCorrectStep
 from . import rough_cal
@@ -62,7 +62,7 @@ __all__ = [
     "MultiFit",
     "MultiFitQuadraticGainCalStep",
     "MultiFitMassCalibrationStep",
-    "filters",
+    "filter_steps",
     "ToeplitzWhitener",
     "FilterMaker",
     "Filter",
