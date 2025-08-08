@@ -5,9 +5,11 @@ name: Python application
 
 on:
   push:
+    branches: [ "main" ]
   # If you don't have a "branches: [...]" entry here, the action runs on any push.
+  # At first, let's run actions only on main pushes.
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
