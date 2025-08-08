@@ -288,7 +288,12 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
-        axis.plot(self.values, **kwargs)
+        axis.plot(self.values, label="mass 5lag filter", **kwargs)
+        axis.grid()
+        axis.set_title(f"{self._filter_type=} V/dV={self.predicted_v_over_dv:.2f}")
+        axis.set_ylabel("filter value")
+        axis.set_xlabel("Lag Time (s)")
+        axis.figure.tight_layout()
 
     def report(self, std_energy: float = 5898.8):
         """Report on estimated V/dV for the filter.
@@ -501,6 +506,53 @@ class FilterMaker:
     whitener: Optional[ToeplitzWhitener] = None
     sample_time_sec: float = 0.0
     peak: float = 0.0
+
+    @classmethod
+    def create_5lag(
+        cls,
+        avg_signal: npt.ArrayLike,
+        n_pretrigger: int,
+        noise_psd: npt.ArrayLike,
+        noise_autocorr_vec: npt.ArrayLike,
+        dt: float,
+        fmax: Optional[float] = None,
+        f_3db: Optional[float] = None,
+    ):
+        """create_5lag creates a 5-lag filter directly, first creating, then using and deleting a `FilterMaker`.
+
+        Parameters
+        ----------
+        avg_signal : npt.ArrayLike
+            The average signal to be used for filter construction
+        n_pretrigger : int
+            Number of samples before the trigger
+        noise_psd : npt.ArrayLike
+            Noise power-spectral density (starting at 0 and ending at the critical/Nyquist frequency)
+        noise_autocorr_vec : npt.ArrayLike
+            Noise autocorrelation
+        dt : float
+            Sampling period
+        fmax : Optional[float], optional
+            A hard low-pass limit, Fourier frequencies above this (in Hz) will be given zero amplitude, by default None
+        f_3db : Optional[float], optional
+            A soft low-pass limit, Fourier frequencies above this (in Hz) will be rolled off by a
+            1-pole filter with this 3 dB point (in Hz), by default None
+
+        Returns
+        -------
+        Filter
+            A 5-lag optimal filter.
+        """
+        peak_signal = np.amax(avg_signal) - avg_signal[0]
+        maker = cls(
+            avg_signal,
+            n_pretrigger,
+            noise_psd=noise_psd,
+            noise_autocorr=noise_autocorr_vec,
+            sample_time_sec=dt,
+            peak=peak_signal,
+        )
+        return maker.compute_5lag(fmax=fmax, f_3db=f_3db)
 
     def compute_5lag(self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
         """Compute a single filter, with optional low-pass filtering, and with optional zero

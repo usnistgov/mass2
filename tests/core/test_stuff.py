@@ -116,14 +116,13 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     step: mass.Filter5LagStep = ch.steps[-1]
     assert isinstance(step, mass.Filter5LagStep)
     filter: mass.Filter = step.filter
-    assert filter.v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
+    assert filter.predicted_v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
     # test that the mass normaliztion in place
     # a pulse filtered value (5lagy) should roughly equal its peak height
     assert np.mean(ch.df["5lagy"].to_numpy()) == pytest.approx(Maxsignal, rel=1e-2)
     # compare v_dv achieved (signal/fwhm) to predicted using 2.355*std=fwhm
     assert Maxsignal / (2.355 * np.std(ch.df["5lagy"].to_numpy())) == pytest.approx(mass_filter.predicted_v_over_dv, rel=5e-2)
-    assert filter.filter_type == "mass 5lag"
-    assert filter.dt == frametime_s
+    assert filter._filter_type == "5lag"
 
 
 def test_noise_autocorr():

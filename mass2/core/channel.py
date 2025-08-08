@@ -12,6 +12,7 @@ import time
 from .noise_channel import NoiseChannel
 from .cal_steps import CalSteps, SummarizeStep
 from .drift_correction import DriftCorrectStep
+from .optimal_filtering import FilterMaker
 from .filters import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
 from . import misc
@@ -465,13 +466,12 @@ class Channel:
             .mean(axis=0)
         )
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
-        filter5lag = mass.mass_5lag_filter(
+        filter5lag = FilterMaker.create_5lag(
             avg_signal=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
             noise_autocorr_vec=spectrum5lag.autocorr_vec,
             dt=self.header.frametime_s,
-            fmax=None,  # not exposed in the API
             f_3db=f_3db,
         )
         step = Filter5LagStep(
