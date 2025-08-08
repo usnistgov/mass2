@@ -268,3 +268,19 @@ class LJHFile:
         with open(filename, "wb") as f:
             f.write(self.header_string)
             f.write(self._mmap[:npulses].tobytes())
+
+    @property
+    def is_continuous(self) -> bool:
+        """Is this LJH file made of a perfectly continuous data stream?
+
+        We generally do take noise data in this mode, and it's useful to analyze the noise
+        data by gluing many records together. This property says whether such gluing is valid.
+
+        Returns
+        -------
+        bool
+            Whether every record is strictly continuous with the ones before and after
+        """
+        expected_subframe_diff = self.nsamples * self.subframediv
+        subframe = self._mmap["subframecount"]
+        return np.max(np.diff(subframe)) <= expected_subframe_diff
