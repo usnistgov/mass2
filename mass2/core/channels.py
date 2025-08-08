@@ -194,14 +194,14 @@ class Channels:
         return cls(channels, description)
 
     @classmethod
-    def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None):
+    def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None, exclude_ch_nums=[]):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
             paths = mass.ljhutil.find_ljh_files(pulse_folder)
             pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
-            pairs = mass.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit)
+            pairs = mass.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"in from_ljh_folder has {len(pairs)} pairs")
