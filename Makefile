@@ -4,7 +4,7 @@
 
 PYSCRIPTS = bin/ljh_merge bin/ljh_truncate
 PYFILES = $(shell find . -name "*.py") $(PYSCRIPTS)
-FORMFILES := $(shell find mass -name "*_form_ui.py")
+FORMFILES := $(shell find mass2 -name "*_form_ui.py")
 
 .PHONY: all build clean test pep8 autopep8 lint ruff
 

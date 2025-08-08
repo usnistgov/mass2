@@ -5,7 +5,7 @@ target-version = "py39"
 
 exclude = [
   "bin/rebuild",
-  "nonstandard",
+  "examples",
 ]
 
 line-length = 135
