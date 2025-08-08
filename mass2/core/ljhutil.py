@@ -1,12 +1,13 @@
 import os
 import re
-from typing import List, Iterator, Tuple, Union
+from typing import Union
+from collections.abc import Iterator
 import pathlib
 
 # functions for finding ljh files and opening them as Channels
 
 
-def find_folders_with_extension(root_path: str, extensions: List[str]) -> List[str]:
+def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[str]:
     """
     Finds all folders within the root_path that contain at least one file with the given extension.
 
@@ -15,7 +16,7 @@ def find_folders_with_extension(root_path: str, extensions: List[str]) -> List[s
     - extension (str): The file extension to search for (e.g., '.txt').
 
     Returns:
-    - List[str]: A list of paths to directories containing at least one file with the given extension.
+    - list[str]: A list of paths to directories containing at least one file with the given extension.
     """
     matching_folders = set()
 
@@ -31,9 +32,7 @@ def find_folders_with_extension(root_path: str, extensions: List[str]) -> List[s
     return list(matching_folders)
 
 
-def find_ljh_files(
-    folder: str, ext: str = ".ljh", search_subdirectories: bool = False
-) -> List[str]:
+def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False) -> list[str]:
     """
     Finds all .ljh files in the given folder and its subfolders.
 
@@ -41,7 +40,7 @@ def find_ljh_files(
     - folder (str): The root directory to start the search from.
 
     Returns:
-    - List[str]: A list of paths to .ljh files.
+    - list[str]: A list of paths to .ljh files.
     """
     ljh_files = []
     if search_subdirectories:
@@ -72,9 +71,7 @@ def extract_channel_number(file_path: str) -> int:
         raise ValueError(f"File path does not match expected pattern: {file_path}")
 
 
-def match_files_by_channel(
-    folder1: str, folder2: str, limit=None
-) -> List[Iterator[Tuple[str, str]]]:
+def match_files_by_channel(folder1: str, folder2: str, limit=None) -> list[Iterator[tuple[str, str]]]:
     """
     Matches .ljh files from two folders by channel number.
 
@@ -83,14 +80,14 @@ def match_files_by_channel(
     - folder2 (str): The second root directory.
 
     Returns:
-    - List[Iterator[Tuple[str, str]]]: A list of iterators, each containing pairs of paths with matching channel numbers.
+    - list[Iterator[tuple[str, str]]]: A list of iterators, each containing pairs of paths with matching channel numbers.
     """
     files1 = find_ljh_files(folder1)
     files2 = find_ljh_files(folder2)
     # print(f"in folder {folder1} found {len(files1)} files")
     # print(f"in folder {folder2} found {len(files2)} files")
 
-    def collect_to_dict_error_on_repeat_channel(files: List[str]) -> dict:
+    def collect_to_dict_error_on_repeat_channel(files: list[str]) -> dict:
         """
         Collects files into a dictionary by channel number, raising an error if a channel number is repeated.
         """
@@ -99,9 +96,7 @@ def match_files_by_channel(
             channel = extract_channel_number(file)
             if channel in files_by_channel.keys():
                 existing_file = files_by_channel[channel]
-                raise ValueError(
-                    f"Duplicate channel number found: {channel} in file {file} and already in {existing_file}"
-                )
+                raise ValueError(f"Duplicate channel number found: {channel} in file {file} and already in {existing_file}")
             files_by_channel[channel] = file
         return files_by_channel
 
@@ -112,9 +107,7 @@ def match_files_by_channel(
     matching_pairs = []
     for channel in sorted(files1_by_channel.keys()):
         if channel in files2_by_channel.keys():
-            matching_pairs.append(
-                (files1_by_channel[channel], files2_by_channel[channel])
-            )
+            matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
     # print(f"in match_files_by_channel found {len(matching_pairs)} channel pairs, {limit=}")
     matching_pairs_limited = matching_pairs[:limit]
     # print(f"in match_files_by_channel found {len(matching_pairs)=} after limit of {limit=}")

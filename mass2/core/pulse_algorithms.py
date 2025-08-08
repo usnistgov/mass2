@@ -3,28 +3,26 @@ from numba import jit
 from numpy.typing import NDArray
 
 # Define the dtype for the structured array
-result_dtype = np.dtype(
-    [
-        ("pretrig_mean", np.float32),
-        ("pretrig_rms", np.float32),
-        ("pulse_average", np.float32),
-        ("pulse_rms", np.float32),
-        ("promptness", np.float32),
-        ("rise_time", np.float32),
-        ("postpeak_deriv", np.float32),
-        ("peak_index", np.uint16),
-        ("peak_value", np.uint16),
-        ("min_value", np.uint16),
-        ("shift1", np.uint16),
-    ]
-)
+result_dtype = np.dtype([
+    ("pretrig_mean", np.float32),
+    ("pretrig_rms", np.float32),
+    ("pulse_average", np.float32),
+    ("pulse_rms", np.float32),
+    ("promptness", np.float32),
+    ("rise_time", np.float32),
+    ("postpeak_deriv", np.float32),
+    ("peak_index", np.uint16),
+    ("peak_value", np.uint16),
+    ("min_value", np.uint16),
+    ("shift1", np.uint16),
+])
 
 # Create a type alias for the structured array
 ResultArrayType = NDArray[result_dtype]
 
 
 @jit(nopython=True)
-def summarize_data_numba(
+def summarize_data_numba(  # noqa: PLR0914
     rawdata: NDArray[np.uint16],
     timebase: float,
     peak_samplenumber: int,
@@ -64,8 +62,7 @@ def summarize_data_numba(
             if signal > peak_value:
                 peak_value = signal
                 peak_index = k
-            if signal < min_value:
-                min_value = signal
+            min_value = min(min_value, signal)
 
             if k < e_nPresamples:
                 pretrig_sum += signal
@@ -102,9 +99,7 @@ def summarize_data_numba(
         results["min_value"][j] = min_value
         pulse_avg = pulse_sum / (nSamples - nPresamples + 1) - ptm
         results["pulse_average"][j] = pulse_avg
-        results["pulse_rms"][j] = np.sqrt(
-            pulse_rms_sum / (nSamples - nPresamples + 1) - ptm * pulse_avg * 2 - ptm**2
-        )
+        results["pulse_rms"][j] = np.sqrt(pulse_rms_sum / (nSamples - nPresamples + 1) - ptm * pulse_avg * 2 - ptm**2)
 
         low_th = int(0.1 * peak_value + ptm)
         high_th = int(0.9 * peak_value + ptm)
@@ -131,9 +126,7 @@ def summarize_data_numba(
             k += 1
 
         if high_value > low_value:
-            results["rise_time"][j] = (
-                timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
-            )
+            results["rise_time"][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
         else:
             results["rise_time"][j] = timebase
 
@@ -157,8 +150,7 @@ def summarize_data_numba(
             t2 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
 
             t3 = min(t2, t0)
-            if t3 > t_max_deriv:
-                t_max_deriv = t3
+            t_max_deriv = max(t_max_deriv, t3)
 
             t0, t1 = t1, t2
 

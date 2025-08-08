@@ -8,10 +8,11 @@ from mass2 import moss
 import joblib
 import traceback
 import lmfit
+import os
 import pathlib
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True)  # noqa: PLR0904
 class Channels:
     channels: dict[int, moss.Channel]
     description: str
@@ -38,7 +39,7 @@ class Channels:
             dfs.append(df.with_columns(ch_series))
         return pl.concat(dfs)
 
-    def linefit(
+    def linefit(  # noqa: PLR0917
         self,
         line,
         col,
@@ -193,8 +194,6 @@ class Channels:
 
     @classmethod
     def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None):
-        import os
-
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
             paths = moss.ljhutil.find_ljh_files(pulse_folder)
@@ -237,10 +236,10 @@ class Channels:
         return self.with_experiment_state_df(df_es)
 
     def with_external_trigger_by_path(self, path=None):
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
     def with_external_trigger_df(self, df_ext):
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
     def with_experiment_state_df(self, df_es):
         # this is not as performant as making use_exprs for states
@@ -272,8 +271,6 @@ class Channels:
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self):
-        import pathlib
-
         parent_folder_path = pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
         print(f"{parent_folder_path=}")
         return parent_folder_path
@@ -293,14 +290,14 @@ class Channels:
     @classmethod
     def from_df(
         cls,
-        df,
+        df_in,
         frametime_s=np.nan,
         n_presamples=None,
         n_samples=None,
         description="from Channels.channels_from_df",
     ):
         # requres a column named "ch_num" containing the channel number
-        keys_df = df.partition_by(by=["ch_num"], as_dict=True)
+        keys_df = df_in.partition_by(by=["ch_num"], as_dict=True)
         dfs = {keys[0]: df for (keys, df) in keys_df.items()}
         channels = {}
         for ch_num, df in dfs.items():

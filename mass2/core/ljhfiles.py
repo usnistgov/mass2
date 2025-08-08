@@ -1,5 +1,5 @@
 from dataclasses import dataclass, replace
-from typing import Optional, ClassVar, Self, Tuple
+from typing import Optional, ClassVar, Self
 import numpy.typing as npt
 import os
 import numpy as np
@@ -56,22 +56,18 @@ class LJHFile:
 
         ljh_version = Version(header_dict["Save File Format Version"])
         if ljh_version < Version("2.2.0"):
-            dtype = np.dtype(
-                [
-                    ("internal_us", np.uint8),
-                    ("internal_unused", np.uint8),
-                    ("internal_ms", np.uint32),
-                    ("data", np.uint16, nsamples),
-                ]
-            )
+            dtype = np.dtype([
+                ("internal_us", np.uint8),
+                ("internal_unused", np.uint8),
+                ("internal_ms", np.uint32),
+                ("data", np.uint16, nsamples),
+            ])
         else:
-            dtype = np.dtype(
-                [
-                    ("subframecount", np.int64),
-                    ("posix_usec", np.int64),
-                    ("data", np.uint16, nsamples),
-                ]
-            )
+            dtype = np.dtype([
+                ("subframecount", np.int64),
+                ("posix_usec", np.int64),
+                ("data", np.uint16, nsamples),
+            ])
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
@@ -84,9 +80,7 @@ class LJHFile:
         npulses = binary_size // pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(
-            filename, dtype, mode="r", offset=header_size, shape=(npulses,)
-        )
+        mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
 
         return LJHFile(
             filename,
@@ -107,7 +101,7 @@ class LJHFile:
         )
 
     @classmethod
-    def read_header(cls, filename: str) -> Tuple[dict, str, int]:
+    def read_header(cls, filename: str) -> tuple[dict, str, int]:
         """Read in the text header of an LJH file. Return the header parsed into a dictionary,
         the complete header string (in case you want to generate a new LJH file from this one),
         and the size of the header in bytes. The file does not remain open after this method.
@@ -129,12 +123,10 @@ class LJHFile:
                 i += 1
                 if line.startswith("#End of Header"):
                     break
-                elif line == "":
+                elif not line:
                     raise Exception("reached EOF before #End of Header")
                 elif i > cls.OVERLONG_HEADER:
-                    raise Exception(
-                        f"header is too long--seems not to contain '#End of Header'\nin file {filename}"
-                    )
+                    raise Exception(f"header is too long--seems not to contain '#End of Header'\nin file {filename}")
                 # ignore lines without ":"
                 elif ":" in line:
                     a, b = line.split(":", maxsplit=1)
@@ -211,9 +203,7 @@ class LJHFile:
         """
         return self._mmap["data"][i]
 
-    def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False
-    ) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -225,15 +215,13 @@ class LJHFile:
 
         Returns
         -------
-        Tuple[pl.DataFrame, pl.DataFrame]
+        tuple[pl.DataFrame, pl.DataFrame]
             (df, header_df)
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
         """
         if self.ljh_version < Version("2.2.0"):
-            raise NotImplementedError(
-                "cannot convert LJH pre-2.2 files to Polars dataframes yet"
-            )
+            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
 
         data = {
             "pulse": self._mmap["data"][first_pulse:],
@@ -246,9 +234,7 @@ class LJHFile:
             "subframecount": pl.UInt64,
         }
         df = pl.DataFrame(data, schema=schema)
-        df = df.select(
-            pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")
-        ).with_columns(df)
+        df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
         header_df = pl.DataFrame(self.header)

@@ -1,7 +1,9 @@
 import os
+import lmfit
 from dataclasses import dataclass, field
 import polars as pl
 import pylab as plt
+import marimo as mo
 import functools
 from mass2 import moss
 from mass2.moss import (
@@ -15,7 +17,6 @@ from typing import Optional
 import numpy as np
 import time
 import mass2 as mass
-import lmfit
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class ChannelHeader:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True)  # noqa: PLR0904
 class Channel:
     df: pl.DataFrame | pl.LazyFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
@@ -50,8 +51,6 @@ class Channel:
     steps_elapsed_s: list[float] = field(default_factory=list)
 
     def mo_stepplots(self):
-        import marimo as mo
-
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
@@ -76,8 +75,6 @@ class Channel:
         return mo_ui
 
     def _mo_stepplots_explicit(self, mo_ui):
-        import marimo as mo
-
         step_ind = mo_ui.step_ind()
         self.step_plot(step_ind)
         fig = plt.gcf()
@@ -309,7 +306,7 @@ class Channel:
         )
         return self.with_step(step)
 
-    def rough_cal(
+    def rough_cal(  # noqa: PLR0917
         self,
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
@@ -357,11 +354,9 @@ class Channel:
         return ch2
 
     def with_good_expr(self, good_expr, replace=False) -> "Channel":
-        if replace:
-            good_expr = good_expr
         # the default value of self.good_expr is True
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        elif good_expr is not True:
+        if not replace and good_expr is not True:
             good_expr = good_expr.and_(self.good_expr)
         return Channel(
             df=self.df,
@@ -518,7 +513,7 @@ class Channel:
         )
         return self.with_step(step)
 
-    def linefit(
+    def linefit(  # noqa: PLR0917
         self,
         line,
         col,
@@ -581,8 +576,6 @@ class Channel:
 
     @classmethod
     def from_off(cls, off) -> "Channel":
-        import os
-
         df = pl.from_numpy(off._mmap)
         df = (
             df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
@@ -614,7 +607,7 @@ class Channel:
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame):
         # df2 = self.df.join_asof(df_ext, )
-        raise Exception("not implemented")
+        raise NotImplementedError("not implemented")
 
     def with_replacement_df(self, df2) -> "Channel":
         return Channel(

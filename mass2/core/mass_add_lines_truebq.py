@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import mass2 as mass
 import numpy as np
 

@@ -1,8 +1,10 @@
 import numpy as np
+import scipy as sp
 import pylab as plt  # type: ignore
+import mass2 as mass
 from dataclasses import dataclass
 from numpy import ndarray
-from typing import Tuple, Optional
+from typing import Optional
 
 
 def calc_autocorrelation(data):
@@ -11,7 +13,7 @@ def calc_autocorrelation(data):
 
     for i in range(ntraces):
         pulse = data[i, :]
-        pulse = pulse - pulse.mean()
+        pulse -= pulse.mean()
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
 
     ac /= ntraces
@@ -24,9 +26,7 @@ def calc_autocorrelation_times(n, dt):
 
 
 def autocorrelation(data, dt):
-    return AutoCorrelation(
-        calc_autocorrelation(data), calc_autocorrelation_times(data.shape[1], dt)
-    )
+    return AutoCorrelation(calc_autocorrelation(data), calc_autocorrelation_times(data.shape[1], dt))
 
 
 @dataclass
@@ -67,14 +67,8 @@ def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 
-def noise_psd_periodogram(
-    data: ndarray, dt: float, window="boxcar", detrend=False
-) -> "NoisePSD":
-    import scipy.signal
-
-    f, Pxx = scipy.signal.periodogram(
-        data, fs=1 / dt, window=window, axis=-1, detrend=detrend
-    )
+def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoisePSD":
+    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
     Pxx_mean = np.mean(Pxx, axis=0)
@@ -85,13 +79,10 @@ def noise_psd_periodogram(
 
 def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
     assert window is None, "windowing not implemented"
-    import mass2 as mass
 
     (n_pulses, len_pulse) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
-    f_mass, psd_mass = mass.power_spectrum.computeSpectrum(
-        data.ravel(), segfactor=n_pulses, dt=dt
-    )
+    f_mass, psd_mass = mass.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
     autocorr_vec = calc_autocorrelation(data)
     # nbins = len(psd_mass)
     # frequencies = calc_psd_frequencies(nbins, dt)
@@ -107,7 +98,7 @@ class NoisePSD:
     def plot(
         self,
         axis: Optional[plt.axis] = None,
-        arb_to_unit_scale_and_label: Tuple[int, str] = (1, "arb"),
+        arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
         loglog: bool = True,
         **plotkwarg,

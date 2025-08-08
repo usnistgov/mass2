@@ -13,10 +13,10 @@ def python_nearest_arrivals(reference_times, other_times):
     nearest_before_index[:first_index] = 1
     nearest_before_index -= 1
     before_times = reference_times - other_times[nearest_before_index]
-    before_times[:first_index] = np.Inf
+    before_times[:first_index] = np.inf
 
     nearest_after_index[last_index:] = other_times.size - 1
     after_times = other_times[nearest_after_index] - reference_times
-    after_times[last_index:] = np.Inf
+    after_times[last_index:] = np.inf
 
     return before_times, after_times

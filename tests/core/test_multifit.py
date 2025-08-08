@@ -1,7 +1,9 @@
-from mass2 import moss
 import numpy as np
+import pylab as plt
 import mass2 as mass
 import polars as pl
+import os
+import tempfile
 
 
 def generate_and_fit_fake_data(
@@ -36,9 +38,9 @@ def generate_and_fit_fake_data(
     # Combine all photon energies
     all_values = np.concatenate([mn_values, gaussian_values[0], gaussian_values[1]])
     df = pl.DataFrame({"energy": all_values})
-    ch = moss.Channel(
+    ch = mass.Channel(
         df,
-        header=moss.ChannelHeader(
+        header=mass.ChannelHeader(
             description="Fake spectral data for testing MultiFit",
             ch_num=1,
             frametime_s=0.1,
@@ -50,7 +52,7 @@ def generate_and_fit_fake_data(
 
     # Set up MultiFit
     multifit = (
-        moss.MultiFit(default_fit_width=80, default_bin_size=1)
+        mass.MultiFit(default_fit_width=80, default_bin_size=1)
         .with_line("MnKAlpha")
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
@@ -63,9 +65,7 @@ def generate_and_fit_fake_data(
         uncalibrated_col="energy",
         calibrated_col="energy2",
     )
-    ch = ch.multifit_mass_cal(
-        multifit, previous_cal_step_index=-1, calibrated_col="energy3"
-    )
+    ch = ch.multifit_mass_cal(multifit, previous_cal_step_index=-1, calibrated_col="energy3")
 
     return ch
 
@@ -73,15 +73,12 @@ def generate_and_fit_fake_data(
 def test_multifit_and_saving_and_loading_steps_in_channel():
     ch = generate_and_fit_fake_data()
     ch.step_plot(-1)
-    import tempfile
-    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
         ch.save_steps(filename)
-        steps_loaded = moss.misc.unpickle_object(filename)
+        steps_loaded = mass.misc.unpickle_object(filename)
     steps_loaded[ch.header.ch_num][-1].dbg_plot(ch.df)
-    import pylab as plt
 
     plt.close()
     plt.close()
@@ -89,22 +86,16 @@ def test_multifit_and_saving_and_loading_steps_in_channel():
 
 def test_multifit_and_saving_and_loading_steps_in_channels():
     ch = generate_and_fit_fake_data()
-    data = moss.Channels({ch.header.ch_num: ch}, "for test_multifit_in_channels")
-    import tempfile
-    import os
+    data = mass.Channels({ch.header.ch_num: ch}, "for test_multifit_in_channels")
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
         data.save_steps(filename)
-        _ = data.load_steps(
-            filename
-        )  # it would be better to start with a data that doesn't have the output of the steps...
+        _ = data.load_steps(filename)  # it would be better to start with a data that doesn't have the output of the steps...
         # and maybe throw an error for writing over existing columns?
         # fow now, I'm happy this is tested at all
-        steps = moss.misc.unpickle_object(filename)
-    _ = data.with_steps_dict(
-        steps
-    )  # pretty much the blow by blow version of load_steps
+        steps = mass.misc.unpickle_object(filename)
+    _ = data.with_steps_dict(steps)  # pretty much the blow by blow version of load_steps
 
 
 if __name__ == "__main__":
