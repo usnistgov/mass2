@@ -12,8 +12,7 @@ def calc_autocorrelation(data):
     ac = np.zeros(nsamples, dtype=float)
 
     for i in range(ntraces):
-        pulse = data[i, :]
-        pulse -= pulse.mean()
+        pulse = data[i, :] - data[i, :].mean()
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
 
     ac /= ntraces

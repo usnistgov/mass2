@@ -29,7 +29,7 @@ def mass_5lag_filter(
         peak=peak_signal,
     )
     mass_filter = maker.compute_5lag(fmax=fmax, f_3db=f_3db)
-    return Filter(
+    return FilterMoss(
         filter=mass_filter.values,
         v_over_dv=mass_filter.predicted_v_over_dv,
         dt=dt,
@@ -39,7 +39,7 @@ def mass_5lag_filter(
 
 
 @dataclass(frozen=True)
-class Filter:
+class FilterMoss:
     filter: np.ndarray
     v_over_dv: float
     dt: float
@@ -93,7 +93,7 @@ def filter_data_5lag(filter_values, pulses):
 
 @dataclass(frozen=True)
 class Filter5LagStep(CalStep):
-    filter: Filter
+    filter: FilterMoss
     spectrum: NoisePSD
 
     def calc_from_df(self, df):

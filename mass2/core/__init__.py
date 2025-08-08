@@ -29,7 +29,8 @@ from .multifit import (
     MultiFitMassCalibrationStep,
 )
 from . import filters
-from .filters import mass_5lag_filter, Filter, Filter5LagStep
+from .filters import mass_5lag_filter, FilterMoss, Filter5LagStep
+from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
 from .drift_correction import drift_correct, DriftCorrectStep
 from . import rough_cal
 from .channel import Channel, ChannelHeader, BadChannel
@@ -47,6 +48,7 @@ __all__ = [
     "optimal_filtering",
     "LJHFile",
     "pulse_algorithms",
+    "noise_algorithms",
     "phase_correct",
     "ljhutil",
     "misc",
@@ -64,7 +66,10 @@ __all__ = [
     "MultiFitMassCalibrationStep",
     "filters",
     "mass_5lag_filter",
+    "FilterMaker",
     "Filter",
+    "ToeplitzWhitener",
+    "FilterMoss",
     "Filter5LagStep",
     "drift_correct",
     "DriftCorrectStep",

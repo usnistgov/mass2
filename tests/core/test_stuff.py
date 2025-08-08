@@ -64,7 +64,7 @@ def test_ljh_fractional_record(tmp_path):
 def test_follow_mass_filtering_rst():  # noqa: PLR0914
     # following https://github.com/usnistgov/mass/blob/master/doc/filtering.rst
 
-    rng = np.random.default_rng(1)
+    rng = np.random.default_rng(3)
 
     # make a pulse and call mass.FilterMaker directly
     # test that the calculated values are correct per the mass docs
@@ -96,7 +96,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     # 250 pulses of length 504
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
-    noise_traces = rng.standard_normal(250, n)
+    noise_traces = rng.standard_normal((250, n))
     pulse_traces = np.tile(signal, (250, 1)) + noise_traces
     header_df = pl.DataFrame()
     frametime_s = 1e-5
@@ -132,7 +132,7 @@ def test_noise_autocorr():
     frametime_s = 1e-5
     # 250 pulses of length 500
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
-    noise_traces = rng.standard_normal(250, 500)
+    noise_traces = rng.standard_normal((250, 500))
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = mass.NoiseChannel(df_noise, header_df, frametime_s)
     assert len(noise_ch.df) == 250
@@ -164,7 +164,7 @@ def test_noise_psd():
     # sigma**2 = 1
     # delta_f == 1
     # PSD = 1/Hz
-    noise_traces = rng.standard_normal(1000, 500)
+    noise_traces = rng.standard_normal((1000, 500))
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = mass.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
     assert noise_ch.frametime_s == frametime_s
@@ -198,7 +198,7 @@ def test_get_pulses_2d():
     header_df = pl.DataFrame()
     frametime_s = 0.5
     # 1000 pulses of length 500
-    noise_traces = rng.standard_normal(10, 5)
+    noise_traces = rng.standard_normal((10, 5))
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = mass.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
     pulses = noise_ch.get_records_2d()
