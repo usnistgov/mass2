@@ -375,27 +375,22 @@ class Filter5Lag(Filter):
         if x.ndim == 1:
             x = x.reshape((1, len(x)))
         nrec, nsamp = x.shape
-        assert nsamp == len(self.values) + self.convolution_lags - 1
-        return _filter_records_5lag(x, self.values, self.convolution_lags, self.FIVELAG_FITTER)
+        nlags = self.convolution_lags
+        assert nsamp == len(self.values) + nlags - 1
+        nrec = x.shape[0]
+        conv = np.zeros((nlags, nrec), dtype=float)
+        for i in range(nlags - 1):
+            conv[i, :] = np.dot(x[:, i : i + 1 - nlags], self.values)
+        conv[nlags - 1, :] = np.dot(x[:, nlags - 1 :], self.values)
 
-
-@njit
-def _filter_records_5lag(x: npt.ArrayLike, values: npt.NDArray, nlags: int, FIVELAG_FITTER: npt.NDArray):
-    "A numba-JIT speedup of the core computation"
-    nrec = x.shape[0]
-    conv = np.zeros((nlags, nrec), dtype=float)
-    for i in range(nlags - 1):
-        conv[i, :] = np.dot(x[:, i : i + 1 - nlags], values)
-    conv[nlags - 1, :] = np.dot(x[:, nlags - 1 :], values)
-
-    # Least-squares fit of 5 values to a parabola.
-    # Order is row 0 = constant ... row 2 = quadratic coefficients.
-    if nlags != 5:
-        raise NotImplementedError("Currently require 5 lags to estimate peak x, y")
-    param = np.dot(FIVELAG_FITTER, conv)
-    peak_x = -0.5 * param[1, :] / param[2, :]
-    peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
-    return peak_y, peak_x
+        # Least-squares fit of 5 values to a parabola.
+        # Order is row 0 = constant ... row 2 = quadratic coefficients.
+        if nlags != 5:
+            raise NotImplementedError("Currently require 5 lags to estimate peak x, y")
+        param = np.dot(self.FIVELAG_FITTER, conv)
+        peak_x = -0.5 * param[1, :] / param[2, :]
+        peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
+        return peak_y, peak_x
 
 
 @dataclass(frozen=True)

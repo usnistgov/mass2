@@ -1,15 +1,15 @@
 import marimo
 
-__generated_with = "0.14.10"
-app = marimo.App(width="medium", app_title="MOSS intro")
+__generated_with = "0.14.16"
+app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
 @app.cell
 def _(mo):
     mo.md(
         """
-    #MOSS internals introdution
-    MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS. MOSS support many algorithms for pulse filtering, calibration, and corrections. MOSS is built on modern open source data science software, including pola.rs and marimo. MOSS supports some key features that MASS struggled with including:
+    #MASS version 2: introduction to internals
+    MASS is the Microcalorimeter Analysis Software Suite. Version 2 is a replacement for Version 1 of MASS (2011-2025). Version 2 supports many algorithms for pulse filtering, calibration, and corrections. It is built on modern open source data science software, including [Pola.rs](https://pola.rs) and [Marimo](https://marimo.io). MASS v2 supports some key features that v1 struggled with, including:
 
       * consecutive data set analysis
       * online (aka realtime) analysis
@@ -31,8 +31,8 @@ def _():
 
 @app.cell
 def _():
-    import moss
-    return (moss,)
+    import mass2
+    return (mass2,)
 
 
 @app.cell
@@ -40,16 +40,16 @@ def _(mo):
     mo.md(
         """
     # Load data
-    Here we load the data, then we explore the internals a bit to show how MOSS is built.
+    Here we load the data, then we explore the internals a bit to show how MASS version 2 is built.
     """
     )
     return
 
 
 @app.cell
-def _(moss, pulsedata):
+def _(mass2, pulsedata):
     _p = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
-    data = moss.Channels.from_ljh_folder(
+    data = mass2.Channels.from_ljh_folder(
         pulse_folder=_p.pulse_folder, noise_folder=_p.noise_folder
     )
     print(data)
@@ -78,22 +78,22 @@ def _(data2):
 
 
 @app.cell
-def _(data3, moss):
+def _(data3, mass2):
     data3.ch0.plot_scatter("timestamp", "energy_pulse_rms", color_col="state_label")
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, moss):
+def _(data3, mass2):
     data3.ch0.plot_scatter("energy_5lagy_dc", "5lagy_dc", color_col="state_label")
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data, moss):
-    def _do_analysis(ch: moss.Channel) -> moss.Channel:
+def _(data, mass2):
+    def _do_analysis(ch: mass2.Channel) -> mass2.Channel:
         return ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
 
     data2 = data.map(_do_analysis)
@@ -102,10 +102,10 @@ def _(data, moss):
 
 
 @app.cell
-def _(data2, moss, pl):
+def _(data2, mass2, pl):
     line_names = ["OKAlpha", "FeLAlpha", "NiLAlpha", "CKAlpha", "NKAlpha", "CuLAlpha"]
 
-    def _do_analysis(ch: moss.Channel) -> moss.Channel:
+    def _do_analysis(ch: mass2.Channel) -> mass2.Channel:
         return (
             ch.rough_cal_combinatoric(
                 line_names,
@@ -131,70 +131,70 @@ def _(data2, moss, pl):
 
 
 @app.cell
-def _(data3, moss):
+def _(data3, mass2):
     data3.ch0.step_plot(-1)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, moss, np):
+def _(data3, mass2, np):
     data3.ch0.plot_hist("energy_5lagy_dc", np.arange(0, 1000, 0.25))
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss, pl):
+def _(data3, dropdown_ch, mass2, pl):
     _result = data3.channels[dropdown_ch.value].linefit(600, col="energy_5lagy_dc", dlo=20, dhi=20,
                                                         binsize=0.25,
                                                         use_expr=(pl.col("state_label") == "SCAN3").and_(pl.col("5lagx").is_between(-1, -0.4)))
     _result.plotm()
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss, pl, plt):
+def _(data3, dropdown_ch, mass2, pl, plt):
     data3.channels[dropdown_ch.value].plot_scatter("5lagx", "energy_5lagy_dc", use_expr=pl.col("state_label") == "SCAN3")
     plt.grid()
     plt.ylim(595, 605)
     plt.xlim(-1.5, 1)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss, pl, plt):
+def _(data3, dropdown_ch, mass2, pl, plt):
     data3.channels[dropdown_ch.value].plot_scatter("rise_time", "energy_5lagy_dc", use_expr=pl.col("state_label") == "SCAN3")
     plt.grid()
     plt.ylim(595, 605)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss, pl, plt):
+def _(data3, dropdown_ch, mass2, pl, plt):
     data3.channels[dropdown_ch.value].plot_scatter("pretrig_mean", "energy_5lagy_dc", use_expr=pl.col("state_label") == "SCAN3")
     plt.ylim(595, 605)
     plt.grid()
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss):
+def _(data3, dropdown_ch, mass2):
     data3.channels[dropdown_ch.value].noise.spectrum().plot()
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, moss, plt):
+def _(data3, dropdown_ch, mass2, plt):
     plt.plot(data3.channels[dropdown_ch.value].noise.df["pulse"][:10].to_numpy().T)
     plt.plot(data3.channels[dropdown_ch.value].df["pulse"][:10].to_numpy().T)
     plt.title("first 10 noise traces and first 10 pulse traces")
-    moss.show()
+    mass2.show()
     return
 
 
@@ -210,10 +210,10 @@ def _(data3, mo):
 
 
 @app.cell
-def _(data3, dropdown_ch, dropdown_step, mo, moss):
+def _(data3, dropdown_ch, dropdown_step, mass2, mo):
     _ch = data3.channels[dropdown_ch.value]
     _ch.step_plot(dropdown_step.value)
-    mo.vstack([dropdown_ch, dropdown_step, moss.show()])
+    mo.vstack([dropdown_ch, dropdown_step, mass2.show()])
     return
 
 
@@ -230,7 +230,7 @@ def _(data3, dropdown_ch):
 
 
 @app.cell
-def _(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
+def _(data3, df_baseline, dropdown_ch, mass2, np, pl, plt):
     def gain(e):
         _ch = data3.channels[dropdown_ch.value]
         calstep = _ch.steps[4]
@@ -246,7 +246,7 @@ def _(data3, df_baseline, dropdown_ch, moss, np, pl, plt):
     _fwhm_baseline = np.std(_baseline_energies)*2.35
     plt.title(f"ch={dropdown_ch.value} {_fwhm_baseline=:.2f}  \n{_fwhm_baseline*gain(0.001)/gain(700)=:.2f} eV")
     plt.xlabel("energy / eV")
-    moss.show()
+    mass2.show()
     return
 
 

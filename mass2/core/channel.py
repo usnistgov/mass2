@@ -567,7 +567,7 @@ class Channel:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass.open(path)
+        ljh = mass.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = Channel(df, header=header, noise=noise_channel)

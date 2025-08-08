@@ -1,11 +1,11 @@
 import marimo
 
-__generated_with = "0.7.17"
+__generated_with = "0.14.16"
 app = marimo.App(width="medium")
 
 
 @app.cell
-def __():
+def _():
     import marimo as mo
     import mass
     from mass.off import (
@@ -22,8 +22,6 @@ def __():
         Channel,
         ChannelGroup,
         getOffFileListFromOneFile,
-        labelPeak,
-        labelPeaks,
         mass,
         mo,
         np,
@@ -33,27 +31,20 @@ def __():
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
-        # why a mass.off style analysis?
-        This is included in moss to
-        1. show how to use variable assignments to force evaluation order to handle the mutable nature of mass
-        2. Show a direct 1-1 comparison of achieved resolution at various lines.
-        """
+    # why a mass.off style analysis?
+    This is included in Mass v2 to
+    1. show how to use variable assignments to force evaluation order to handle the mutable nature of mass v1
+    2. Show a direct 1-1 comparison of achieved resolution at various lines.
+    """
     )
     return
 
 
 @app.cell
-def __(
-    Channel,
-    ChannelGroup,
-    getOffFileListFromOneFile,
-    mass,
-    np,
-    pulsedata,
-):
+def _(Channel, ChannelGroup, getOffFileListFromOneFile, mass, np, pulsedata):
     """
     Day Summary: Mostly Ne-like data, of W, Re, and Os
 
@@ -101,22 +92,11 @@ def __(
     )
     data.calibrateFollowingPlan("filtValuePCDC", "energy")
     ds.diagnoseCalibration()
-    return (
-        a,
-        data,
-        date,
-        ds,
-        esf,
-        folder_path,
-        off_path,
-        orig_esf_path,
-        states,
-        timing_path,
-    )
+    return a, data, ds
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a
     ds.diagnoseCalibration()
     mo.mpl.interactive(plt.gcf())
@@ -124,7 +104,7 @@ def __(a, ds, mo, plt):
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a  # for marimo order
     ds.diagnoseCalibration()
     mo.mpl.interactive(plt.gcf())
@@ -132,7 +112,7 @@ def __(a, ds, mo, plt):
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a
     ds.plotAvsB("relTimeSec", "energy")
     mo.mpl.interactive(plt.gcf())
@@ -140,7 +120,7 @@ def __(a, ds, mo, plt):
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a
     ds.plotAvsB("pretriggerMean", "energy")
     mo.mpl.interactive(plt.gcf())
@@ -148,7 +128,7 @@ def __(a, ds, mo, plt):
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a
     ds.plotAvsB("filtPhase", "energy", states="START")
     mo.mpl.interactive(plt.gcf())
@@ -156,7 +136,7 @@ def __(a, ds, mo, plt):
 
 
 @app.cell
-def __(a, ds, mo, np, plt):
+def _(a, ds: "Channel", mo, np, plt):
     a
     ds.plotHist(np.arange(0, 60000, 10), "filtValue", coAddStates=False)
     mo.mpl.interactive(plt.gcf())
@@ -164,23 +144,23 @@ def __(a, ds, mo, np, plt):
 
 
 @app.cell
-def __(a, ds, mo, plt):
+def _(a, ds: "Channel", mo, plt):
     a
     result = ds.linefit("AlKAlpha", states="START")
     result.plotm()
     mo.mpl.interactive(plt.gcf())
-    return result,
+    return
 
 
 @app.cell
-def __(a, data, np, plt):
+def _(a, data: "ChannelGroup", np, plt):
     b = a
     data.calcExternalTriggerTiming()
     data._externalTriggerSubframes()
     plt.figure()
     plt.plot(np.diff(data._externalTriggerSubframes()[:10000]), ".")
     plt.title("external trigger differences, this should all be one value!!")
-    return b,
+    return
 
 
 if __name__ == "__main__":

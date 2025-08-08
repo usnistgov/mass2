@@ -10,19 +10,14 @@ def test_ljh_mnkalpha():
     notebook2.app.run()
 
 
-def test_off_ebit():
-    from . import off_ebit as notebook
-    notebook.app.run()
-
-
 def test_broken_notebook():
     from . import broken_notebook as notebook
     with pytest.raises(Exception):
         notebook.app.run()
 
 
-def test_ebit_july2024_from_off():
-    from . import ebit_july2024_from_off as notebook
+def test_bessy():
+    from . import bessy_20240727 as notebook
     notebook.app.run()
 
 # currently fails due to raising a warning on an unclosed file

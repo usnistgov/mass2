@@ -1,19 +1,24 @@
 import marimo
 
-__generated_with = "0.10.12"
+__generated_with = "0.14.16"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
     import marimo as mo
-    import moss
+    import mass2
     import numpy as np
     import pylab as plt
     from pathlib import Path
     import polars as pl
-    import moss.mass_add_lines
-    return Path, mo, moss, np, pl, plt
+    return Path, mass2, mo, np, pl, plt
+
+
+@app.cell
+def _(mo):
+    mo.md("### Demo of steps--won't work if you aren't user https://github.com/ggggggggg")
+    return
 
 
 @app.cell
@@ -51,12 +56,12 @@ def _(plt):
 
 
 @app.cell
-def _(bin_path, moss, threshold, trigger_filter):
-    bin = moss.TrueBqBin.load(bin_path)
+def _(bin_path, mass2, moss, threshold, trigger_filter):
+    bin = mass2.TrueBqBin.load(bin_path)
     trigger_result = bin.trigger(trigger_filter, threshold, limit_hours=2)
     trigger_result.plot(decimate=50, n_limit=100000, offset=0, x_axis_time_s=True)
     moss.show()
-    return bin, trigger_result
+    return (trigger_result,)
 
 
 @app.cell
@@ -135,7 +140,7 @@ def _(ch2, moss, np, pl):
         ch3.df.select(residual_rms_range=pl.col("residual_rms").cut([0, 23, 10000]))
     )
     ch3 = ch3.with_columns(pl.Series("spikey_stand_in", np.random.rand(len(ch3.df)) > 0.9))
-    return avg_pulse, ch3, pulses, residual_rms, residual_rmss, template
+    return avg_pulse, ch3
 
 
 @app.cell
@@ -170,7 +175,7 @@ def _(ch3, min_frames_from_last, min_frames_until_next, np, pl):
         return category
 
     ch4 = ch3.with_columns(categorize_df(ch3.df, cat_cond))
-    return cat_cond, categorize_df, ch4
+    return cat_cond, ch4
 
 
 @app.cell
@@ -273,7 +278,7 @@ def _(ch4, mo):
 
     def step_num():
         return step_desc_list.index(dropdown_step.value)
-    return dropdown_step, get_step_desc, step_desc_list, step_num
+    return
 
 
 @app.cell
@@ -317,17 +322,7 @@ def _(ch4, min_frames_from_last, moss, np, pl, plt):
         f"{np.sum(counts)} counts, {live_time_s:.2f} s live time, total count rate = {total_count_rate:.2f}+/-{total_count_rate_unc:.2f}/s"
     )
     moss.show()
-    return (
-        bin_centers,
-        bin_edges,
-        bin_size,
-        counts,
-        energies,
-        live_time_s,
-        livetime_clean_energies,
-        total_count_rate,
-        total_count_rate_unc,
-    )
+    return
 
 
 @app.cell
@@ -342,7 +337,7 @@ def _(ch4, moss, pl):
     )
     result.plotm()
     moss.show()
-    return (result,)
+    return
 
 
 @app.cell

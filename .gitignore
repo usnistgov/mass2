@@ -90,6 +90,7 @@ coverage.xml
 .pytest_cache/
 cover/
 
+example_steps_dict.pkl
 
 # Environments
 .env

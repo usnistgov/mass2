@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.10.13"
+__generated_with = "0.14.16"
 app = marimo.App(width="medium")
 
 
@@ -17,14 +17,20 @@ def _():
     return Path, lmfit, mo, moss, np, pl, plt
 
 
+@app.cell
+def _(mo):
+    mo.md("### Demo of steps--won't work if you aren't user https://github.com/ggggggggg")
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         r"""
-        # set key parameters
-        Changing any of these will re-evaluate some or all of notebook, so it can be slow. But this is how you tweak stuff.
-        I moved most of the numerical parameters here for ease of seeing what you may want to tweak.
-        """
+    # set key parameters
+    Changing any of these will re-evaluate some or all of notebook, so it can be slow. But this is how you tweak stuff.
+    I moved most of the numerical parameters here for ease of seeing what you may want to tweak.
+    """
     )
     return
 
@@ -85,7 +91,9 @@ def _(
     threshold,
     trigger_filter,
 ):
-    mo.md(f"""# print key parameters
+    mo.md(
+        f"""
+    # print key parameters
     this is a workaround for not having a great pdf output yet that includes code
     we just list all the hand defined paramters manually and print them
 
@@ -100,7 +108,8 @@ def _(
     * {max_frontload=}
     * {min_last_minus_first=}
     * {phi0_dac_units=}
-    """)
+    """
+    )
     return
 
 
@@ -115,7 +124,7 @@ def _(bin_path, mo, moss, threshold, trigger_filter):
     # it should be able to release that memory as needed to keep the computer running well
     trigger_result.plot(decimate=10, n_limit=100000, offset=0, x_axis_time_s=True)
     mo.vstack([mo.md("#triggering check plot"), moss.show()])
-    return bin, trigger_result
+    return (trigger_result,)
 
 
 @app.cell
@@ -218,16 +227,7 @@ def _(ch2, mo, moss, np, npre, pl):
     2. calculate residual_rms
     3. calculate frontloat
     results in `ch3`, the 3rd update of the Channel""")
-    return (
-        avg_pulse,
-        ch3,
-        frontload,
-        last_minus_first,
-        pulses,
-        residual_rms,
-        residual_rmss,
-        template,
-    )
+    return avg_pulse, ch3
 
 
 @app.cell
@@ -286,7 +286,7 @@ def _(
     mo.md("""#categorization
     assign pulses to categories based on things we calculated about the pulse
     this isn't perfect, it's just the best I've done""")
-    return cat_cond, categorize_df, ch4
+    return cat_cond, ch4
 
 
 @app.cell
@@ -492,17 +492,7 @@ def _(ch4, min_frames_from_last, mo, moss, np, pl, plt):
     )
     plt.yscale("log")
     mo.vstack([mo.md("#coadded spectrum with livetime\nbeware unlocks not neccesarily fully accounted for"), moss.show()])
-    return (
-        bin_centers,
-        bin_edges,
-        bin_size,
-        counts,
-        energies,
-        live_time_s,
-        livetime_clean_energies,
-        total_count_rate,
-        total_count_rate_unc,
-    )
+    return bin_centers, bin_edges, bin_size, livetime_clean_energies
 
 
 @app.cell
@@ -528,7 +518,7 @@ def _(
     plt.legend()
 
     mo.vstack([mo.md("# histogram by category plot"), moss.show()])
-    return (cat,)
+    return
 
 
 @app.cell
@@ -589,7 +579,7 @@ def _(ch4, estimate_dataframe_size, human_readable_size, mo, pl):
     {_readable_size} data saved to {_absolute_path}
 
     naivley it should should be {estimate_dataframe_size(_df)}, but may be smaller with compression"""), _df])
-    return current_time, datetime, os
+    return
 
 
 @app.cell(hide_code=True)
@@ -672,11 +662,7 @@ def _(mo, pl):
             print(f"Parquet file size: {readable_size}")
             return readable_size
     mo.md("helper code for checking file size is reasonable")
-    return (
-        estimate_dataframe_size,
-        human_readable_size,
-        write_and_measure_parquet,
-    )
+    return estimate_dataframe_size, human_readable_size
 
 
 @app.cell
