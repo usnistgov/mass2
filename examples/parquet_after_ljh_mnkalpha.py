@@ -12,7 +12,7 @@ def _():
     import marimo as mo
     import mass2
 
-    return mo, pl, plt
+    return mass2, mo, pl, plt
 
 
 @app.cell
@@ -30,12 +30,12 @@ def _(mo):
 
 
 @app.cell
-def _(moss, pl):
+def _(mass2, pl):
     import pulsedata
 
     pulse_folder = pulsedata.pulse_noise_ljh_pairs["20230626"].pulse_folder
-    data = moss.Channels.from_ljh_folder(pulse_folder=pulse_folder)
-    steps_dict = moss.misc.unpickle_object("example_steps_dict.pkl")
+    data = mass2.Channels.from_ljh_folder(pulse_folder=pulse_folder)
+    steps_dict = mass2.misc.unpickle_object("example_steps_dict.pkl")
     truth_dfg = pl.read_parquet("example_result.parquet")
     return data, steps_dict, truth_dfg
 
@@ -72,15 +72,15 @@ def _(mo):
     mo.md(
         r"""
     # unified analysis experience
-    We can create a `moss.Channels` object from any `DataFrame` with a `ch_num` column (just rename it if you named it wrong!). then all our analysis and plotting methods work. We can use this to save intermediate results, or just to use our fitting tools on already analyzed data.
+    We can create a `mass2.Channels` object from any `DataFrame` with a `ch_num` column (just rename it if you named it wrong!). then all our analysis and plotting methods work. We can use this to save intermediate results, or just to use our fitting tools on already analyzed data.
     """
     )
     return
 
 
 @app.cell
-def _(data2, moss, truth_dfg):
-    data_from_truth_dfg = moss.Channels.from_df(
+def _(data2, mass2, truth_dfg):
+    data_from_truth_dfg = mass2.Channels.from_df(
         truth_dfg,
         frametime_s=data2.channels[4102].header.frametime_s,
         n_presamples=data2.channels[4102].header.n_presamples,
