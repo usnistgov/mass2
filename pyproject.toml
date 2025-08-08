@@ -19,16 +19,19 @@ dependencies = [
     "h5py>=2.7",
     "indexedproperty",
     "lmfit>=0.9.11",
+    "marimo",
     "matplotlib>1.5",
     "numba",
     "numpy>=1.14, <2.2",
     "packaging",
-    "pre-commit",
+    "polars",
     "progress",
+    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
     "pyyaml",
     "scikit-learn",
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
     "scipy>=1.12",
+    "tornado",  # for matplotlib plots in Marimo
     "uncertainties",
     "xraydb",
 ]
@@ -39,6 +42,8 @@ dev = [
     "pytest",
     "ruff",
     "flake8",
+    "pre-commit",
+    "tox",
 ]
 # Use `uv sync --group docs` to get the packages needed to create documentation
 docs = [

@@ -1,9 +1,12 @@
 import numpy as np
 import pylab as plt
 import polars as pl
+import subprocess
+import sys
+import pathlib
 import dill
 import marimo as mo
-from typing import Dict, Any
+from typing import Any
 
 
 def show(fig=None):
@@ -34,14 +37,7 @@ def smallest_positive_real(arr):
 def good_series(df, col, good_expr, use_expr):
     # this uses lazy before filting to hopefully allow polars to only access the data needed to filter
     # and the data needed to output what we want
-    return (
-        df.lazy()
-        .filter(good_expr)
-        .filter(use_expr)
-        .select(pl.col(col))
-        .collect()
-        .to_series()
-    )
+    return df.lazy().filter(good_expr).filter(use_expr).select(pl.col(col)).collect().to_series()
 
 
 def median_absolute_deviation(x):
@@ -75,9 +71,7 @@ def midpoints_and_step_size(x):
 
 def hist_of_series(series, bin_edges):
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    counts = series.rename("count").hist(
-        bin_edges, include_category=False, include_breakpoint=False
-    )
+    counts = series.rename("count").hist(bin_edges, include_category=False, include_breakpoint=False)
     return bin_centers, counts.to_numpy().T[0]
 
 
@@ -86,9 +80,7 @@ def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
         plt.figure()
         axis = plt.gca()
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    hist = series.rename("count").hist(
-        bin_edges, include_category=False, include_breakpoint=False
-    )
+    hist = series.rename("count").hist(bin_edges, include_category=False, include_breakpoint=False)
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
@@ -105,10 +97,6 @@ def plot_a_vs_b_series(a, b, axis=None, **plotkwarg):
 
 
 def launch_examples():
-    import subprocess
-    import sys
-    import pathlib
-
     examples_folder = pathlib.Path(__file__).parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
     examples_folder_relative = examples_folder.relative_to(pathlib.Path.cwd())
@@ -140,9 +128,7 @@ def root_mean_squared(x, axis=None):
     return np.sqrt(np.mean(x**2, axis))
 
 
-def merge_dicts_ordered_by_keys(
-    dict1: Dict[int, Any], dict2: Dict[int, Any]
-) -> Dict[int, Any]:
+def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) -> dict[int, Any]:
     # Combine both dictionaries' items (key, value) into a list of tuples
     combined_items = list(dict1.items()) + list(dict2.items())
 
@@ -150,6 +136,6 @@ def merge_dicts_ordered_by_keys(
     combined_items.sort(key=lambda item: item[0])
 
     # Convert the sorted list of tuples back into a dictionary
-    merged_dict: Dict[int, Any] = {key: value for key, value in combined_items}
+    merged_dict: dict[int, Any] = {key: value for key, value in combined_items}
 
     return merged_dict

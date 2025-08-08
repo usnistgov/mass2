@@ -1,5 +1,5 @@
 from dataclasses import dataclass, replace
-from typing import Optional, ClassVar, Self, Tuple
+from typing import Optional, ClassVar, Self
 import numpy.typing as npt
 import os
 import numpy as np
@@ -27,6 +27,7 @@ class LJHFile:
     timebase: float
     nsamples: int
     npresamples: int
+    subframediv: int
     client: str
     header: dict
     header_string: str
@@ -46,25 +47,27 @@ class LJHFile:
         nsamples = header_dict["Total Samples"]
         npresamples = header_dict["Presamples"]
         client = header_dict.get("Software Version", "UNKNOWN")
+        if "Subframe divisions" in header_dict:
+            subframediv = header_dict["Subframe divisions"]
+        elif "Number of rows" in header_dict:
+            subframediv = header_dict["Number of rows"]
+        else:
+            subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
         if ljh_version < Version("2.2.0"):
-            dtype = np.dtype(
-                [
-                    ("internal_us", np.uint8),
-                    ("internal_unused", np.uint8),
-                    ("internal_ms", np.uint32),
-                    ("data", np.uint16, nsamples),
-                ]
-            )
+            dtype = np.dtype([
+                ("internal_us", np.uint8),
+                ("internal_unused", np.uint8),
+                ("internal_ms", np.uint32),
+                ("data", np.uint16, nsamples),
+            ])
         else:
-            dtype = np.dtype(
-                [
-                    ("subframecount", np.int64),
-                    ("posix_usec", np.int64),
-                    ("data", np.uint16, nsamples),
-                ]
-            )
+            dtype = np.dtype([
+                ("subframecount", np.int64),
+                ("posix_usec", np.int64),
+                ("data", np.uint16, nsamples),
+            ])
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
@@ -77,9 +80,7 @@ class LJHFile:
         npulses = binary_size // pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(
-            filename, dtype, mode="r", offset=header_size, shape=(npulses,)
-        )
+        mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
 
         return LJHFile(
             filename,
@@ -88,6 +89,7 @@ class LJHFile:
             timebase,
             nsamples,
             npresamples,
+            subframediv,
             client,
             header_dict,
             header_string,
@@ -99,7 +101,7 @@ class LJHFile:
         )
 
     @classmethod
-    def read_header(cls, filename: str) -> Tuple[dict, str, int]:
+    def read_header(cls, filename: str) -> tuple[dict, str, int]:
         """Read in the text header of an LJH file. Return the header parsed into a dictionary,
         the complete header string (in case you want to generate a new LJH file from this one),
         and the size of the header in bytes. The file does not remain open after this method.
@@ -121,12 +123,10 @@ class LJHFile:
                 i += 1
                 if line.startswith("#End of Header"):
                     break
-                elif line == "":
+                elif not line:
                     raise Exception("reached EOF before #End of Header")
                 elif i > cls.OVERLONG_HEADER:
-                    raise Exception(
-                        f"header is too long--seems not to contain '#End of Header'\nin file {filename}"
-                    )
+                    raise Exception(f"header is too long--seems not to contain '#End of Header'\nin file {filename}")
                 # ignore lines without ":"
                 elif ":" in line:
                     a, b = line.split(":", maxsplit=1)
@@ -145,6 +145,7 @@ class LJHFile:
             ("Presamples", int),
             ("Number of columns", int),
             ("Number of rows", int),
+            ("Subframe divisions", int),
         }:
             header_dict[name] = datatype(header_dict.get(name, -1))
         return header_dict, header_string, header_size
@@ -202,9 +203,7 @@ class LJHFile:
         """
         return self._mmap["data"][i]
 
-    def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False
-    ) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -216,15 +215,13 @@ class LJHFile:
 
         Returns
         -------
-        Tuple[pl.DataFrame, pl.DataFrame]
+        tuple[pl.DataFrame, pl.DataFrame]
             (df, header_df)
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
         """
         if self.ljh_version < Version("2.2.0"):
-            raise NotImplementedError(
-                "cannot convert LJH pre-2.2 files to Polars dataframes yet"
-            )
+            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
 
         data = {
             "pulse": self._mmap["data"][first_pulse:],
@@ -237,9 +234,7 @@ class LJHFile:
             "subframecount": pl.UInt64,
         }
         df = pl.DataFrame(data, schema=schema)
-        df = df.select(
-            pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")
-        ).with_columns(df)
+        df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
         header_df = pl.DataFrame(self.header)
@@ -259,3 +254,19 @@ class LJHFile:
         with open(filename, "wb") as f:
             f.write(self.header_string)
             f.write(self._mmap[:npulses].tobytes())
+
+    @property
+    def is_continuous(self) -> bool:
+        """Is this LJH file made of a perfectly continuous data stream?
+
+        We generally do take noise data in this mode, and it's useful to analyze the noise
+        data by gluing many records together. This property says whether such gluing is valid.
+
+        Returns
+        -------
+        bool
+            Whether every record is strictly continuous with the ones before and after
+        """
+        expected_subframe_diff = self.nsamples * self.subframediv
+        subframe = self._mmap["subframecount"]
+        return np.max(np.diff(subframe)) <= expected_subframe_diff
