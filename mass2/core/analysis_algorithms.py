@@ -457,50 +457,6 @@ def unwrap_n(data, period, mask, n=3):
     return udata
 
 
-@njit
-def filter_data_5lag_cython(rawdata, filter_values):
-    """Filter the complete data file one chunk at a time."""
-    nPulses = rawdata.shape[0]
-    nSamples = rawdata.shape[1]
-
-    filt_phase = np.zeros(nPulses, dtype=np.float64)
-    filt_value = np.zeros(nPulses, dtype=np.float64)
-
-    for i in range(nPulses):
-        pulse = rawdata[i, :]
-
-        f0, f1, f2, f3 = filter_values[0], filter_values[1], filter_values[2], filter_values[3]
-
-        conv0 = pulse[0] * f0 + pulse[1] * f1 + pulse[2] * f2 + pulse[3] * f3
-        conv1 = pulse[1] * f0 + pulse[2] * f1 + pulse[3] * f2
-        conv2 = pulse[2] * f0 + pulse[3] * f1
-        conv3 = pulse[3] * f0
-        conv4 = 0.0
-
-        for k in range(4, nSamples - 4):
-            f4 = filter_values[k]
-            sample = pulse[k]
-            conv0 += sample * f4
-            conv1 += sample * f3
-            conv2 += sample * f2
-            conv3 += sample * f1
-            conv4 += sample * f0
-            f0, f1, f2, f3 = f1, f2, f3, f4
-
-        conv4 += pulse[nSamples - 4] * f0 + pulse[nSamples - 3] * f1 + pulse[nSamples - 2] * f2 + pulse[nSamples - 1] * f3
-        conv3 += pulse[nSamples - 4] * f1 + pulse[nSamples - 3] * f2 + pulse[nSamples - 2] * f3
-        conv2 += pulse[nSamples - 4] * f2 + pulse[nSamples - 3] * f3
-        conv1 += pulse[nSamples - 4] * f3
-
-        p0 = conv0 * (-6.0 / 70) + conv1 * (24.0 / 70) + conv2 * (34.0 / 70) + conv3 * (24.0 / 70) + conv4 * (-6.0 / 70)
-        p1 = conv0 * (-14.0 / 70) + conv1 * (-7.0 / 70) + conv3 * (7.0 / 70) + conv4 * (14.0 / 70)
-        p2 = conv0 * (10.0 / 70) + conv1 * (-5.0 / 70) + conv2 * (-10.0 / 70) + conv3 * (-5.0 / 70) + conv4 * (10.0 / 70)
-
-        filt_phase[i] = -0.5 * p1 / p2
-        filt_value[i] = p0 - 0.25 * p1**2 / p2
-    return filt_value, filt_phase
-
-
 def time_drift_correct(  # noqa: PLR0914
     time,
     uncorrected,
