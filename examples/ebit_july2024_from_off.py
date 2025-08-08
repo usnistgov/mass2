@@ -1,11 +1,11 @@
 import marimo
 
-__generated_with = "0.9.28"
-app = marimo.App(width="medium", app_title="ebit moss example")
+__generated_with = "0.14.16"
+app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
 @app.cell
-def __():
+def _():
     import polars as pl
     import pylab as plt
     import numpy as np
@@ -14,26 +14,32 @@ def __():
 
 
 @app.cell
-def __():
-    import moss
+def _():
+    import mass2
     import pulsedata
     import mass
     import pathlib
-    return mass, moss, pathlib, pulsedata
+    return mass, mass2, pulsedata
 
 
 @app.cell
-def __(mass, moss, pulsedata):
-    off_paths = moss.ljhutil.find_ljh_files(
+def _(mo):
+    mo.md("# This is broken in MASS v2")
+    return
+
+
+@app.cell
+def _(mass, mass2, pulsedata):
+    off_paths = mass2.ljhutil.find_ljh_files(
         str(pulsedata.off["ebit_20240723_0000"]), ext=".off"
     )
     off = mass.off.OffFile(off_paths[0])
-    return off, off_paths
+    return (off_paths,)
 
 
 @app.cell
-def __(moss, off_paths):
-    data = moss.Channels.from_off_paths(
+def _(mass2, off_paths):
+    data = mass2.Channels.from_off_paths(
         off_paths, "ebit_20240723_0000"
     ).with_experiment_state_by_path()
     data
@@ -41,7 +47,7 @@ def __(moss, off_paths):
 
 
 @app.cell
-def __(off_paths, pl):
+def _(off_paths, pl):
     from pathlib import Path
 
     timing_file_path = Path(off_paths[0]).parent / "time_20240723.txt"
@@ -52,11 +58,11 @@ def __(off_paths, pl):
         "calibration_status", timestamp=pl.from_epoch("timestamp", time_unit="s")
     )
     timing_df
-    return Path, timing_df, timing_file_path
+    return Path, timing_df
 
 
 @app.cell
-def __(Path, mo, np, off_paths, plt):
+def _(Path, mo, np, off_paths, plt):
     external_trigger_file_path = (
         Path(off_paths[0]).parent / "20240723_run0000_external_trigger.bin"
     )
@@ -72,11 +78,11 @@ def __(Path, mo, np, off_paths, plt):
     plt.xlabel("external trigger index")
     plt.ylabel("different in subframe counts between external triggers")
     mo.mpl.interactive(plt.gcf())
-    return external_trigger_file_path, external_trigger_subframe_count
+    return
 
 
 @app.cell
-def __(data, pl, timing_df):
+def _(data, pl, timing_df):
     def with_timing_df(ch):
         # load the ebit calibration source timing file from csv
         df2 = ch.df.join_asof(timing_df, left_on="timestamp", right_on="timestamp")
@@ -93,7 +99,7 @@ def __(data, pl, timing_df):
 
 
 @app.cell
-def __(data, pl):
+def _(data, pl):
     data2 = data.map(
         lambda ch: ch.with_columns(
             ch.df.select(filtPhase=pl.col("derivativeLike") / pl.col("filtValue"))
@@ -110,7 +116,7 @@ def __(data, pl):
 
 
 @app.cell
-def __(data2, pl, with_timing_df):
+def _(data2, pl, with_timing_df):
     line_names = [
         "ZnLAlpha",
         "AlKAlpha",
@@ -149,7 +155,7 @@ def __(data2, pl, with_timing_df):
 
 
 @app.cell
-def __(data3, label_lines, line_names, pl):
+def _(data3, label_lines, line_names, pl):
     data4 = data3.map(lambda ch: label_lines(ch, -2))
     data4 = data4.map(
         lambda ch: ch.rough_cal_combinatoric(
@@ -165,7 +171,7 @@ def __(data3, label_lines, line_names, pl):
 
 
 @app.cell
-def __(data3, mo):
+def _(data3, mo):
     _ch_nums = list(str(_ch_num) for _ch_num in data3.channels.keys())
     dropdown_ch = mo.ui.dropdown(
         options=_ch_nums, value=_ch_nums[0], label="channel number"
@@ -184,7 +190,7 @@ def __(data3, mo):
 
 
 @app.cell
-def __(data3, dropdown_ch, mo, plt):
+def _(data3, dropdown_ch, mo, plt):
     data3.channels[int(dropdown_ch.value)].step_plot(-2)
     plt.gcf().suptitle(f"ch{int(dropdown_ch.value)}")
     # plt.tight_layout()
@@ -193,7 +199,7 @@ def __(data3, dropdown_ch, mo, plt):
 
 
 @app.cell
-def __(data3, dropdown_ch, mo, plt):
+def _(data3, dropdown_ch, mo, plt):
     data3.channels[int(dropdown_ch.value)].step_plot(-1)
     plt.gcf().suptitle(f"ch{int(dropdown_ch.value)}")
     plt.grid(True)
@@ -202,14 +208,14 @@ def __(data3, dropdown_ch, mo, plt):
 
 
 @app.cell
-def __(data2, mo, plt):
+def _(data2, mo, plt):
     data2.ch0.step_plot(-1)
     mo.mpl.interactive(plt.gcf())
     return
 
 
 @app.cell
-def __(data3, dropdown_ch, mass, pl):
+def _(data3, dropdown_ch, mass, pl):
     def label_lines(ch, previous_step_index, line_names=None, line_width=80):
         previous_step, previous_step_index = ch.get_step(previous_step_index)
         if line_names is None:
@@ -234,21 +240,21 @@ def __(data3, dropdown_ch, mass, pl):
         return ch.with_columns(df2.select("line_name"))
 
     ch3 = label_lines(data3.channels[int(dropdown_ch.value)], -2)
-    return ch3, label_lines
+    return (label_lines,)
 
 
 @app.cell
-def __(data4, moss, pl):
+def _(data4, mass2, pl):
     result = data4.ch0.linefit(
         "AlKAlpha", "energy_filtValue_dc_pc", use_expr=pl.col("state_label") == "START"
     )
     result.plotm()
-    moss.show()
-    return (result,)
+    mass2.show()
+    return
 
 
 @app.cell
-def __(data4, mo, pl, plt):
+def _(data4, mo, pl, plt):
     data4.ch0.plot_scatter(
         x_col=pl.col("filtPhase"),
         y_col="energy_filtValue_dc_pc",
@@ -261,7 +267,7 @@ def __(data4, mo, pl, plt):
 
 
 @app.cell
-def __(data4, mo, pl, plt):
+def _(data4, mo, pl, plt):
     data4.ch0.plot_scatter(
         x_col=pl.col("timestamp"),
         y_col="energy_filtValue_dc_pc",
@@ -274,8 +280,8 @@ def __(data4, mo, pl, plt):
 
 
 @app.cell
-def __(moss, pl):
-    multifit = moss.MultiFit(
+def _(mass2, pl):
+    multifit = mass2.MultiFit(
         default_fit_width=80,
         default_use_expr=pl.col("state_label") == "START",
         default_bin_size=0.6,
@@ -297,7 +303,7 @@ def __(moss, pl):
 
 
 @app.cell
-def __(data4, multifit):
+def _(data4, multifit):
     data5 = data4.map(
         lambda ch: ch.multifit_mass_cal(
             multifit, previous_cal_step_index=-1, calibrated_col="energy2_filtValue_dc_pc"
@@ -307,23 +313,23 @@ def __(data4, multifit):
 
 
 @app.cell
-def __(data5, dropdown_ch, moss):
+def _(data5, dropdown_ch, mass2):
     data5.channels[int(dropdown_ch.value)].step_plot(-1)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         r"""
-        ### TODOS
-        * hunter run on all data again and report any errors
-        * plot rms_residual_energy vs channel number
-        * plot gain spline vs channel
-        * plot filt_value vs area
-        * make a drift at a line plot
-        """
+    ### TODOS
+    * hunter run on all data again and report any errors
+    * plot rms_residual_energy vs channel number
+    * plot gain spline vs channel
+    * plot filt_value vs area
+    * make a drift at a line plot
+    """
     )
     return
 

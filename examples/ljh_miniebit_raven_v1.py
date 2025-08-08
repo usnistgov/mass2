@@ -1,79 +1,81 @@
 import marimo
 
-__generated_with = "0.9.28"
-app = marimo.App(width="medium", app_title="MOSS intro")
+__generated_with = "0.14.16"
+app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
-        #MOSS internals introdution
-        MOSS is the Microcalorimeter Online Spectral Software, a replacement for MASS. MOSS support many algorithms for pulse filtering, calibration, and corrections. MOSS is built on modern open source data science software, including pola.rs and marimo. MOSS supports some key features that MASS struggled with including:
-          * consecutive data set analysis
-          * online (aka realtime) analysis
-          * easily supporting different analysis chains
-        """
+    #MASS version 2: introduction to internals
+    MASS is the Microcalorimeter Analysis Software Suite. Version 2 is a replacement for Version 1 of MASS (2011-2025). Version 2 supports many algorithms for pulse filtering, calibration, and corrections. It is built on modern open source data science software, including [Pola.rs](https://pola.rs) and [Marimo](https://marimo.io). MASS v2 supports some key features that v1 struggled with, including:
+
+    * consecutive data set analysis
+    * online (aka realtime) analysis
+    * easily supporting different analysis chains
+
+    """
     )
     return
 
 
 @app.cell
-def __():
+def _():
     import polars as pl
     import pylab as plt
     import numpy as np
     import marimo as mo
     import pulsedata
-    return mo, np, pl, plt, pulsedata
+    return mo, np, pl, plt
 
 
 @app.cell
-def __():
-    import moss
-    return (moss,)
+def _():
+    import mass2
+    return (mass2,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
-        # Load data
-        Here we load the data, then we explore the internals a bit to show how MOSS is built.
-        """
+    # Load data: NOT CURRENTLY INSTALLED
+    Here we load the data, then we explore the internals a bit to show how MASS v2 is built.
+    """
     )
     return
 
 
 @app.cell
-def __(moss):
+def _(mass2):
     pulse_folder = "/data/20241211/0003"
     noise_folder = "/data/20241211/0001"
-    data = moss.Channels.from_ljh_folder(
+    data = mass2.Channels.from_ljh_folder(
         pulse_folder=pulse_folder, noise_folder=noise_folder,
         limit=100
     )
     data = data.map(lambda channel: channel.summarize_pulses())
-    return data, noise_folder, pulse_folder
+    return (data,)
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(
         """
-        # basic analysis
-        The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
+    # basic analysis
+    The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
-        The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects. 
+    The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
 
-        The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
-        """
+    The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
+    """
     )
     return
 
 
 @app.cell
-def __(data, pl):
+def _(data, pl):
     data2 = data.map(
         lambda channel: channel.with_good_expr_pretrig_mean_and_postpeak_deriv()
         .with_good_expr(pl.col("pulse_average") > 0)
@@ -103,57 +105,57 @@ def __(data, pl):
 
 
 @app.cell
-def __():
+def _():
     return
 
 
 @app.cell(hide_code=True)
-def __(mo):
+def _(mo):
     mo.md(
         """
-        # inspecting the data
+    # inspecting the data
 
-        Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell. marimo's nicest display doesn't work with array columns like our pulse column, so lets leave that out for now.
-        """
+    Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell. marimo's nicest display doesn't work with array columns like our pulse column, so lets leave that out for now.
+    """
     )
     return
 
 
 @app.cell
-def __(data2, pl):
+def _(data2, pl):
     data2.ch0.with_good_expr(pl.col("promptness") < 0.98).df.select(pl.exclude("pulse"))
     return
 
 
 @app.cell
-def __(data2, moss, plt):
+def _(data2, mass2, plt):
     _pulses = data2.ch0.df.limit(20)["pulse"].to_numpy()
     plt.figure()
     plt.plot(_pulses.T)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(data2, mo):
+def _(data2, mo):
     mo.md(
         f"""
-        To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step. 
+    To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step.
 
-        {data2.ch0.step_summary()=}
-        """
+    {data2.ch0.step_summary()=}
+    """
     )
     return
 
 
 @app.cell
-def __(result):
+def _(result):
     result.fit_report()
     return
 
 
 @app.cell
-def __(data2, mo):
+def _(data2, mo):
     chs = list(data2.channels.keys())
     dropdown_ch = mo.ui.dropdown({str(k): k for k in chs}, value=str(chs[0]), label="ch")
     _energy_cols = [col for col in data2.dfg().columns if col.startswith("energy")]
@@ -164,31 +166,31 @@ def __(data2, mo):
     steps[0].description
     steps_d = {f"{i} {steps[i].description}": i for i in range(len(steps))}
     dropdown_step = mo.ui.dropdown(steps_d, value=list(steps_d.keys())[-1], label="step")
-    return chs, dropdown_ch, dropdown_col, dropdown_step, steps, steps_d
+    return dropdown_ch, dropdown_col, dropdown_step
 
 
 @app.cell
-def __(dropdown_ch, dropdown_col, dropdown_step, mo):
+def _(dropdown_ch, dropdown_col, dropdown_step, mo):
     mo.vstack([dropdown_ch, dropdown_step, dropdown_col])
     return
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_step, moss):
+def _(data2, dropdown_ch, dropdown_step, mass2):
     _ch = data2.channels[dropdown_ch.value]
     _ch.step_plot(dropdown_step.value)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(mo):
+def _(mo):
     mo.md(r"""# plot a noise spectrum""")
     return
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_col, mo, plt):
+def _(data2, dropdown_ch, dropdown_col, mo, plt):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
     _ch.noise.spectrum().plot()
@@ -197,7 +199,7 @@ def __(data2, dropdown_ch, dropdown_col, mo, plt):
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_col):
+def _(data2, dropdown_ch, dropdown_col):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
     _steps = _ch.steps
@@ -206,7 +208,7 @@ def __(data2, dropdown_ch, dropdown_col):
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_col, mo, plt):
+def _(data2, dropdown_ch, dropdown_col, mo, plt):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
     result = _ch.linefit("FeLAlpha", col=_col)
@@ -217,37 +219,37 @@ def __(data2, dropdown_ch, dropdown_col, mo, plt):
 
 
 @app.cell
-def __(data2, moss):
+def _(data2, mass2):
     data2.ch0.plot_scatter("pulse_average", "energy_5lagy")
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(data, dropdown_ch, dropdown_col, moss):
+def _(data, dropdown_ch, dropdown_col, mass2):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data.channels[int(_ch_num)]
     print(f"{len(_ch.df)=}")
     _ch.plot_scatter("timestamp", "pretrig_mean", use_good_expr=False)
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(data, dropdown_ch, dropdown_col, moss):
+def _(data, dropdown_ch, dropdown_col, mass2):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data.channels[int(_ch_num)]
     _ch.plot_scatter("timestamp", "pulse_rms")
-    moss.show()
+    mass2.show()
     return
 
 
 @app.cell
-def __(data2, dropdown_ch, dropdown_col, moss, np):
+def _(data2, dropdown_ch, dropdown_col, mass2, np):
     _ch_num, _col = int(dropdown_ch.value), dropdown_col.value
     _ch = data2.channels[int(_ch_num)]
     _ch.plot_hist("energy_5lagy_dc", np.arange(0, 3000, 5))
-    moss.show()
+    mass2.show()
     return
 
 
