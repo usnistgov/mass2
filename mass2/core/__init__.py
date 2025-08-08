@@ -8,8 +8,6 @@ from . import message_logging
 from . import utilities
 from . import phase_correct
 
-
-from .projectors_script import make_projectors
 from .experiment_state import ExperimentStateFile
 
 
@@ -45,11 +43,11 @@ __all__ = [
     "pulse_model",
     "message_logging",
     "utilities",
-    "optimal_filtering",
+    "phase_correct",
+    "ExperimentStateFile",
     "LJHFile",
     "pulse_algorithms",
     "noise_algorithms",
-    "phase_correct",
     "ljhutil",
     "misc",
     "good_series",
