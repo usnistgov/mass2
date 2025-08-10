@@ -10,7 +10,7 @@ try:
     import xraydb
 
 except ModuleNotFoundError:
-    print('** Skipping module mass.materials, because it requires the "xraydb" python package.')
+    print('** Skipping module mass2.materials, because it requires the "xraydb" python package.')
     print("** Please see https://xraypy.github.io/XrayDB/installation.html for installation instructions.")
 
 # TODO: This module might be clearer if we remove the distinction between FilterStack and Film, since each

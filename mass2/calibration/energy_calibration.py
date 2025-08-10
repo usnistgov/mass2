@@ -160,7 +160,7 @@ class EnergyCalibrationMaker:
         """Add a single energy calibration point.
 
         Can call as .add_cal_point(ph, energy, name) or if the "energy" is a line name, then
-        .add_cal_point(ph, name) will find energy as `energy=mass.STANDARD_FEATURES[name]`.
+        .add_cal_point(ph, name) will find energy as `energy=mass2.STANDARD_FEATURES[name]`.
         Thus the following are equivalent:
 
             cal = cal.add_cal_point(12345.6, 5898.801, "Mn Ka1")

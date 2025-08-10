@@ -1,5 +1,5 @@
 """
-mass.mathstat.robust
+mass2.mathstat.robust
 
 Functions from the field of robust statistics.
 
@@ -148,7 +148,7 @@ def shorth_range(x, normalize=False, sort_inplace=False, location=False):
     The Shortest Half of a data set {x} means that closed interval [a,b] where (1) a and b are both
     elements of the data set, (2) at least half of the elements are in the closed interval, and (3)
     which minimizes the length of the closed interval (b-a).  The shorth range is (b-a). See
-    mass.mathstat.robust.shorth_information for further explanation and references in the
+    mass2.mathstat.robust.shorth_information for further explanation and references in the
     literature.
 
     Args:

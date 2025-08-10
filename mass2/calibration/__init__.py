@@ -1,5 +1,5 @@
 """
-mass.calibration - Collection of tools related to energy calibration.
+mass2.calibration - Collection of tools related to energy calibration.
 """
 
 # ruff: noqa: F403

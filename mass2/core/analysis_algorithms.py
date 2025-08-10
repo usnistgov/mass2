@@ -1,5 +1,5 @@
 """
-mass.core.analysis_algorithms - main algorithms used in data analysis
+mass2.core.analysis_algorithms - main algorithms used in data analysis
 
 Designed to abstract certain key algorithms out of the class `MicrocalDataSet`
 and be able to run them fast.
@@ -36,9 +36,6 @@ def estimateRiseTime(pulse_data, timebase, nPretrig):
     Specifically, take the first and last of the rising points in the range of
     10% to 90% of the peak value, interpolate a line between the two, and use its
     slope to find the time to rise from 0 to the peak.
-
-    See also mass.nonstandard.deprecated.fitExponentialRiseTime for a more traditional
-    (and computationally expensive) definition.
 
     Args:
         pulse_data: An np.ndarray of dimension 1 (a single pulse record) or 2 (an

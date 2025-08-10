@@ -157,7 +157,7 @@ class SpectralLine:
         result = np.zeros_like(x)
         for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm, self.normalized_lorentzian_integral_intensity):
             result += ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma)
-            # mass.voigt() is normalized to have unit integrated intensity
+            # mass2.voigt() is normalized to have unit integrated intensity
         return result
 
     def components(self, x, instrument_gaussian_fwhm):
@@ -463,7 +463,7 @@ addline(
 
 
 # With the publication of Ménesguen 2022, we want to keep our previous line shapes around for
-# cross-checking. You can find them as, e.g., mass.MgKAlpha_v1
+# cross-checking. You can find them as, e.g., mass2.MgKAlpha_v1
 addline(
     element="Mg",
     material="metal_v1",

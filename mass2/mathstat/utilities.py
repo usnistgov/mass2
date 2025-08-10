@@ -1,5 +1,5 @@
 """
-mass.mathstat.utilities
+mass2.mathstat.utilities
 
 Several math and plotting utilities:
 * plot_as_stepped_hist

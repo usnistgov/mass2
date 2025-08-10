@@ -3,7 +3,7 @@ import polars as pl
 from dataclasses import dataclass
 from mass2.core.cal_steps import CalStep
 from mass2.core.noise_algorithms import NoisePSD
-from mass.core.optimal_filtering import Filter
+from mass2.core.optimal_filtering import Filter
 
 
 @dataclass(frozen=True)

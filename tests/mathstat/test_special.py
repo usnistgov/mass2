@@ -1,5 +1,5 @@
 """
-Test framework for the mass.mathstat.special functions
+Test framework for the mass2.mathstat.special functions
 
 Created on Feb 3, 2012
 
