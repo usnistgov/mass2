@@ -1,12 +1,11 @@
 # Build mass
 # J. Fowler, NIST
-# Updated May 2023
+# Updated Aug 2025. It's getting to be pretty useless to have this!
 
 PYSCRIPTS = bin/ljh_merge bin/ljh_truncate
 PYFILES = $(shell find . -name "*.py") $(PYSCRIPTS)
-FORMFILES := $(shell find mass2 -name "*_form_ui.py")
 
-.PHONY: all build clean test pep8 autopep8 lint ruff
+.PHONY: all build clean test ruff
 
 all: test
 
@@ -15,20 +14,6 @@ clean:
 
 test:
 	pytest
-
-PEPFILES := $(PYFILES)
-PEPFILES := $(filter-out $(FORMFILES), $(PEPFILES))  # Remove the UI.py forms
-
-pep8: pep8-report.txt
-pep8-report.txt: $(PEPFILES) Makefile
-	pycodestyle --exclude=build,nonstandard . > $@ || true
-
-autopep8: $(PEPFILES) Makefile
-	autopep8 --verbose --in-place --recursive .
-
-lint: lint-report.txt
-lint-report.txt: $(PYFILES) Makefile
-	ruff check > $@
 
 ruff:
 	ruff check
