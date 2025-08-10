@@ -1,6 +1,6 @@
 import numpy as np
 import pylab as plt
-import mass2 as mass
+import mass2
 import polars as pl
 import os
 import tempfile
@@ -21,7 +21,7 @@ def generate_and_fit_fake_data(
     rng = np.random.default_rng(seed)
 
     # Generate MnKAlpha line data
-    line = mass.calibration.fluorescence_lines.MnKAlpha
+    line = mass2.calibration.fluorescence_lines.MnKAlpha
     mn_values = line.rvs(size=n_mn_counts, instrument_gaussian_fwhm=mn_fwhm_ev, rng=rng)
 
     gaussian_values = []
@@ -38,9 +38,9 @@ def generate_and_fit_fake_data(
     # Combine all photon energies
     all_values = np.concatenate([mn_values, gaussian_values[0], gaussian_values[1]])
     df = pl.DataFrame({"energy": all_values})
-    ch = mass.Channel(
+    ch = mass2.Channel(
         df,
-        header=mass.ChannelHeader(
+        header=mass2.ChannelHeader(
             description="Fake spectral data for testing MultiFit",
             ch_num=1,
             frametime_s=0.1,
@@ -52,12 +52,12 @@ def generate_and_fit_fake_data(
 
     # Set up MultiFit
     multifit = (
-        mass.MultiFit(default_fit_width=80, default_bin_size=1)
+        mass2.MultiFit(default_fit_width=80, default_bin_size=1)
         .with_line("MnKAlpha")
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
     )
-    mass.line_models.VALIDATE_BIN_SIZE = False
+    mass2.line_models.VALIDATE_BIN_SIZE = False
     ch = ch.rough_cal_combinatoric(
         ["MnKAlpha", gaussian_centers_ev[0], gaussian_centers_ev[1]],
         ph_smoothing_fwhm=4,
@@ -77,7 +77,7 @@ def test_multifit_and_saving_and_loading_steps_in_channel():
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
         ch.save_steps(filename)
-        steps_loaded = mass.misc.unpickle_object(filename)
+        steps_loaded = mass2.misc.unpickle_object(filename)
     steps_loaded[ch.header.ch_num][-1].dbg_plot(ch.df)
 
     plt.close()
@@ -86,7 +86,7 @@ def test_multifit_and_saving_and_loading_steps_in_channel():
 
 def test_multifit_and_saving_and_loading_steps_in_channels():
     ch = generate_and_fit_fake_data()
-    data = mass.Channels({ch.header.ch_num: ch}, "for test_multifit_in_channels")
+    data = mass2.Channels({ch.header.ch_num: ch}, "for test_multifit_in_channels")
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
@@ -94,7 +94,7 @@ def test_multifit_and_saving_and_loading_steps_in_channels():
         _ = data.load_steps(filename)  # it would be better to start with a data that doesn't have the output of the steps...
         # and maybe throw an error for writing over existing columns?
         # fow now, I'm happy this is tested at all
-        steps = mass.misc.unpickle_object(filename)
+        steps = mass2.misc.unpickle_object(filename)
     _ = data.with_steps_dict(steps)  # pretty much the blow by blow version of load_steps
 
 

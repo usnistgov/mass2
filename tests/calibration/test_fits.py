@@ -7,7 +7,7 @@ Test that line work correctly.
 import pytest
 from pytest import approx
 import numpy as np
-import mass2 as mass
+import mass2
 
 # ruff: noqa: PLR0917
 
@@ -127,7 +127,7 @@ class Test_ratio_weighted_averages:
             0,
         ])
         self.x = np.linspace(-1.98, 1.98, 100) + 10
-        line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line(
+        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(
             "testline", energy=10, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
         )
         self.model = line.model()
@@ -228,7 +228,7 @@ class Test_gaussian_basic:
         nbins = 100
         nfits = 30
 
-        line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line(
+        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(
             "testline", energy=ctr, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
         )
         self.model = line.model()
@@ -250,7 +250,7 @@ class Test_Gaussian:
         self.y = np.exp(-0.5 * (self.x - self.center) ** 2 / (sigma**2))
         self.y *= self.integral / self.y.sum()
 
-        line = mass.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", self.center, 0, 0)
+        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", self.center, 0, 0)
         self.model = line.model()
         self.params = self.model.guess(self.y, bin_centers=self.x, dph_de=1)
         self.params["fwhm"].set(2.3548 * sigma)
@@ -311,7 +311,7 @@ class TestMnKA_fitter:
     ):
         bin_edges = np.arange(5850, 5950, 0.5)
         # generate random x-ray pulse energies following MnKAlpha distribution
-        line = mass.calibration.fluorescence_lines.MnKAlpha
+        line = mass2.calibration.fluorescence_lines.MnKAlpha
         model = line.model(has_tails=vary_tail)
 
         values = line.rvs(size=n, instrument_gaussian_fwhm=0, rng=self.rng)
@@ -375,7 +375,7 @@ class TestMnKA_fitter:
 
 def test_MnKA_float32():
     """See issue 193: if the energies are float32, then the fit shouldn't be flummoxed."""
-    line = mass.calibration.fluorescence_lines.MnKAlpha
+    line = mass2.calibration.fluorescence_lines.MnKAlpha
     model = line.model()
     N = 100000
     rng = np.random.default_rng(238)
@@ -396,7 +396,7 @@ def test_MnKA_float32():
 
 def test_MnKA_narrowbins():
     """See issue 194: if dPH/dE >> 1, we should not automatically trigger the too-narrow-bins warning."""
-    line = mass.calibration.fluorescence_lines.MnKAlpha
+    line = mass2.calibration.fluorescence_lines.MnKAlpha
     model = line.model()
     N = 10000
     rng = np.random.default_rng(238)
@@ -415,7 +415,7 @@ def test_MnKA_narrowbins():
 def test_integral_parameter():
     """See issue 202: parameter 'integral' should be the total number of counts.
     See also issue 204: parameter 'integral' should scale inversely with a QE model."""
-    line = mass.MnKAlpha
+    line = mass2.MnKAlpha
     bgperev = 50
     Nsignal = 10000
     rng = np.random.default_rng(3038)
@@ -459,8 +459,8 @@ def test_integral_parameter():
 class Test_Composites_lmfit:
     @pytest.fixture(autouse=True)
     def setUp(self):
-        if "dummy1" not in mass.spectra.keys():
-            mass.calibration.fluorescence_lines.addline(
+        if "dummy1" not in mass2.spectra.keys():
+            mass2.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
                 linetype="1",
@@ -470,11 +470,11 @@ class Test_Composites_lmfit:
                 energies=np.array([653.493657]),
                 lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                reference_amplitude_type=mass2.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
                 ka12_energy_diff=None,
             )
-        if "dummy2" not in mass.spectra.keys():
-            mass.calibration.fluorescence_lines.addline(
+        if "dummy2" not in mass2.spectra.keys():
+            mass2.calibration.fluorescence_lines.addline(
                 element="dummy",
                 material="dummy_material",
                 linetype="2",
@@ -484,7 +484,7 @@ class Test_Composites_lmfit:
                 energies=np.array([653.679946]),
                 lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                reference_amplitude_type=mass2.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
                 ka12_energy_diff=None,
             )
         rng = np.random.default_rng(131)
@@ -493,8 +493,8 @@ class Test_Composites_lmfit:
         n1 = 10000
         n2 = 20000
         self.n = n1 + n2
-        self.line1 = mass.spectra["dummy1"]
-        self.line2 = mass.spectra["dummy2"]
+        self.line1 = mass2.spectra["dummy1"]
+        self.line2 = mass2.spectra["dummy2"]
         self.nominal_separation = self.line2.nominal_peak_energy - self.line1.nominal_peak_energy
         values1 = self.line1.rvs(size=n1, instrument_gaussian_fwhm=resolution, rng=rng)
         values2 = self.line2.rvs(size=n2, instrument_gaussian_fwhm=resolution, rng=rng)
@@ -547,7 +547,7 @@ class Test_Composites_lmfit:
 
 
 def test_BackgroundMLEModel():
-    class BackgroundMLEModel(mass.calibration.line_models.MLEModel):
+    class BackgroundMLEModel(mass2.calibration.line_models.MLEModel):
         def __init__(self, independent_vars=["bin_centers"], prefix="", nan_policy="raise", **kwargs):
             def modelfunc(bin_centers, background, bg_slope):
                 bg = np.zeros_like(bin_centers) + background
@@ -580,7 +580,7 @@ def test_negatives():
     counts = np.array([2, 4, 2, 4], dtype=np.int64)
     bin_centers = np.array([8009.07622011, 8009.57622011, 8010.07622011, 8010.57622011])
 
-    model = mass.spectra["CuKAlpha"].model()
+    model = mass2.spectra["CuKAlpha"].model()
     params = model.guess(bin_centers=bin_centers, data=counts, dph_de=1)
     params["dph_de"].set(1, min=0.1, max=10, vary=False)
     params["fwhm"].set(4)
@@ -679,7 +679,7 @@ def test_issue_125():
         81,
         59,
     ])
-    line = mass.MnKAlpha
+    line = mass2.MnKAlpha
     model = line.model()
     params = model.guess(contents, bin_centers=e, dph_de=1)
     params["fwhm"].set(20)
@@ -706,7 +706,7 @@ def test_tail_tau_behaves_same_vs_energy_scale():
 
     def get_spectrum_with_tail(escale):
         peak_ph = 6000 * escale
-        model = mass.get_model(peak_ph, has_tails=True)
+        model = mass2.get_model(peak_ph, has_tails=True)
         params = model.make_params()
         params["fwhm"].set(2 * escale)
         params["tail_tau"].set(30 * escale)
@@ -845,7 +845,7 @@ def test_a_fit_that_was_failing_with_too_small_a_fwhm():
         4393.03401847,
         4393.94266137,
     ])
-    model = mass.get_model(49127.24)
+    model = mass2.get_model(49127.24)
     dph_de_guess = np.mean(bin_centers) / model.spect.nominal_peak_energy
     params = model.guess(counts, bin_centers=bin_centers, dph_de=dph_de_guess)
     params["dph_de"].set(0.09086, vary=False)

@@ -9,7 +9,7 @@ import lmfit
 import os
 import pathlib
 
-import mass2 as mass
+import mass2
 from .channel import Channel, ChannelHeader, BadChannel
 
 
@@ -52,11 +52,11 @@ class Channels:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
+        model = mass2.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
-        bin_centers, counts = mass.misc.hist_of_series(df_small[col], _bin_edges)
+        bin_centers, counts = mass2.misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
         print(f"before update {params=}")
@@ -75,7 +75,7 @@ class Channels:
 
     def plot_hist(self, col, bin_edges, use_expr=True, axis=None):
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
-        ax = mass.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
+        ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
 
     def plot_hists(self, col, bin_edges, group_by_col, axis=None, use_expr=None, skip_none=True):
@@ -109,7 +109,7 @@ class Channels:
                 ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
             else:
                 ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
-            # bin_centers, counts = mass.misc.hist_of_series(values, bin_edges)
+            # bin_centers, counts = mass2.misc.hist_of_series(values, bin_edges)
             # plt.plot(bin_centers, counts, label=group_name)
 
         # Customize the plot
@@ -140,7 +140,7 @@ class Channels:
                 print(f"{error_type=}")
                 print(f"{error_message=}")
                 new_bad_channels[key] = channel.as_bad(error_type, error_message, backtrace)
-        new_bad_channels = mass.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
+        new_bad_channels = mass2.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
 
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
@@ -189,7 +189,7 @@ class Channels:
     def from_off_paths(cls, off_paths, description):
         channels = {}
         for path in off_paths:
-            ch = Channel.from_off(mass.off.OffFile(path))
+            ch = Channel.from_off(mass2.off.OffFile(path))
             channels[ch.header.ch_num] = ch
         return cls(channels, description)
 
@@ -197,11 +197,11 @@ class Channels:
     def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None, exclude_ch_nums=[]):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if noise_folder is None:
-            paths = mass.ljhutil.find_ljh_files(pulse_folder)
+            paths = mass2.ljhutil.find_ljh_files(pulse_folder)
             pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
-            pairs = mass.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
+            pairs = mass2.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"in from_ljh_folder has {len(pairs)} pairs")
@@ -223,7 +223,7 @@ class Channels:
     def get_experiment_state_df(self, experiment_state_path=None):
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
-            experiment_state_path = mass.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
+            experiment_state_path = mass2.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         # _col0, _col1 = df.columns
         df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
@@ -264,11 +264,11 @@ class Channels:
         steps = {}
         for channum, ch in self.channels.items():
             steps[channum] = ch.steps[:]
-        mass.misc.pickle_object(steps, filename)
+        mass2.misc.pickle_object(steps, filename)
         return steps
 
     def load_steps(self, filename):
-        steps = mass.misc.unpickle_object(filename)
+        steps = mass2.misc.unpickle_object(filename)
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self):

@@ -109,7 +109,7 @@ uv pip install -e git+https://github.com/usnistgov/mass2.git#egg=mass2
 
 The above (HTTPS) cloning method is probably simpler initially (no ssh setup). On the other hand, users who contribute to MASS will prefer to set up password-free connections with an ssh key. For them, instead of using the last line above, contributors should use ssh-based cloning:
 ```bash
-uv pip install -e git+ssh://git@github.com/usnistgov/mass.git#egg=mass
+uv pip install -e git+ssh://git@github.com/usnistgov/mass2.git#egg=mass
 ```
 
 If you install in any virtual environment, the install location will be inside the `MYVENV/src/mass` where `MYVENV` is the name of your venv. You can switch git branches and update from GitHub in that directory and have everything take effect immediately.
@@ -133,12 +133,12 @@ If you manage to install conda, it is possible to install MASS in your base cond
 conda create --name analysis -y
 conda activate analysis
 pip install --upgrade pip
-pip install -e git+https://github.com/usnistgov/mass.git#egg=mass
+pip install -e git+https://github.com/usnistgov/mass2.git#egg=mass
 ```
 
 The above (HTTPS) cloning method is probably simpler initially (no ssh setup), but users who contribute to MASS might prefer to set up password-free connections with an ssh key. For them, instead of using the last line above, contributors might want to use ssh-based cloning:
 ```bash
-pip install -e git+ssh://git@github.com/usnistgov/mass.git#egg=mass
+pip install -e git+ssh://git@github.com/usnistgov/mass2.git#egg=mass
 ```
 
 You'll also need to remember to activate the `analysis` environment in each terminal where you want to use MASS, via

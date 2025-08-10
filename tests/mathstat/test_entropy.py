@@ -9,7 +9,7 @@ Joe Fowler
 
 import pytest
 import numpy as np
-import mass2 as mass
+import mass2
 from mass2.mathstat.entropy import laplace_entropy, _merge_orderedlists, laplace_cross_entropy, laplace_KL_divergence  # noqa
 
 
@@ -161,20 +161,20 @@ class Test_LaplaceEntropy:
     def test_bug115():
         """See MASS issue #115: nonsense values are appearing in KL divergence."""
         rng = np.random.default_rng(100)
-        x = mass.MnKAlpha.rvs(size=100, rng=rng, instrument_gaussian_fwhm=0)
+        x = mass2.MnKAlpha.rvs(size=100, rng=rng, instrument_gaussian_fwhm=0)
         gain = np.linspace(-0.01, 0.01, 21)
         for p in gain:
             xg = np.exp(p) * x
-            D = mass.mathstat.entropy.laplace_cross_entropy(xg, x, w=3.0, approx_mode="exact")
+            D = mass2.mathstat.entropy.laplace_cross_entropy(xg, x, w=3.0, approx_mode="exact")
             assert abs(D) < 20
 
     @staticmethod
     def test_bug116():
         """See MASS issue #116: nonsense values are STILL appearing in KL divergence."""
         rng = np.random.default_rng(100)
-        x = mass.MnKAlpha.rvs(size=1000, rng=rng, instrument_gaussian_fwhm=0)
+        x = mass2.MnKAlpha.rvs(size=1000, rng=rng, instrument_gaussian_fwhm=0)
         gain = np.linspace(-0.005, 0.005, 11)
         for p in gain:
             xg = np.exp(p) * x
-            D = mass.mathstat.entropy.laplace_cross_entropy(xg, x, w=1.0, approx_mode="exact")
+            D = mass2.mathstat.entropy.laplace_cross_entropy(xg, x, w=1.0, approx_mode="exact")
             assert abs(D) < 20

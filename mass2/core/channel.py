@@ -16,7 +16,7 @@ from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
 from . import misc
-import mass2 as mass
+import mass2
 
 
 @dataclass(frozen=True)
@@ -222,7 +222,7 @@ class Channel:
         plt.tight_layout()
 
     def good_series(self, col, use_expr=True):
-        return mass.good_series(self.df, col, self.good_expr, use_expr)
+        return mass2.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_gain_cal(
         self,
@@ -235,8 +235,8 @@ class Channel:
         # this is meant to filter the data, then select down to the columsn we need, then materialize them,
         # all without copying our pulse records again
         uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        peak_ph_vals, _peak_heights = mass.algorithms.find_local_maxima(uncalibrated, gaussian_fwhm=ph_smoothing_fwhm)
-        name_e, energies_out, opt_assignments = mass.algorithms.find_opt_assignment(
+        peak_ph_vals, _peak_heights = mass2.algorithms.find_local_maxima(uncalibrated, gaussian_fwhm=ph_smoothing_fwhm)
+        name_e, energies_out, opt_assignments = mass2.algorithms.find_opt_assignment(
             peak_ph_vals,
             line_names=line_names,
             maxacc=0.1,
@@ -252,7 +252,7 @@ class Channel:
         # energy_residuals = predicted_energies - energies_out
         # if any(np.abs(energy_residuals) > max_residual_ev):
         #     raise Exception(f"too large residuals: {energy_residuals=} eV")
-        step = mass.RoughCalibrationGainStep(
+        step = mass2.RoughCalibrationGainStep(
             [uncalibrated_col],
             [calibrated_col],
             self.good_expr,
@@ -273,7 +273,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = mass.RoughCalibrationStep.learn_combinatoric(
+        step = mass2.RoughCalibrationStep.learn_combinatoric(
             self,
             line_names,
             uncalibrated_col=uncalibrated_col,
@@ -294,7 +294,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = mass.RoughCalibrationStep.learn_combinatoric_height_info(
+        step = mass2.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
             line_names,
             line_heights_allowed,
@@ -318,7 +318,7 @@ class Channel:
         n_extra_peaks: int = 10,
         acceptable_rms_residual_e: float = 10,
     ) -> "Channel":
-        step = mass.RoughCalibrationStep.learn_3peak(
+        step = mass2.RoughCalibrationStep.learn_3peak(
             self,
             line_names,
             uncalibrated_col,
@@ -437,7 +437,7 @@ class Channel:
         return self.with_step(step)
 
     def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = mass.PretrigMeanJumpFixStep(
+        step = mass2.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,
@@ -524,7 +524,7 @@ class Channel:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
+        model = mass2.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
@@ -567,7 +567,7 @@ class Channel:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = Channel(df, header=header, noise=noise_channel)
@@ -674,7 +674,7 @@ class Channel:
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
-        step = mass.phase_correct.phase_correct_mass_specific_lines(
+        step = mass2.phase_correct.phase_correct_mass_specific_lines(
             self,
             indicator_col,
             uncorrected_col,

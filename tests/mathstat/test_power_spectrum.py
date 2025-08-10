@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pylab as plt
-import mass2 as mass
+import mass2
 
 from mass2.mathstat.power_spectrum import computeSpectrum
 
@@ -19,7 +19,7 @@ def test_basic():
 
 
 def test_values():
-    f, psd = mass.mathstat.power_spectrum.computeSpectrum(np.arange(10), segfactor=1, dt=1)
+    f, psd = mass2.mathstat.power_spectrum.computeSpectrum(np.arange(10), segfactor=1, dt=1)
     expected = [405.0, 52.36067977, 14.47213595, 7.63932023, 5.52786405, 5.0]
     for a, b in zip(psd, expected):
         assert a == pytest.approx(b)
@@ -43,8 +43,8 @@ def test_creating_filter_from_non_LJH_data():
     # ^ we're just testing math here, this "average pulse" is easier than making an actual pulse shape
 
     noise_traces = rng.standard_normal((record_len, n_noise_records))
-    noise_autocorr = mass.mathstat.power_spectrum.autocorrelation_broken_from_pulses(noise_traces)
-    noise_psd_calculator = mass.mathstat.power_spectrum.PowerSpectrum(record_len // 2, dt=frametime_s)
+    noise_autocorr = mass2.mathstat.power_spectrum.autocorrelation_broken_from_pulses(noise_traces)
+    noise_psd_calculator = mass2.mathstat.power_spectrum.PowerSpectrum(record_len // 2, dt=frametime_s)
     window = np.ones(record_len)
     for i in range(n_noise_records):
         noise_psd_calculator.addDataSegment(noise_traces[:, i], window=window)
@@ -53,7 +53,7 @@ def test_creating_filter_from_non_LJH_data():
     plt.close()
     noise_psd = noise_psd_calculator.spectrum()
 
-    maker = mass.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr, noise_psd=noise_psd, sample_time_sec=frametime_s)
+    maker = mass2.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr, noise_psd=noise_psd, sample_time_sec=frametime_s)
     filter_obj = maker.compute_5lag()
     print("predicted resolutions")
     filter_obj.report(std_energy=1000)

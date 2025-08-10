@@ -1,10 +1,10 @@
 """
-Test code for mass.calibration.algorithms.
+Test code for mass2.calibration.algorithms.
 """
 
 from pytest import approx
 import numpy as np
-import mass2 as mass
+import mass2
 from mass2.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, build_fit_ranges_ph, multifit
 import itertools
 
@@ -39,7 +39,7 @@ def test_find_local_maxima():
 
 def test_build_fit_ranges():
     known_energies = np.array([1000, 2000, 2050, 3000])
-    factory = mass.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
+    factory = mass2.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
     cal1 = factory.make_calibration(approximate=False)
 
     # this call asks for fit ranges at each known energy, and asks to avoid the line at 3050,
@@ -63,7 +63,7 @@ def test_build_fit_ranges():
 
 def test_build_fit_ranges_ph():
     known_energies = np.array([1000, 2000, 2050, 3000])
-    factory = mass.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
+    factory = mass2.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
     cal1 = factory.make_calibration(approximate=False)
 
     # this call asks for fit ranges at each known energy, and asks to avoid the line at 3050,
@@ -89,7 +89,7 @@ def test_complete():
     # generate pulseheights from known spectrum
     num_samples = {k: 1000 * (k + 1) for k in range(5)}
     line_names = ["MnKAlpha", "MnKBeta", "CuKAlpha", "TiKAlpha", "FeKAlpha"]
-    spect = {i: mass.spectra[n] for (i, n) in enumerate(line_names)}
+    spect = {i: mass2.spectra[n] for (i, n) in enumerate(line_names)}
     e = []
     for k, s in spect.items():
         e.extend(s.rvs(size=num_samples[k], instrument_gaussian_fwhm=k + 3.0, rng=rng))
@@ -106,7 +106,7 @@ def test_complete():
     energies_opt = np.asanyarray(energies_opt)
 
     z = np.zeros_like(energies_opt)
-    factory = mass.EnergyCalibrationMaker(ph_opt, energies_opt, z, z, line_names)
+    factory = mass2.EnergyCalibrationMaker(ph_opt, energies_opt, z, z, line_names)
     approxcal = factory.make_calibration(approximate=False)
 
     _energies, fit_lo_hi, slopes_de_dph = build_fit_ranges_ph(energies_opt, [], approxcal, 100)

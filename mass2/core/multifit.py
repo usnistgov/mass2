@@ -7,10 +7,10 @@ import numpy as np
 import polars as pl
 import pylab as plt
 
-import mass2 as mass
 from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
 from mass2.calibration.line_models import GenericLineModel
 from mass2.core.cal_steps import CalStep
+import mass2
 
 
 def handle_none(val, default):
@@ -34,9 +34,9 @@ class FitSpec:
         return params
 
     def fit_series_without_use_expr(self, series):
-        bin_centers, counts = mass.misc.hist_of_series(series, self.bin_edges)
+        bin_centers, counts = mass2.misc.hist_of_series(series, self.bin_edges)
         params = self.params(bin_centers, counts)
-        bin_centers, bin_size = mass.misc.midpoints_and_step_size(self.bin_edges)
+        bin_centers, bin_size = mass2.misc.midpoints_and_step_size(self.bin_edges)
         result = self.model.fit(counts, params, bin_centers=bin_centers)
         result.set_label_hints(
             binsize=bin_size,
@@ -49,7 +49,7 @@ class FitSpec:
         return result
 
     def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr):
-        series = mass.good_series(df, col, good_expr, use_expr=self.use_expr)
+        series = mass2.good_series(df, col, good_expr, use_expr=self.use_expr)
         return self.fit_series_without_use_expr(series)
 
     def fit_ch(self, ch, col: str):
@@ -66,7 +66,7 @@ class MultiFit:
     results: Optional[list] = None
 
     def with_line(self, line, dlo=None, dhi=None, bin_size=None, use_expr=None, params_update=None):
-        model = mass.getmodel(line)
+        model = mass2.getmodel(line)
         peak_energy = model.spect.peak_energy
         dlo = handle_none(dlo, self.default_fit_width / 2)
         dhi = handle_none(dhi, self.default_fit_width / 2)
@@ -190,7 +190,7 @@ class MultiFit:
             return ph / gain
 
         e_predicted = ph2energy(peaks_uncalibrated)
-        rms_residual_energy = mass.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
+        rms_residual_energy = mass2.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
         return pfit_gain, rms_residual_energy
 
     def to_mass_cal(self, previous_energy2ph, curvetype=Curvetypes.GAIN, approximate=False):

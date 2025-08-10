@@ -8,7 +8,7 @@ Paul Szypryt
 """
 
 import numpy as np
-import mass2 as mass
+import mass2
 from mass2.calibration.fluorescence_lines import spectra
 import xraydb
 
@@ -17,7 +17,7 @@ def initialize_hci_line_model(line_name, has_linear_background=False, has_tails=
     """Initializes a single lorentzian hci lmfit model. Reformats line_name to create a lmfit valid prefix.
 
     Args:
-        line_name: name of line within mass.spectra
+        line_name: name of line within mass2.spectra
         has_linear_background: (default False) include linear background in the model
         has_tails: (default False) include low energy tail in the model
     """
@@ -45,7 +45,7 @@ def initialize_hci_composite_model(composite_name, individual_models, has_linear
         composite_model = add_bg_model(composite_model)
     # Workaround for energy calibration using composite models, pick 1st GenericLineModel component
     line_model_components = [
-        i_comp for i_comp in composite_model.components if isinstance(i_comp, mass.calibration.line_models.GenericLineModel)
+        i_comp for i_comp in composite_model.components if isinstance(i_comp, mass2.calibration.line_models.GenericLineModel)
     ]
     if peak_component_name is None:
         peak_component_name = line_model_components[0]._name
@@ -150,7 +150,7 @@ def add_bg_model(generic_model, vary_slope=False):
 
     composite_name = generic_model._name
     bg_prefix = f"{composite_name}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
-    background_model = mass.calibration.line_models.LinearBackgroundModel(name=f"{composite_name} Background", prefix=bg_prefix)
+    background_model = mass2.calibration.line_models.LinearBackgroundModel(name=f"{composite_name} Background", prefix=bg_prefix)
     background_model.set_param_hint("bg_slope", vary=vary_slope)
     composite_model = generic_model + background_model
     composite_model.name = composite_name

@@ -1,7 +1,7 @@
 import collections
 from typing import Union
-import mass2 as mass
 import numpy as np
+import mass2
 
 
 class ExperimentStateFile:
@@ -31,7 +31,7 @@ class ExperimentStateFile:
 
     @staticmethod
     def experimentStateFilenameFromDatasetFilename(datasetFilename):
-        basename, _channum = mass.ljh_util.ljh_basename_channum(datasetFilename)
+        basename, _channum = mass2.ljh_util.ljh_basename_channum(datasetFilename)
         return basename + "_experiment_state.txt"
 
     def parse(self):

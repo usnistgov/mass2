@@ -1,9 +1,9 @@
-import mass2 as mass
 import os
 import logging
 import h5py
 import sys
 import argparse
+import mass2
 
 LOG = logging.getLogger("mass")
 LOG.setLevel(logging.DEBUG)
@@ -28,7 +28,7 @@ def make_projectors(  # noqa: PLR0917
     f_3db_ats=None,
     f_3db_5lag=None,
 ):
-    data = mass.TESGroup(
+    data = mass2.TESGroup(
         pulse_files, noise_files, overwrite_hdf5_file=True, hdf5_filename=mass_hdf5_path, hdf5_noisefilename=mass_hdf5_noise_path
     )
     for ds in data:
@@ -52,7 +52,7 @@ def make_projectors(  # noqa: PLR0917
 
 def parse_args(fake):
     if fake:
-        return mass.ljh2off.FakeArgs()
+        return mass2.ljh2off.FakeArgs()
     example_usage = """python make_projectors.py pulse_path noise_path"""
     parser = argparse.ArgumentParser(description="convert ljh files to off files, example:\n" + example_usage)
     parser.add_argument("pulse_path", help="path a a single ljh file with pulses, other channel numbers will be found automatically")
@@ -122,7 +122,7 @@ def main(args=None):
     for k in sorted(vars(args).keys()):
         print(f"{k}: {vars(args)[k]}")
     # find files
-    channums = mass.ljh_util.ljh_get_channels_both(args.pulse_path, args.noise_path)
+    channums = mass2.ljh_util.ljh_get_channels_both(args.pulse_path, args.noise_path)
     if not args.silent:
         print(f"found these {len(channums)} channels with both pulse and noise files: {channums}")
     nchan = len(channums)
@@ -132,8 +132,8 @@ def main(args=None):
             print(f"chose first max_channels={args.max_channels} channels")
     if len(channums) == 0:
         raise Exception(f"no channels found for files matching {args.pulse_path} and {args.noise_path}")
-    pulse_basename, _ = mass.ljh_util.ljh_basename_channum(args.pulse_path)
-    noise_basename, _ = mass.ljh_util.ljh_basename_channum(args.noise_path)
+    pulse_basename, _ = mass2.ljh_util.ljh_basename_channum(args.pulse_path)
+    noise_basename, _ = mass2.ljh_util.ljh_basename_channum(args.noise_path)
     pulse_files = [pulse_basename + f"_chan{channum}.ljh" for channum in channums]
     noise_files = [noise_basename + f"_chan{channum}.ljh" for channum in channums]
     # handle output filename
