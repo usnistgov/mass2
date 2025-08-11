@@ -1,7 +1,7 @@
-import collections
+from collections import OrderedDict
 from typing import Union
-import mass2 as mass
 import numpy as np
+import mass2
 
 
 class ExperimentStateFile:
@@ -31,7 +31,7 @@ class ExperimentStateFile:
 
     @staticmethod
     def experimentStateFilenameFromDatasetFilename(datasetFilename):
-        basename, _channum = mass.ljh_util.ljh_basename_channum(datasetFilename)
+        basename, _channum = mass2.ljh_util.ljh_basename_channum(datasetFilename)
         return basename + "_experiment_state.txt"
 
     def parse(self):
@@ -102,19 +102,15 @@ class ExperimentStateFile:
         # unixnanos = timestamps of new records
         # i0_unixnanos is how many records have been state-indexed
         if statesDict is None:
-            statesDict = collections.OrderedDict()
+            statesDict = OrderedDict()
 
         newLabels = self.allLabels[i0_allLabels:]
-
-        if statesDict is None:
-            statesDict = collections.OrderedDict()
 
         # if the statesDict already exists, and there are no new states, update the active state and return the statesDict.
         if len(statesDict.keys()) > 0 and len(newLabels) == 0:
             assert i0_allLabels > 0
-            for k in statesDict.keys():
-                last_key = k
-                s = statesDict[last_key]
+            last_key = next(reversed(statesDict))
+            s = statesDict[last_key]
             if isinstance(s, slice):
                 # set the slice from the start of the state to the last new record
                 s2 = slice(s.start, i0_unixnanos + len(unixnanos))
@@ -123,7 +119,7 @@ class ExperimentStateFile:
                 # set the slice from the start of the state to the last new record
                 s[-1] = slice(s_.start, i0_unixnanos + len(unixnanos))
                 s2 = s
-            statesDict[k] = s2
+            statesDict[last_key] = s2
             return statesDict
 
         # unixnanos = new record timestamps
@@ -135,11 +131,10 @@ class ExperimentStateFile:
         # the state that was active last time calcStatesDict was called may need special handling
         if len(statesDict.keys()) > 0 and len(newLabels) > 0:
             assert i0_allLabels > 0
-            for k in statesDict.keys():
-                last_key = k
+            last_key = next(reversed(statesDict))
             s = statesDict[last_key]
             s2 = slice(s.start, inds[0])
-            statesDict[k] = s2
+            statesDict[last_key] = s2
         # iterate over self.allLabels because it corresponds to self.unixnanos
         for i, label in enumerate(newLabels):
             if label not in self.unaliasedLabels:

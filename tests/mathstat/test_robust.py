@@ -1,7 +1,7 @@
 """
 test_robust.py
 
-Test functions in mass.mathstat.robust
+Test functions in mass2.mathstat.robust
 
 Created on Feb 9, 2012
 

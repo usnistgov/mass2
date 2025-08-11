@@ -4,6 +4,8 @@
 
 **2.0.0alpha** August 4, 2025-
 
+* Complete rewrite of MASS for version 2.
+
 
 ## Mass Version 1 (2010-2025)
 

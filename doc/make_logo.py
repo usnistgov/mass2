@@ -3,8 +3,8 @@ import pylab as plt
 
 
 def logo(seed=46):
-    trace_color = "#002288"
-    text_color = "#cc2222"
+    text_color = "#002288"
+    trace_color = "#cc2222"
     ndets = 15
     rise_time = 3.0
     fall_time = 11.0
@@ -20,17 +20,19 @@ def logo(seed=46):
     x /= normalize
 
     fig = plt.figure(9, figsize=(1.28, 1.28), dpi=100)
-    fig.subplots_adjust(bottom=0.15, top=0.85, left=0.15, right=0.85)
+    margin = 0.08
+    tmargin = 1 - margin
+    fig.subplots_adjust(bottom=margin, top=tmargin, left=margin, right=tmargin)
     plt.clf()
     plt.plot(t, x, color=trace_color, lw=2)
     plt.xticks([])
     plt.yticks([])
-    plt.text(110, 0.75, "Mass", ha="right", size=18, color=text_color)
+    plt.text(110, 0.75, "Mass2", ha="right", size=17, color=text_color)
 
     rg = np.random.default_rng(seed)
 
     # Other dets
-    cm = plt.cm.Spectral_r
+    cm = plt.cm.Spectral
     for i in range(ndets):
         n = rg.poisson(0.8, size=1)
         x = np.zeros_like(t)

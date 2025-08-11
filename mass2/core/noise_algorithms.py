@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 import pylab as plt  # type: ignore
-import mass2 as mass
+import mass2
 from dataclasses import dataclass
 from numpy import ndarray
 from typing import Optional
@@ -81,7 +81,7 @@ def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
 
     (n_pulses, len_pulse) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
-    f_mass, psd_mass = mass.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
+    f_mass, psd_mass = mass2.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
     autocorr_vec = calc_autocorrelation(data)
     # nbins = len(psd_mass)
     # frequencies = calc_psd_frequencies(nbins, dt)

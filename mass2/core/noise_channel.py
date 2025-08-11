@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import polars as pl
-import mass2 as mass
 import numpy as np
+import mass2
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class NoiseChannel:
 
         noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
         excursion = excursion2d(noise_traces)
-        max_excursion = mass.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
+        max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
         return df_noise2, max_excursion
 
@@ -76,7 +76,7 @@ class NoiseChannel:
         trunc_back=0,
     ):
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
-        spectrum = mass.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
+        spectrum = mass2.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
         return spectrum
 
     def __hash__(self):
@@ -90,7 +90,7 @@ class NoiseChannel:
 
     @classmethod
     def from_ljh(cls, path):
-        ljh = mass.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         noise_channel = cls(df, header_df, header_df["Timebase"][0])
         return noise_channel

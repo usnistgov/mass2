@@ -1,6 +1,6 @@
 import numpy as np
 
-import mass2 as mass
+import mass2
 import logging
 
 LOG = logging.getLogger("mass")
@@ -52,7 +52,7 @@ class TestTimeDriftCorrection:
         return 1 + 0.005 * np.sin(2 * np.pi * t / 10000.0)
 
     def test_make_drifting_data(self):
-        distrib = mass.calibration.MnKAlpha
+        distrib = mass2.calibration.MnKAlpha
         res_fwhm_ev = 3.0
         cps = 1
         duration_s = 10000

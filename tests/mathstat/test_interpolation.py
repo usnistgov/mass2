@@ -8,7 +8,7 @@ Joe Fowler
 """
 
 import numpy as np
-import mass2 as mass
+import mass2
 from mass2.mathstat.interpolate import k_spline, GPRSpline
 
 
@@ -44,9 +44,9 @@ class Test_SmoothingSpline:
         dph = np.array([0.60491869, 0.65811683, 0.71025965, 0.76146158, 0.81181613, 0.86140111, 0.9102821, 0.95851515, 1.00614861])
 
         # At time of issue #74, this crashed on next line for Joe, but not for Galen.
-        mass.mathstat.interpolate.SmoothingSplineLog(ph, e, de, dph)
+        mass2.mathstat.interpolate.SmoothingSplineLog(ph, e, de, dph)
 
-        cal = mass.EnergyCalibrationMaker.init(e**0.8, e, dph, de)
+        cal = mass2.EnergyCalibrationMaker.init(e**0.8, e, dph, de)
         # At time of issue #74, this crashed on next line for Galen, but not for Joe.
         cal.drop_one_errors()
 

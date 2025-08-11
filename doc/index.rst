@@ -1,7 +1,7 @@
 Mass
 ======
 
-.. image:: mass_logo_128.png
+.. image:: mass2_logo_128.png
   :width: 128
   :alt: Wicked sweet mass logo
 

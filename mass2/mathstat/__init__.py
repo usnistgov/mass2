@@ -1,5 +1,5 @@
 """
-mass.mathstat - Collection of tools for math and statistics
+mass2.mathstat - Collection of tools for math and statistics
 
 Joe Fowler, NIST
 """

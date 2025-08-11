@@ -12,7 +12,7 @@ import typing
 from typing import Optional, Union
 import itertools
 
-import mass2 as mass
+import mass2
 from .channel import Channel
 from .cal_steps import CalStep
 
@@ -291,7 +291,7 @@ def hist_smoothed(
         hi = (np.max(pulse_heights) + 3 * fwhm_pulse_height_units).astype(np.float64)
         bin_edges = np.linspace(lo, hi, n + 1)
 
-    _, step_size = mass.misc.midpoints_and_step_size(bin_edges)
+    _, step_size = mass2.misc.midpoints_and_step_size(bin_edges)
     counts, _ = np.histogram(pulse_heights, bin_edges)
     fwhm_in_bin_number_units = fwhm_pulse_height_units / step_size
     smoothed_counts = smooth_hist_with_gauassian_by_fft(counts, fwhm_in_bin_number_units)
@@ -320,7 +320,7 @@ def peakfind_local_maxima_of_smoothed_hist(
 ) -> SmoothedLocalMaximaResult:
     assert len(pulse_heights > 10), "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
-    bin_centers, _step_size = mass.misc.midpoints_and_step_size(bin_edges)
+    bin_centers, _step_size = mass2.misc.midpoints_and_step_size(bin_edges)
     local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
     # require a minimum before and after a maximum (the first check is redundant with behavior of local_maxima)
     if local_maxima_inds[0] < local_minima_inds[0]:
@@ -363,7 +363,7 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     flag = (y[1:-1] > y[:-2]) & (y[1:-1] > y[2:])
     lm = np.arange(1, n - 1)[flag]
     lm = lm[np.argsort(-y[lm])]
-    bin_centers, _step_size = mass.misc.midpoints_and_step_size(bins)
+    bin_centers, _step_size = mass2.misc.midpoints_and_step_size(bins)
     return np.array(x[lm]), np.array(y[lm]), (hist, bin_centers, y)
 
 
@@ -388,7 +388,7 @@ def rank_assignments(ph, e):
     x_m_x0_over_x1_m_x0 = (x - x0) / (x1 - x0)
     y = y0 + (y1 - y0) * x_m_x0_over_x1_m_x0
     y_expected = e[1:-1]
-    rms_e_residual = mass.misc.root_mean_squared(y - y_expected, axis=1)
+    rms_e_residual = mass2.misc.root_mean_squared(y - y_expected, axis=1)
     # prefer negative slopes for gain
     # gain_first = ph[0]/e[0]
     # gain_last = ph[-1]/e[-1]
@@ -460,7 +460,7 @@ def find_optimal_assignment2(ph, e, line_names):
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
         pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
-    result = mass.rough_cal.BestAssignmentPfitGainResult(
+    result = mass2.rough_cal.BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
         residual_e=None,
@@ -481,7 +481,7 @@ def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
         pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
-    result = mass.rough_cal.BestAssignmentPfitGainResult(
+    result = mass2.rough_cal.BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
         residual_e=None,
@@ -541,7 +541,7 @@ def find_best_residual_among_all_possible_assignments(
         assignment_inds = np.array(indices)
         ph_assigned = np.array(ph[assignment_inds])
         residual_e, pfit_gain = find_pfit_gain_residual(ph_assigned, e)
-        rms_residual = mass.misc.root_mean_squared(residual_e)
+        rms_residual = mass2.misc.root_mean_squared(residual_e)
         if rms_residual < best_rms_residual:
             best_rms_residual = rms_residual
             best_ph_assigned = ph_assigned
@@ -638,15 +638,15 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
         return np.inf, "assignments should be unique"
 
     # now we evaluate the assignment and create a result object
-    residual_e, pfit_gain = mass.rough_cal.find_pfit_gain_residual(df["possible_ph"].to_numpy(), df["line_energy"].to_numpy())
+    residual_e, pfit_gain = mass2.rough_cal.find_pfit_gain_residual(df["possible_ph"].to_numpy(), df["line_energy"].to_numpy())
     if pfit_gain(1e5) < 0:
         # well formed calibration have positive gain at 1e5
         return np.inf, "pfit_gain should be above zero at 100k ph"
     if any(np.iscomplex(pfit_gain.roots())):
         # well formed calibrations have real roots
         return np.inf, "pfit_gain should not have complex roots"
-    rms_residual_e = mass.misc.root_mean_squared(residual_e)
-    result = mass.rough_cal.BestAssignmentPfitGainResult(
+    rms_residual_e = mass2.misc.root_mean_squared(residual_e)
+    result = mass2.rough_cal.BestAssignmentPfitGainResult(
         rms_residual_e,
         ph_assigned=df["possible_ph"].to_numpy(),
         residual_e=residual_e,
@@ -675,8 +675,8 @@ class RoughCalibrationStep(CalStep):
         return df2
 
     def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
-        series = mass.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
-        axis = mass.misc.plot_hist_of_series(series, bin_edges)
+        series = mass2.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
+        axis = mass2.misc.plot_hist_of_series(series, bin_edges)
         axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
         for line_name, energy in zip(self.line_names, self.line_energies):
             axis.annotate(line_name, (energy, 0), rotation=90)
@@ -718,11 +718,13 @@ class RoughCalibrationStep(CalStep):
         n_extra: int,
         use_expr: bool = True,
     ) -> "RoughCalibrationStep":
-        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        (names, ee) = mass2.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = mass.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = mass.rough_cal.find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
+        pfresult = mass2.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = mass2.rough_cal.find_optimal_assignment2(
+            pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names
+        )
 
         step = cls(
             [uncalibrated_col],
@@ -748,11 +750,11 @@ class RoughCalibrationStep(CalStep):
         n_extra: int,
         use_expr: bool = True,
     ) -> "RoughCalibrationStep":
-        (names, ee) = mass.algorithms.line_names_and_energies(line_names)
+        (names, ee) = mass2.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = mass.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = mass.rough_cal.find_optimal_assignment2_height_info(
+        pfresult = mass2.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = mass2.rough_cal.find_optimal_assignment2_height_info(
             pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra],
             ee,
             names,
@@ -787,9 +789,11 @@ class RoughCalibrationStep(CalStep):
     ) -> "RoughCalibrationStep":
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
-        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        (line_names, line_energies) = mass2.algorithms.line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        pfresult = mass.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units)
+        pfresult = mass2.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+            uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
+        )
         possible_phs = pfresult.ph_sorted_by_prominence()[: len(line_names) + n_extra_peaks]
         df3peak, _dfe = rank_3peak_assignments(
             possible_phs,

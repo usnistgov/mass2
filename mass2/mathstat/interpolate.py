@@ -1,7 +1,7 @@
 """
 interpolate.py
 
-Module mass.mathstat.interpolate
+Module mass2.mathstat.interpolate
 
 Contains interpolations functions not readily available elsewhere.
 
@@ -49,7 +49,7 @@ class CubicSpline:
     Usage:
     x=np.linspace(4,12,20)
     y=(x-6)**2+np.random.standard_normal(20)
-    cs = mass.CubicSpline(x, y)
+    cs = mass2.CubicSpline(x, y)
     plt.clf()
     plt.plot(x,y,'ok')
     xa = np.linspace(0,16,200)

@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import scipy.signal
 
-import mass2 as mass
+import mass2
 from mass2.mathstat.interpolate import CubicSpline
 from mass2.common import tostr
 import logging
@@ -183,7 +183,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
             def target(shift):
                 yadj = y.copy()
                 yadj[bins == i] += shift
-                return mass.mathstat.entropy.laplace_entropy(yadj, kernel_width)
+                return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)
 
             brack = 0.003 * np.array([-1, 1], dtype=float)
             sbest, _KLbest, niter, _ = sp.optimize.brent(target, (), brack=brack, full_output=True, tol=3e-4)
@@ -201,16 +201,16 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
             def target(shift):
                 yadj = ycorr.copy()
                 yadj[bins == i] += shift
-                return mass.mathstat.entropy.laplace_entropy(yadj, kernel_width)
+                return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)
 
             brack = 0.002 * np.array([-1, 1], dtype=float)
             sbest, _KLbest, niter, _ = sp.optimize.brent(target, (), brack=brack, full_output=True, tol=1e-4)
             iter2 += niter
             yknot2[i] = sbest
         correction = CubicSpline(knots, yknot + yknot2)
-        H0 = mass.mathstat.entropy.laplace_entropy(y, kernel_width)
-        H1 = mass.mathstat.entropy.laplace_entropy(ycorr, kernel_width)
-        H2 = mass.mathstat.entropy.laplace_entropy(y + correction(x), kernel_width)
+        H0 = mass2.mathstat.entropy.laplace_entropy(y, kernel_width)
+        H1 = mass2.mathstat.entropy.laplace_entropy(ycorr, kernel_width)
+        H2 = mass2.mathstat.entropy.laplace_entropy(y + correction(x), kernel_width)
         LOG.debug(
             "Laplace entropy before/middle/after: %.4f, %.4f %.4f (%d+%d iterations, %d phase groups)", H0, H1, H2, iter1, iter2, NBINS
         )

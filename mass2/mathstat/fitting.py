@@ -1,5 +1,5 @@
 """
-mass.mathstat.fitting
+mass2.mathstat.fitting
 
 Model-fitting utilities.
 

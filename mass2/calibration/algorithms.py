@@ -1,7 +1,7 @@
 """
 This file is intended to include algorithms that could be generally useful
 for calibration. Mostly they are pulled out of the former
-mass.calibration.young module.
+mass2.calibration.young module.
 """
 
 import itertools
@@ -10,7 +10,7 @@ import numpy as np
 
 
 from mass2.calibration.fluorescence_lines import STANDARD_FEATURES
-import mass2 as mass
+import mass2
 
 
 def line_names_and_energies(line_names):
@@ -162,16 +162,16 @@ class FailedToGetModelException(Exception):
 
 
 def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
-    if isinstance(lineNameOrEnergy, mass.GenericLineModel):
+    if isinstance(lineNameOrEnergy, mass2.GenericLineModel):
         line = lineNameOrEnergy.spect
-    elif isinstance(lineNameOrEnergy, mass.SpectralLine):
+    elif isinstance(lineNameOrEnergy, mass2.SpectralLine):
         line = lineNameOrEnergy
     elif isinstance(lineNameOrEnergy, str):
-        if lineNameOrEnergy in mass.spectra:
-            line = mass.spectra[lineNameOrEnergy]
-        elif lineNameOrEnergy in mass.STANDARD_FEATURES:
-            energy = mass.STANDARD_FEATURES[lineNameOrEnergy]
-            line = mass.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
+        if lineNameOrEnergy in mass2.spectra:
+            line = mass2.spectra[lineNameOrEnergy]
+        elif lineNameOrEnergy in mass2.STANDARD_FEATURES:
+            energy = mass2.STANDARD_FEATURES[lineNameOrEnergy]
+            line = mass2.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
         else:
             raise FailedToGetModelException(f"failed to get line from lineNameOrEnergy={lineNameOrEnergy}")
     else:
@@ -179,9 +179,10 @@ def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
             energy = float(lineNameOrEnergy)
         except Exception:
             raise FailedToGetModelException(
-                f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable to float or a str in mass.spectra or mass.STANDARD_FEATURES"
+                f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable"
+                " to float or a str in mass2.spectra or mass2.STANDARD_FEATURES"
             )
-        line = mass.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
+        line = mass2.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
     return line.model(has_linear_background=has_linear_background, has_tails=has_tails)
 
 

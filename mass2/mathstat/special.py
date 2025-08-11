@@ -1,7 +1,7 @@
 """
 special.py
 
-Module mass.mathstat.special
+Module mass2.mathstat.special
 
 Contains special functions not readily available elsewhere.
 

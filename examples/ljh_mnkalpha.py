@@ -92,7 +92,7 @@ def _(data, mass2, mo, plt):
 
     if calibrated_col is None:
         calibrated_col = f"energy_{uncalibrated_col}"
-    (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+    (line_names, line_energies) = mass2.algorithms.line_names_and_energies(line_names)
     uncalibrated = ch0.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
     pfresult = mass2.rough_cal.peakfind_local_maxima_of_smoothed_hist(
         uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
@@ -624,7 +624,7 @@ def _(ch6, mo, np, pl, plt):
         import mass
 
         dlo, dhi = 50, 50
-        e0 = mass.STANDARD_FEATURES[line_name]
+        e0 = mass2.STANDARD_FEATURES[line_name]
         pt, e = ch.good_serieses(
             ["pretrig_mean", "energy_5lagy"],
             use_expr=pl.col("energy_5lagy_dc").is_between(e0 - dlo, e0 + dhi),

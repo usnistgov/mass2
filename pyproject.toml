@@ -7,7 +7,7 @@ authors = [
     {name = "Galen O'Neil", email = "ggggggggg@github.com"},
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 readme = "README.md"
 license = "MIT"
 keywords = ["mass", "dastard", "microcalorimeter"]
@@ -56,9 +56,8 @@ Repository = "https://github.com/usnistgov/mass2.git"
 Issues = "https://github.com/usnistgov/mass2/issues"
 
 [project.scripts]
-ljh_truncate = "mass2.ljh_truncate:main"
-ljh2off = "mass2.core.ljh2off:main"
-make_projectors = "mass2.core.projectors_script:main"
+ljh_merge = "mass2.core.ljhutil:main_ljh_merge"
+ljh_truncate = "mass2.core.ljhutil:main_ljh_truncate"
 
 
 [build-system]
@@ -67,7 +66,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-data]
 mass2 = [
-    "bin/ljh_truncate",
     "calibration/nist_xray_data.dat",
     "calibration/low_z_xray_data.dat",
     "calibration/nist_asd_2023.pickle.gz",
