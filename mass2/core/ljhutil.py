@@ -42,7 +42,7 @@ def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[s
     return list(matching_folders)
 
 
-def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False) -> list[str]:
+def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False, exclude_ch_nums=[]) -> list[str]:
     """
     Finds all .ljh files in the given folder and its subfolders.
 
@@ -60,6 +60,8 @@ def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool =
     for dirpath, _, filenames in pathgen:
         for filename in filenames:
             if filename.endswith(ext):
+                if extract_channel_number(filename) in exclude_ch_nums:
+                    continue
                 ljh_files.append(os.path.join(dirpath, filename))
     return ljh_files
 

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -192,10 +193,20 @@ class Channels:
         return cls(channels, description)
 
     @classmethod
-    def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None, exclude_ch_nums=[]):
+    def from_ljh_folder(
+        cls,
+        pulse_folder: str,
+        noise_folder: Optional[str] = None,
+        limit: Optional[int] = None,
+        exclude_ch_nums: Optional[list[int]] = None,
+    ):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
+        if exclude_ch_nums is None:
+            exclude_ch_nums: list[int] = []
         if noise_folder is None:
-            paths = mass2.ljhutil.find_ljh_files(pulse_folder)
+            paths = mass2.ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
+            if limit is not None:
+                paths = paths[:limit]
             pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
