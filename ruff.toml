@@ -4,8 +4,8 @@
 target-version = "py39"
 
 exclude = [
-  "bin/rebuild",
   "examples",
+  "mass2/data/*template.py",
 ]
 
 line-length = 135
