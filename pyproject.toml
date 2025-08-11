@@ -58,6 +58,7 @@ Issues = "https://github.com/usnistgov/mass2/issues"
 [project.scripts]
 ljh_merge = "mass2.core.ljhutil:main_ljh_merge"
 ljh_truncate = "mass2.core.ljhutil:main_ljh_truncate"
+mass2 = "mass2.core.mass2main:main"
 
 
 [build-system]
