@@ -188,7 +188,76 @@ class LJHFile:
             binary_size=current_binary_size,
         )
 
-    def read_trace(self, i: int) -> npt.ArrayLike:
+    @property
+    def subframecount(self):
+        """Return a copy of the subframecount memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of subframecount values for each pulse record.
+        """
+        mmap = self._mmap["subframecount"]
+        subframecount = np.zeros(self.npulses, dtype=np.int64)
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            subframecount[first:last] = mmap[first:last]
+            first = last
+        return subframecount
+
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        mmap = self._mmap["posix_usec"]
+        subframecount = np.zeros(self.npulses, dtype=np.int64)
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            subframecount[first:last] = mmap[first:last]
+            first = last
+        return subframecount
+
+    @property
+    def datatimes_float(self):
+        """Compute pulse record times in floating-point (seconds since the 1970 epoch).
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, compute on chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of pulse record times in floating-point (seconds since the 1970 epoch).
+        """
+        raw = self._mmap["posix_usec"]
+        datatimes_float = np.zeros(self.npulses, dtype=np.float64)
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            datatimes_float[first:last] = raw[first:last] / 1e6
+            first = last
+        return datatimes_float
+
+    def read_trace(self, i: int) -> npt.NDArray:
         """Return a single pulse record from an LJH file.
 
         Parameters
@@ -202,6 +271,11 @@ class LJHFile:
             A view into the pulse record.
         """
         return self._mmap["data"][i]
+
+    def read_trace_with_timing(self, i: int) -> tuple[int, int, npt.NDArray]:
+        """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
+        pulse_record = self.read_trace(i)
+        return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
 
     def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
