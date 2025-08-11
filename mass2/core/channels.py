@@ -23,8 +23,7 @@ class Channels:
     @property
     def ch0(self):
         assert len(self.channels) > 0, "channels must be non-empty"
-        for v in self.channels.values():
-            return v
+        return next(iter(self.channels.values()))
 
     @functools.cache
     def dfg(self, exclude="pulse"):
