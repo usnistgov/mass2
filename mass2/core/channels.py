@@ -177,12 +177,10 @@ class Channels:
     @classmethod
     def from_ljh_path_pairs(cls, pulse_noise_pairs, description):
         channels = {}
-        print(f"in from_ljh_path_pairs {len(pulse_noise_pairs)}")
         for pulse_path, noise_path in pulse_noise_pairs:
             channel = Channel.from_ljh(pulse_path, noise_path)
             assert channel.header.ch_num not in channels.keys()
             channels[channel.header.ch_num] = channel
-        print(f"in from_ljh_path_pairs {len(channels)=}")
         return cls(channels, description)
 
     @classmethod
@@ -203,10 +201,7 @@ class Channels:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             pairs = mass2.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
-        print(f"{description}")
-        print(f"in from_ljh_folder has {len(pairs)} pairs")
         data = cls.from_ljh_path_pairs(pairs, description)
-        print(f"and the Channels obj has {len(data.channels)} pairs")
         return data
 
     def get_an_ljh_path(self):
