@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 import re
@@ -257,3 +258,25 @@ def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[i
             outfile.write(prefix)
             trace = infile.read_trace(i)
             trace.tofile(outfile, sep="")
+
+
+def main_ljh_truncate() -> None:
+    """
+    A convenience script to truncate all LJH files that match a pattern, writing a new LJH file for each
+    that contains only the first N pulse records.
+    """
+    parser = argparse.ArgumentParser(description="Truncate a set of LJH files")
+    parser.add_argument("pattern", type=str, help="basename of files to process, e.g. 20171116_152922")
+    parser.add_argument("out", type=str, help="string to append to basename when creating output filename")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--npulses", type=int, help="Number of pulses to keep")
+    group.add_argument("--timestamp", type=float, help="Keep only pulses before this timestamp")
+    args = parser.parse_args()
+
+    pattern = f"{args.pattern}_chan*.ljh"
+
+    filenames = filename_glob_expand(pattern)
+    for in_fname in filenames:
+        ch = re.search(r"chan(\d+)\.ljh", in_fname).groups()[0]
+        out_fname = f"{args.pattern}_{args.out}_chan{ch}.ljh"
+        ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
