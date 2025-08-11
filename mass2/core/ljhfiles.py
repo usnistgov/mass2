@@ -22,6 +22,7 @@ class LJHFile:
     """
 
     filename: str
+    channum: int
     dtype: np.dtype
     npulses: int
     timebase: float
@@ -42,7 +43,7 @@ class LJHFile:
     @classmethod
     def open(cls, filename: str, max_pulses: Optional[int] = None) -> "LJHFile":
         header_dict, header_string, header_size = cls.read_header(filename)
-        nsamples = header_dict["Total Samples"]
+        channum = header_dict["Channel"]
         timebase = header_dict["Timebase"]
         nsamples = header_dict["Total Samples"]
         npresamples = header_dict["Presamples"]
@@ -84,6 +85,7 @@ class LJHFile:
 
         return LJHFile(
             filename,
+            channum,
             dtype,
             npulses,
             timebase,
