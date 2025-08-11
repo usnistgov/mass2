@@ -3,13 +3,14 @@ import os
 import re
 import struct
 import numpy as np
-from typing import Union
+from typing import Union, Optional, BinaryIO
 from collections.abc import Iterator
 import pathlib
 from packaging.version import Version
 
-from ..common import isstr
 from .ljhfiles import LJHFile
+
+__all__ = ["find_ljh_files", "ljh_truncate"]
 
 # functions for finding ljh files and opening them as Channels
 
@@ -53,7 +54,7 @@ def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool =
     if search_subdirectories:
         pathgen = os.walk(folder)
     else:
-        pathgen = zip([folder], [None], [os.listdir(folder)])
+        pathgen = zip([folder], [[""]], [os.listdir(folder)])
     for dirpath, _, filenames in pathgen:
         for filename in filenames:
             if filename.endswith(ext):
@@ -98,7 +99,7 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nu
         """
         Collects files into a dictionary by channel number, raising an error if a channel number is repeated.
         """
-        files_by_channel = {}
+        files_by_channel: dict[int, str] = {}
         for file in files:
             channel = extract_channel_number(file)
             if channel in files_by_channel.keys():
@@ -139,7 +140,7 @@ def external_trigger_bin_path_from_ljh_path(
     return ljh_path.parent / new_file_name
 
 
-def ljh_sort_filenames_numerically(fnames, inclusion_list=None):
+def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: Optional[list[int]] = None) -> list[str]:
     """Sort filenames of the form '*_chanXXX.*', according to the numerical value of channel number XXX.
 
     Filenames are first sorted by the usual string comparisons, then by channel number. In this way,
@@ -155,10 +156,10 @@ def ljh_sort_filenames_numerically(fnames, inclusion_list=None):
     :rtype: list
     """
     if fnames is None or len(fnames) == 0:
-        return None
+        return []
 
     if inclusion_list is not None:
-        fnames = filter(lambda n: extract_channel_number(n) in inclusion_list, fnames)
+        fnames = list(filter(lambda n: extract_channel_number(n) in inclusion_list, fnames))
 
     # Sort the results first by raw filename, then sort numerically by LJH channel number.
     # Because string sort and the builtin `sorted` are both stable, we ensure that the first
@@ -167,24 +168,19 @@ def ljh_sort_filenames_numerically(fnames, inclusion_list=None):
     return sorted(fnames, key=extract_channel_number)
 
 
-def filename_glob_expand(pattern):
+def filename_glob_expand(pattern: str) -> list[str]:
     """Return the result of glob-expansion on the input pattern.
 
-    :param pattern: If a string, treat it as a glob pattern and return the glob-result
-        as a list. If it isn't a string, return it unchanged (presumably then
-        it's already a sequence).
+    :param pattern: Aglob pattern and return the glob-result as a list.
     :type pattern: str
     :return: filenames; the result is sorted first by str.sort, then by ljh_sort_filenames_numerically()
     :rtype: list
     """
-    if not isstr(pattern):
-        return pattern
-
     result = glob.glob(pattern)
     return ljh_sort_filenames_numerically(result)
 
 
-def helper_write_pulse(dest, src, i):
+def helper_write_pulse(dest: BinaryIO, src: LJHFile, i: int) -> None:
     subframecount, timestamp_usec, trace = src.read_trace_with_timing(i)
     prefix = struct.pack("<Q", int(subframecount))
     dest.write(prefix)
@@ -193,7 +189,7 @@ def helper_write_pulse(dest, src, i):
     trace.tofile(dest, sep="")
 
 
-def ljh_append_traces(src_name, dest_name, pulses=None):
+def ljh_append_traces(src_name: str, dest_name: str, pulses: Optional[range] = None) -> None:
     """Append traces from one LJH file onto another. The destination file is
     assumed to be version 2.2.0.
 
@@ -207,17 +203,16 @@ def ljh_append_traces(src_name, dest_name, pulses=None):
 
     src = LJHFile.open(src_name)
     if pulses is None:
-        pulses = range(src.nPulses)
+        pulses = range(src.npulses)
     with open(dest_name, "ab") as dest_fp:
         for i in pulses:
             helper_write_pulse(dest_fp, src, i)
 
 
-def ljh_truncate(input_filename, output_filename, n_pulses=None, timestamp=None, segmentsize=None):
+def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[int] = None, timestamp: Optional[float] = None) -> None:
     """Truncate an LJH file.
 
-    Writes a new copy of an LJH file, with
-    with the identical header, but with a smaller number of raw data pulses.
+    Writes a new copy of an LJH file, with the same header but fewer raw data pulses.
 
     Arguments:
     input_filename  -- name of file to truncate
@@ -225,8 +220,6 @@ def ljh_truncate(input_filename, output_filename, n_pulses=None, timestamp=None,
     n_pulses        -- truncate to include only this many pulses (default None)
     timestamp       -- truncate to include only pulses with timestamp earlier
                        than this number (default None)
-    segmentsize     -- number of bytes per segment; this is primarily here to
-                       facilitate testing (defaults to same value as in LJHFile)
 
     Exactly one of n_pulses and timestamp must be specified.
     """
@@ -243,19 +236,17 @@ def ljh_truncate(input_filename, output_filename, n_pulses=None, timestamp=None,
             raise ValueError(msg)
 
     infile = LJHFile.open(input_filename)
-    if segmentsize is not None:
-        infile.set_segment_size(segmentsize)
 
     if Version(infile.version_str.decode()) < Version("2.2.0"):
         raise Exception(f"Don't know how to truncate this LJH version [{infile.version_str}]")
 
     with open(output_filename, "wb") as outfile:
         # write the header as a single string.
-        for k, v in infile.header_dict.items():
-            outfile.write(k + b": " + v + b"\r\n")
-        outfile.write(b"#End of Header\r\n")
+        for k, v in infile.header.items():
+            outfile.write(bytes(f"{k}: {v}\n", encoding="utf-8"))
+        outfile.write(b"#End of Header\n")
 
-        # Write pulses. Stop reading segments from the original file as soon as possible.
+        # Write pulses.
         if n_pulses is None:
             n_pulses = infile.nPulses
         for i in range(n_pulses):
