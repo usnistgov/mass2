@@ -236,9 +236,8 @@ def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[i
             raise ValueError(msg)
 
     infile = LJHFile.open(input_filename)
-
-    if Version(infile.version_str.decode()) < Version("2.2.0"):
-        raise Exception(f"Don't know how to truncate this LJH version [{infile.version_str}]")
+    if infile.ljh_version < Version("2.2.0"):
+        raise Exception(f"Don't know how to truncate this LJH version [{infile.ljh_version}]")
 
     with open(output_filename, "wb") as outfile:
         # write the header as a single string.
@@ -248,7 +247,7 @@ def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[i
 
         # Write pulses.
         if n_pulses is None:
-            n_pulses = infile.nPulses
+            n_pulses = infile.npulses
         for i in range(n_pulses):
             if timestamp is not None and infile.datatimes_float[i] > timestamp:
                 break
@@ -256,5 +255,5 @@ def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[i
             outfile.write(prefix)
             prefix = struct.pack("<Q", np.uint64(infile.datatimes_raw[i]))
             outfile.write(prefix)
-            trace = infile.alldata[i, :]
+            trace = infile.read_trace(i)
             trace.tofile(outfile, sep="")
