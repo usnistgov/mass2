@@ -8,7 +8,7 @@ Write the truncated data to a new (set of) LJH file(s).
 import argparse
 import re
 import mass2
-from mass2.core.ljh_util import filename_glob_expand
+from mass2.core.ljhutil import filename_glob_expand
 
 
 def main():

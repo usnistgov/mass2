@@ -15,8 +15,7 @@ import argparse
 import os
 import shutil
 import mass2
-from mass2.core.ljh_util import filename_glob_expand
-from mass2.core.ljh_modify import ljh_append_traces
+from mass2.core.ljhutil import filename_glob_expand, ljh_append_traces
 
 
 def merge(out_path, filenames, overwrite):

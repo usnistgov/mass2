@@ -1,8 +1,15 @@
+import glob
 import os
 import re
+import struct
+import numpy as np
 from typing import Union
 from collections.abc import Iterator
 import pathlib
+from packaging.version import Version
+
+from ..common import isstr
+from .ljhfiles import LJHFile
 
 # functions for finding ljh files and opening them as Channels
 
@@ -130,3 +137,133 @@ def external_trigger_bin_path_from_ljh_path(
     base_name = ljh_path.name.split("_chan")[0]
     new_file_name = f"{base_name}_external_trigger.bin"
     return ljh_path.parent / new_file_name
+
+
+def ljh_sort_filenames_numerically(fnames, inclusion_list=None):
+    """Sort filenames of the form '*_chanXXX.*', according to the numerical value of channel number XXX.
+
+    Filenames are first sorted by the usual string comparisons, then by channel number. In this way,
+    the standard sort is applied to all files with the same channel number.
+
+    :param fnames: A sequence of filenames of the form '*_chan*.*'
+    :type fnames: list of str
+    :param inclusion_list: If not None, a container with channel numbers. All files
+        whose channel numbers are not on this list will be omitted from the
+        output, defaults to None
+    :type inclusion_list: sequence of int, optional
+    :return: A list containg the same filenames, sorted according to the numerical value of channel number.
+    :rtype: list
+    """
+    if fnames is None or len(fnames) == 0:
+        return None
+
+    if inclusion_list is not None:
+        fnames = filter(lambda n: extract_channel_number(n) in inclusion_list, fnames)
+
+    # Sort the results first by raw filename, then sort numerically by LJH channel number.
+    # Because string sort and the builtin `sorted` are both stable, we ensure that the first
+    # sort is used to break ties in channel number.
+    fnames.sort()
+    return sorted(fnames, key=extract_channel_number)
+
+
+def filename_glob_expand(pattern):
+    """Return the result of glob-expansion on the input pattern.
+
+    :param pattern: If a string, treat it as a glob pattern and return the glob-result
+        as a list. If it isn't a string, return it unchanged (presumably then
+        it's already a sequence).
+    :type pattern: str
+    :return: filenames; the result is sorted first by str.sort, then by ljh_sort_filenames_numerically()
+    :rtype: list
+    """
+    if not isstr(pattern):
+        return pattern
+
+    result = glob.glob(pattern)
+    return ljh_sort_filenames_numerically(result)
+
+
+def helper_write_pulse(dest, src, i):
+    subframecount, timestamp_usec, trace = src.read_trace_with_timing(i)
+    prefix = struct.pack("<Q", int(subframecount))
+    dest.write(prefix)
+    prefix = struct.pack("<Q", int(timestamp_usec))
+    dest.write(prefix)
+    trace.tofile(dest, sep="")
+
+
+def ljh_append_traces(src_name, dest_name, pulses=None):
+    """Append traces from one LJH file onto another. The destination file is
+    assumed to be version 2.2.0.
+
+    Can be used to grab specific traces from some other ljh file, and append them onto an existing ljh file.
+
+    Args:
+        src_name: the name of the source file
+        dest_name: the name of the destination file
+        pulses: indices of the pulses to copy (default: None, meaning copy all)
+    """
+
+    src = LJHFile.open(src_name)
+    if pulses is None:
+        pulses = range(src.nPulses)
+    with open(dest_name, "ab") as dest_fp:
+        for i in pulses:
+            helper_write_pulse(dest_fp, src, i)
+
+
+def ljh_truncate(input_filename, output_filename, n_pulses=None, timestamp=None, segmentsize=None):
+    """Truncate an LJH file.
+
+    Writes a new copy of an LJH file, with
+    with the identical header, but with a smaller number of raw data pulses.
+
+    Arguments:
+    input_filename  -- name of file to truncate
+    output_filename -- filename for truncated file
+    n_pulses        -- truncate to include only this many pulses (default None)
+    timestamp       -- truncate to include only pulses with timestamp earlier
+                       than this number (default None)
+    segmentsize     -- number of bytes per segment; this is primarily here to
+                       facilitate testing (defaults to same value as in LJHFile)
+
+    Exactly one of n_pulses and timestamp must be specified.
+    """
+
+    if (n_pulses is None and timestamp is None) or (n_pulses is not None and timestamp is not None):
+        msg = "Must specify exactly one of n_pulses, timestamp."
+        msg += f" Values were {str(n_pulses)}, {str(timestamp)}"
+        raise Exception(msg)
+
+    # Check for file problems, then open the input and output LJH files.
+    if os.path.exists(output_filename):
+        if os.path.samefile(input_filename, output_filename):
+            msg = f"Input '{input_filename}' and output '{output_filename}' are the same file, which is not allowed"
+            raise ValueError(msg)
+
+    infile = LJHFile.open(input_filename)
+    if segmentsize is not None:
+        infile.set_segment_size(segmentsize)
+
+    if Version(infile.version_str.decode()) < Version("2.2.0"):
+        raise Exception(f"Don't know how to truncate this LJH version [{infile.version_str}]")
+
+    with open(output_filename, "wb") as outfile:
+        # write the header as a single string.
+        for k, v in infile.header_dict.items():
+            outfile.write(k + b": " + v + b"\r\n")
+        outfile.write(b"#End of Header\r\n")
+
+        # Write pulses. Stop reading segments from the original file as soon as possible.
+        if n_pulses is None:
+            n_pulses = infile.nPulses
+        for i in range(n_pulses):
+            if timestamp is not None and infile.datatimes_float[i] > timestamp:
+                break
+            prefix = struct.pack("<Q", np.uint64(infile.subframecount[i]))
+            outfile.write(prefix)
+            prefix = struct.pack("<Q", np.uint64(infile.datatimes_raw[i]))
+            outfile.write(prefix)
+            trace = infile.alldata[i, :]
+            trace.tofile(outfile, sep="")
