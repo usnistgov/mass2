@@ -6,6 +6,7 @@
 
 * Complete rewrite of MASS for version 2. Base data wrangling on [Pola.rs](https://pola.rs/).
 * Allow `Channel` objects to have callable to transform raw data (e.g., by inverting it) (issue 12).
+* Raise minimum python version to 3.10 for type annotations to work.
 
 
 ## Mass Version 1 (2010-2025)

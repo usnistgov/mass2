@@ -7,7 +7,7 @@ authors = [
     {name = "Galen O'Neil", email = "ggggggggg@github.com"},
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 keywords = ["mass", "dastard", "microcalorimeter"]

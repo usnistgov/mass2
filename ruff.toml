@@ -1,7 +1,7 @@
 # Configuration file for ruff, the one lint tool to rule them all.
 
-# Assume Python 3.9 [end of life will be October 2025. See https://endoflife.date/python]
-target-version = "py39"
+# Assume Python 3.10 [end of life will be October 2026. See https://endoflife.date/python]
+target-version = "py310"
 
 exclude = [
   "examples",
