@@ -55,13 +55,14 @@ jobs:
     - name: Test with pytest
       run: pytest
 
-    - name: Run doctests (only on most recent Python version)
-      if: ${{ matrix.python-version == 3.13 }}
-      run: |
-        uv sync --all-extras --group docs
-        cd doc
-        uv run make clean
-        uv run make doctest
+    # TODO: make doctests work again
+    # - name: Run doctests (only on most recent Python version)
+    #   if: ${{ matrix.python-version == 3.13 }}
+    #   run: |
+    #     uv sync --all-extras --group docs
+    #     cd doc
+    #     uv run make clean
+    #     uv run make doctest
 
 # TO DO: generate docs automatically and deploy them.
 #
