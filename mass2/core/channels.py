@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -22,8 +23,7 @@ class Channels:
     @property
     def ch0(self):
         assert len(self.channels) > 0, "channels must be non-empty"
-        for v in self.channels.values():
-            return v
+        return next(iter(self.channels.values()))
 
     @functools.cache
     def dfg(self, exclude="pulse"):
@@ -177,12 +177,10 @@ class Channels:
     @classmethod
     def from_ljh_path_pairs(cls, pulse_noise_pairs, description):
         channels = {}
-        print(f"in from_ljh_path_pairs {len(pulse_noise_pairs)}")
         for pulse_path, noise_path in pulse_noise_pairs:
             channel = Channel.from_ljh(pulse_path, noise_path)
             assert channel.header.ch_num not in channels.keys()
             channels[channel.header.ch_num] = channel
-        print(f"in from_ljh_path_pairs {len(channels)=}")
         return cls(channels, description)
 
     @classmethod
@@ -194,19 +192,29 @@ class Channels:
         return cls(channels, description)
 
     @classmethod
-    def from_ljh_folder(cls, pulse_folder, noise_folder=None, limit=None, exclude_ch_nums=[]):
+    def from_ljh_folder(
+        cls,
+        pulse_folder: str,
+        noise_folder: Optional[str] = None,
+        limit: Optional[int] = None,
+        exclude_ch_nums: Optional[list[int]] = None,
+    ):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
+        if exclude_ch_nums is None:
+            exclude_ch_nums: list[int] = []
         if noise_folder is None:
-            paths = mass2.ljhutil.find_ljh_files(pulse_folder)
+            paths = mass2.ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
+            if limit is not None:
+                paths = paths[:limit]
             pairs = [(path, None) for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             pairs = mass2.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
-        print(f"in from_ljh_folder has {len(pairs)} pairs")
+        print(f"   from_ljh_folder has {len(pairs)} pairs")
         data = cls.from_ljh_path_pairs(pairs, description)
-        print(f"and the Channels obj has {len(data.channels)} pairs")
+        print(f"   and the Channels obj has {len(data.channels)} pairs")
         return data
 
     def get_an_ljh_path(self):
