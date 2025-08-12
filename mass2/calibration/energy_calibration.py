@@ -13,7 +13,6 @@ import numpy.typing as npt
 from typing import Any
 from enum import Enum, auto
 
-from typing import Self
 from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
@@ -61,7 +60,7 @@ class EnergyCalibrationMaker:
         dph: npt.ArrayLike | None = None,
         de: npt.ArrayLike | None = None,
         names: list[str] | None = None,
-    ) -> Self:
+    ) -> EnergyCalibrationMaker:
         if ph is None:
             ph = np.array([], dtype=float)
         else:
