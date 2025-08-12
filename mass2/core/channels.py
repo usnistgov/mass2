@@ -211,7 +211,10 @@ class Channels:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             pairs = mass2.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
+        print(f"{description}")
+        print(f"   from_ljh_folder has {len(pairs)} pairs")
         data = cls.from_ljh_path_pairs(pairs, description)
+        print(f"   and the Channels obj has {len(data.channels)} pairs")
         return data
 
     def get_an_ljh_path(self):
