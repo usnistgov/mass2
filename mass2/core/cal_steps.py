@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -45,20 +46,27 @@ class SummarizeStep(CalStep):
     pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
+    transform_raw: Optional[callable] = None
 
-    def calc_from_df(self, df):
-        df2 = pl.concat(
-            pl.from_numpy(
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        summaries = []
+        for df_iter in df.iter_slices():
+            raw = df_iter[self.pulse_col].to_numpy()
+            if self.transform_raw is not None:
+                raw = self.transform_raw(raw)
+
+            s = pl.from_numpy(
                 pulse_algorithms.summarize_data_numba(
-                    df_iter[self.pulse_col].to_numpy(),
+                    raw,
                     self.frametime_s,
                     peak_samplenumber=self.peak_index,
                     pretrigger_ignore_samples=self.pretrigger_ignore_samples,
                     nPresamples=self.n_presamples,
                 )
             )
-            for df_iter in df.iter_slices()
-        ).with_columns(df)
+            summaries.append(s)
+
+        df2 = pl.concat(summaries).with_columns(df)
         return df2
 
     def dbg_plot(self, df_after, **kwargs):

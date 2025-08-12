@@ -4,7 +4,8 @@
 
 **2.0.0alpha** August 4, 2025-
 
-* Complete rewrite of MASS for version 2.
+* Complete rewrite of MASS for version 2. Base data wrangling on [Pola.rs](https://pola.rs/).
+* Allow `Channel` objects to have callable to transform raw data (e.g., by inverting it) (issue 12).
 
 
 ## Mass Version 1 (2010-2025)
