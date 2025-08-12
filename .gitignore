@@ -31,8 +31,6 @@ __pycache__
 .*_cache
 *.code-workspace
 
-_version.py
-
 # data files
 *.parquet
 *.sqlite3
@@ -106,3 +104,6 @@ venv.bak/
 .dmypy.json
 dmypy.json
 .vscode/settings.json
+
+_version.py
+mass2/_version.py

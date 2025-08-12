@@ -20,6 +20,7 @@ are not symmetric with respect to reversal of `x` and `y`.
 """
 
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 import scipy as sp
 from numba import njit
 
@@ -29,7 +30,7 @@ from numba import njit
 DTYPE = np.float64
 
 
-def laplace_entropy(x_in, w: float = 1.0, approx_mode: str = "size") -> float:
+def laplace_entropy(x_in: ArrayLike, w: float = 1.0, approx_mode: str = "size") -> float:
     r"""Compute the entropy of data set `x` where the
     kernel is the Laplace kernel k(x) \propto exp(-abs(x-x0)/w).
 
@@ -46,6 +47,7 @@ def laplace_entropy(x_in, w: float = 1.0, approx_mode: str = "size") -> float:
                that, and using Simpson's rule on the PDF samples that result.
     ``size``   Uses "approx" if len(x)>200000, or "exact" otherwise.
     """
+    x_in = np.asarray(x_in)
     N = len(x_in)
     if N == 0:
         raise ValueError("laplace_entropy(x) needs at least 1 element in `x`.")
@@ -65,7 +67,8 @@ def laplace_entropy(x_in, w: float = 1.0, approx_mode: str = "size") -> float:
 
 
 @njit
-def laplace_entropy_array(x, w: float = 1.0) -> float:
+def laplace_entropy_array(x: ArrayLike, w: float = 1.0) -> float:
+    x = np.asarray(x)
     N = len(x)
     c = np.zeros(N, dtype=DTYPE)
     d = np.zeros(N, dtype=DTYPE)
@@ -92,17 +95,17 @@ def laplace_entropy_array(x, w: float = 1.0) -> float:
     return H
 
 
-def laplace_entropy_approx(x, w: float = 1.0) -> float:
+def laplace_entropy_approx(x: ArrayLike, w: float = 1.0) -> float:
     """Approximate the entropy with a binned histogram and the Laplace-distribution
     kernel-density estimator of the probability distribtion."""
     EXTEND_DATA = 5 * w
     BINS_PER_W = 20
     KERNEL_WIDTH_IN_WS = 15.0
 
-    xmin = x.min() - EXTEND_DATA
-    xmax = x.max() + EXTEND_DATA
+    xmin = np.min(x) - EXTEND_DATA
+    xmax = np.max(x) + EXTEND_DATA
     nbins = int(0.5 + (xmax - xmin) * BINS_PER_W / w)
-    c, b = np.histogram(x, nbins, [xmin, xmax])
+    c, b = np.histogram(x, nbins, (xmin, xmax))
     db = b[1] - b[0]
     nx = int(0.5 + KERNEL_WIDTH_IN_WS * w / db)
 
@@ -122,7 +125,7 @@ def laplace_entropy_approx(x, w: float = 1.0) -> float:
     return -sp.integrate.simpson(p * np.log(p), dx=db)
 
 
-def _merge_orderedlists(x1_in, x2_in):
+def _merge_orderedlists(x1_in: ArrayLike, x2_in: ArrayLike) -> tuple[NDArray, NDArray]:
     """Given two lists that are assumed to be sorted (in ascending order),
     return `(x, wasfirst)` where `x` is an array that contains all the values
     from `x1` and `x2` in sorted order, and where `wasfirst` is a boolean array
@@ -150,7 +153,9 @@ def _merge_orderedlists(x1_in, x2_in):
 
 
 @njit
-def _merge_orderedlists_arrays(out, wasfirst, x1, x2):
+def _merge_orderedlists_arrays(out: NDArray, wasfirst: NDArray, x1: ArrayLike, x2: ArrayLike) -> None:
+    x1 = np.asarray(x1)
+    x2 = np.asarray(x2)
     N1 = len(x1)
     N2 = len(x2)
     i = j = k = 0
@@ -175,7 +180,7 @@ def _merge_orderedlists_arrays(out, wasfirst, x1, x2):
                 return
 
 
-def laplace_KL_divergence(x, y, w: float = 1.0, approx_mode: str = "size") -> float:
+def laplace_KL_divergence(x: ArrayLike, y: ArrayLike, w: float = 1.0, approx_mode: str = "size") -> float:
     r"""Compute the Kullback-Leibler divergence of data set `y` from data set `x`.
 
     Use kernel-density estimation, where the kernel is the Laplace kernel
@@ -190,7 +195,7 @@ def laplace_KL_divergence(x, y, w: float = 1.0, approx_mode: str = "size") -> fl
     return laplace_cross_entropy(x, y, w, approx_mode=approx_mode) - laplace_entropy(x, w, approx_mode=approx_mode)
 
 
-def laplace_cross_entropy(x, y, w: float = 1.0, approx_mode: str = "size") -> float:
+def laplace_cross_entropy(x: ArrayLike, y: ArrayLike, w: float = 1.0, approx_mode: str = "size") -> float:
     r"""`laplace_cross_entropy(x, y, w: float = 1.0, approx_mode="size")`
 
     Compute the cross-entropy of data set `x` from data set `y`, where the
@@ -218,6 +223,8 @@ def laplace_cross_entropy(x, y, w: float = 1.0, approx_mode: str = "size") -> fl
     """
     if w <= 0.0:
         raise ValueError("laplace_cross_entropy(x, y, w) needs `w>0`.")
+    x = np.asarray(x)
+    y = np.asarray(y)
     Nx = len(x)
     Ny = len(y)
     if Nx == 0 or Ny == 0:
@@ -236,7 +243,7 @@ def laplace_cross_entropy(x, y, w: float = 1.0, approx_mode: str = "size") -> fl
         return laplace_cross_entropy_approx(np.asarray(x, dtype=DTYPE), np.asarray(y, dtype=DTYPE), w)
 
 
-def laplace_cross_entropy_arrays(x, y) -> float:
+def laplace_cross_entropy_arrays(x: ArrayLike, y: ArrayLike) -> float:  # noqa: PLR0914
     # List of all places where q(u) increases or decreases because of a y-point.
     Qstepwidth = 2 * np.sqrt(6)
     ynodes, qstep_is_up = _merge_orderedlists(y - 0.5 * Qstepwidth, y + 0.5 * Qstepwidth)
@@ -244,6 +251,8 @@ def laplace_cross_entropy_arrays(x, y) -> float:
     # List of all places where p(u) or q(u) changes because of an x- a y-point.
     nodes, isx = _merge_orderedlists(x, ynodes)
 
+    x = np.asarray(x)
+    y = np.asarray(y)
     Nx = len(x)
     Ny = len(y)
     N = Nx + Ny * 2
@@ -304,7 +313,7 @@ def laplace_cross_entropy_arrays(x, y) -> float:
     return H
 
 
-def laplace_cross_entropy_approx(x, y, w: float = 1.0) -> float:
+def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> float:
     """Approximate the cross-entropy with a binned histogram and the
     Laplace-distribution kernel-density estimator of the probability distribtion.
     """
@@ -312,11 +321,11 @@ def laplace_cross_entropy_approx(x, y, w: float = 1.0) -> float:
     BINS_PER_W = 20
     KERNEL_WIDTH_IN_WS = 15.0
 
-    xmin = min(x.min(), y.min()) - EXTEND_DATA
-    xmax = max(x.max(), y.max()) + EXTEND_DATA
+    xmin = min(np.min(x), np.min(y)) - EXTEND_DATA
+    xmax = max(np.max(x), np.max(y)) + EXTEND_DATA
     nbins = int(0.5 + (xmax - xmin) * BINS_PER_W / w)
-    cx, b = np.histogram(x, nbins, [xmin, xmax])
-    cy, b = np.histogram(y, nbins, [xmin, xmax])
+    cx, b = np.histogram(x, nbins, (xmin, xmax))
+    cy, b = np.histogram(y, nbins, (xmin, xmax))
     db = b[1] - b[0]
     nx = int(0.5 + KERNEL_WIDTH_IN_WS * w / db)
 
