@@ -78,3 +78,8 @@ version_file = "mass2/_version.py"
 
 [tool.mypy]
 disable_error_code = ["import-untyped"]
+exclude = [
+    "mass2/data/notebook_starter_template.py",
+    "mass2/core/mass2main.py",
+    "mass2/core/mass2notebook.py"
+    ]
