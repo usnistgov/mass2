@@ -18,7 +18,7 @@ class CalStep:
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        pass
+        return self
 
 
 @dataclass(frozen=True)

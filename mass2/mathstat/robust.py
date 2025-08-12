@@ -33,6 +33,7 @@ Rewritten with Numba Jan 23, 2025
 """
 
 import numpy as np
+from numpy.typing import ArrayLike
 from numba import njit
 
 
@@ -362,7 +363,7 @@ def _high_median(sort_idx, weights, n):
 
 
 @njit
-def _choose_trial_val(left, right, x: float, n: int):
+def _choose_trial_val(left: ArrayLike, right: ArrayLike, x: ArrayLike, n: int):
     """Choose a trial val as the weighted median of the medians of the remaining candidates in
     each row, where the weights are the number of candidates remaining in each row."""
 
