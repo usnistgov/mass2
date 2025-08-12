@@ -5,7 +5,7 @@ import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from typing import Optional
+from typing import Optional, Callable
 import numpy as np
 import time
 
@@ -49,7 +49,7 @@ class Channel:
     df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
-    transform_raw: Optional[callable] = None
+    transform_raw: Optional[Callable] = None
 
     def mo_stepplots(self):
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -486,6 +486,7 @@ class Channel:
             use_expr=use_expr,
             filter=filter5lag,
             spectrum=spectrum5lag,
+            transform_raw=self.transform_raw,
         )
         return self.with_step(step)
 
@@ -567,7 +568,7 @@ class Channel:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Optional[callable] = None) -> "Channel":
+    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Optional[Callable] = None) -> "Channel":
         if noise_path is None:
             noise_channel = None
         else:

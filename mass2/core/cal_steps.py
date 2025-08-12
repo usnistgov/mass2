@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Callable
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -17,18 +17,21 @@ class CalStep:
     def description(self):
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        pass
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):
     period: float
 
-    def calc_from_df(self, df: pl.DataFrame):
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         ptm1 = df[self.inputs[0]].to_numpy()
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after, **kwargs):
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
         plt.figure()
         plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0])
         plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0])
@@ -46,7 +49,7 @@ class SummarizeStep(CalStep):
     pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
-    transform_raw: Optional[callable] = None
+    transform_raw: Optional[Callable] = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []
@@ -69,7 +72,7 @@ class SummarizeStep(CalStep):
         df2 = pl.concat(summaries).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after, **kwargs):
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
         pass
 
 
@@ -80,26 +83,20 @@ class CalSteps:
     # 2. we could calculate intermediate quantities optionally and not materialize all of them
     steps: list[CalStep]
 
-    def calc_from_df(self, df):
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
         for step in self.steps:
             df = step.calc_from_df(df).with_columns(df)
         return df
 
-    def calc_from_df_np(self, df):
-        "return a dataframe with all the newly calculated info"
-        for step in self.steps:
-            df = step.calc_from_df_np(df).with_columns(df)
-        return df
-
     @classmethod
-    def new_empty(cls):
+    def new_empty(cls) -> "CalSteps":
         return cls([])
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int) -> CalStep:
         return self.steps[key]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.steps)
 
     # def copy(self):
@@ -107,6 +104,6 @@ class CalSteps:
     #     # a list entry, aka a CalStep, should be immutable
     #     return CalSteps(self.steps[:])
 
-    def with_step(self, step: CalStep):
+    def with_step(self, step: CalStep) -> "CalSteps":
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
