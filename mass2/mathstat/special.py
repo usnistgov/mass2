@@ -14,6 +14,7 @@ February 3, 2012
 """
 
 import numpy as np
+from numpy.typing import NDArray, ArrayLike
 import scipy.special
 
 __all__ = ["voigt", "voigt_approx_fwhm"]
@@ -22,7 +23,7 @@ _sqrt2 = np.sqrt(2.0)
 _sqrt2pi = np.sqrt(2.0 * np.pi)
 
 
-def voigt(x, xctr, hwhm, sigma):
+def voigt(x: ArrayLike, xctr: float, hwhm: float, sigma: float) -> NDArray:
     """Voigt function (a Gaussian convolved with a Lorentzian).
 
     Compute and return the Voigt function V(x; xctr,hwhm,sigma) for a sequence of points <x>.
@@ -55,8 +56,7 @@ def voigt(x, xctr, hwhm, sigma):
         Voigt function values, as 1d array of same size as x.
     """
 
-    if not isinstance(x, np.ndarray):
-        return voigt(np.array(x), xctr, hwhm, sigma)
+    x = np.asarray(x)
 
     # Handle the pure Gaussian limit by itself
     if hwhm == 0.0:
@@ -72,7 +72,7 @@ def voigt(x, xctr, hwhm, sigma):
     return (w.real) / (sigma * _sqrt2pi)
 
 
-def voigt_approx_fwhm(fwhm_lorentzian, fwhm_gaussian):
+def voigt_approx_fwhm(fwhm_lorentzian: float, fwhm_gaussian: float) -> float:
     """The Olivero & Longbothum 1977 approximation to the Voigt full-width at half-maximum.
 
     See doi:10.1016/0022-4073(77)90161-3, and also Wikipedia.
