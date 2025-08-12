@@ -8,8 +8,6 @@ from . import message_logging
 from . import utilities
 from . import phase_correct
 
-from .experiment_state import ExperimentStateFile
-
 
 from .ljhfiles import LJHFile
 from . import pulse_algorithms
@@ -44,7 +42,6 @@ __all__ = [
     "message_logging",
     "utilities",
     "phase_correct",
-    "ExperimentStateFile",
     "LJHFile",
     "pulse_algorithms",
     "noise_algorithms",
