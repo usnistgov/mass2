@@ -88,7 +88,6 @@ def _(data, mass2, mo, plt):
     min_gain_fraction_at_ph_30k: float = 0.25
     fwhm_pulse_height_units: float = 75
     n_extra_peaks: int = 10
-    import mass  # type: ignore
 
     if calibrated_col is None:
         calibrated_col = f"energy_{uncalibrated_col}"
@@ -621,7 +620,6 @@ def _(ch6, mo, np, plt):
 @app.cell
 def _(ch6, mo, np, pl, plt):
     def pfit_dc(line_name, ch):
-        import mass
 
         dlo, dhi = 50, 50
         e0 = mass2.STANDARD_FEATURES[line_name]
