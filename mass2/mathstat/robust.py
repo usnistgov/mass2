@@ -33,11 +33,12 @@ Rewritten with Numba Jan 23, 2025
 """
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
+from typing import Optional
 from numba import njit
 
 
-def bisquare_weighted_mean(x, k, center=None, tol=None):
+def bisquare_weighted_mean(x: ArrayLike, k: float, center: Optional[float] = None, tol: Optional[float] = None) -> float:
     """The bisquare weighted mean of the data <x> with a k-value of <k>.
 
     Args:
@@ -59,6 +60,7 @@ def bisquare_weighted_mean(x, k, center=None, tol=None):
     Data values a distance of more than <k> from the weighted mean are given no weight.
     """
 
+    x = np.asarray(x)
     if center is None:
         center = np.median(x)
     if tol is None:
@@ -77,7 +79,7 @@ def bisquare_weighted_mean(x, k, center=None, tol=None):
     )
 
 
-def huber_weighted_mean(x, k, center=None, tol=None):
+def huber_weighted_mean(x: ArrayLike, k: float, center: Optional[float] = None, tol: Optional[float] = None) -> float:
     """Huber's weighted mean of the data <x> with a k-value of <k>.
 
     Args:
@@ -99,6 +101,7 @@ def huber_weighted_mean(x, k, center=None, tol=None):
     Data values a distance of more than <k> from the weighted mean are given no weight.
     """
 
+    x = np.asarray(x)
     if center is None:
         center = np.median(x)
     if tol is None:
@@ -116,19 +119,20 @@ def huber_weighted_mean(x, k, center=None, tol=None):
     )
 
 
-def trimean(x):
+def trimean(x: ArrayLike) -> float:
     """Return Tukey's trimean for a data set <x>, a measure of its central tendency
     ("location" or "center").
 
     If (q1,q2,q3) are the quartiles (i.e., the 25%ile, median, and 75 %ile),
     the trimean is (q1+q3)/4 + q2/2.
     """
+    x = np.asarray(x)
     q1, q2, q3 = [np.percentile(x, per) for per in (25, 50, 75)]
     trimean = 0.25 * (q1 + q3) + 0.5 * q2
     return trimean
 
 
-def median_abs_dev(x, normalize=False):
+def median_abs_dev(x: ArrayLike, normalize: bool = False) -> float:
     """Median absolute deviation (from the median) of data vector.
 
     Args:
@@ -137,13 +141,16 @@ def median_abs_dev(x, normalize=False):
             the statistic consistent with the standard deviation for an asymptotically large
             sample of Gaussian deviates (default False).
     """
-    mad = np.median(np.abs(np.asarray(x) - np.median(x)))
+    x = np.asarray(x)
+    mad = np.median(np.abs(x - np.median(x)))
     if normalize:
         return mad / 0.674480  # Half of the normal distribution has abs(x-mu) < 0.674480*sigma
     return mad
 
 
-def shorth_range(x, normalize=False, sort_inplace=False, location=False):
+def shorth_range(
+    x: ArrayLike, normalize: bool = False, sort_inplace: bool = False, location: bool = False
+) -> float | tuple[float, float, float]:
     """Returns the Shortest Half (shorth) Range, a robust estimator of dispersion.
 
     The Shortest Half of a data set {x} means that closed interval [a,b] where (1) a and b are both
@@ -177,15 +184,15 @@ def shorth_range(x, normalize=False, sort_inplace=False, location=False):
     just how useless they are.
     """
 
-    n = len(x)  # Number of data values
-    nhalves = int((n + 1) / 2)  # Number of minimal intervals containing at least half the data
-    nobs = 1 + int(n / 2)  # Number of data values in each minimal interval
-
     if not sort_inplace:
         x = np.array(x)
     elif not isinstance(x, np.ndarray):
         raise ValueError("sort_inplace cannot be True unless the data set x is a np.ndarray.")
     x.sort()
+
+    n = len(x)  # Number of data values
+    nhalves = int((n + 1) / 2)  # Number of minimal intervals containing at least half the data
+    nobs = 1 + int(n / 2)  # Number of data values in each minimal interval
 
     range_each_half = x[n - nhalves : n] - x[0:nhalves]
     idxa = range_each_half.argmin()
@@ -225,7 +232,7 @@ _Statistica Neerlandica_, 42(2), 103–116. https://doi.org/10.1111/j.1467-9574.
 """
 
 
-def high_median(x, weights=None, return_index=False):
+def high_median(x: ArrayLike, weights: Optional[ArrayLike] = None, return_index: bool = False) -> float | tuple[float, int]:
     """Compute the weighted high median of data set x with weights <weights>.
 
     Returns:
@@ -250,7 +257,7 @@ def high_median(x, weights=None, return_index=False):
     return x[ri]
 
 
-def Qscale(x, sort_inplace=False):
+def Qscale(x: ArrayLike, sort_inplace: bool = False) -> float:
     """Compute the robust estimator of scale Q of Rousseeuw and Croux using only O(n log n)
     memory and computations.
 
@@ -321,7 +328,7 @@ def Qscale(x, sort_inplace=False):
 
 
 @njit
-def _high_median(sort_idx, weights, n):
+def _high_median(sort_idx: ArrayLike, weights: ArrayLike, n: int) -> float:
     """Compute the weighted high median of data set with weights <weights>.
 
     Instead of sending the data set x, send the order statistics <sort_idx> over
@@ -329,12 +336,10 @@ def _high_median(sort_idx, weights, n):
 
     It returns the smallest j such that the sum of all weights for data
     with x[i] <= x[j] is strictly greater than half the total weight.
-
-    If return_index is True, then the chosen index is returned also as (highmed, index).
     """
-    total_weight = 0.0
-    for i in range(n):
-        total_weight += weights[i]
+    sort_idx = np.asarray(sort_idx)
+    weights = np.asarray(weights)
+    total_weight = weights[:n].sum()
     half_weight = 0.5 * total_weight
 
     imin, imax = 0, n  # The possible range of j will always be the half-open interval [imin,imax)
@@ -363,17 +368,13 @@ def _high_median(sort_idx, weights, n):
 
 
 @njit
-def _choose_trial_val(left: ArrayLike, right: ArrayLike, x: ArrayLike, n: int):
+def _choose_trial_val(left: NDArray, right: NDArray, x: ArrayLike, n: int) -> tuple[float, int, int]:
     """Choose a trial val as the weighted median of the medians of the remaining candidates in
     each row, where the weights are the number of candidates remaining in each row."""
 
-    # cdef Py_ssize_t i
-    # cdef int chosen_row, chosen_col, ctr_index
-
-    # cdef float trial_val
-    # cdef double[:] weights
-    # cdef double[:] row_median
-
+    left = np.asarray(left)
+    right = np.asarray(right)
+    x = np.asarray(x)
     weights = np.zeros(n - 1, dtype=np.float64)
     row_median = np.zeros(n - 1, dtype=np.float64)
 
