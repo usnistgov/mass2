@@ -1,5 +1,5 @@
 import numpy as np
-from numba import jit
+from numba import njit
 from numpy.typing import NDArray
 
 # Define the dtype for the structured array
@@ -21,22 +21,17 @@ result_dtype = np.dtype([
 ResultArrayType = NDArray[result_dtype]
 
 
-@jit(nopython=True)
+@njit
 def summarize_data_numba(  # noqa: PLR0914
     rawdata: NDArray[np.uint16],
     timebase: float,
     peak_samplenumber: int,
     pretrigger_ignore_samples: int,
     nPresamples: int,
-    first: int = 0,
-    end: int = 0,
 ) -> ResultArrayType:
     """Summarize one segment of the data file, loading it into cache."""
     nPulses = rawdata.shape[0]
     nSamples = rawdata.shape[1]
-
-    if end <= 0:
-        end = nPulses
 
     e_nPresamples = nPresamples - pretrigger_ignore_samples
 
