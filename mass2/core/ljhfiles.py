@@ -1,5 +1,5 @@
 from dataclasses import dataclass, replace
-from typing import Optional, ClassVar, Self
+from typing import ClassVar
 import numpy.typing as npt
 import os
 import numpy as np
@@ -36,12 +36,12 @@ class LJHFile:
     binary_size: int
     _mmap: np.memmap
     ljh_version: Version
-    max_pulses: Optional[int] = None
+    max_pulses: int | None = None
 
     OVERLONG_HEADER: ClassVar[int] = 100
 
     @classmethod
-    def open(cls, filename: str, max_pulses: Optional[int] = None) -> "LJHFile":
+    def open(cls, filename: str, max_pulses: int | None = None) -> "LJHFile":
         header_dict, header_string, header_size = cls.read_header(filename)
         channum = header_dict["Channel"]
         timebase = header_dict["Timebase"]
@@ -157,7 +157,7 @@ class LJHFile:
         """The size in bytes of each binary pulse record (including the timestamps)"""
         return self.dtype.itemsize
 
-    def reopen_binary(self, max_pulses: Optional[int] = None) -> Self:
+    def reopen_binary(self, max_pulses: int | None = None) -> "LJHFile":
         """Reopen the underlying binary section of the LJH file, in case its size has changed,
         without re-reading the LJH header section.
 
