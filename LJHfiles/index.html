@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>LJH file format - Mass2</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "LJH file format";
+        var mkdocs_page_input_path = "LJHfiles.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> Mass2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">LJH file format</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#header-information">Header Information</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#header-notes">Header Notes:</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#binary-information">Binary Information</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#earlier-versions-of-the-ljh-standard">Earlier versions of the LJH standard</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#binary-information-for-ljh-version-210">Binary Information (for LJH version 2.1.0)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#changelog">Changelog</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../about/">About</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">Mass2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">LJH file format</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="ljh-memorial-file-format">LJH Memorial File Format</h1>
+<p><strong>LJH Version 2.2.0</strong> is the current LJH file format (since 2015).</p>
+<p>An LJH file contains segmented, time-series data that represent separate triggered pulses observed in a single cryogenic microcalorimeter.</p>
+<p>The LJH file format consists of a <em>human-readable ASCII header</em> followed by an arbitrary number of <em>binary data records</em>. Information in the header specifies the exact length in bytes of each data record.</p>
+<h2 id="header-information">Header Information</h2>
+<p>The human-readable ASCII header is the start of the LJH file. That means you can say <code>less myfile_chan5.ljh</code> at a unix terminal and get meaningful information about the file before the gibberish starts. Handy, right?</p>
+<p>The header is somewhat fragile (it might have been better written in YAML or TOML or even JSON, but we decided just to live with it). It consists of key-value pairs, with a format of <code>Key: value</code>, one pair per line.</p>
+<h3 id="header-notes">Header Notes:</h3>
+<ul>
+<li>Lines begining with <code>#</code> are usually ignored.</li>
+<li><code>#End of Header</code> marks the end of the header and the transition to the binary data.</li>
+<li><code>#End of Description</code> has special meaning if <code>System description of this File:</code> has been read.</li>
+<li>Newlines are the newlines of the digitizing computer. The interpreting program must accept LF, CR, or CRLF.</li>
+<li>Capitalization must be matched.</li>
+<li>One space follows a colon. Any additional spaces are treated as part of the value.</li>
+<li>Programs that read LJH files ignore header keys that are unexpected or unneeded.</li>
+</ul>
+<pre><code class="language-text">#LJH Memorial File Format
+</code></pre>
+<p>This line indicates that the file is based on format described here.</p>
+<pre><code class="language-text">Save File Format Version: 2.2.0
+Software Version: DASTARD version 0.2.15
+Software Git Hash: 85ab821
+Data source: Abaco
+</code></pre>
+<p>These lines uniquely identify the exact format, so the interpreting program can adapt. While the first line should be sufficient for this purpose, the second and third lines take in the possibility that a particular program may have a bug. The interpreting program may be aware of this bug and compensate. The Data source is meant for later human reference.</p>
+<pre><code class="language-text">Number of rows: 74
+Number of columns: 1
+Row number (from 0-73 inclusive): 12
+Column number (from 0-0 inclusive): 0
+Number of channels: 74
+Channel name: chan12
+Channel: 12
+ChannelIndex (in dastard): 12
+</code></pre>
+<p><a href="https://github.com/usnistgov/dastard">Dastard</a> inserts this information to help downstream analysis tools understand the array being used when this file was acquired.</p>
+<pre><code class="language-text">Digitized Word Size in Bytes: 2
+</code></pre>
+<p>Each sample is stored in this many bytes.</p>
+<pre><code class="language-text">Location: LLNL
+Cryostat: C3PO
+Thermometer: GRT1
+Temperature (Ohm or K): 0.1
+Bridge range: 20.0E3
+Magnetic field (A or Gauss): 0.75
+Detector: SnTES#8
+Sample: Orange peel
+Excitation/Source: none
+Operator: Leisure Larry
+</code></pre>
+<p>Like the several lines above, most lines are comments for later human use and are not interpreted by general-purpose LJH readers.</p>
+<pre><code class="language-text">System description of this File:
+blah
+blah
+blah
+User description of this File:
+blah
+blah
+blah
+#End of Description
+</code></pre>
+<p>This is a multiline comment. Once the <code>Description of this File:</code> line is read, all following lines are concantenated until <code>#End of Description</code> is read. Again, this is ignored by programs that read LJH files.</p>
+<pre><code class="language-text">Number of Digitizers: 1
+Number of Active Channels: 2
+</code></pre>
+<p>The number of digitizers and channels present in the file are given so that space may be allocated for them by the interpreting program, if necessary.</p>
+<pre><code class="language-text">Timestamp offset (s): 3016738980.049000
+</code></pre>
+<p>The meaning of this and the means of interpreting it are dependent upon the particular programs creating and reading this file. It was a necessary offset in earlier versions of LJH, where we did not reserve enough bytes per record to record a full timestamp. In LJH 2.2, it serves as a simple zero-time (all records should be no earlier than this "offset").</p>
+<pre><code class="language-text">Server Start Time: 18 Nov 2022, 15:47:34 MST
+First Record Time: 18 Nov 2022, 16:54:15 MST
+</code></pre>
+<p>These times show when the server (Dastard, in this case) started running, and when the first record was written to this file.</p>
+<pre><code class="language-text">Timebase: 5.000000E-8
+Number of samples per point: 1
+</code></pre>
+<p>Timebase gives the sampling period (in seconds). Number of samples per point is generally 1, but can be more in special cases where samples are averaged and downsampled before recording.</p>
+<pre><code class="language-text">Presamples: 256
+Total Samples: 1024
+</code></pre>
+<p>Total samples is the actual record length in samples. The trigger point will be located at sample number Presamples.</p>
+<h2 id="binary-information">Binary Information</h2>
+<p>If you read an LJH file until the characters <code>#End of Header</code> plus the following CR and/or LF, then the remainder of the file is the binary section. It consists of a sequence of data records.</p>
+<p>Each record starts with a 16-byte time marker. The record's waveform data consists of the next L*M bytes, where L is the number of samples (<code>Total Samples:</code> value from the header) and M is the number of bytes per sample (<code>Digitized Word Size in Bytes:</code> from the header). M is always 2 bytes per sample, in practice.</p>
+<ul>
+<li>The full record's length is <strong>16+L*M</strong> .</li>
+<li>All values in the data record are little endian.</li>
+<li>The first 8-byte word is the subframe counter. It counts the number of <em>subframe</em> times read out since the server started. If the server has to resynchronize on the raw data, then the subframe counter will be incremented by an <em>estimate</em> to account for the time missed. For TDM data, the subframe rate is equal to the row rate, also known as the <em>line rate</em>. For µMUX data, subframes run at a multiple of the frame rate given by the <code>Subframe divisions:</code> value in the LJH header (typically 64).</li>
+<li>The second 8-byte word is the POSIX microsecond time, i.e., the time in microseconds since 1 January 1970 00:00 UT. (Warning: this will overflow in only 292,226 years if you interpret it as a signed number.)</li>
+<li>The next L words (of M bytes each) are the data record, as a signed or unsigned integer. (Typically, we use signed for the TDM error signal and unsigned for TDM feedback or for µMUX data.)</li>
+</ul>
+<h2 id="earlier-versions-of-the-ljh-standard">Earlier versions of the LJH standard</h2>
+<h3 id="binary-information-for-ljh-version-210">Binary Information (for LJH version 2.1.0)</h3>
+<p><strong>Version 2.1.0 follows. This version was made obsolete in 2015 by version 2.2.0.</strong></p>
+<p>Each record starts with a 6-byte time marker. The record's waveform data consists of the next L*M bytes, where L is the number of samples (<code>Total Samples:</code> value from the header) and M is the number of bytes per sample (<code>Digitized Word Size in Bytes:</code> from the header). M is always 2 bytes per sample, in practice.</p>
+<ul>
+<li>The full record's length is <strong>6+L*M</strong> .</li>
+<li>All values in the data record are little endian.</li>
+<li>The first byte is a "4 microsecond tick".  That is, it counts microseconds past the millisecond counter and records the count divided by 4.  Beware that previous versions of LJH used the first byte to signify something about the type of data.  Igor seems to ignore this byte, though, so I think we're okay to stuff timing information into it.</li>
+<li>The second byte used to signify a channel number N, which corresponds to the Nth channel described in the header. Channel number 255 is reserved for temperature readout with the DMM. Since 2010, this has always been meaningless.</li>
+<li>The next 4 bytes are an unsigned 32-bit number that is the value of a millisecond counter on the digitizing computer.</li>
+<li>The next L words (of M bytes each) are the data record, as a signed or unsigned integer. (Typically, we use signed for the TDM error signal and unsigned for the TDM feedback.)</li>
+</ul>
+<h3 id="changelog">Changelog</h3>
+<ul>
+<li><strong>Version 2.2.0 (6 Aug 2015)</strong> Changed the binary definition to include 8 bytes each record for pulse timing (microsecond precision) and frame number.</li>
+<li><strong>Version 2.1.0 (23 Sep 2011)</strong>  Used the first byte of each record to get 4 microsec timing resolution instead of 1 ms.</li>
+<li><strong>Version 2.0.0 (27 Mar 2011)</strong> Defined inversion and offset more clearly</li>
+<li><strong>Version 2.0.0 (5 Jan 2001)</strong> Changed definition of discrimination level</li>
+<li><strong>Version 2.0.0 (24 May 2000)</strong> since most PCs have least significant byte first, the binary information has been changed to default</li>
+<li><strong>Version 1.1.0 (8 May 2000)</strong> added a few more user and channel parameters as well as provisions for temperature monitoring</li>
+<li><strong>Initial 1.0.0 (5 Aug 1999)</strong> definition by Larry J. Hiller</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../about/" class="btn btn-neutral float-right" title="About">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../about/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
