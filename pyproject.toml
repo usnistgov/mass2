@@ -48,7 +48,7 @@ dev = [
 ]
 # Use `uv sync --group docs` to get the packages needed to create documentation
 docs = [
-    "sphinx",
+    "mkdocs",
     "recommonmark",
 ]
 
