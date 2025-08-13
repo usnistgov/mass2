@@ -1,6 +1,7 @@
 site_name: Mass2
 nav:
   - Home: index.md
+  - Fluorescence lines: fluorescence.md
   - LJH file format: LJHfiles.md
   - About: about.md
 theme: readthedocs
