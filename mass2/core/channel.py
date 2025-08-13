@@ -203,46 +203,6 @@ class Channel:
     def good_series(self, col, use_expr=True):
         return mass2.good_series(self.df, col, self.good_expr, use_expr)
 
-    def rough_gain_cal(
-        self,
-        line_names,
-        uncalibrated_col,
-        calibrated_col,
-        ph_smoothing_fwhm,
-        use_expr=True,
-    ) -> "Channel":
-        # this is meant to filter the data, then select down to the columsn we need, then materialize them,
-        # all without copying our pulse records again
-        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        peak_ph_vals, _peak_heights = mass2.algorithms.find_local_maxima(uncalibrated, gaussian_fwhm=ph_smoothing_fwhm)
-        name_e, energies_out, opt_assignments = mass2.algorithms.find_opt_assignment(
-            peak_ph_vals,
-            line_names=line_names,
-            maxacc=0.1,
-        )
-        gain = opt_assignments / energies_out
-        gain_pfit = np.polynomial.Polynomial.fit(opt_assignments, gain, deg=2)
-
-        def ph2energy(uncalibrated):
-            calibrated = uncalibrated / gain_pfit(uncalibrated)
-            return calibrated
-
-        predicted_energies = ph2energy(np.array(opt_assignments))
-        # energy_residuals = predicted_energies - energies_out
-        # if any(np.abs(energy_residuals) > max_residual_ev):
-        #     raise Exception(f"too large residuals: {energy_residuals=} eV")
-        step = mass2.RoughCalibrationGainStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr=use_expr,
-            line_names=name_e,
-            line_energies=energies_out,
-            predicted_energies=predicted_energies,
-            ph2energy=ph2energy,
-        )
-        return self.with_step(step)
-
     def rough_cal_combinatoric(
         self,
         line_names,
