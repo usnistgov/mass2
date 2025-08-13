@@ -4,7 +4,6 @@ mass2.mathstat.utilities
 Several math and plotting utilities:
 * plot_as_stepped_hist
 * plot_stepped_hist_poisson_errors
-* savitzky_golay
 
 Joe Fowler, NIST
 
@@ -12,15 +11,18 @@ Started March 24, 2011
 """
 
 import numpy as np
+import pylab as plt
+from collections import namedtuple
+from numpy.typing import ArrayLike, NDArray
 
-__all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "savitzky_golay", "find_svd_randomly", "find_range_randomly"]
+__all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "find_svd_randomly", "find_range_randomly"]
 
 # Create a module-local RNG. If you need to seed it to achieve repeatable tests,
 # you can replace this.
 rng = np.random.default_rng()
 
 
-def plot_as_stepped_hist(axis, data, bins, **kwargs):
+def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwargs) -> None:
     """Plot data in stepped-histogram format.
 
     Args:
@@ -32,6 +34,8 @@ def plot_as_stepped_hist(axis, data, bins, **kwargs):
             the bin centers.
         **kwargs: All other keyword arguments will be passed to axis.plot().
     """
+    data = np.asarray(data)
+    bins = np.asarray(bins)
     if len(bins) == len(data) + 1:
         bin_edges = bins
         x = np.zeros(2 * len(bin_edges), dtype=float)
@@ -51,7 +55,9 @@ def plot_as_stepped_hist(axis, data, bins, **kwargs):
     axis.set_xlim([x[0], x[-1]])
 
 
-def plot_stepped_hist_poisson_errors(axis, counts, bin_ctrs, scale=1.0, offset=0.0, **kwargs):
+def plot_stepped_hist_poisson_errors(
+    axis: plt.Axes, counts: ArrayLike, bin_ctrs: ArrayLike, scale: float = 1.0, offset: float = 0.0, **kwargs
+) -> None:
     """Use plot_as_stepped_hist to plot a histogram, where also
     an error band is plotted, assuming data are Poisson-distributed.
 
@@ -66,11 +72,13 @@ def plot_stepped_hist_poisson_errors(axis, counts, bin_ctrs, scale=1.0, offset=0
         offset: Plot counts*scale+offset if you need to convert counts to some physical units.
         **kwargs: All other keyword arguments will be passed to axis.plot().
     """
+    counts = np.asarray(counts)
+    bin_ctrs = np.asarray(bin_ctrs)
     if len(bin_ctrs) == len(counts) + 1:
         bin_ctrs = 0.5 * (bin_ctrs[1:] + bin_ctrs[:-1])
     elif len(bin_ctrs) != len(counts):
         raise ValueError("bin_ctrs must be either the same length as counts, or 1 longer.")
-    smooth_counts = savitzky_golay(counts * scale, 7, 4)
+    smooth_counts = counts * scale
     errors = np.sqrt(counts) * scale
     fill_lower = smooth_counts - errors
     fill_upper = smooth_counts + errors
@@ -80,78 +88,7 @@ def plot_stepped_hist_poisson_errors(axis, counts, bin_ctrs, scale=1.0, offset=0
     plot_as_stepped_hist(axis, counts * scale + offset, bin_ctrs, **kwargs)
 
 
-def savitzky_golay(y, window_size, order, deriv=0):
-    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
-
-    The Savitzky-Golay filter removes high frequency noise from data.
-    It has the advantage of preserving the original shape and
-    features of the signal better than other types of filtering
-    approaches, such as moving averages techhniques.
-    Parameters
-    ----------
-    y : array_like, shape (N,)
-        the values of the time history of the signal.
-    window_size : int
-        the length of the window. Must be an odd integer number.
-    order : int
-        the order of the polynomial used in the filtering.
-        Must be less then `window_size` - 1.
-    deriv: int
-        the order of the derivative to compute (default = 0 means only smoothing)
-    Returns
-    -------
-    ys : ndarray, shape (N)
-        the smoothed signal (or it's n-th derivative).
-    Notes
-    -----
-    The Savitzky-Golay is a type of low-pass filter, particularly
-    suited for smoothing noisy data. The main idea behind this
-    approach is to make for each point a least-square fit with a
-    polynomial of high order over a odd-sized window centered at
-    the point.
-    Examples
-    --------
-    t = np.linspace(-4, 4, 500)
-    y = np.exp( -t**2 ) + np.random.default_rng().normal(0, 0.05, t.shape)
-    ysg = savitzky_golay(y, window_size=31, order=4)
-    import matplotlib.pyplot as plt
-    plt.plot(t, y, label='Noisy signal')
-    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
-    plt.plot(t, ysg, 'r', label='Filtered signal')
-    plt.legend()
-    plt.show()
-    References
-    ----------
-    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
-       Data by Simplified Least Squares Procedures. Analytical
-       Chemistry, 1964, 36 (8), pp 1627-1639.
-    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
-       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
-       Cambridge University Press ISBN-13: 9780521880688
-    """
-    try:
-        window_size = np.abs(int(window_size))
-        order = np.abs(int(order))
-    except ValueError as _msg:
-        raise ValueError(f"window_size and order have to be of type int: {_msg}")
-    if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
-    if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order + 1)
-    half_window = (window_size - 1) // 2
-    # precompute coefficients
-    b = np.asmatrix([[k**i for i in order_range] for k in range(-half_window, half_window + 1)])
-    m = np.linalg.pinv(b).A[deriv]
-    # pad the signal at the extremes with
-    # values taken from the signal itself
-    firstvals = y[0] - np.abs(y[1 : half_window + 1][::-1] - y[0])
-    lastvals = y[-1] + np.abs(y[-half_window - 1 : -1][::-1] - y[-1])
-    y = np.concatenate((firstvals, y, lastvals))
-    return np.convolve(m, y, mode="valid")
-
-
-def find_range_randomly(A, nl, q=1):
+def find_range_randomly(A: ArrayLike, nl: int, q: int = 1) -> NDArray:
     """Find approximate range of matrix A using nl random vectors and
     with q power iterations (q>=0). Based on Halko Martinsson & Tropp Algorithm 4.3
 
@@ -177,7 +114,7 @@ def find_range_randomly(A, nl, q=1):
     return Q
 
 
-def find_svd_randomly(A, nl, q=2):
+def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArray, NDArray]:
     """Find approximate SVD of matrix A using nl random vectors and
     with q power iterations. Based on Halko Martinsson & Tropp Algorithm 5.1
 
@@ -185,8 +122,10 @@ def find_svd_randomly(A, nl, q=2):
     approximate matrix decompositions." by N Halko, P Martinsson, and J Tropp. *SIAM
     Review* v53 #2 (2011) pp217-288. http://epubs.siam.org/doi/abs/10.1137/090771806
     """
+    A = np.asarray(A)
     Q = find_range_randomly(A, nl, q=q)
     B = np.dot(Q.T, A)
-    u_b, w, v = np.linalg.svd(B, 0)
-    u = np.dot(Q, u_b)
-    return u, w, v
+    SVD_B = np.linalg.svd(B, full_matrices=False)
+    u = np.dot(Q, SVD_B.U)
+    SVDResult = namedtuple("SVDResult", ["U", "W", "Vh"])
+    return SVDResult(U=u, W=SVD_B.W, Vh=SVD_B.Vh)

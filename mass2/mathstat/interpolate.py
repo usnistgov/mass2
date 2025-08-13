@@ -176,6 +176,10 @@ class CubicSpline:
             result = result[0]
         return result
 
+    @staticmethod
+    def variance(xtest):
+        return np.zeros_like(xtest)
+
 
 def k_spline(x, y):
     """Compute the spline covariance kernel, R&W eq 6.28."""

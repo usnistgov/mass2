@@ -5,7 +5,7 @@ import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from typing import Optional
+from typing import Optional, Callable
 import numpy as np
 import time
 
@@ -49,6 +49,7 @@ class Channel:
     df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
+    transform_raw: Optional[Callable] = None
 
     def mo_stepplots(self):
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -418,7 +419,10 @@ class Channel:
 
     @functools.cache
     def typical_peak_ind(self, col="pulse"):
-        return int(np.median(self.df.limit(100)[col].to_numpy().argmax(axis=1)))
+        raw = self.df.limit(100)[col].to_numpy()
+        if self.transform_raw is not None:
+            raw = self.transform_raw(raw)
+        return int(np.median(raw.argmax(axis=1)))
 
     def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
         if peak_index is None:
@@ -433,6 +437,7 @@ class Channel:
             pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.header.n_presamples,
+            transform_raw=self.transform_raw,
         )
         return self.with_step(step)
 
@@ -481,6 +486,7 @@ class Channel:
             use_expr=use_expr,
             filter=filter5lag,
             spectrum=spectrum5lag,
+            transform_raw=self.transform_raw,
         )
         return self.with_step(step)
 
@@ -562,7 +568,7 @@ class Channel:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False) -> "Channel":
+    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Optional[Callable] = None) -> "Channel":
         if noise_path is None:
             noise_channel = None
         else:
@@ -570,7 +576,7 @@ class Channel:
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = Channel(df, header=header, noise=noise_channel)
+        channel = Channel(df, header=header, noise=noise_channel, transform_raw=transform_raw)
         return channel
 
     @classmethod
@@ -616,6 +622,7 @@ class Channel:
             good_expr=self.good_expr,
             df_history=self.df_history,
             steps=self.steps,
+            transform_raw=self.transform_raw,
         )
 
     def with_columns(self, df2) -> "Channel":

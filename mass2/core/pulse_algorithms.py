@@ -125,6 +125,15 @@ def summarize_data_numba(  # noqa: PLR0914
         else:
             results["rise_time"][j] = timebase
 
+        # The following is quite confusing, but it appears to be equivalent to
+        # slope = -2 * pulse[peak_samplenumber:-4]
+        # slope -= pulse[peak_samplenumber+1:-3]
+        # slope += pulse[peak_samplenumber+3:-1]
+        # slope += 2*pulse[peak_samplenumber+4:]
+        # slope = np.minimum(slope[2:], slope[:-2])
+        # results["postpeak_deriv"][j] = 0.1 * np.max(slope)
+        # TODO: consider replacing, if the above is not slower?
+
         f0, f1, f3, f4 = 2, 1, -1, -2
         s0, s1, s2, s3 = (
             pulse[peak_samplenumber],

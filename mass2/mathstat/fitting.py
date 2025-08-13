@@ -54,6 +54,8 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     ValueError
         if k doesn't satisfy x.min() < k < x.max()
     """
+    x = np.asarray(x)
+    y = np.asarray(y)
     xi = x[x < k]
     yi = y[x < k]
     xj = x[x >= k]
@@ -132,6 +134,8 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: Optional[tuple[float, fl
     plt.plot(xj, a+c*(xj-kbest), "--k")
     plt.legend()
     """
+    x = np.asarray(x)
+    y = np.asarray(y)
 
     def penalty(k, x, y):
         _, _, X2 = kink_model(k, x, y)

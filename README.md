@@ -59,7 +59,7 @@ We expect that the major differences between Mass versions 1 and 2 will be disru
 
 
 ## Installation
-Mass requires Python version 3.9 or higher. (GitHub tests it automatically with Python versions 3.9 and 3.13.) We strongly recommend installation inside a virtual environment to help with dependencies and avoiding conflicts. Here are some ways to install Mass 2:
+Mass requires Python version 3.10 or higher. (GitHub tests it automatically with Python versions 3.10 and 3.13.) We strongly recommend installation inside a virtual environment to help with dependencies and avoiding conflicts. Here are some ways to install Mass 2:
 
 1. For a data-acquisition computer, install the whole software suite together: https://github.com/usnistgov/microcal-daq/. [Instructions](#1-install-the-microcal-daq-meta-package)
 2. For a personal workstation or other non-lab computer, install using the modern [uv](https://docs.astral.sh/uv/) package manager. [Instructions](#2-use-the-uv-package-manager)

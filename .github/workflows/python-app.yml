@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - python-version: 3.9
+        - python-version: '3.10' # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989)
         - python-version: 3.13
 
     steps:
