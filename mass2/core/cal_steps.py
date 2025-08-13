@@ -10,8 +10,8 @@ from . import pulse_algorithms
 class CalStep:
     inputs: list[str]
     output: list[str]
-    good_expr: pl.Expr
-    use_expr: pl.Expr
+    good_expr: bool | pl.Expr
+    use_expr: bool | pl.Expr
 
     @property
     def description(self):

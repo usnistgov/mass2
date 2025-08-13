@@ -277,7 +277,7 @@ def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_num
 
 def hist_smoothed(
     pulse_heights: ndarray,
-    fwhm_pulse_height_units: int,
+    fwhm_pulse_height_units: float,
     bin_edges: ndarray | None = None,
 ) -> tuple[ndarray, ndarray, ndarray]:
     pulse_heights = pulse_heights.astype(np.float64)
@@ -297,7 +297,7 @@ def hist_smoothed(
     return smoothed_counts, bin_edges, counts
 
 
-def local_maxima(y: ndarray) -> ndarray:
+def local_maxima(y: ndarray) -> tuple[ndarray, ndarray]:
     local_maxima_inds = []
     local_minima_inds = []
     increasing = False
@@ -314,7 +314,7 @@ def local_maxima(y: ndarray) -> ndarray:
 
 def peakfind_local_maxima_of_smoothed_hist(
     pulse_heights: ndarray,
-    fwhm_pulse_height_units: int,
+    fwhm_pulse_height_units: float,
     bin_edges: ndarray | None = None,
 ) -> SmoothedLocalMaximaResult:
     assert len(pulse_heights > 10), "not enough pulses"
@@ -493,7 +493,7 @@ def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed
     return result
 
 
-def find_pfit_gain_residual(ph: ndarray, e: tuple[float, float, float, float, float, float]) -> tuple[ndarray, Polynomial]:
+def find_pfit_gain_residual(ph: ndarray, e: ndarray) -> tuple[ndarray, Polynomial]:
     assert len(ph) == len(e)
     gain = ph / e
     pfit_gain = np.polynomial.Polynomial.fit(ph, gain, deg=2)
@@ -526,16 +526,15 @@ def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, 
     )
 
 
-def find_best_residual_among_all_possible_assignments(
-    ph: ndarray, e: tuple[float, float, float, float, float, float]
-) -> tuple[float64, ndarray, ndarray, ndarray, Polynomial]:
+def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -> tuple[float, ndarray, ndarray, ndarray, Polynomial]:
     assert len(ph) >= len(e)
     ph = np.sort(ph)
     assignments_inds = itertools.combinations(np.arange(len(ph)), len(e))
     best_rms_residual = np.inf
-    best_ph_assigned = None
-    best_residual_e = None
-    best_pfit = None
+    best_ph_assigned = np.array([])
+    best_residual_e = np.array([])
+    best_assignment_inds = np.array([])
+    best_pfit = Polynomial([0])
     for i, indices in enumerate(assignments_inds):
         assignment_inds = np.array(indices)
         ph_assigned = np.array(ph[assignment_inds])
@@ -661,7 +660,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
 @dataclass(frozen=True)
 class RoughCalibrationStep(CalStep):
     pfresult: SmoothedLocalMaximaResult
-    assignment_result: BestAssignmentPfitGainResult
+    assignment_result: BestAssignmentPfitGainResult | None
     ph2energy: typing.Callable
     success: bool
 
@@ -693,7 +692,8 @@ class RoughCalibrationStep(CalStep):
     def dbg_plot_success(self, df: DataFrame, axs: None | ndarray = None):
         if axs is None:
             _, axs = plt.subplots(2, 1, figsize=(11, 6))
-        self.assignment_result.plot(ax=axs[0])
+        if self.assignment_result:
+            self.assignment_result.plot(ax=axs[0])
         self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
@@ -704,7 +704,9 @@ class RoughCalibrationStep(CalStep):
         plt.tight_layout()
 
     def energy2ph(self, energy: float64) -> float:
-        return self.assignment_result.energy2ph(energy)
+        if self.assignment_result:
+            return self.assignment_result.energy2ph(energy)
+        return 0.0
 
     @classmethod
     def learn_combinatoric(
@@ -813,7 +815,7 @@ class RoughCalibrationStep(CalStep):
                 best_assignment_result = assignment_result
                 if rms_residual < acceptable_rms_residual_e:
                     break
-        if not np.isinf(best_rms_residual):
+        if best_assignment_result and not np.isinf(best_rms_residual):
             success = True
             ph2energy = best_assignment_result.ph2energy
             # df3peak_on_failure = None

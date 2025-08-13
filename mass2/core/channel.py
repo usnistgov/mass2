@@ -494,7 +494,7 @@ class Channel:
     def step_summary(self):
         return [(type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)]
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
@@ -641,7 +641,7 @@ class Channel:
         misc.pickle_object(steps, filename)
         return steps
 
-    def plot_summaries(self, use_expr: pl.Expr | None = None, downsample: int | None = None, log: bool = False) -> None:
+    def plot_summaries(self, use_expr_in: pl.Expr | None = None, downsample: int | None = None, log: bool = False) -> None:
         """Plot a summary of the data set, including time series and histograms of key pulse properties.
 
         Parameters
@@ -667,8 +667,7 @@ class Channel:
             ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
         )
 
-        if use_expr is None:
-            use_expr = self.good_expr
+        use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
             downsample = self.npulses // 10000
@@ -682,17 +681,17 @@ class Channel:
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")
-        df = df.filter(use_expr).select(preserve).collect()
+        df2 = df.filter(use_expr).select(preserve).collect()
 
         # Plot timeseries relative to 0 = the last 00 UT during or before the run.
-        timestamp = df["timestamp"].to_numpy()
+        timestamp = df2["timestamp"].to_numpy()
         last_midnight = timestamp[-1].astype("datetime64[D]")
         hour_rel = (timestamp - last_midnight).astype(float) / 3600e6
 
         for i, (column_name, label, color, limits) in enumerate(plottables):
-            if column_name not in df:
+            if column_name not in df2:
                 continue
-            y = df[column_name].to_numpy()
+            y = df2[column_name].to_numpy()
 
             # Time series scatter plots (left-hand panels)
             plt.subplot(len(plottables), 2, 1 + i * 2)
