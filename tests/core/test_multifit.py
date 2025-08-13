@@ -48,6 +48,7 @@ def generate_and_fit_fake_data(
             n_samples=100,
             df=None,
         ),
+        npulses=len(all_values),
     )
 
     # Set up MultiFit

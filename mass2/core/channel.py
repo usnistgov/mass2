@@ -44,6 +44,7 @@ class ChannelHeader:
 class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
+    npulses: int
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
@@ -317,6 +318,7 @@ class Channel:
         ch2 = Channel(
             df=df2,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
@@ -339,6 +341,7 @@ class Channel:
         return Channel(
             df=self.df,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=good_expr,
             df_history=self.df_history,
@@ -553,7 +556,7 @@ class Channel:
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = Channel(df, header=header, noise=noise_channel, transform_raw=transform_raw)
+        channel = Channel(df, header=header, npulses=ljh.npulses, noise=noise_channel, transform_raw=transform_raw)
         return channel
 
     @classmethod
@@ -574,7 +577,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header)
+        channel = cls(df, header, off.nPulses)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
@@ -595,6 +598,7 @@ class Channel:
         return Channel(
             df=df2,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=self.good_expr,
             df_history=self.df_history,
@@ -639,7 +643,7 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df) -> "Channel":
-        ch2 = Channel(pl.concat([self.df, df]), self.header, self.noise, self.good_expr)
+        ch2 = Channel(pl.concat([self.df, df]), self.header, self.npulses, self.noise, self.good_expr)
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
@@ -707,8 +711,7 @@ class Channel:
             use_expr = self.good_expr
 
         if downsample is None:
-            nrecs = len(self.df)
-            downsample = nrecs // 10000
+            downsample = self.npulses // 10000
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
@@ -747,7 +750,7 @@ class Channel:
             contents, _, _ = plt.hist(y[in_limit], 200, log=log, histtype="stepfilled", fc=color, alpha=0.5)
             if log:
                 plt.ylim(ymin=contents.min())
-        print(f"Plotting {len(y)} out of {len(self.df)} data points")
+        print(f"Plotting {len(y)} out of {self.npulses} data points")
 
 
 @dataclass(frozen=True)

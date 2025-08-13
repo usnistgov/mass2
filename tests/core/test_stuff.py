@@ -96,8 +96,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     # 250 pulses of length 504
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
-    noise_traces = rng.standard_normal((250, n))
-    pulse_traces = np.tile(signal, (250, 1)) + noise_traces
+    npulses = 250
+    noise_traces = rng.standard_normal((npulses, n))
+    pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
@@ -111,7 +112,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces})
-    ch = mass2.Channel(df, header, noise=noise_ch)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     ch = ch.filter5lag()
     step: mass2.Filter5LagStep = ch.steps[-1]
     assert isinstance(step, mass2.Filter5LagStep)

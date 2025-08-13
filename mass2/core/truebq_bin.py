@@ -121,7 +121,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
         return ch
 
     def to_channel_mmap(
@@ -157,7 +157,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
         return ch
 
     def to_summarized_channel(
@@ -217,7 +217,7 @@ class TriggerResult:
         # The following lines are broken August 8, 2025. Replace them with something non-broken.
         # pulse_storage = PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
         # ch = Channel(df, ch_header, noise, pulse_storage=pulse_storage)
-        return Channel(df, ch_header, noise)
+        return Channel(df, ch_header, npulses=len(df), noise=noise)
 
 
 @dataclass(frozen=True)

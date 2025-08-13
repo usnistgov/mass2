@@ -320,5 +320,6 @@ class Channels:
                     n_samples=n_samples,
                     df=df,
                 ),
+                npulses=len(df),
             )
         return Channels(channels, description)
