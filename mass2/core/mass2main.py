@@ -5,7 +5,6 @@ import numpy as np
 import scipy as sp
 import pylab as plt
 import polars as pl
-from typing import Optional
 import mass2
 
 """mass2main
@@ -14,7 +13,7 @@ import mass2
 """
 
 
-def load_ljh(directory: str, limit: Optional[int], exclude_ch_nums: Optional[int]) -> mass2.core.Channels:
+def load_ljh(directory: str, limit: int | None, exclude_ch_nums: int | None) -> mass2.core.Channels:
     data = mass2.core.Channels.from_ljh_folder(directory, limit=limit, exclude_ch_nums=exclude_ch_nums)
     return data
 

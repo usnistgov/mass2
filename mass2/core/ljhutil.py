@@ -5,7 +5,7 @@ import shutil
 import re
 import struct
 import numpy as np
-from typing import Union, Optional, BinaryIO
+from typing import BinaryIO
 from collections.abc import Iterator
 import pathlib
 from packaging.version import Version
@@ -127,7 +127,7 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nu
 
 
 def experiment_state_path_from_ljh_path(
-    ljh_path: Union[str, pathlib.Path],
+    ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
@@ -136,7 +136,7 @@ def experiment_state_path_from_ljh_path(
 
 
 def external_trigger_bin_path_from_ljh_path(
-    ljh_path: Union[str, pathlib.Path],
+    ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
@@ -144,7 +144,7 @@ def external_trigger_bin_path_from_ljh_path(
     return ljh_path.parent / new_file_name
 
 
-def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: Optional[list[int]] = None) -> list[str]:
+def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: list[int] | None = None) -> list[str]:
     """Sort filenames of the form '*_chanXXX.*', according to the numerical value of channel number XXX.
 
     Filenames are first sorted by the usual string comparisons, then by channel number. In this way,
@@ -193,7 +193,7 @@ def helper_write_pulse(dest: BinaryIO, src: LJHFile, i: int) -> None:
     trace.tofile(dest, sep="")
 
 
-def ljh_append_traces(src_name: str, dest_name: str, pulses: Optional[range] = None) -> None:
+def ljh_append_traces(src_name: str, dest_name: str, pulses: range | None = None) -> None:
     """Append traces from one LJH file onto another. The destination file is
     assumed to be version 2.2.0.
 
@@ -213,7 +213,7 @@ def ljh_append_traces(src_name: str, dest_name: str, pulses: Optional[range] = N
             helper_write_pulse(dest_fp, src, i)
 
 
-def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[int] = None, timestamp: Optional[float] = None) -> None:
+def ljh_truncate(input_filename: str, output_filename: str, n_pulses: int | None = None, timestamp: float | None = None) -> None:
     """Truncate an LJH file.
 
     Writes a new copy of an LJH file, with the same header but fewer raw data pulses.

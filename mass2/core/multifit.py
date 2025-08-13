@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 import lmfit
 import copy
 import math
@@ -63,7 +62,7 @@ class MultiFit:
     default_use_expr: bool = True
     default_params_update: dict = field(default_factory=lmfit.Parameters)
     fitspecs: list[FitSpec] = field(default_factory=list)
-    results: Optional[list] = None
+    results: list | None = None
 
     def with_line(self, line, dlo=None, dhi=None, bin_size=None, use_expr=None, params_update=None):
         model = mass2.getmodel(line)

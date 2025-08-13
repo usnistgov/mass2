@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -195,9 +194,9 @@ class Channels:
     def from_ljh_folder(
         cls,
         pulse_folder: str,
-        noise_folder: Optional[str] = None,
-        limit: Optional[int] = None,
-        exclude_ch_nums: Optional[list[int]] = None,
+        noise_folder: str | None = None,
+        limit: int | None = None,
+        exclude_ch_nums: list[int] | None = None,
     ):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if exclude_ch_nums is None:

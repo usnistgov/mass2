@@ -5,7 +5,7 @@ import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from typing import Optional, Callable
+from collections.abc import Callable
 import numpy as np
 import time
 
@@ -44,12 +44,12 @@ class ChannelHeader:
 class Channel:
     df: pl.DataFrame | pl.LazyFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
-    noise: Optional[NoiseChannel] = field(default=None, repr=False)
+    noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
     df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
-    transform_raw: Optional[Callable] = None
+    transform_raw: Callable | None = None
 
     def mo_stepplots(self):
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -100,29 +100,6 @@ class Channel:
         axis = misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
         axis.set_title(f"ch {self.header.ch_num} plot_hist")
         return axis
-
-    # def plot_hists(self, col, bin_edges, group_by_col, axis=None):
-    #     """
-    #     Plots histograms for the given column, grouped by the specified column.
-
-    #     Parameters:
-    #     - col (str): The column name to plot.
-    #     - bin_edges (array-like): The edges of the bins for the histogram.
-    #     - group_by_col (str): The column name to group by. This is required.
-    #     - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
-    #     """
-    #     if axis is None:
-    #         fig, ax = plt.subplots()  # Create a new figure if no axis is provided
-    #     else:
-    #         ax = axis
-    #     # Group by the specified column and filter using good_expr
-    #     df_grouped = (self.df.filter(self.good_expr)
-    #                 .group_by(group_by_col, maintain_order=True)
-    #                 .agg([pl.col(col).alias(col)])
-    #     )
-
-    #     # Collect the result to evaluate the lazy expression
-    #     df_grouped_collected = df_grouped.collect()
 
     def plot_hists(
         self,
@@ -311,7 +288,7 @@ class Channel:
         self,
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
-        calibrated_col: Optional[str] = None,
+        calibrated_col: str | None = None,
         use_expr: bool | pl.Expr = True,
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
@@ -568,7 +545,7 @@ class Channel:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Optional[Callable] = None) -> "Channel":
+    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Callable | None = None) -> "Channel":
         if noise_path is None:
             noise_channel = None
         else:

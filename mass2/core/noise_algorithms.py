@@ -4,7 +4,6 @@ import pylab as plt  # type: ignore
 import mass2
 from dataclasses import dataclass
 from numpy import ndarray
-from typing import Optional
 
 
 def calc_autocorrelation(data):
@@ -96,7 +95,7 @@ class NoisePSD:
 
     def plot(
         self,
-        axis: Optional[plt.axis] = None,
+        axis: plt.axis | None = None,
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
         loglog: bool = True,

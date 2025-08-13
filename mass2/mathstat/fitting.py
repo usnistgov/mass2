@@ -6,7 +6,6 @@ Model-fitting utilities.
 Joe Fowler, NIST
 """
 
-from typing import Optional
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import scipy as sp
@@ -80,7 +79,7 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     return model, abc, X2
 
 
-def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: Optional[tuple[float, float]] = None):
+def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | None = None):
     """Find the linear least-squares solution for a kinked-linear model.
 
     The model is f(x) = a+b(x-k) for x<k and f(x)=a+c(x-k) for x>=k, where

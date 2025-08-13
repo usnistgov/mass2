@@ -7,7 +7,6 @@ Tools for fitting and simulating X-ray fluorescence lines.
 
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
 import numpy.typing as npt
 from enum import Enum
 import importlib.resources as pkg_resources
@@ -377,7 +376,7 @@ class LineshapeReference:
     url: str
 
     @classmethod
-    def load(cls, filename: Optional[str] = None) -> dict:
+    def load(cls, filename: str | None = None) -> dict:
         references = {"unknown": LineshapeReference("unknown", "unknown", "")}
         if filename is None:
             filename = pkg_resources.files("mass2").joinpath("data", "fluorescence_line_references.yaml")

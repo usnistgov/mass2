@@ -9,7 +9,6 @@ from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult  # type: ignore
 import scipy as sp
 import typing
-from typing import Optional, Union
 import itertools
 
 import mass2
@@ -85,7 +84,7 @@ class BestAssignmentPfitGainResult:
     def ph_unassigned(self) -> ndarray:
         return np.array(list(set(self.ph_target) - set(self.ph_assigned)))
 
-    def plot(self, ax: Optional[Axes] = None):
+    def plot(self, ax: Axes | None = None):
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -106,7 +105,7 @@ class BestAssignmentPfitGainResult:
         # since our function is invalid outside that range
         return self.pfit_gain.roots()[1]
 
-    def ph2energy(self, ph: Union[ndarray, float]) -> Union[float64, ndarray]:
+    def ph2energy(self, ph: ndarray | float) -> float64 | ndarray:
         return ph / self.pfit_gain(ph)
 
     def energy2ph(self, energy):
@@ -197,10 +196,10 @@ class SmoothedLocalMaximaResult:
 
     def plot(
         self,
-        assignment_result: Optional[BestAssignmentPfitGainResult] = None,
+        assignment_result: BestAssignmentPfitGainResult | None = None,
         n_highlight: int = 10,
         plot_counts: bool = False,
-        ax: Optional[Axes] = None,
+        ax: Axes | None = None,
     ) -> Axes:
         if ax is None:
             plt.figure()
@@ -279,7 +278,7 @@ def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_num
 def hist_smoothed(
     pulse_heights: ndarray,
     fwhm_pulse_height_units: int,
-    bin_edges: Optional[ndarray] = None,
+    bin_edges: ndarray | None = None,
 ) -> tuple[ndarray, ndarray, ndarray]:
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
@@ -316,7 +315,7 @@ def local_maxima(y: ndarray) -> ndarray:
 def peakfind_local_maxima_of_smoothed_hist(
     pulse_heights: ndarray,
     fwhm_pulse_height_units: int,
-    bin_edges: Optional[ndarray] = None,
+    bin_edges: ndarray | None = None,
 ) -> SmoothedLocalMaximaResult:
     assert len(pulse_heights > 10), "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
@@ -691,14 +690,14 @@ class RoughCalibrationStep(CalStep):
         else:
             self.dbg_plot_failure(df, axs)
 
-    def dbg_plot_success(self, df: DataFrame, axs: Union[None, ndarray] = None):
+    def dbg_plot_success(self, df: DataFrame, axs: None | ndarray = None):
         if axs is None:
             _, axs = plt.subplots(2, 1, figsize=(11, 6))
         self.assignment_result.plot(ax=axs[0])
         self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
-    def dbg_plot_failure(self, df: DataFrame, axs: Union[None, ndarray] = None):
+    def dbg_plot_failure(self, df: DataFrame, axs: None | ndarray = None):
         if axs is None:
             _, axs = plt.subplots(2, 1, figsize=(11, 6))
         self.pfresult.plot(self.assignment_result, ax=axs[1])
@@ -779,7 +778,7 @@ class RoughCalibrationStep(CalStep):
         ch: Channel,
         line_names: list[str | float64],
         uncalibrated_col: str = "filtValue",
-        calibrated_col: Optional[str] = None,
+        calibrated_col: str | None = None,
         use_expr: bool | pl.Expr = True,
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,

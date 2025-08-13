@@ -34,11 +34,10 @@ Rewritten with Numba Jan 23, 2025
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from typing import Optional
 from numba import njit
 
 
-def bisquare_weighted_mean(x: ArrayLike, k: float, center: Optional[float] = None, tol: Optional[float] = None) -> float:
+def bisquare_weighted_mean(x: ArrayLike, k: float, center: float | None = None, tol: float | None = None) -> float:
     """The bisquare weighted mean of the data <x> with a k-value of <k>.
 
     Args:
@@ -79,7 +78,7 @@ def bisquare_weighted_mean(x: ArrayLike, k: float, center: Optional[float] = Non
     )
 
 
-def huber_weighted_mean(x: ArrayLike, k: float, center: Optional[float] = None, tol: Optional[float] = None) -> float:
+def huber_weighted_mean(x: ArrayLike, k: float, center: float | None = None, tol: float | None = None) -> float:
     """Huber's weighted mean of the data <x> with a k-value of <k>.
 
     Args:
@@ -232,7 +231,7 @@ _Statistica Neerlandica_, 42(2), 103–116. https://doi.org/10.1111/j.1467-9574.
 """
 
 
-def high_median(x: ArrayLike, weights: Optional[ArrayLike] = None, return_index: bool = False) -> float | tuple[float, int]:
+def high_median(x: ArrayLike, weights: ArrayLike | None = None, return_index: bool = False) -> float | tuple[float, int]:
     """Compute the weighted high median of data set x with weights <weights>.
 
     Returns:

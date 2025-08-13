@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Callable
+from collections.abc import Callable
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -49,7 +49,7 @@ class SummarizeStep(CalStep):
     pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
-    transform_raw: Optional[Callable] = None
+    transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []
