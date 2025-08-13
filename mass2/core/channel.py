@@ -677,6 +677,78 @@ class Channel:
         misc.pickle_object(steps, filename)
         return steps
 
+    def plot_summaries(self, use_expr: pl.Expr | None = None, downsample: int | None = None, log: bool = False) -> None:
+        """Plot a summary of the data set, including time series and histograms of key pulse properties.
+
+        Parameters
+        ----------
+        use_expr : pl.Expr | None, optional
+            A polars expression to determine valid pulses, by default None. If None, use `self.good_expr`
+        downsample : int | None, optional
+            Plot only every one of `downsample` pulses in the scatter plots, by default None.
+            If None, choose the smallest value so that no more than 10000 points appear
+        log : bool, optional
+            Whether to make the histograms have a logarithmic y-scale, by default False.
+        """
+        plt.figure()
+        tpi_microsec = (self.typical_peak_ind() - self.header.n_presamples) * (1e6 * self.header.frametime_s)
+        plottables = (
+            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
+            ("pulse_average", "Pulse Avg", "purple", None),
+            ("peak_value", "Peak value", "blue", None),
+            ("pretrig_rms", "Pretrig RMS", "green", [0, 4000]),
+            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
+            ("postpeak_deriv", "Max PostPk deriv", "gold", [0, 200]),
+            ("rise_time_µs", "Rise time (µs)", "orange", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
+            ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
+        )
+
+        if use_expr is None:
+            use_expr = self.good_expr
+
+        if downsample is None:
+            nrecs = len(self.df)
+            downsample = nrecs // 10000
+        downsample = max(downsample, 1)
+
+        df = self.df.lazy().gather_every(downsample)
+        df = df.with_columns(
+            ((pl.col("peak_index") - self.header.n_presamples) * (1e6 * self.header.frametime_s)).alias("peak_time_µs")
+        )
+        df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
+        existing_columns = df.collect_schema().names()
+        preserve = [p[0] for p in plottables if p[0] in existing_columns]
+        preserve.append("timestamp")
+        df = df.filter(use_expr).select(preserve).collect()
+
+        # Plot timeseries relative to 0 = the last 00 UT during or before the run.
+        timestamp = df["timestamp"].to_numpy()
+        last_midnight = timestamp[-1].astype("datetime64[D]")
+        hour_rel = (timestamp - last_midnight).astype(float) / 3600e6
+
+        for i, (column_name, label, color, limits) in enumerate(plottables):
+            if column_name not in df:
+                continue
+            y = df[column_name].to_numpy()
+
+            # Time series scatter plots (left-hand panels)
+            plt.subplot(len(plottables), 2, 1 + i * 2)
+            plt.ylabel(label)
+            plt.plot(hour_rel, y, ".", ms=1, color=color)
+            if i == len(plottables) - 1:
+                plt.xlabel("Time since last UT midnight (hours)")
+
+            # Histogram (right-hand panels)
+            plt.subplot(len(plottables), 2, 2 + i * 2)
+            if limits is None:
+                in_limit = np.ones(len(y), dtype=bool)
+            else:
+                in_limit = np.logical_and(y[:] > limits[0], y[:] < limits[1])
+            contents, _, _ = plt.hist(y[in_limit], 200, log=log, histtype="stepfilled", fc=color, alpha=0.5)
+            if log:
+                plt.ylim(ymin=contents.min())
+        print(f"Plotting {len(y)} out of {len(self.df)} data points")
+
 
 @dataclass(frozen=True)
 class BadChannel:
