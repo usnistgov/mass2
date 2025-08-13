@@ -6,7 +6,6 @@ import re
 import struct
 import numpy as np
 from typing import BinaryIO
-from collections.abc import Iterator
 import pathlib
 from packaging.version import Version
 
@@ -83,7 +82,7 @@ def extract_channel_number(file_path: str) -> int:
         raise ValueError(f"File path does not match expected pattern: {file_path}")
 
 
-def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nums=[]) -> list[Iterator[tuple[str, str]]]:
+def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nums=[]) -> list[tuple[str, str]]:
     """
     Matches .ljh files from two folders by channel number.
 

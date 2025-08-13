@@ -95,7 +95,7 @@ class NoisePSD:
 
     def plot(
         self,
-        axis: plt.axis | None = None,
+        axis: plt.Axes | None = None,
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
         loglog: bool = True,
