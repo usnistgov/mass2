@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from collections.abc import Callable
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -51,7 +52,7 @@ class Channels:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass2.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
+        model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
@@ -121,7 +122,7 @@ class Channels:
 
         plt.tight_layout()
 
-    def map(self, f, allow_throw=False):
+    def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         new_channels = {}
         new_bad_channels = {}
         for key, channel in self.channels.items():
@@ -200,12 +201,12 @@ class Channels:
     ):
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         if exclude_ch_nums is None:
-            exclude_ch_nums: list[int] = []
+            exclude_ch_nums = []
         if noise_folder is None:
             paths = mass2.ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
             if limit is not None:
                 paths = paths[:limit]
-            pairs = [(path, None) for path in paths]
+            pairs = [(path, "") for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             pairs = mass2.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)

@@ -46,7 +46,7 @@ class Test_SmoothingSpline:
         # At time of issue #74, this crashed on next line for Joe, but not for Galen.
         mass2.mathstat.interpolate.SmoothingSplineLog(ph, e, de, dph)
 
-        cal = mass2.EnergyCalibrationMaker.init(e**0.8, e, dph, de)
+        cal = mass2.calibration.EnergyCalibrationMaker.init(e**0.8, e, dph, de)
         # At time of issue #74, this crashed on next line for Galen, but not for Joe.
         cal.drop_one_errors()
 

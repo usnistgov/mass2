@@ -6,6 +6,7 @@ from pytest import approx
 import numpy as np
 import mass2
 from mass2.calibration.algorithms import find_opt_assignment, find_local_maxima, build_fit_ranges, build_fit_ranges_ph, multifit
+from mass2.calibration.energy_calibration import EnergyCalibrationMaker
 import itertools
 
 rng = np.random.default_rng(2)
@@ -39,7 +40,7 @@ def test_find_local_maxima():
 
 def test_build_fit_ranges():
     known_energies = np.array([1000, 2000, 2050, 3000])
-    factory = mass2.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
+    factory = EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
     cal1 = factory.make_calibration(approximate=False)
 
     # this call asks for fit ranges at each known energy, and asks to avoid the line at 3050,
@@ -63,7 +64,7 @@ def test_build_fit_ranges():
 
 def test_build_fit_ranges_ph():
     known_energies = np.array([1000, 2000, 2050, 3000])
-    factory = mass2.EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
+    factory = EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
     cal1 = factory.make_calibration(approximate=False)
 
     # this call asks for fit ranges at each known energy, and asks to avoid the line at 3050,
@@ -106,7 +107,7 @@ def test_complete():
     energies_opt = np.asanyarray(energies_opt)
 
     z = np.zeros_like(energies_opt)
-    factory = mass2.EnergyCalibrationMaker(ph_opt, energies_opt, z, z, line_names)
+    factory = EnergyCalibrationMaker(ph_opt, energies_opt, z, z, line_names)
     approxcal = factory.make_calibration(approximate=False)
 
     _energies, fit_lo_hi, slopes_de_dph = build_fit_ranges_ph(energies_opt, [], approxcal, 100)

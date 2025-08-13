@@ -507,7 +507,7 @@ class Channel:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass2.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
+        model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
@@ -546,7 +546,7 @@ class Channel:
 
     @classmethod
     def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Callable | None = None) -> "Channel":
-        if noise_path is None:
+        if not noise_path:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)

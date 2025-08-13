@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 import os
 import mass2
-from mass2 import EnergyCalibrationMaker, Curvetypes
+from mass2.calibration import EnergyCalibrationMaker, Curvetypes
 
 
 def basic_nonlinearity(e: np.ndarray) -> np.ndarray:
@@ -232,7 +232,7 @@ class TestJoeStyleEnergyCalibration:
             with h5py.File(fname, "w") as h5:
                 grp = h5.require_group("calibration")
                 cal1.save_to_hdf5(grp, "cal1")
-                cal2 = mass2.EnergyCalibration.load_from_hdf5(grp, "cal1")
+                cal2 = mass2.calibration.EnergyCalibration.load_from_hdf5(grp, "cal1")
                 assert len(grp.keys()) == 1
             assert all(cal1.ph == cal2.ph)
             assert all(cal2.energy == cal2.energy)
@@ -312,7 +312,7 @@ class TestJoeStyleEnergyCalibration:
             1.74482802,
         ])
         de = np.array([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01])
-        factory = mass2.EnergyCalibrationMaker.init(ph, e, dph, de)
+        factory = mass2.calibration.EnergyCalibrationMaker.init(ph, e, dph, de)
         cal = factory.make_calibration(curvename=Curvetypes.GAIN, approximate=True)
         assert (np.abs(cal(ph) - e) < 0.9 * dph).all()
 
@@ -330,8 +330,8 @@ class TestJoeStyleEnergyCalibration:
         ph1 = e * 10 / (1 + e / 2500)
         ph2 = ph1.copy()
         ph2[5] *= (ph2[5] / ph2[4]) ** (-0.85)
-        factory1 = mass2.EnergyCalibrationMaker(ph1, e, ph1 * 1e-4, np.zeros_like(e), names)
-        factory2 = mass2.EnergyCalibrationMaker(ph2, e, ph2 * 1e-4, np.zeros_like(e), names)
+        factory1 = mass2.calibration.EnergyCalibrationMaker(ph1, e, ph1 * 1e-4, np.zeros_like(e), names)
+        factory2 = mass2.calibration.EnergyCalibrationMaker(ph2, e, ph2 * 1e-4, np.zeros_like(e), names)
         cal1 = factory1.make_calibration(Curvetypes.GAIN)
         cal2 = factory2.make_calibration(Curvetypes.GAIN)
         assert cal1.ismonotonic
