@@ -279,9 +279,11 @@ def main_ljh_truncate() -> None:
 
     filenames = filename_glob_expand(pattern)
     for in_fname in filenames:
-        ch = re.search(r"chan(\d+)\.ljh", in_fname).groups()[0]
-        out_fname = f"{args.pattern}_{args.out}_chan{ch}.ljh"
-        ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
+        matches = re.search(r"chan(\d+)\.ljh", in_fname)
+        if matches:
+            ch = matches.groups()[0]
+            out_fname = f"{args.pattern}_{args.out}_chan{ch}.ljh"
+            ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
 
 
 def ljh_merge(out_path: str, filenames: list[str], overwrite: bool):
@@ -349,8 +351,8 @@ def main_ljh_merge() -> None:
         if args.dry_run:
             return
 
-    f = LJHFile.open(filenames[0])
-    channum = f.channum
+    ljh = LJHFile.open(filenames[0])
+    channum = ljh.channum
 
     out_dir = args.outdir
     if not out_dir:

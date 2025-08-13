@@ -304,7 +304,7 @@ class LJHFile:
             "posix_usec": self._mmap["posix_usec"][first_pulse:],
             "subframecount": self._mmap["subframecount"][first_pulse:],
         }
-        schema = {
+        schema: pl._typing.SchemaDict = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
             "subframecount": pl.UInt64,
@@ -328,7 +328,7 @@ class LJHFile:
         """
         npulses = max(npulses, self.npulses)
         with open(filename, "wb") as f:
-            f.write(self.header_string)
+            f.write(self.header_string.encode("utf-8"))
             f.write(self._mmap[:npulses].tobytes())
 
     @property

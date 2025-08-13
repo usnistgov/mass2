@@ -778,7 +778,7 @@ class RoughCalibrationStep(CalStep):
     def learn_3peak(  # noqa: PLR0917 PLR0914,
         cls,
         ch: Channel,
-        line_names: list[str | float64],
+        line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
         use_expr: bool | pl.Expr = True,

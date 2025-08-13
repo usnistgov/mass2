@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from functools import cached_property
 import numpy.typing as npt
 from enum import Enum
+import pathlib
 import importlib.resources as pkg_resources
 
 import numpy as np
@@ -79,7 +80,7 @@ class AmplitudeType(Enum):
     VOIGT_PEAK_HEIGHT = "Peak height of Voigts"
 
 
-spectra = {}
+spectra: dict[str, "SpectralLine"] = {}
 
 
 @dataclass(frozen=True)
@@ -376,10 +377,10 @@ class LineshapeReference:
     url: str
 
     @classmethod
-    def load(cls, filename: str | None = None) -> dict:
+    def load(cls, filename: pathlib.Path | str | None = None) -> dict:
         references = {"unknown": LineshapeReference("unknown", "unknown", "")}
         if filename is None:
-            filename = pkg_resources.files("mass2").joinpath("data", "fluorescence_line_references.yaml")
+            filename = str(pkg_resources.files("mass2") / "data" / "fluorescence_line_references.yaml")
         with open(filename, "r", encoding="utf-8") as file:
             d = yaml.safe_load(file)
             for item in d:

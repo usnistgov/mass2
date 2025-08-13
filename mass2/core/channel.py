@@ -369,7 +369,7 @@ class Channel:
             peak_index = self.typical_peak_ind(col)
         step = SummarizeStep(
             inputs=[col],
-            output="many",
+            output=["many"],
             good_expr=self.good_expr,
             use_expr=True,
             frametime_s=self.header.frametime_s,
@@ -410,6 +410,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
+        assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter5lag = FilterMaker.create_5lag(
             avg_signal=avg_pulse,

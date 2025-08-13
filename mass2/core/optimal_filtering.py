@@ -293,7 +293,7 @@ class Filter(ABC):
         axis.set_title(f"{self._filter_type=} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Lag Time (s)")
-        axis.figure.tight_layout()
+        plt.gcf().tight_layout()
 
     def report(self, std_energy: float = 5898.8):
         """Report on estimated V/dV for the filter.
@@ -551,6 +551,7 @@ class FilterMaker:
         Filter
             A 5-lag optimal filter.
         """
+        avg_signal = np.asarray(avg_signal)
         peak_signal = np.amax(avg_signal) - avg_signal[0]
         maker = cls(
             avg_signal,

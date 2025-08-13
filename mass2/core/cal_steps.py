@@ -18,7 +18,8 @@ class CalStep:
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        return self
+        # TODO: should this be an abstract method?
+        return df.filter(self.good_expr)
 
 
 @dataclass(frozen=True)

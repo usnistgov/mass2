@@ -18,7 +18,7 @@ result_dtype = np.dtype([
 ])
 
 # Create a type alias for the structured array
-ResultArrayType = NDArray[result_dtype]
+ResultArrayType = NDArray
 
 
 @njit
