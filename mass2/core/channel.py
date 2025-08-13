@@ -622,7 +622,7 @@ class Channel:
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
-        step = mass2.phase_correct.phase_correct_mass_specific_lines(
+        step = mass2.core.phase_correct_steps.phase_correct_mass_specific_lines(
             self,
             indicator_col,
             uncorrected_col,

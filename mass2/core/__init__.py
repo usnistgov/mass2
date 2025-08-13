@@ -33,7 +33,7 @@ from .channel import Channel, ChannelHeader, BadChannel
 from .truebq_bin import TrueBqBin
 from .channels import Channels
 from .rough_cal import RoughCalibrationStep
-from . import moss_phase_correct
+from . import phase_correct_steps
 
 __all__ = [
     "analysis_algorithms",
@@ -73,5 +73,5 @@ __all__ = [
     "TrueBqBin",
     "Channels",
     "RoughCalibrationStep",
-    "moss_phase_correct",
+    "phase_correct_steps",
 ]
