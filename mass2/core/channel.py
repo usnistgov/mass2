@@ -26,7 +26,7 @@ class ChannelHeader:
     frametime_s: float
     n_presamples: int
     n_samples: int
-    df: pl.DataFrame | pl.LazyFrame = field(repr=False)
+    df: pl.DataFrame = field(repr=False)
 
     @classmethod
     def from_ljh_header_df(cls, df):
@@ -42,11 +42,11 @@ class ChannelHeader:
 
 @dataclass(frozen=True)  # noqa: PLR0904
 class Channel:
-    df: pl.DataFrame | pl.LazyFrame = field(repr=False)
+    df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
-    df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
+    df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
