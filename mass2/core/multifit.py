@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Optional
 import lmfit
 import copy
 import math
@@ -7,6 +6,7 @@ import numpy as np
 import polars as pl
 import pylab as plt
 
+from mass2.calibration.algorithms import get_model
 from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
 from mass2.calibration.line_models import GenericLineModel
 from mass2.core.cal_steps import CalStep
@@ -63,10 +63,10 @@ class MultiFit:
     default_use_expr: bool = True
     default_params_update: dict = field(default_factory=lmfit.Parameters)
     fitspecs: list[FitSpec] = field(default_factory=list)
-    results: Optional[list] = None
+    results: list | None = None
 
     def with_line(self, line, dlo=None, dhi=None, bin_size=None, use_expr=None, params_update=None):
-        model = mass2.getmodel(line)
+        model = get_model(line)
         peak_energy = model.spect.peak_energy
         dlo = handle_none(dlo, self.default_fit_width / 2)
         dhi = handle_none(dhi, self.default_fit_width / 2)

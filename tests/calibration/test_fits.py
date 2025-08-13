@@ -8,6 +8,7 @@ import pytest
 from pytest import approx
 import numpy as np
 import mass2
+from mass2.calibration.fluorescence_lines import AmplitudeType
 
 # ruff: noqa: PLR0917
 
@@ -415,7 +416,7 @@ def test_MnKA_narrowbins():
 def test_integral_parameter():
     """See issue 202: parameter 'integral' should be the total number of counts.
     See also issue 204: parameter 'integral' should scale inversely with a QE model."""
-    line = mass2.MnKAlpha
+    line = mass2.spectra["MnKAlpha"]
     bgperev = 50
     Nsignal = 10000
     rng = np.random.default_rng(3038)
@@ -470,7 +471,7 @@ class Test_Composites_lmfit:
                 energies=np.array([653.493657]),
                 lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass2.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                reference_amplitude_type=AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
                 ka12_energy_diff=None,
             )
         if "dummy2" not in mass2.spectra.keys():
@@ -484,7 +485,7 @@ class Test_Composites_lmfit:
                 energies=np.array([653.679946]),
                 lorentzian_fwhm=np.array([0.1]),
                 reference_amplitude=np.array([1]),
-                reference_amplitude_type=mass2.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                reference_amplitude_type=AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
                 ka12_energy_diff=None,
             )
         rng = np.random.default_rng(131)
@@ -679,7 +680,7 @@ def test_issue_125():
         81,
         59,
     ])
-    line = mass2.MnKAlpha
+    line = mass2.spectra["MnKAlpha"]
     model = line.model()
     params = model.guess(contents, bin_centers=e, dph_de=1)
     params["fwhm"].set(20)
@@ -706,7 +707,7 @@ def test_tail_tau_behaves_same_vs_energy_scale():
 
     def get_spectrum_with_tail(escale):
         peak_ph = 6000 * escale
-        model = mass2.get_model(peak_ph, has_tails=True)
+        model = mass2.calibration.get_model(peak_ph, has_tails=True)
         params = model.make_params()
         params["fwhm"].set(2 * escale)
         params["tail_tau"].set(30 * escale)
@@ -845,7 +846,7 @@ def test_a_fit_that_was_failing_with_too_small_a_fwhm():
         4393.03401847,
         4393.94266137,
     ])
-    model = mass2.get_model(49127.24)
+    model = mass2.calibration.get_model(49127.24)
     dph_de_guess = np.mean(bin_centers) / model.spect.nominal_peak_energy
     params = model.guess(counts, bin_centers=bin_centers, dph_de=dph_de_guess)
     params["dph_de"].set(0.09086, vary=False)

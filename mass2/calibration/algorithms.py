@@ -162,16 +162,16 @@ class FailedToGetModelException(Exception):
 
 
 def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
-    if isinstance(lineNameOrEnergy, mass2.GenericLineModel):
+    if isinstance(lineNameOrEnergy, mass2.calibration.GenericLineModel):
         line = lineNameOrEnergy.spect
-    elif isinstance(lineNameOrEnergy, mass2.SpectralLine):
+    elif isinstance(lineNameOrEnergy, mass2.calibration.SpectralLine):
         line = lineNameOrEnergy
     elif isinstance(lineNameOrEnergy, str):
         if lineNameOrEnergy in mass2.spectra:
             line = mass2.spectra[lineNameOrEnergy]
         elif lineNameOrEnergy in mass2.STANDARD_FEATURES:
             energy = mass2.STANDARD_FEATURES[lineNameOrEnergy]
-            line = mass2.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
+            line = mass2.calibration.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
         else:
             raise FailedToGetModelException(f"failed to get line from lineNameOrEnergy={lineNameOrEnergy}")
     else:
@@ -182,12 +182,8 @@ def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
                 f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable"
                 " to float or a str in mass2.spectra or mass2.STANDARD_FEATURES"
             )
-        line = mass2.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
+        line = mass2.calibration.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
     return line.model(has_linear_background=has_linear_background, has_tails=has_tails)
-
-
-# support both names as they were both used historically
-getmodel = get_model
 
 
 def multifit(ph, line_names, fit_lo_hi, binsize_ev, slopes_de_dph, hide_deprecation=False):
@@ -223,7 +219,7 @@ def singlefit(ph, name, lo, hi, binsize_ph, approx_dP_dE):
         raise Exception("too damn many bins, dont like running out of memory")
     counts, bin_edges = np.histogram(ph, np.arange(lo, hi, binsize_ph))
     e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
-    model = getmodel(name)
+    model = get_model(name)
     guess_params = model.guess(counts, bin_centers=e, dph_de=approx_dP_dE)
     if "Gaussian" not in model.name:
         guess_params["dph_de"].set(approx_dP_dE, vary=False)

@@ -27,6 +27,7 @@ dependencies = [
     "polars",
     "progress",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
+    "pyqt5",
     "pyyaml",
     "scikit-learn",
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+

@@ -94,8 +94,8 @@ class FilterStack:
 @dataclass(frozen=True)
 class Filter:
     name: str
-    material: NDArray[str]
-    atomic_number: NDArray[int]
+    material: NDArray
+    atomic_number: NDArray
     density_g_per_cm3: NDArray[np.float64]
     thickness_cm: NDArray[np.float64]
     fill_fraction: ufloat = 1.0

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Callable
+from collections.abc import Callable
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -10,15 +10,16 @@ from . import pulse_algorithms
 class CalStep:
     inputs: list[str]
     output: list[str]
-    good_expr: pl.Expr
-    use_expr: pl.Expr
+    good_expr: bool | pl.Expr
+    use_expr: bool | pl.Expr
 
     @property
     def description(self):
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        return self
+        # TODO: should this be an abstract method?
+        return df.filter(self.good_expr)
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class SummarizeStep(CalStep):
     pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
-    transform_raw: Optional[Callable] = None
+    transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []

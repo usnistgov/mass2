@@ -7,7 +7,6 @@ import matplotlib.pylab as plt
 from numba import njit
 
 import numpy.typing as npt
-from typing import Optional
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -187,7 +186,7 @@ class ToeplitzWhitener:
         return np.linalg.solve(MA, AR)
 
 
-def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: Optional[float], f_3db: Optional[float]):
+def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: float | None, f_3db: float | None):
     """Band-limit the column-vectors in a model matrix with a hard and/or
     1-pole low-pass filter. Change the input `modelmatrix` in-place.
 
@@ -257,13 +256,13 @@ class Filter(ABC):
     nominal_peak: float
     variance: float
     predicted_v_over_dv: float
-    dt_values: Optional[np.ndarray]
-    const_values: Optional[np.ndarray]
-    signal_model: Optional[np.ndarray]
-    dt_model: Optional[np.ndarray]
+    dt_values: np.ndarray | None
+    const_values: np.ndarray | None
+    signal_model: np.ndarray | None
+    dt_model: np.ndarray | None
     convolution_lags: int = 1
-    fmax: Optional[float] = None
-    f_3db: Optional[float] = None
+    fmax: float | None = None
+    f_3db: float | None = None
     cut_pre: int = 0
     cut_post: int = 0
 
@@ -278,7 +277,7 @@ class Filter(ABC):
     def _filter_type(self):
         return "illegal: this is supposed to be an abstract base class"
 
-    def plot(self, axis: Optional[plt.Axes] = None, **kwargs):
+    def plot(self, axis: plt.Axes | None = None, **kwargs):
         """Make a plot of the filter
 
         Parameters
@@ -294,7 +293,7 @@ class Filter(ABC):
         axis.set_title(f"{self._filter_type=} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Lag Time (s)")
-        axis.figure.tight_layout()
+        plt.gcf().tight_layout()
 
     def report(self, std_energy: float = 5898.8):
         """Report on estimated V/dV for the filter.
@@ -509,10 +508,10 @@ class FilterMaker:
 
     signal_model: npt.ArrayLike
     n_pretrigger: int
-    noise_autocorr: Optional[npt.ArrayLike] = None
-    noise_psd: Optional[npt.ArrayLike] = None
-    dt_model: Optional[npt.ArrayLike] = None
-    whitener: Optional[ToeplitzWhitener] = None
+    noise_autocorr: npt.ArrayLike | None = None
+    noise_psd: npt.ArrayLike | None = None
+    dt_model: npt.ArrayLike | None = None
+    whitener: ToeplitzWhitener | None = None
     sample_time_sec: float = 0.0
     peak: float = 0.0
 
@@ -524,8 +523,8 @@ class FilterMaker:
         noise_psd: npt.ArrayLike,
         noise_autocorr_vec: npt.ArrayLike,
         dt: float,
-        fmax: Optional[float] = None,
-        f_3db: Optional[float] = None,
+        fmax: float | None = None,
+        f_3db: float | None = None,
     ):
         """create_5lag creates a 5-lag filter directly, first creating, then using and deleting a `FilterMaker`.
 
@@ -552,6 +551,7 @@ class FilterMaker:
         Filter
             A 5-lag optimal filter.
         """
+        avg_signal = np.asarray(avg_signal)
         peak_signal = np.amax(avg_signal) - avg_signal[0]
         maker = cls(
             avg_signal,
@@ -563,7 +563,7 @@ class FilterMaker:
         )
         return maker.compute_5lag(fmax=fmax, f_3db=f_3db)
 
-    def compute_5lag(self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
+    def compute_5lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
         """Compute a single filter, with optional low-pass filtering, and with optional zero
         weights at the pre-trigger or post-trigger end of the filter.
 
@@ -626,9 +626,7 @@ class FilterMaker:
             filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
         )
 
-    def compute_fourier(
-        self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0
-    ) -> Filter:
+    def compute_fourier(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
         """Compute a single Fourier-domain filter, with optional low-pass filtering, and with optional
         zero weights at the pre-trigger or post-trigger end of the filter. Fourier domain calculation
         implicitly assumes periodic boundary conditions.
@@ -727,7 +725,7 @@ class FilterMaker:
             cut_post,
         )
 
-    def compute_ats(self, fmax: Optional[float] = None, f_3db: Optional[float] = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:  # noqa: PLR0914
+    def compute_ats(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:  # noqa: PLR0914
         """Compute a single "arrival-time-safe" filter, with optional low-pass filtering,
         and with optional zero weights at the pre-trigger or post-trigger end of the filter.
 

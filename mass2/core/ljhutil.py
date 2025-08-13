@@ -5,8 +5,7 @@ import shutil
 import re
 import struct
 import numpy as np
-from typing import Union, Optional, BinaryIO
-from collections.abc import Iterator
+from typing import BinaryIO
 import pathlib
 from packaging.version import Version
 
@@ -83,7 +82,7 @@ def extract_channel_number(file_path: str) -> int:
         raise ValueError(f"File path does not match expected pattern: {file_path}")
 
 
-def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nums=[]) -> list[Iterator[tuple[str, str]]]:
+def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nums=[]) -> list[tuple[str, str]]:
     """
     Matches .ljh files from two folders by channel number.
 
@@ -127,7 +126,7 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nu
 
 
 def experiment_state_path_from_ljh_path(
-    ljh_path: Union[str, pathlib.Path],
+    ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
@@ -136,7 +135,7 @@ def experiment_state_path_from_ljh_path(
 
 
 def external_trigger_bin_path_from_ljh_path(
-    ljh_path: Union[str, pathlib.Path],
+    ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
@@ -144,7 +143,7 @@ def external_trigger_bin_path_from_ljh_path(
     return ljh_path.parent / new_file_name
 
 
-def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: Optional[list[int]] = None) -> list[str]:
+def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: list[int] | None = None) -> list[str]:
     """Sort filenames of the form '*_chanXXX.*', according to the numerical value of channel number XXX.
 
     Filenames are first sorted by the usual string comparisons, then by channel number. In this way,
@@ -193,7 +192,7 @@ def helper_write_pulse(dest: BinaryIO, src: LJHFile, i: int) -> None:
     trace.tofile(dest, sep="")
 
 
-def ljh_append_traces(src_name: str, dest_name: str, pulses: Optional[range] = None) -> None:
+def ljh_append_traces(src_name: str, dest_name: str, pulses: range | None = None) -> None:
     """Append traces from one LJH file onto another. The destination file is
     assumed to be version 2.2.0.
 
@@ -213,7 +212,7 @@ def ljh_append_traces(src_name: str, dest_name: str, pulses: Optional[range] = N
             helper_write_pulse(dest_fp, src, i)
 
 
-def ljh_truncate(input_filename: str, output_filename: str, n_pulses: Optional[int] = None, timestamp: Optional[float] = None) -> None:
+def ljh_truncate(input_filename: str, output_filename: str, n_pulses: int | None = None, timestamp: float | None = None) -> None:
     """Truncate an LJH file.
 
     Writes a new copy of an LJH file, with the same header but fewer raw data pulses.
@@ -280,9 +279,11 @@ def main_ljh_truncate() -> None:
 
     filenames = filename_glob_expand(pattern)
     for in_fname in filenames:
-        ch = re.search(r"chan(\d+)\.ljh", in_fname).groups()[0]
-        out_fname = f"{args.pattern}_{args.out}_chan{ch}.ljh"
-        ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
+        matches = re.search(r"chan(\d+)\.ljh", in_fname)
+        if matches:
+            ch = matches.groups()[0]
+            out_fname = f"{args.pattern}_{args.out}_chan{ch}.ljh"
+            ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
 
 
 def ljh_merge(out_path: str, filenames: list[str], overwrite: bool):
@@ -350,8 +351,8 @@ def main_ljh_merge() -> None:
         if args.dry_run:
             return
 
-    f = LJHFile.open(filenames[0])
-    channum = f.channum
+    ljh = LJHFile.open(filenames[0])
+    channum = ljh.channum
 
     out_dir = args.outdir
     if not out_dir:

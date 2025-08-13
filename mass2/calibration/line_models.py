@@ -262,9 +262,17 @@ class GenericLineModel(MLEModel):
         self.spect = spect
         self._has_tails = has_tails
         self._has_linear_background = has_linear_background
+
+        param_names = ["fwhm", "peak_ph", "dph_de", "integral"]
+        if self._has_linear_background:
+            param_names += ["background", "bg_slope"]
+        if self._has_tails:
+            param_names += ["tail_frac", "tail_tau", "tail_share_hi", "tail_tau_hi"]
+        kwargs.update({"prefix": prefix, "nan_policy": nan_policy, "independent_vars": independent_vars, "param_names": param_names})
+
         if has_tails:
 
-            def modelfunc(  # noqa: PLR0917
+            def modelfunctails(  # noqa: PLR0917
                 bin_centers,
                 fwhm,
                 peak_ph,
@@ -298,6 +306,8 @@ class GenericLineModel(MLEModel):
                     return r
                 return r * qemodel(energy)
 
+            super().__init__(modelfunctails, **kwargs)
+
         else:
 
             def modelfunc(bin_centers, fwhm, peak_ph, dph_de, integral, background=0, bg_slope=0):
@@ -313,13 +323,8 @@ class GenericLineModel(MLEModel):
                     return r
                 return r * qemodel(energy)
 
-        param_names = ["fwhm", "peak_ph", "dph_de", "integral"]
-        if self._has_linear_background:
-            param_names += ["background", "bg_slope"]
-        if self._has_tails:
-            param_names += ["tail_frac", "tail_tau", "tail_share_hi", "tail_tau_hi"]
-        kwargs.update({"prefix": prefix, "nan_policy": nan_policy, "independent_vars": independent_vars, "param_names": param_names})
-        super().__init__(modelfunc, **kwargs)
+            super().__init__(modelfunc, **kwargs)
+
         self._set_paramhints_prefix()
 
     def _set_paramhints_prefix(self):

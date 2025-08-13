@@ -12,6 +12,7 @@ import pytest
 from pytest import approx
 import numpy as np
 import mass2
+from mass2.calibration.fluorescence_lines import AmplitudeType
 import pylab as plt
 
 
@@ -89,7 +90,7 @@ class TestAddFitter:
                 lorentzian_fwhm=np.array([0.1, 0.1]),
                 allow_replacement=replace,
                 reference_amplitude=np.array([1, 2]),
-                reference_amplitude_type=mass2.AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
+                reference_amplitude_type=AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
                 ka12_energy_diff=None,
             )
 

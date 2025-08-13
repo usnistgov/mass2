@@ -5,7 +5,7 @@ import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from typing import Optional, Callable
+from collections.abc import Callable
 import numpy as np
 import time
 
@@ -26,7 +26,7 @@ class ChannelHeader:
     frametime_s: float
     n_presamples: int
     n_samples: int
-    df: pl.DataFrame | pl.LazyFrame = field(repr=False)
+    df: pl.DataFrame = field(repr=False)
 
     @classmethod
     def from_ljh_header_df(cls, df):
@@ -42,14 +42,15 @@ class ChannelHeader:
 
 @dataclass(frozen=True)  # noqa: PLR0904
 class Channel:
-    df: pl.DataFrame | pl.LazyFrame = field(repr=False)
+    df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
-    noise: Optional[NoiseChannel] = field(default=None, repr=False)
+    npulses: int
+    noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
-    df_history: list[pl.DataFrame | pl.LazyFrame] = field(default_factory=list, repr=False)
+    df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
-    transform_raw: Optional[Callable] = None
+    transform_raw: Callable | None = None
 
     def mo_stepplots(self):
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -100,29 +101,6 @@ class Channel:
         axis = misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
         axis.set_title(f"ch {self.header.ch_num} plot_hist")
         return axis
-
-    # def plot_hists(self, col, bin_edges, group_by_col, axis=None):
-    #     """
-    #     Plots histograms for the given column, grouped by the specified column.
-
-    #     Parameters:
-    #     - col (str): The column name to plot.
-    #     - bin_edges (array-like): The edges of the bins for the histogram.
-    #     - group_by_col (str): The column name to group by. This is required.
-    #     - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
-    #     """
-    #     if axis is None:
-    #         fig, ax = plt.subplots()  # Create a new figure if no axis is provided
-    #     else:
-    #         ax = axis
-    #     # Group by the specified column and filter using good_expr
-    #     df_grouped = (self.df.filter(self.good_expr)
-    #                 .group_by(group_by_col, maintain_order=True)
-    #                 .agg([pl.col(col).alias(col)])
-    #     )
-
-    #     # Collect the result to evaluate the lazy expression
-    #     df_grouped_collected = df_grouped.collect()
 
     def plot_hists(
         self,
@@ -225,46 +203,6 @@ class Channel:
     def good_series(self, col, use_expr=True):
         return mass2.good_series(self.df, col, self.good_expr, use_expr)
 
-    def rough_gain_cal(
-        self,
-        line_names,
-        uncalibrated_col,
-        calibrated_col,
-        ph_smoothing_fwhm,
-        use_expr=True,
-    ) -> "Channel":
-        # this is meant to filter the data, then select down to the columsn we need, then materialize them,
-        # all without copying our pulse records again
-        uncalibrated = self.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        peak_ph_vals, _peak_heights = mass2.algorithms.find_local_maxima(uncalibrated, gaussian_fwhm=ph_smoothing_fwhm)
-        name_e, energies_out, opt_assignments = mass2.algorithms.find_opt_assignment(
-            peak_ph_vals,
-            line_names=line_names,
-            maxacc=0.1,
-        )
-        gain = opt_assignments / energies_out
-        gain_pfit = np.polynomial.Polynomial.fit(opt_assignments, gain, deg=2)
-
-        def ph2energy(uncalibrated):
-            calibrated = uncalibrated / gain_pfit(uncalibrated)
-            return calibrated
-
-        predicted_energies = ph2energy(np.array(opt_assignments))
-        # energy_residuals = predicted_energies - energies_out
-        # if any(np.abs(energy_residuals) > max_residual_ev):
-        #     raise Exception(f"too large residuals: {energy_residuals=} eV")
-        step = mass2.RoughCalibrationGainStep(
-            [uncalibrated_col],
-            [calibrated_col],
-            self.good_expr,
-            use_expr=use_expr,
-            line_names=name_e,
-            line_energies=energies_out,
-            predicted_energies=predicted_energies,
-            ph2energy=ph2energy,
-        )
-        return self.with_step(step)
-
     def rough_cal_combinatoric(
         self,
         line_names,
@@ -311,7 +249,7 @@ class Channel:
         self,
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
-        calibrated_col: Optional[str] = None,
+        calibrated_col: str | None = None,
         use_expr: bool | pl.Expr = True,
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
@@ -340,6 +278,7 @@ class Channel:
         ch2 = Channel(
             df=df2,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
@@ -362,6 +301,7 @@ class Channel:
         return Channel(
             df=self.df,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=good_expr,
             df_history=self.df_history,
@@ -429,7 +369,7 @@ class Channel:
             peak_index = self.typical_peak_ind(col)
         step = SummarizeStep(
             inputs=[col],
-            output="many",
+            output=["many"],
             good_expr=self.good_expr,
             use_expr=True,
             frametime_s=self.header.frametime_s,
@@ -470,6 +410,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
+        assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter5lag = FilterMaker.create_5lag(
             avg_signal=avg_pulse,
@@ -530,7 +471,7 @@ class Channel:
         binsize=0.5,
         params_update=lmfit.Parameters(),
     ):
-        model = mass2.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
+        model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
@@ -554,7 +495,7 @@ class Channel:
     def step_summary(self):
         return [(type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)]
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
@@ -568,15 +509,15 @@ class Channel:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Optional[Callable] = None) -> "Channel":
-        if noise_path is None:
+    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Callable | None = None) -> "Channel":
+        if not noise_path:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = Channel(df, header=header, noise=noise_channel, transform_raw=transform_raw)
+        channel = Channel(df, header=header, npulses=ljh.npulses, noise=noise_channel, transform_raw=transform_raw)
         return channel
 
     @classmethod
@@ -597,7 +538,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header)
+        channel = cls(df, header, off.nPulses)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
@@ -618,6 +559,7 @@ class Channel:
         return Channel(
             df=df2,
             header=self.header,
+            npulses=self.npulses,
             noise=self.noise,
             good_expr=self.good_expr,
             df_history=self.df_history,
@@ -662,7 +604,7 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df) -> "Channel":
-        ch2 = Channel(pl.concat([self.df, df]), self.header, self.noise, self.good_expr)
+        ch2 = Channel(pl.concat([self.df, df]), self.header, self.npulses, self.noise, self.good_expr)
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
@@ -681,7 +623,7 @@ class Channel:
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
-        step = mass2.phase_correct.phase_correct_mass_specific_lines(
+        step = mass2.core.phase_correct_steps.phase_correct_mass_specific_lines(
             self,
             indicator_col,
             uncorrected_col,
@@ -699,6 +641,76 @@ class Channel:
         steps = {self.header.ch_num: self.steps[:]}
         misc.pickle_object(steps, filename)
         return steps
+
+    def plot_summaries(self, use_expr_in: pl.Expr | None = None, downsample: int | None = None, log: bool = False) -> None:
+        """Plot a summary of the data set, including time series and histograms of key pulse properties.
+
+        Parameters
+        ----------
+        use_expr : pl.Expr | None, optional
+            A polars expression to determine valid pulses, by default None. If None, use `self.good_expr`
+        downsample : int | None, optional
+            Plot only every one of `downsample` pulses in the scatter plots, by default None.
+            If None, choose the smallest value so that no more than 10000 points appear
+        log : bool, optional
+            Whether to make the histograms have a logarithmic y-scale, by default False.
+        """
+        plt.figure()
+        tpi_microsec = (self.typical_peak_ind() - self.header.n_presamples) * (1e6 * self.header.frametime_s)
+        plottables = (
+            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
+            ("pulse_average", "Pulse Avg", "purple", None),
+            ("peak_value", "Peak value", "blue", None),
+            ("pretrig_rms", "Pretrig RMS", "green", [0, 4000]),
+            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
+            ("postpeak_deriv", "Max PostPk deriv", "gold", [0, 200]),
+            ("rise_time_µs", "Rise time (µs)", "orange", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
+            ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
+        )
+
+        use_expr = self.good_expr if use_expr_in is None else use_expr_in
+
+        if downsample is None:
+            downsample = self.npulses // 10000
+        downsample = max(downsample, 1)
+
+        df = self.df.lazy().gather_every(downsample)
+        df = df.with_columns(
+            ((pl.col("peak_index") - self.header.n_presamples) * (1e6 * self.header.frametime_s)).alias("peak_time_µs")
+        )
+        df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
+        existing_columns = df.collect_schema().names()
+        preserve = [p[0] for p in plottables if p[0] in existing_columns]
+        preserve.append("timestamp")
+        df2 = df.filter(use_expr).select(preserve).collect()
+
+        # Plot timeseries relative to 0 = the last 00 UT during or before the run.
+        timestamp = df2["timestamp"].to_numpy()
+        last_midnight = timestamp[-1].astype("datetime64[D]")
+        hour_rel = (timestamp - last_midnight).astype(float) / 3600e6
+
+        for i, (column_name, label, color, limits) in enumerate(plottables):
+            if column_name not in df2:
+                continue
+            y = df2[column_name].to_numpy()
+
+            # Time series scatter plots (left-hand panels)
+            plt.subplot(len(plottables), 2, 1 + i * 2)
+            plt.ylabel(label)
+            plt.plot(hour_rel, y, ".", ms=1, color=color)
+            if i == len(plottables) - 1:
+                plt.xlabel("Time since last UT midnight (hours)")
+
+            # Histogram (right-hand panels)
+            plt.subplot(len(plottables), 2, 2 + i * 2)
+            if limits is None:
+                in_limit = np.ones(len(y), dtype=bool)
+            else:
+                in_limit = np.logical_and(y[:] > limits[0], y[:] < limits[1])
+            contents, _, _ = plt.hist(y[in_limit], 200, log=log, histtype="stepfilled", fc=color, alpha=0.5)
+            if log:
+                plt.ylim(ymin=contents.min())
+        print(f"Plotting {len(y)} out of {self.npulses} data points")
 
 
 @dataclass(frozen=True)

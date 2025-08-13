@@ -161,7 +161,7 @@ class Test_LaplaceEntropy:
     def test_bug115():
         """See MASS issue #115: nonsense values are appearing in KL divergence."""
         rng = np.random.default_rng(100)
-        x = mass2.MnKAlpha.rvs(size=100, rng=rng, instrument_gaussian_fwhm=0)
+        x = mass2.spectra["MnKAlpha"].rvs(size=100, rng=rng, instrument_gaussian_fwhm=0)
         gain = np.linspace(-0.01, 0.01, 21)
         for p in gain:
             xg = np.exp(p) * x
@@ -172,7 +172,7 @@ class Test_LaplaceEntropy:
     def test_bug116():
         """See MASS issue #116: nonsense values are STILL appearing in KL divergence."""
         rng = np.random.default_rng(100)
-        x = mass2.MnKAlpha.rvs(size=1000, rng=rng, instrument_gaussian_fwhm=0)
+        x = mass2.spectra["MnKAlpha"].rvs(size=1000, rng=rng, instrument_gaussian_fwhm=0)
         gain = np.linspace(-0.005, 0.005, 11)
         for p in gain:
             xg = np.exp(p) * x
