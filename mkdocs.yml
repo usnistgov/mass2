@@ -1,5 +1,6 @@
 site_name: Mass2
 nav:
   - Home: index.md
+  - LJH file format: LJHfiles.md
   - About: about.md
-  - LJH files: LJHfiles.md
+theme: readthedocs
