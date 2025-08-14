@@ -4,6 +4,7 @@ nav:
   - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
   - Fluorescence lines: fluorescence.md
+  - HCI lines: hci_lines_from_asd.md
   - LJH file format: LJHfiles.md
   - About: about.md
 
