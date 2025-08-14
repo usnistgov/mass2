@@ -244,3 +244,13 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     assert len(psd.frequencies) == 6
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
     assert np.allclose(psd_raw.psd, psd.psd)
+
+
+def test_concat_dfs_with_concat_state():
+    df1 = pl.DataFrame({"a": [1, 2, 3]})
+    df2 = pl.DataFrame({"a": [7, 8]})
+    df_concat = mass2.core.misc.concat_dfs_with_concat_state(df1, df2)
+    assert df_concat.shape == (5, 2)
+    assert df_concat["concat_state"].to_list() == [0] * 3 + [1] * 2
+    df_concat2 = mass2.core.misc.concat_dfs_with_concat_state(df_concat, df2)
+    assert df_concat2.shape == (7, 2)

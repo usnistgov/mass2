@@ -61,17 +61,13 @@ class TriggerResult:
         )
         plt.axhline(self.threshold, label="threshold")
         df = pl.DataFrame({"trig_inds": self.trig_inds})
-        trig_inds_plot = df.filter(pl.col("trig_inds").is_between(Noffset, N)).to_series().to_numpy()
-        plt.plot(
-            ((trig_inds_plot - Noffset) / decimate) * x_axis_scale,
-            filter_out[trig_inds_plot - Noffset],
-            "o",
-            label="trig_inds",
-        )
+        # use int division so the trigger points always lie on data that is plotted
+        trig_inds_plot = df.filter(pl.col("trig_inds").is_between(Noffset, N)).to_series().to_numpy() // decimate
+        plt.plot((trig_inds_plot - Noffset) * x_axis_scale, filter_out_decimated[trig_inds_plot - Noffset], "o", label="trig_inds")
         plt.title(f"{self.data_source.description}, trigger result debug plot")
         plt.legend()
         if x_axis_time_s:
-            plt.xlabel("time with arb offset / s")
+            plt.xlabel(f"time with arb offset / s ({decimate=})")
         else:
             plt.xlabel(f"sample number with arb offset after decimation={decimate}")
         plt.ylabel("signal (arb)")
@@ -234,7 +230,15 @@ class TrueBqBin:
     @classmethod
     def load(cls, bin_path):
         bin_path = Path(bin_path)
-        channel_number = int(str(bin_path.parent)[-1])
+        try:
+            # for when it's named like dev2_ai6
+            channel_number = int(str(bin_path.parent)[-1])
+        except ValueError:
+            # for when it's named like 2A
+            def bay2int(bay):
+                return (int(bay[0]) - 1) * 4 + "ABCD".index(bay[1].upper())
+
+            channel_number = bay2int(str(bin_path.parent.stem))
         desc = str(bin_path.parent.parent.stem)
         header_np = np.memmap(bin_path, dtype=header_dtype, mode="r", offset=0, shape=1)
         sample_rate_hz = header_np["sample_rate_hz"][0]
@@ -421,10 +425,10 @@ def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_sample
     try:
         trig_inds = np.load(file_path)
         if verbose:
-            print(f"cache hit for {file_path}")
+            print(f"trigger cache hit for {file_path}")
     except FileNotFoundError:
         if verbose:
-            print(f"cache miss for {file_path}")
+            print(f"trigger cache miss for {file_path}")
         data_trunc = data[:actual_n_samples]
         trig_inds = fasttrig_filter_trigger(data_trunc, filter_in, threshold)
         np.save(file_path, trig_inds)

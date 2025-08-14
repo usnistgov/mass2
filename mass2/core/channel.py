@@ -603,12 +603,12 @@ class Channel:
         )
         return self.with_step(step)
 
-    def concat_df(self, df) -> "Channel":
-        ch2 = Channel(pl.concat([self.df, df]), self.header, self.npulses, self.noise, self.good_expr)
+    def concat_df(self, df: pl.DataFrame) -> "Channel":
+        ch2 = Channel(mass2.core.misc.concat_dfs_with_concat_state(self.df, df), self.header, self.npulses, self.noise, self.good_expr)
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
-    def concat_ch(self, ch) -> "Channel":
+    def concat_ch(self, ch: "Channel") -> "Channel":
         ch2 = self.concat_df(ch.df)
         return ch2
 

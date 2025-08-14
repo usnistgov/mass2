@@ -139,3 +139,17 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
     merged_dict: dict[int, Any] = {key: value for key, value in combined_items}
 
     return merged_dict
+
+
+def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state"):
+    if concat_state_col in df1.columns:
+        # Continue incrementing from the last known concat_state
+        max_state = df1[concat_state_col][-1]
+        df2 = df2.with_columns(pl.lit(max_state + 1).alias(concat_state_col))
+    else:
+        # Fresh concat: label first as 0, second as 1
+        df1 = df1.with_columns(pl.lit(0).alias(concat_state_col))
+        df2 = df2.with_columns(pl.lit(1).alias(concat_state_col))
+
+    df_out = pl.concat([df1, df2], how="vertical")
+    return df_out

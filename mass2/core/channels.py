@@ -288,13 +288,14 @@ class Channels:
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
         ch_nums = sorted(list(set(self.channels.keys()).intersection(other_data.channels.keys())))
-        channels2 = {}
+        new_channels = {}
         for ch_num in ch_nums:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
-            ch2 = ch.concat_ch(other_ch)
-            channels2[ch_num] = ch2
-        return Channels(channels2, self.description + other_data.description)
+            combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
+            new_ch = ch.with_replacement_df(combined_df)
+            new_channels[ch_num] = new_ch
+        return mass2.Channels(new_channels, self.description + other_data.description)
 
     @classmethod
     def from_df(
