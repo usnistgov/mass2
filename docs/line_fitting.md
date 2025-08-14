@@ -50,7 +50,7 @@ Objects of the type `SpectralLine` encode the line shape of a fluorescence line,
   N = 100000
   energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
   plt.clf()
-  sim, bin_edges, _ = plt.hist(energies, 120, [5865, 5925], histtype="step");
+  sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype="step");
   binsize = bin_edges[1] - bin_edges[0]
   e = bin_edges[:-1] + 0.5*binsize
   plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, "k")
