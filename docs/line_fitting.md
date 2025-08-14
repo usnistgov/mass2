@@ -2,7 +2,7 @@
 
 Joe Fowler, January 2020.
 
-Mass uses use the **LMFIT package** <https://lmfit.github.io/lmfit-py/> by wrapping it in the Mass2 class `GenericLineModel` and its subclasses.
+Mass uses use the [**LMFIT package**](https://lmfit.github.io/lmfit-py/) by wrapping it in the Mass2 class `GenericLineModel` and its subclasses.
 
 ## LMFit vs Scipy
 
