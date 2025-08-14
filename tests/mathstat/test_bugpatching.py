@@ -25,4 +25,4 @@ def TestNumpyHistogramPrecisionBug():
     # ... The following 2 lines raise ValueErrors if numpy has the bug and
     # the mass patch fails to fix it.
     counts, _binedges = np.histogram(a32, 10, bin_limits)
-    counts, _binedges, _patches = plt.hist(a32, 10, bin_limits)
+    counts, _binedges, _patches = plt.hist(a32, 10, range=bin_limits)

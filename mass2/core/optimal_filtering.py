@@ -456,8 +456,8 @@ def _filter_records_ats(x: npt.ArrayLike, values: npt.NDArray, dt_values: npt.ND
 class FilterMaker:
     """An object capable of creating optimal filter based on a single signal and noise set.
 
-    Arguments:
-
+    Parameters
+    ---------
     signal_model : npt.ArrayLike
         The average signal shape.  Filters will be rescaled so that the output
         upon putting this signal into the filter equals the *peak value* of this

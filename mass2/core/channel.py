@@ -647,7 +647,7 @@ class Channel:
 
         Parameters
         ----------
-        use_expr : pl.Expr | None, optional
+        use_expr_in : pl.Expr | None, optional
             A polars expression to determine valid pulses, by default None. If None, use `self.good_expr`
         downsample : int | None, optional
             Plot only every one of `downsample` pulses in the scatter plots, by default None.

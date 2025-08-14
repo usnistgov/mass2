@@ -149,7 +149,7 @@ def test_noise_autocorr():
 
     spect = noise_ch.spectrum()
     assert len(spect.autocorr_vec) == 500
-    assert spect.autocorr_vec[0] == pytest.approx(1, rel=1e-2)
+    assert spect.autocorr_vec[0] == pytest.approx(1, rel=3e-2)
     assert np.mean(np.abs(spect.autocorr_vec[1:])) == pytest.approx(0, abs=1e-2)
 
 

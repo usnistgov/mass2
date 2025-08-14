@@ -28,15 +28,17 @@ DEFAULT_PICKLE_PATH = pkg_resources.files("mass2").joinpath("data", DEFAULT_PICK
 class NIST_ASD:
     """Class for working with a pickled atomic spectra database"""
 
-    def __init__(self, pickleFilename=None):
+    def __init__(self, pickleFilename: str | None = None):
         """Loads ASD pickle file (optionally gzipped)
 
-        Args:
-            pickleFilename: (default None) ASD pickle file name, as str, if not using default
+        Parameters
+        ----------
+        pickleFilename : str | None, optional
+            ASD pickle file name, as str, or if none then `mass2.calibration.hci_lines.DEFAULT_PICKLE_PATH` (default None)
         """
 
         if pickleFilename is None:
-            pickleFilename = os.path.join(os.path.split(__file__)[0], DEFAULT_PICKLE_PATH)
+            pickleFilename = os.path.join(os.path.split(__file__)[0], str(DEFAULT_PICKLE_PATH))
 
         if pickleFilename.endswith(".gz"):
             with gzip.GzipFile(pickleFilename, "rb") as handle:
@@ -50,40 +52,64 @@ class NIST_ASD:
 
         return list(self.NIST_ASD_Dict.keys())
 
-    def getAvailableSpectralCharges(self, element):
+    def getAvailableSpectralCharges(self, element: str) -> list[int]:
         """For a given element, returns a list of all available charge states from the ASD pickle file
 
-        Args:
-            element: str representing atomic symbol of element, e.g. 'Ne'
+        Parameters
+        ----------
+        element : str
+            atomic symbol of element, e.g. 'Ne'
+
+        Returns
+        -------
+        list[int]
+            Available charge states
         """
 
         return list(self.NIST_ASD_Dict[element].keys())
 
     def getAvailableLevels(
         self,
-        element,
-        spectralCharge,
-        requiredConf=None,
-        requiredTerm=None,
-        requiredJVal=None,
-        maxLevels=None,
-        units="eV",
-        getUncertainty=True,
-    ):
+        element: str,
+        spectralCharge: int,
+        requiredConf: str | None = None,
+        requiredTerm: str | None = None,
+        requiredJVal: str | None = None,
+        maxLevels: int | None = None,
+        units: str = "eV",
+        getUncertainty: bool = True,
+    ) -> dict:
         """For a given element and spectral charge state, return a dict of all known levels from the ASD pickle file
 
-        Args:
-            element: str representing atomic symbol of element, e.g. 'Ne'
-            spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne
-            requiredConf: (default None) filters results to those with ``conf == requiredConf``
-            requiredTerm: (default None) filters results to those with ``term == requiredTerm``
-            requiredJVal: (default None) filters results to those with ``JVal == requiredJVal``
-            maxLevels: (default None) the maximum number of levels (sorted by energy) to return
-            units: (default 'eV') 'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values
+        Parameters
+        ----------
+        element : str
+            Elemental atomic symbol, e.g. 'Ne'
+        spectralCharge : int
+            spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne
+        requiredConf : str | None, optional
+            if not None, limits results to those with `conf == requiredConf`, by default None
+        requiredTerm : str | None, optional
+            if not None, limits results to those with `term == requiredTerm`, by default None
+        requiredJVal : str | None, optional
+            if not None, limits results to those with `a == requiredJVal`, by default None
+        maxLevels : int | None, optional
+            the maximum number of levels (sorted by energy) to return, by default None
+        units : str, optional
+            'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values, by default "eV"
+        getUncertainty : bool, optional
+            whether to return uncertain values, by default True
+
+        Returns
+        -------
+        dict
+            A dictionary of energy level strings to energy levels.
         """
+        if units not in {"eV", "cm-1"}:
+            raise ValueError("Unit type not supported, please use eV or cm-1")
 
         spectralCharge = int(spectralCharge)
-        levelsDict = {}
+        levelsDict: dict = {}
         numLevels = 0
         for iLevel in list(self.NIST_ASD_Dict[element][spectralCharge].keys()):
             try:
@@ -92,23 +118,14 @@ class NIST_ASD:
                     if numLevels == maxLevels:
                         return levelsDict
                 # If required, check to see if level matches search conf, term, JVal
-                includeConf = False
                 includeTerm = False
                 includeJVal = False
                 conf, term, j_str = iLevel.split()
                 JVal = j_str.split("=")[1]
-                if requiredConf is None:
-                    includeConf = True
-                elif conf == requiredConf:
-                    includeConf = True
-                if requiredTerm is None:
-                    includeTerm = True
-                elif term == requiredTerm:
-                    includeTerm = True
-                if requiredJVal is None:
-                    includeJVal = True
-                elif JVal == requiredJVal:
-                    includeJVal = True
+                includeConf = (requiredConf is None) or conf == requiredConf
+                includeTerm = (requiredTerm is None) or term == requiredTerm
+                includeJVal = (requiredJVal is None) or JVal == requiredJVal
+
                 # Include levels that match, in either cm-1 or eV
                 if includeConf and includeTerm and includeJVal:
                     numLevels += 1
@@ -124,25 +141,38 @@ class NIST_ASD:
                             ]
                         else:
                             levelsDict[iLevel] = INVCM_TO_EV * self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
-                    else:
-                        levelsDict = None
-                        print("Unit type not supported, please use eV or cm-1")
             except ValueError:
                 f"Warning: cannot parse level: {iLevel}"
         return levelsDict
 
-    def getSingleLevel(self, element, spectralCharge, conf, term, JVal, units="eV", getUncertainty=True):
+    def getSingleLevel(
+        self, element: str, spectralCharge: int, conf: str, term: str, JVal: str, units: str = "eV", getUncertainty: bool = True
+    ) -> float:
         """Return the level data for a fully defined element, charge state, conf, term, and JVal.
 
-        Args:
-            element: str representing atomic symbol of element, e.g. 'Ne'
-            spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne
-            conf: str representing nuclear configuration, e.g. '2p'
-            term: str representing nuclear term, e.g. '2P*'
-            JVal: str representing total angular momentum J, e.g. '3/2'
-            units: (default 'eV') 'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values
-            getUncertainty: (default True) if True, includes uncertainties in list of levels
+        Parameters
+        ----------
+        element : str
+            atomic symbol of element, e.g. 'Ne'
+        spectralCharge : int
+            spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne
+        conf : str
+            nuclear configuration, e.g. '2p'
+        term : str
+            nuclear term, e.g. '2P*'
+        JVal : str
+            total angular momentum J, e.g. '3/2'
+        units : str, optional
+            'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values, by default "eV"
+        getUncertainty : bool, optional
+            includes uncertainties in list of levels, by default True
+
+        Returns
+        -------
+        float
+            _description_
         """
+
         levelString = f"{conf} {term} J={JVal}"
         if units == "cm-1":
             if getUncertainty:
@@ -155,8 +185,7 @@ class NIST_ASD:
             else:
                 levelEnergy = self.NIST_ASD_Dict[element][spectralCharge][levelString][0] * INVCM_TO_EV
         else:
-            levelEnergy = None
-            print("Unit type not supported, please use eV or cm-1")
+            raise ValueError("Unit type not supported, please use eV or cm-1")
         return levelEnergy
 
 
