@@ -1,16 +1,12 @@
-Fitting spectral line models to data in MASS
-============================================
-
-Designed for MASS version 0.7.3.
+# Fitting spectral line models to data in MASS
 
 Joe Fowler, January 2020.
 
-Previously, we wrote our own modification to the Levenberg-Marquardt optimizer in order to reach maximum-likelihood (not least-squares) fits. This appears in mass as the ``LineFitter`` class and its subclasses. In its place, we want to use the `LMFIT package <https://lmfit.github.io/lmfit-py/>`_ and the new MASS class ``GenericLineModel`` and its subclasses.
+Previously, we wrote our own modification to the Levenberg-Marquardt optimizer in order to reach maximum-likelihood (not least-squares) fits. This appears in mass as the `LineFitter` class and its subclasses. In its place, we want to use the `LMFIT package <https://lmfit.github.io/lmfit-py/>`_ and the new MASS class `GenericLineModel` and its subclasses.
 
-LMFit vs Scipy
---------------
+## LMFit vs Scipy
 
-LMFIT has numerous advantages over the basic ``scipy.optimize`` module. Quoting from the LMFIT documentation, the user can:
+LMFIT has numerous advantages over the basic `scipy.optimize` module. Quoting from the LMFIT documentation, the user can:
 
 * forget about the order of variables and refer to Parameters by meaningful names.
 * place bounds on Parameters as attributes, without worrying about preserving the order of arrays for variables and boundaries.
@@ -19,12 +15,12 @@ LMFIT has numerous advantages over the basic ``scipy.optimize`` module. Quoting 
 
 Only some of these are implemented in the original MASS fitters, and even they are not all implemented in the most robust possible way. The one disadvantage of the core LMFIT package is that it minimizes the sum of squares of a vector instead of maximizing the Poisson likelihood. This is easily remedied, however, by replacing the usual computation of residuals with one that computes the square root of the Poisson likelihood contribution from each bin. Voilá! A maximum likelihood fitter for histograms.
 
-Advantages of LMFIT over the earlier, homemade method of the ``LineFitter`` include:
+Advantages of LMFIT over the earlier, homemade method of the `LineFitter` include:
 
 * Users can forget about the order of variables and refer to Parameters by meaningful names.
 * Users can place algebraic constraints on Parameters.
 * The interface for setting upper/lower bounds on parameters and for varying or fixing them is much more elegant, memorable, and simple than our homemade version.
-* It ultimately wraps the ``scipy.optimize`` package and therefore inherits all of its advantages:
+* It ultimately wraps the `scipy.optimize` package and therefore inherits all of its advantages:
 
   * a choice of over a dozen optimizers with highly technical documentation,
   * some optimizers that aim for true global (not just local) optimization, and
@@ -33,15 +29,13 @@ Advantages of LMFIT over the earlier, homemade method of the ``LineFitter`` incl
 * It's the work of Matt Newville, an x-ray scientist responsible for the excellent `ifeffit <http://cars9.uchicago.edu/ifeffit/>`_ and its successor `Larch <https://xraypy.github.io/xraylarch/>`_.
 * Above all, *its documentation is complete, already written, and maintained by not-us.*
 
-Usage guide
------------
+## Usage guide
 
 This overview is hardly complete, but we hope it can be a quick-start guide and also hint at how you can convert your own analysis work from the old to the new, preferred fitting methods.
 
-The underlying spectral line shape models
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### The underlying spectral line shape models
 
-Objects of the type ``SpectralLine`` encode the line shape of a fluorescence line, as a sum of Voigt or Lorentzian distributions. Because they inherit from ``scipy.stats.rv_continuous``, they allow computation of cumulative distribution functions and the simulation of data drawn from the distribution. An example of the creation and usage is:
+Objects of the type `SpectralLine` encode the line shape of a fluorescence line, as a sum of Voigt or Lorentzian distributions. Because they inherit from `scipy.stats.rv_continuous`, they allow computation of cumulative distribution functions and the simulation of data drawn from the distribution. An example of the creation and usage is:
 
 .. testsetup::
 
@@ -78,13 +72,12 @@ Objects of the type ``SpectralLine`` encode the line shape of a fluorescence lin
   :width: 40%
 
 
-The ``SpectralLine`` object is useful to you if you need to generate simulated data, or to plot a line shape, as shown above. Both the new fitting "model" objects and the old "fitter" objects use the ``SpectralLine`` object to hold line shape information. You don't need to create a ``SpectralLine`` object for fitting, though; it will be done automatically.
+The `SpectralLine` object is useful to you if you need to generate simulated data, or to plot a line shape, as shown above. Both the new fitting "model" objects and the old "fitter" objects use the `SpectralLine` object to hold line shape information. You don't need to create a `SpectralLine` object for fitting, though; it will be done automatically.
 
 
-How to use the LMFIT-based models for fitting
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### How to use the LMFIT-based models for fitting
 
-The simplest case of line fitting requires only 3 steps: create a model instance from a ``SpectralLine``, guess its parameters from the data, and perform a fit with this guess. Unlike the old fitters, plotting is not done as part of the fit--you have to do that separately.
+The simplest case of line fitting requires only 3 steps: create a model instance from a `SpectralLine`, guess its parameters from the data, and perform a fit with this guess. Unlike the old fitters, plotting is not done as part of the fit--you have to do that separately.
 
 .. testcode::
 
@@ -121,7 +114,7 @@ The simplest case of line fitting requires only 3 steps: create a model instance
 .. image:: img/mnka_fit1m.png
   :width: 40%
 
-You can print a nicely formatted fit report with ``fit_report()``:
+You can print a nicely formatted fit report with `fit_report()`:
 
 .. code-block:: python
 
@@ -153,10 +146,9 @@ You can print a nicely formatted fit report with ``fit_report()``:
       C(fwhm, peak_ph)        = -0.1121
 
 
-Fitting with exponential tails (to low or high energy)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### Fitting with exponential tails (to low or high energy)
 
-Notice when you report the fit (or check the contents of the ``params`` or ``resultB.params`` objects), there are no parameters referring to exponential tails of a Bortels response. That's because the default fitter assumes a *Gaussian* response. If you want tails, that's a constructor argument:
+Notice when you report the fit (or check the contents of the `params` or `resultB.params` objects), there are no parameters referring to exponential tails of a Bortels response. That's because the default fitter assumes a *Gaussian* response. If you want tails, that's a constructor argument:
 
 .. testcode::
 
@@ -176,7 +168,7 @@ Notice when you report the fit (or check the contents of the ``params`` or ``res
   :width: 40%
 
 
-By default, the ``has_tails=True`` will set up a non-zero low-energy tail and allow it to vary, while the high-energy tail is set to zero amplitude and doesn't vary. Use these numbered examples if you want to fit for a high-energy tail (1), to fix the low-E tail at some non-zero level (2) or to turn off the low-E tail completely (3):
+By default, the `has_tails=True` will set up a non-zero low-energy tail and allow it to vary, while the high-energy tail is set to zero amplitude and doesn't vary. Use these numbered examples if you want to fit for a high-energy tail (1), to fix the low-E tail at some non-zero level (2) or to turn off the low-E tail completely (3):
 
 .. testcode::
 
@@ -195,10 +187,9 @@ By default, the ``has_tails=True`` will set up a non-zero low-energy tail and al
   params["tail_tau"].set(vary=False)
 
 
-Fitting with a quantum efficiency model
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### Fitting with a quantum efficiency model
 
-If you want to multiply the line models by a model of the quantum efficiency, you can do that. You need a ``qemodel`` function or callable function object that takes an energy (scalar or vector) and returns the corresponding QE. For example, you can use the "Raven1 2019" QE model from `mass.materials`. The filter-stack models are not terribly fast to run, so it's best to compute once, spline the results, and pass that spline as the ``qemodel`` to ``line.model(qemodel=qemodel)``.
+If you want to multiply the line models by a model of the quantum efficiency, you can do that. You need a `qemodel` function or callable function object that takes an energy (scalar or vector) and returns the corresponding QE. For example, you can use the "Raven1 2019" QE model from `mass.materials`. The filter-stack models are not terribly fast to run, so it's best to compute once, spline the results, and pass that spline as the `qemodel` to `line.model(qemodel=qemodel)`.
 
 .. testcode::
 
@@ -236,9 +227,9 @@ If you want to multiply the line models by a model of the quantum efficiency, yo
 
 When you fit with a non-trivial QE model, the fit parameters that refer to signal and background intensity all refer to a sensor with an ideal QE=1. These include:
 
-* ``integral``
-* ``background``
-* ``bg_slope``
+* `integral`
+* `background`
+* `bg_slope`
 
 That is, the fit values must be multiplied by the local QE to give the number of _observed_ signal counts, background counts per bin, or background slope.
 With or without a QE model, "integral" refers to the number of photons that would be seen across all energies (not just in the range being fit).
@@ -325,21 +316,21 @@ is an example of using the old fitters. Don't do that!
 An overview of how to convert is:
 
 #. Get a Model object instead of a Fitter object.
-#. Use ``p=model.guess(data, bin_centers=e, dph_de=dph_de)`` to create a heuristic for the starting parameters.
-#. Change starting values and toggle the ``vary`` attribute on parameters, as needed. For example: ``p["dph_de"].set(1.0, vary=False)``
-#. Use ``result=model.fit(data, p, bin_centers=e)`` to perform the fit and store the result.
+#. Use `p=model.guess(data, bin_centers=e, dph_de=dph_de)` to create a heuristic for the starting parameters.
+#. Change starting values and toggle the `vary` attribute on parameters, as needed. For example: `p["dph_de"].set(1.0, vary=False)`
+#. Use `result=model.fit(data, p, bin_centers=e)` to perform the fit and store the result.
 #. The result holds many attributes and methods (see `MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result>`_ for full documentation). These include:
 
-  * ``result.params`` = the model's best-fit parameters object
-  * ``result.best_values`` = a dictionary of the best-fit parameter values
-  * ``result.best_fit`` = the model's y-values at the best-fit parameter values
-  * ``result.chisqr`` = the chi-squared statistic of the fit (here, -2log(L))
-  * ``result.covar`` = the computed covariance
-  * ``result.fit_report()`` = return a pretty-printed string reporting on the fit
-  * ``result.plot_fit()`` = make a plot of the data and fit
-  * ``result.plot_residuals()`` = make a plot of the residuals (fit-data)
-  * ``result.plot()`` = make a plot of the data, fit, and residuals, generally `plotm` is preferred
-  * ``result.plotm()`` = make a plot of the data, fit, and fit params with dataset filename in title
+  * `result.params` = the model's best-fit parameters object
+  * `result.best_values` = a dictionary of the best-fit parameter values
+  * `result.best_fit` = the model's y-values at the best-fit parameter values
+  * `result.chisqr` = the chi-squared statistic of the fit (here, -2log(L))
+  * `result.covar` = the computed covariance
+  * `result.fit_report()` = return a pretty-printed string reporting on the fit
+  * `result.plot_fit()` = make a plot of the data and fit
+  * `result.plot_residuals()` = make a plot of the residuals (fit-data)
+  * `result.plot()` = make a plot of the data, fit, and residuals, generally `plotm` is preferred
+  * `result.plotm()` = make a plot of the data, fit, and fit params with dataset filename in title
 
 
 One detail that's changed: the new models parameterize the tau values (scale lengths of exponential tails) in eV units. The old fitters assumed tau were given in units of bins. Another is that the parameter "integral" refers to the integrated number of counts across all energies; the old parameter "amplitude" was the same but scaled by the bin width in eV. The old way didn't make sense, but that's how it was.
@@ -347,8 +338,8 @@ One detail that's changed: the new models parameterize the tau values (scale len
 To do
 ^^^^^
 
-* [x] We probably should restructure the ``SpectralLine``, ``GenericLineModel``, and perhaps also the older ``LineFitter`` objects such that the specific versions for (say) Mn Kα become not subclasses but instances of them. See `issue 182 <https://github.com/usnistgov/mass/issues/182>`_ on the question of whether this change might speed up loading of MASS. Done by PR#120.
-* [x] Add to ``GenericLineModel`` one or more methods to make plots comparing data and fit with parameter values printed on the plot.
+* [x] We probably should restructure the `SpectralLine`, `GenericLineModel`, and perhaps also the older `LineFitter` objects such that the specific versions for (say) Mn Kα become not subclasses but instances of them. See `issue 182 <https://github.com/usnistgov/mass/issues/182>`_ on the question of whether this change might speed up loading of MASS. Done by PR#120.
+* [x] Add to `GenericLineModel` one or more methods to make plots comparing data and fit with parameter values printed on the plot.
 * [x] The LMFIT view of models is such that we would probably find it easy to fit one histogram for the sum of (say) a Mn Kα and a Cr Kβ line simultaneously. Add features to our object, as needed, and document the procedure here.
 * [ ] We could implement convolution between two models (see just below `CompositeModel <https://lmfit.github.io/lmfit-py/model.html#lmfit.model.CompositeModel>`_ in the docs for how to do this).
-* [x] At some point, we ought to remove the deprecated ``LineFitter`` object and subclasses thereof.
+* [x] At some point, we ought to remove the deprecated `LineFitter` object and subclasses thereof.
