@@ -8,38 +8,62 @@ Paul Szypryt
 """
 
 import numpy as np
+import xraydb
 import mass2
 from mass2.calibration.fluorescence_lines import spectra
-import xraydb
+from mass2.calibration.line_models import GenericLineModel
 
 
-def initialize_hci_line_model(line_name, has_linear_background=False, has_tails=False):
-    """Initializes a single lorentzian hci lmfit model. Reformats line_name to create a lmfit valid prefix.
+def initialize_hci_line_model(line_name: str, has_linear_background: bool = False, has_tails: bool = False) -> GenericLineModel:
+    """Initializes a single lorentzian HCI line model. Reformats line_name to create a lmfit valid prefix.
 
-    Args:
-        line_name: name of line within mass2.spectra
-        has_linear_background: (default False) include linear background in the model
-        has_tails: (default False) include low energy tail in the model
+    Parameters
+    ----------
+    line_name : str
+        name of line to use in mass2.spectra
+    has_linear_background : bool, optional
+        include linear background in the model, by default False
+    has_tails : bool, optional
+        include low-energy tail in the model, by default False
+
+    Returns
+    -------
+    GenericLineModel
+        New HCI line.
     """
-
-    line = spectra[line_name]()
+    line = spectra[line_name]
     prefix = f"{line_name}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
     line_model = line.model(has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix)
     line_model.shortname = line_name
     return line_model
 
 
-def initialize_hci_composite_model(composite_name, individual_models, has_linear_background=False, peak_component_name=None):
+def initialize_hci_composite_model(
+    composite_name: str,
+    individual_models: list[GenericLineModel],
+    has_linear_background: bool = False,
+    peak_component_name: str | None = None,
+) -> GenericLineModel:
     """Initializes composite lmfit model from the sum of input models
 
-    Args:
-        composite_name: str name given to composite line model
-        line_models: array of lmfit models to sum into a composite model
-        has_linear_background: (default False) include a single linear background on top of group of lorentzians
-        peak_component_name: designate a component to be a peak for energy, all expressions are referenced to this component
+    Parameters
+    ----------
+    composite_name : str
+        name given to composite line model
+    individual_models : list[GenericLineModel]
+        Models to sum into a composite
+    has_linear_background : bool, optional
+        include a single linear background on top of group of lorentzians, by default False
+    peak_component_name : str | None, optional
+        designate a component to be a peak for energy, all expressions are referenced to this component, by default None
+
+    Returns
+    -------
+    GenericLineModel
+        The new composite line
     """
 
-    composite_model = np.sum(individual_models)
+    composite_model: GenericLineModel = np.sum(individual_models)
     composite_model.name = composite_name
     if has_linear_background:
         composite_model = add_bg_model(composite_model)
@@ -71,15 +95,28 @@ def initialize_hci_composite_model(composite_name, individual_models, has_linear
     return composite_model
 
 
-def initialize_HLike_2P_model(element, conf, has_linear_background=False, has_tails=False, vary_amp_ratio=False):
+def initialize_HLike_2P_model(
+    element: str, conf: str, has_linear_background: bool = False, has_tails: bool = False, vary_amp_ratio: bool = False
+) -> GenericLineModel:
     """Initializes H-like 2P models consisting of J=1/2 and J=3/2 lines
 
-    Args:
-        element: atomic symbol as str, e.g. 'Ne' or 'Ar'
-        conf: nuclear configuration as str, e.g. '2p' or '3p'
-        has_linear_background: (default False) include a single linear background on top of the 2 Lorentzians
-        has_tails: (default False) include low energy tail in the model
-        vary_amp_ratio: (default False) allow the ratio of the J=3/2 to J=1/2 states to vary away from 2
+    Parameters
+    ----------
+    element : str
+        atomic symbol as str, e.g. 'Ne' or 'Ar'
+    conf : str
+        nuclear configuration as str, e.g. '2p' or '3p'
+    has_linear_background : bool, optional
+        include a single linear background on top of the 2 Lorentzians, by default False
+    has_tails : bool, optional
+        include low energy tail in the model, by default False
+    vary_amp_ratio : bool, optional
+        allow the ratio of the J=3/2 to J=1/2 states to vary away from 2, by default False
+
+    Returns
+    -------
+    GenericLineModel
+        The new composite line
     """
 
     # Set up line names and lmfit prefixes
@@ -89,8 +126,8 @@ def initialize_HLike_2P_model(element, conf, has_linear_background=False, has_ta
     prefix_1_2 = f"{line_name_1_2}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
     prefix_3_2 = f"{line_name_3_2}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
     # Initialize individual lines and models
-    line_1_2 = spectra[line_name_1_2]()
-    line_3_2 = spectra[line_name_3_2]()
+    line_1_2 = spectra[line_name_1_2]
+    line_3_2 = spectra[line_name_3_2]
     model_1_2 = line_1_2.model(has_linear_background=False, has_tails=has_tails, prefix=prefix_1_2)
     model_3_2 = line_3_2.model(has_linear_background=False, has_tails=has_tails, prefix=prefix_3_2)
     # Initialize composite model and set addition H-like constraints
@@ -107,15 +144,28 @@ def initialize_HLike_2P_model(element, conf, has_linear_background=False, has_ta
     return composite_model
 
 
-def initialize_HeLike_complex_model(element, has_linear_background=False, has_tails=False, additional_line_names=[]):
+def initialize_HeLike_complex_model(
+    element: str, has_linear_background: bool = False, has_tails: bool = False, additional_line_names: list = []
+) -> GenericLineModel:
     """Initializes 1s2s,2p He-like complexes for a given element.
+
     By default, uses only the 1s.2s 3S J=1, 1s.2p 3P* J=1, and 1s.2p 1P* J=1 lines.
 
-    Args:
-        element: atomic symbol as str, e.g. 'Ne' or 'Ar'
-        has_linear_background: (default False) include a single linear background on top of the Lorentzian models
-        has_tails: (default False) include low energy tail in the model
-        additional_line_names: (default []) additional line names to include in model, e.g. low level Li/Be-like features
+    Parameters
+    ----------
+    element : str
+        atomic symbol as str, e.g. 'Ne' or 'Ar'
+    has_linear_background : bool, optional
+        include a single linear background on top of the Lorentzian models, by default False
+    has_tails : bool, optional
+        include low energy tail in the model, by default False
+    additional_line_names : list, optional
+        additional line names to include in model, e.g. low level Li/Be-like features, by default []
+
+    Returns
+    -------
+    GenericLineModel
+        A model of the given HCI complex.
     """
 
     # Set up line names
@@ -140,33 +190,54 @@ def initialize_HeLike_complex_model(element, has_linear_background=False, has_ta
     return composite_model
 
 
-def add_bg_model(generic_model, vary_slope=False):
+def add_bg_model(generic_model: GenericLineModel, vary_slope: bool = False) -> GenericLineModel:
     """Adds a LinearBackgroundModel to a generic lmfit model
 
-    Args:
-        generic_model: Generic lmfit model object to which to add a linear background model
-        vary_slope: (default False) allows a varying linear slope rather than just constant value
+    Parameters
+    ----------
+    generic_model : GenericLineModel
+        object to which to add a linear background model
+    vary_slope : bool, optional
+        allows a varying linear slope rather than just constant value, by default False
+
+    Returns
+    -------
+    GenericLineModel
+        The input model, with background componets added
     """
+    # composite_name = generic_model._name
+    # bg_prefix = f"{composite_name}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
+    raise NotImplementedError("No LinearBackgroundModel still exists in mass2")
+    # background_model = mass2.calibration.line_models.LinearBackgroundModel(name=f"{composite_name} Background", prefix=bg_prefix)
+    # background_model.set_param_hint("bg_slope", vary=vary_slope)
+    # composite_model = generic_model + background_model
+    # composite_model.name = composite_name
+    # return composite_model
 
-    composite_name = generic_model._name
-    bg_prefix = f"{composite_name}_".replace(" ", "_").replace("J=", "").replace("/", "_").replace("*", "").replace(".", "")
-    background_model = mass2.calibration.line_models.LinearBackgroundModel(name=f"{composite_name} Background", prefix=bg_prefix)
-    background_model.set_param_hint("bg_slope", vary=vary_slope)
-    composite_model = generic_model + background_model
-    composite_model.name = composite_name
-    return composite_model
 
+def models(
+    has_linear_background: bool = False,
+    has_tails: bool = False,
+    vary_Hlike_amp_ratio: bool = False,
+    additional_Helike_complex_lines=[],
+) -> dict:
+    """Generates some commonly used HCI line models that can be used for energy calibration, etc.
 
-def models(has_linear_background=False, has_tails=False, vary_Hlike_amp_ratio=False, additional_Helike_complex_lines=[]):
-    """
-    Generates some commonly used HCI line models that can be used for energy calibration, etc.
+    Parameters
+    ----------
+    has_linear_background : bool, optional
+        include a single linear background on top of the 2 Lorentzians, by default False
+    has_tails : bool, optional
+        nclude low-energy tail in the model, by default False
+    vary_Hlike_amp_ratio : bool, optional
+        allow the ratio of the J=3/2 to J=1/2 H-like states to vary, by default False
+    additional_Helike_complex_lines : list, optional
+        additional line names to include inHe-like complex model, e.g. low level Li/Be-like features, by default []
 
-    Args:
-        has_linear_background: (default False) include a single linear background on top of the 2 Lorentzians
-        has_tails: (default False) include low energy tail in the model
-        vary_Hlike_amp_ratio: (default False) allow the ratio of the J=3/2 to J=1/2 H-like states to vary
-            additional_Helike_complex_lines: (default []) additional line names to include inHe-like complex
-            model, e.g. low level Li/Be-like features
+    Returns
+    -------
+    _type_
+        Dictionary of mass2.calibration.fluorescence_lines.SpectralLine objects, containing commonly used HCI lines.
     """
 
     models_dict = {}
