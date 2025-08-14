@@ -50,6 +50,7 @@ dev = [
 docs = [
     "mkdocs",
     "mkdocstrings[python]>=0.18",
+    "mktestdocs",
 ]
 
 [project.urls]
