@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Line fitting - Mass2</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../assets/_mkdocstrings.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Line fitting";
+        var mkdocs_page_input_path = "line_fitting.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> Mass2
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../docstrings/">Docstrings</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../filtering/">Optimal filtering</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../fluorescence/">Fluorescence lines</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Line fitting</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#lmfit-vs-scipy">LMFit vs Scipy</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-guide">Usage guide</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#the-underlying-spectral-line-shape-models">The underlying spectral line shape models</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#how-to-use-the-lmfit-based-models-for-fitting">How to use the LMFIT-based models for fitting</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fitting-with-exponential-tails-to-low-or-high-energy">Fitting with exponential tails (to low or high energy)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fitting-with-a-quantum-efficiency-model">Fitting with a quantum efficiency model</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fitting-a-simple-gaussian-lorentzian-or-voigt-function">Fitting a simple Gaussian, Lorentzian, or Voigt function</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#more-details-of-fitting-fluorescence-line-models">More details of fitting fluorescence-line models</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../hci_lines_from_asd/">HCI lines</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../xray_efficiency_models/">X-ray models</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../LJHfiles/">LJH file format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../tests/">Testing</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../about/">About</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">Mass2</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Line fitting</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="fitting-spectral-line-models-to-data-in-mass">Fitting spectral line models to data in MASS</h1>
+<p>Joe Fowler, January 2020.</p>
+<p>Mass uses use the <a href="https://lmfit.github.io/lmfit-py/"><strong>LMFIT package</strong></a> by wrapping it in the Mass2 class <code>GenericLineModel</code> and its subclasses.</p>
+<h2 id="lmfit-vs-scipy">LMFit vs Scipy</h2>
+<p>LMFIT has numerous advantages over the basic <code>scipy.optimize</code> module. Quoting from the LMFIT documentation, the user can:</p>
+<ul>
+<li>forget about the order of variables and refer to Parameters by meaningful names.</li>
+<li>place bounds on Parameters as attributes, without worrying about preserving the order of arrays for variables and boundaries.</li>
+<li>fix Parameters, without having to rewrite the objective function.</li>
+<li>place algebraic constraints on Parameters.</li>
+</ul>
+<p>The one disadvantage of the core LMFIT package for our purposes is that it minimizes the sum of squares of a vector instead of maximizing the Poisson likelihood. This is easily remedied, however, by replacing the usual computation of residuals with one that computes the square root of the Poisson likelihood contribution from each bin. Voilá! A maximum likelihood fitter for histograms.</p>
+<p>Advantages of LMFIT over our earlier, homemade approach to fitting line shapes include:</p>
+<ul>
+<li>Users can forget about the order of variables and refer to Parameters by meaningful names.</li>
+<li>Users can place algebraic constraints on Parameters.</li>
+<li>The interface for setting upper/lower bounds on parameters and for varying or fixing them is much more elegant, memorable, and simple than our homemade version.</li>
+<li>
+<p>It ultimately wraps the <code>scipy.optimize</code> package and therefore inherits all of its advantages:</p>
+</li>
+<li>
+<p>a choice of over a dozen optimizers with highly technical documentation,</p>
+</li>
+<li>some optimizers that aim for true global (not just local) optimization, and</li>
+<li>the countless expert-years that have been invested in perfecting it.</li>
+<li>LMFIT automatically computes numerous statistics of each fit including estimated uncertainties, correlations, and multiple quality-of-fit statistics (information criteria as well as chi-square) and offers user-friendly fit reports. See the <a href="https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result"><code>MinimizerResult</code></a> object.</li>
+<li>It's the work of Matt Newville, an x-ray scientist responsible for the excellent <a href="http://cars9.uchicago.edu/ifeffit/"><code>ifeffit</code></a> and its successor <a href="https://xraypy.github.io/xraylarch/"><code>Larch</code></a>.</li>
+<li>Above all, <em>its documentation is complete, already written, and maintained by not-us.</em></li>
+</ul>
+<h2 id="usage-guide">Usage guide</h2>
+<p>This overview is hardly complete, but we hope it can be a quick-start guide and also hint at how you can convert your own analysis work from the old to the new, preferred fitting methods.</p>
+<h3 id="the-underlying-spectral-line-shape-models">The underlying spectral line shape models</h3>
+<p>Objects of the type <code>SpectralLine</code> encode the line shape of a fluorescence line, as a sum of Voigt or Lorentzian distributions. Because they inherit from <code>scipy.stats.rv_continuous</code>, they allow computation of cumulative distribution functions and the simulation of data drawn from the distribution. An example of the creation and usage is:</p>
+<pre><code class="language-python">  import numpy as np
+  import pylab as plt
+  import mass2
+  import mass2.materials
+
+  # Known lines are accessed by:
+  line = mass2.spectra[&quot;MnKAlpha&quot;]
+
+  rng = np.random.default_rng(1066)
+  N = 100000
+  energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
+  plt.clf()
+  sim, bin_edges, _ = plt.hist(energies, 120, [5865, 5925], histtype=&quot;step&quot;);
+  binsize = bin_edges[1] - bin_edges[0]
+  e = bin_edges[:-1] + 0.5*binsize
+  plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, &quot;k&quot;)
+  plt.xlabel(&quot;Energy (eV)&quot;)
+  plt.title(&quot;Mn K$\\alpha$ random deviates and theory curve&quot;)
+</code></pre>
+<!-- plt.savefig("img/distribution_plus_theory.png"); plt.close()
+
+.. image:: img/distribution_plus_theory.png
+  :width: 40% -->
+
+<p>The <code>SpectralLine</code> object is useful to you if you need to generate simulated data, or to plot a line shape, as shown above. The objects that perform line fitting  use the <code>SpectralLine</code> object to hold line shape information. You don't need to create a <code>SpectralLine</code> object for fitting, though; it will be done automatically.</p>
+<h3 id="how-to-use-the-lmfit-based-models-for-fitting">How to use the LMFIT-based models for fitting</h3>
+<p>The simplest case of line fitting requires only 3 steps: create a model instance from a <code>SpectralLine</code>, guess its parameters from the data, and perform a fit with this guess. Plotting is not done as part of the fit--you have to do that separately.</p>
+<pre><code class="language-python">  model = line.model()
+  params = model.guess(sim, bin_centers=e, dph_de=1)
+  resultA = model.fit(sim, params, bin_centers=e)
+
+  # Fit again but with dPH/dE held at 1.
+  # dPH/dE will be a free parameter for the fit by default, largely due to the history of MnKAlpha fits being so critical during development.
+  # This will not work for nearly monochromatic lines, however, as the resolution (fwhm) and scale (dph_de) are exactly degenerate.
+  # In practice, most fits are done with dph_de fixed.
+  params = resultA.params.copy()
+  resultB = model.fit(sim, params, bin_centers=e, dph_de=1)
+  params[&quot;dph_de&quot;].set(1.0, vary=False)
+
+  # There are two plotting methods. The first is an LMfit built-in; the other (&quot;mass-style&quot;) puts the
+  # fit parameters on the plot.
+  resultB.plot()
+  resultB.plotm()
+
+  # The best-fit params are found in resultB.params
+  # and a dictionary of their values is resultB.best_values.
+  # The parameters given as an argument to fit are unchanged.
+</code></pre>
+<!-- .. testcode::
+  :hide:
+
+  plt.savefig("img/mnka_fit1m.png"); plt.close()
+  plt.savefig("img/mnka_fit1.png"); plt.close()
+
+.. image:: img/mnka_fit1.png
+  :width: 40%
+
+.. image:: img/mnka_fit1m.png
+  :width: 40% -->
+
+<p>You can print a nicely formatted fit report with the method <code>fit_report()</code>:</p>
+<pre><code class="language-python">  print(resultB.fit_report())
+</code></pre>
+<pre><code class="language-text">  [[Model]]
+      GenericLineModel(MnKAlpha)
+  [[Fit Statistics]]
+      # fitting method   = least_squares
+      # function evals   = 15
+      # data points      = 120
+      # variables        = 4
+      chi-square         = 100.565947
+      reduced chi-square = 0.86694782
+      Akaike info crit   = -13.2013653
+      Bayesian info crit = -2.05139830
+      R-squared          = 0.99999953
+  [[Variables]]
+      fwhm:        2.21558094 +/- 0.02687437 (1.21%) (init = 2.217155)
+      peak_ph:     5898.79525 +/- 0.00789761 (0.00%) (init = 5898.794)
+      dph_de:      1 (fixed)
+      integral:    99986.5425 +/- 314.455266 (0.31%) (init = 99985.8)
+      background:  5.0098e-16 +/- 0.80578112 (160842446370819488.00%) (init = 2.791565e-09)
+      bg_slope:    0 (fixed)
+  [[Correlations]] (unreported correlations are &lt; 0.100)
+      C(integral, background) = -0.3147
+      C(fwhm, peak_ph)        = -0.1121
+</code></pre>
+<h3 id="fitting-with-exponential-tails-to-low-or-high-energy">Fitting with exponential tails (to low or high energy)</h3>
+<p>Notice when you report the fit (or check the contents of the <code>params</code> or <code>resultB.params</code> objects), there are no parameters referring to exponential tails of a Bortels response. That's because the default fitter assumes a <em>Gaussian</em> response. If you want tails, that's a constructor argument:</p>
+<pre><code class="language-python">  model = line.model(has_tails=True)
+  params = model.guess(sim, bin_centers=e, dph_de=1)
+  params[&quot;dph_de&quot;].set(1.0, vary=False)
+  resultC = model.fit(sim, params, bin_centers=e)
+  resultC.plot()
+  # print(resultC.fit_report())
+</code></pre>
+<!-- .. testcode::
+  :hide:
+
+  plt.savefig("img/mnka_fit2.png"); plt.close()
+
+.. image:: img/mnka_fit2.png
+  :width: 40% -->
+
+<p>By default, the <code>has_tails=True</code> will set up a non-zero low-energy tail and allow it to vary, while the high-energy tail is set to zero amplitude and doesn't vary. Use these numbered examples if you want to fit for a high-energy tail (1), to fix the low-E tail at some non-zero level (2) or to turn off the low-E tail completely (3):</p>
+<pre><code class="language-python">  # 1. To let the low-E and high-E tail both vary simultaneously
+  params[&quot;tail_share_hi&quot;].set(.1, vary=True)
+  params[&quot;tail_tau_hi&quot;].set(30, vary=True)
+
+  # 2. To fix the sum of low-E and high-E tail at a 10% level, with low-E tau=30 eV, but
+  # the share of the low vs high tail can vary
+  params[&quot;tail_frac&quot;].set(.1, vary=False)
+  params[&quot;tail_tau&quot;].set(30, vary=False)
+
+  # 3. To turn off low-E tail
+  params[&quot;tail_frac&quot;].set(.1, vary=True)
+  params[&quot;tail_share_hi&quot;].set(1, vary=False)
+  params[&quot;tail_tau&quot;].set(vary=False)
+</code></pre>
+<h3 id="fitting-with-a-quantum-efficiency-model">Fitting with a quantum efficiency model</h3>
+<p>If you want to multiply the line models by a model of the quantum efficiency, you can do that. You need a <code>qemodel</code> function or callable function object that takes an energy (scalar or vector) and returns the corresponding efficiency. For example, you can use the "Raven1 2019" QE model from <code>mass2.materials</code>. The filter-stack models are not terribly fast to run, so it's best to compute once, spline the results, and pass that spline as the <code>qemodel</code> to <code>line.model(qemodel=qemodel)</code>.</p>
+<pre><code class="language-python">  raven_filters = mass2.materials.efficiency_models.filterstack_models[&quot;RAVEN1 2019&quot;]
+  eknots = np.linspace(100, 20000, 1991)
+  qevalues = raven_filters(eknots)
+  qemodel = mass2.mathstat.interpolate.CubicSpline(eknots, qevalues)
+
+  model = line.model(qemodel=qemodel)
+  resultD = model.fit(sim, resultB.params, bin_centers=e)
+  resultD.plotm()
+  # print(resultD.fit_report())
+
+  fit_counts = resultD.params[&quot;integral&quot;].value
+  localqe = qemodel(mass2.STANDARD_FEATURES[&quot;MnKAlpha&quot;])
+  fit_observed = fit_counts*localqe
+  fit_err = resultD.params[&quot;integral&quot;].stderr
+  count_err = fit_err*localqe
+  print(&quot;Fit finds {:.0f}±{:.0f} counts before QE, or {:.0f}±{:.0f} observed. True value {:d}.&quot;.format(
+      round(fit_counts, -1), round(fit_err, -1), round(fit_observed, -1), round(count_err, -1), N))
+</code></pre>
+<pre><code class="language-text">Fit finds 168810±530 counts before QE, or 100020±320 observed. True value 100000.
+</code></pre>
+<!-- .. testcode::
+  :hide:
+
+  plt.savefig("img/mnka_fit3.png"); plt.close()
+
+.. image:: img/mnka_fit3.png
+  :width: 40% -->
+
+<p>When you fit with a non-trivial QE model, all fit parameters that refer to intensities of signal or background refer to a sensor with an ideal QE=1. These parameters include:</p>
+<ul>
+<li><code>integral</code></li>
+<li><code>background</code></li>
+<li><code>bg_slope</code></li>
+</ul>
+<p>That is, the fit values must be multiplied by the local QE to give the number of <em>observed</em> signal counts, background counts per bin, or background slope.
+With or without a QE model, "integral" refers to the number of photons that would be seen across all energies (not just in the range being fit).</p>
+<h3 id="fitting-a-simple-gaussian-lorentzian-or-voigt-function">Fitting a simple Gaussian, Lorentzian, or Voigt function</h3>
+<pre><code class="language-python">  e_ctr = 1000.0
+  Nsig = 10000
+  Nbg = 1000
+
+  sigma = 1.0
+  x_gauss = rng.standard_normal(Nsig)*sigma + e_ctr
+  hwhm = 1.0
+  x_lorentz = rng.standard_cauchy(Nsig)*hwhm + e_ctr
+  x_voigt = rng.standard_cauchy(Nsig)*hwhm + rng.standard_normal(Nsig)*sigma + e_ctr
+  bg = rng.uniform(e_ctr-5, e_ctr+5, size=Nbg)
+
+  # Gaussian fit
+  c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
+  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, 0, 0)
+  line.linetype = &quot;Gaussian&quot;
+  model = line.model()
+  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+  params[&quot;fwhm&quot;].set(2.3548*sigma)
+  params[&quot;background&quot;].set(Nbg/len(c))
+  resultG = model.fit(c, params, bin_centers=bin_ctr)
+  resultG.plotm()
+  # print(resultG.fit_report())
+
+  # Lorentzian fit
+  c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
+  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, 0)
+  line.linetype = &quot;Lorentzian&quot;
+  model = line.model()
+  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+  params[&quot;fwhm&quot;].set(2.3548*sigma)
+  params[&quot;background&quot;].set(Nbg/len(c))
+  resultL = model.fit(c, params, bin_centers=bin_ctr)
+  resultL.plotm()
+  # print(resultL.fit_report())
+
+  # Voigt fit
+  c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
+  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, sigma)
+  line.linetype = &quot;Voigt&quot;
+  model = line.model()
+  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+  params[&quot;fwhm&quot;].set(2.3548*sigma)
+  params[&quot;background&quot;].set(Nbg/len(c))
+  resultV = model.fit(c, params, bin_centers=bin_ctr)
+  resultV.plotm()
+  # print(resultV.fit_report())
+</code></pre>
+<!-- .. testcode::
+  :hide:
+
+  plt.savefig("img/mnka_fitV.png"); plt.close()
+  plt.savefig("img/mnka_fitL.png"); plt.close()
+  plt.savefig("img/mnka_fitG.png"); plt.close()
+
+.. image:: img/mnka_fitG.png
+  :width: 40%
+
+.. image:: img/mnka_fitL.png
+  :width: 40%
+
+.. image:: img/mnka_fitV.png
+  :width: 40% -->
+
+<h3 id="more-details-of-fitting-fluorescence-line-models">More details of fitting fluorescence-line models</h3>
+<ol>
+<li>Use <code>p=model.guess(data, bin_centers=e, dph_de=dph_de)</code> to create a heuristic for the starting parameters.</li>
+<li>Change starting values and toggle the <code>vary</code> attribute on parameters, as needed. For example: <code>p["dph_de"].set(1.0, vary=False)</code></li>
+<li>Use <code>result=model.fit(data, p, bin_centers=e)</code> to perform the fit and store the result.</li>
+<li>The result holds many attributes and methods (see <a href="https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result"><code>MinimizerResult</code></a> for full documentation). These include:<ul>
+<li><code>result.params</code> = the model's best-fit parameters object</li>
+<li><code>result.best_values</code> = a dictionary of the best-fit parameter values</li>
+<li><code>result.best_fit</code> = the model's y-values at the best-fit parameter values</li>
+<li><code>result.chisqr</code> = the chi-squared statistic of the fit (here, -2log(L))</li>
+<li><code>result.covar</code> = the computed covariance</li>
+<li><code>result.fit_report()</code> = return a pretty-printed string reporting on the fit</li>
+<li><code>result.plot_fit()</code> = make a plot of the data and fit</li>
+<li><code>result.plot_residuals()</code> = make a plot of the residuals (fit-data)</li>
+<li><code>result.plot()</code> = make a plot of the data, fit, and residuals, generally <code>plotm</code> is preferred</li>
+<li><code>result.plotm()</code> = make a plot of the data, fit, and fit params with dataset filename in title</li>
+</ul>
+</li>
+</ol>
+<p>The tau values (scale lengths of exponential tails) in eV units. The parameter "integral" refers to the integrated number of counts across all energies (whether inside or beyond the fitted energy range).</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../fluorescence/" class="btn btn-neutral float-left" title="Fluorescence lines"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../hci_lines_from_asd/" class="btn btn-neutral float-right" title="HCI lines">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../fluorescence/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../hci_lines_from_asd/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

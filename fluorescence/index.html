@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>About - Mass2</title>
+    <title>Fluorescence lines - Mass2</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,8 +13,8 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "About";
-        var mkdocs_page_input_path = "about.md";
+        var mkdocs_page_name = "Fluorescence lines";
+        var mkdocs_page_input_path = "fluorescence.md";
         var mkdocs_page_url = null;
       </script>
     
@@ -52,8 +52,20 @@
                 <li class="toctree-l1"><a class="reference internal" href="../filtering/">Optimal filtering</a>
                 </li>
               </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../fluorescence/">Fluorescence lines</a>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Fluorescence lines</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#examples">Examples</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#1-plot-the-distribution">1. Plot the distribution</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#2-generate-random-deviates-from-a-fluorescence-line-shape">2. Generate random deviates from a fluorescence line shape</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#3-fit-data-to-a-fluorescence-line-model">3. Fit data to a fluorescence line model</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
                 </li>
               </ul>
               <ul>
@@ -76,10 +88,8 @@
                 <li class="toctree-l1"><a class="reference internal" href="../tests/">Testing</a>
                 </li>
               </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">About</a>
-    <ul class="current">
-    </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../about/">About</a>
                 </li>
               </ul>
       </div>
@@ -96,7 +106,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">About</li>
+      <li class="breadcrumb-item active">Fluorescence lines</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -105,27 +115,55 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h2 id="authors">Authors</h2>
-<p>MASS is the work of physicists from <a href="https://www.nist.gov/pml/quantum-sensors">Quantum Sensors Division</a> of the NIST Boulder Labs and the University of Colorado <a href="https://www.colorado.edu/physics/">Physics Department</a>, with substantial contributions from:</p>
-<ul>
-<li><a href="https://github.com/joefowler/">Joe Fowler</a>, project director</li>
-<li><a href="https://github.com/ggggggggg/">Galen O'Neil</a>, co-director</li>
-<li><a href="https://github.com/danbek/">Dan Becker</a></li>
-<li>Young-Il Joe</li>
-<li><a href="https://github.com/cjtitus">Jamie Titus</a></li>
-<li><a href="https://github.com/jsh162">Joshua Ho</a></li>
-<li>Many collaborators, who have made many bug reports, bug fixes, and feature requests.</li>
-</ul>
-<h2 id="major-versions">Major Versions</h2>
-<ul>
-<li>MASS version 2 was begin in August 2025. It is still unstable, in alpha or pre-alpha status. Find it at <a href="https://github.com/usnistgov/mass2">https://github.com/usnistgov/mass2</a></li>
-<li>MASS version 1 was begun in November 2010. Bug-fix development continues. Find it at <a href="https://github.com/usnistgov/mass">https://github.com/usnistgov/mass</a></li>
-</ul>
+                <h2 id="fluorescence-lines">Fluorescence Lines</h2>
+<p>Mass includes numerous features to help you analyze and model the fluorescence emission of various elements. Mass can</p>
+<ol>
+<li>Approximate the shape of the fluorescence line emission for certain lines (particularly the K-alpha and K-beta lines of elements from Mg to Zn, or Z=12 to 30).</li>
+<li>Generate random deviates, drawn from these same energy distributions.</li>
+<li>Fit a measured spectrum to on of these energy distributions.</li>
+</ol>
+<h3 id="examples">Examples</h3>
+<h4 id="1-plot-the-distribution">1. Plot the distribution</h4>
+<p>Objects of the <code>SpectralLine</code> class are callable, and return their PDF given the energy as an array or scalar argument.</p>
+<pre><code class="language-python">import mass2
+import numpy as np
+import pylab as plt
+spectrum = mass2.spectra[&quot;MnKAlpha&quot;]
+plt.clf()
+axis=plt.gca()
+for fwhm in (3,4,5,6,8,10):
+    spectrum.plot(axis=axis,components=False,label=&quot;{}&quot;.format(fwhm),setylim=False,instrument_gaussian_fwhm=fwhm);
+plt.legend(loc=&quot;upper left&quot;)
+plt.title(&quot;Mn K$\\alpha$ distribution at various resolutions&quot;)
+plt.xlabel(&quot;Energy (eV)&quot;)
+</code></pre>
+<h4 id="2-generate-random-deviates-from-a-fluorescence-line-shape">2. Generate random deviates from a fluorescence line shape</h4>
+<p>Objects of the <code>SpectralLine</code> class roughly copy the API of the scipy type <code>scipy.stats.rv_continuous</code> and offer some of the methods, such as <code>pdf</code>, <code>rvs</code>.:</p>
+<pre><code class="language-python">energies0 = spectrum.rvs(size=20000, instrument_gaussian_fwhm=0)
+energies3 = spectrum.rvs(size=20000, instrument_gaussian_fwhm=3)
+
+plt.clf()
+contents0, bin_edges0, _ = plt.hist(energies0, 200, range=[5820,5960], histtype=&quot;step&quot;)
+contents3, bin_edges3, _ = plt.hist(energies3, 200, range=[5820,5960], histtype=&quot;step&quot;)
+bin_ctr = bin_edges3[:-1] + 0.5 * (bin_edges3[1] - bin_edges3[0])
+plt.xlabel(&quot;Energy (eV)&quot;)
+plt.ylabel(&quot;Counts per bin&quot;)
+</code></pre>
+<h4 id="3-fit-data-to-a-fluorescence-line-model">3. Fit data to a fluorescence line model</h4>
+<pre><code class="language-python">model = mass2.spectra[&quot;MnKAlpha&quot;].model()
+guess_params = model.guess(contents3, bin_ctr, dph_de=1.0)
+result = model.fit(contents3, guess_params, bin_centers=bin_ctr)
+result.plotm()
+print(result.best_values)
+fwhm = result.params[&quot;fwhm&quot;]
+print(f&quot;Estimated resolution (FWHM) = {fwhm.value}±{fwhm.stderr}&quot;)
+</code></pre>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../tests/" class="btn btn-neutral float-left" title="Testing"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../filtering/" class="btn btn-neutral float-left" title="Optimal filtering"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../line_fitting/" class="btn btn-neutral float-right" title="Line fitting">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -148,8 +186,10 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../tests/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../filtering/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
+    
+      <span><a href="../line_fitting/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

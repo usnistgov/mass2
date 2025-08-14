@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>About - Mass2</title>
+    <title>Testing - Mass2</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,8 +13,8 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "About";
-        var mkdocs_page_input_path = "about.md";
+        var mkdocs_page_name = "Testing";
+        var mkdocs_page_input_path = "tests.md";
         var mkdocs_page_url = null;
       </script>
     
@@ -72,14 +72,14 @@
                 <li class="toctree-l1"><a class="reference internal" href="../LJHfiles/">LJH file format</a>
                 </li>
               </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../tests/">Testing</a>
-                </li>
-              </ul>
               <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">About</a>
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Testing</a>
     <ul class="current">
     </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../about/">About</a>
                 </li>
               </ul>
       </div>
@@ -96,7 +96,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">About</li>
+      <li class="breadcrumb-item active">Testing</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -105,27 +105,16 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h2 id="authors">Authors</h2>
-<p>MASS is the work of physicists from <a href="https://www.nist.gov/pml/quantum-sensors">Quantum Sensors Division</a> of the NIST Boulder Labs and the University of Colorado <a href="https://www.colorado.edu/physics/">Physics Department</a>, with substantial contributions from:</p>
-<ul>
-<li><a href="https://github.com/joefowler/">Joe Fowler</a>, project director</li>
-<li><a href="https://github.com/ggggggggg/">Galen O'Neil</a>, co-director</li>
-<li><a href="https://github.com/danbek/">Dan Becker</a></li>
-<li>Young-Il Joe</li>
-<li><a href="https://github.com/cjtitus">Jamie Titus</a></li>
-<li><a href="https://github.com/jsh162">Joshua Ho</a></li>
-<li>Many collaborators, who have made many bug reports, bug fixes, and feature requests.</li>
-</ul>
-<h2 id="major-versions">Major Versions</h2>
-<ul>
-<li>MASS version 2 was begin in August 2025. It is still unstable, in alpha or pre-alpha status. Find it at <a href="https://github.com/usnistgov/mass2">https://github.com/usnistgov/mass2</a></li>
-<li>MASS version 1 was begun in November 2010. Bug-fix development continues. Find it at <a href="https://github.com/usnistgov/mass">https://github.com/usnistgov/mass</a></li>
-</ul>
+                <h1 id="unit-testing">Unit testing</h1>
+<p>If you want to run the unit tests for <code>mass2</code> go to your <code>mass2</code> directory and do <code>pytest .</code></p>
+<p>If you want to add tests to <code>mass2</code>, you do <em>not</em> need to use the old <code>unittest</code> framework. Simpler, more modern tests in the <code>pytest</code> style are allowed (and preferred). Put any new tests in a file somewhere inside <code>tests</code> with a name like <code>test_myfeature.py</code>, it must match the pattern <code>test_*.py</code> to be found by pytest.</p>
+<p>On each commit to develop, the tests will be run automatically by GitHub Actions. See <a href="https://github.com/usnistgov/mass2/actions">results of recent tests</a>.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../tests/" class="btn btn-neutral float-left" title="Testing"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../LJHfiles/" class="btn btn-neutral float-left" title="LJH file format"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../about/" class="btn btn-neutral float-right" title="About">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -148,8 +137,10 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../tests/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../LJHfiles/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
+    
+      <span><a href="../about/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

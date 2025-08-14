@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/theme.css" />
     <link rel="stylesheet" href="css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="assets/_mkdocstrings.css" rel="stylesheet" />
     
       <script>
         // Current page data
@@ -50,7 +51,35 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="docstrings/">Docstrings</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="filtering/">Optimal filtering</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="fluorescence/">Fluorescence lines</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="line_fitting/">Line fitting</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="hci_lines_from_asd/">HCI lines</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="xray_efficiency_models/">X-ray models</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="LJHfiles/">LJH file format</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="tests/">Testing</a>
                 </li>
               </ul>
               <ul>
@@ -80,38 +109,42 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="mass-2-microcalorimeter-analysis-software-suite">MASS 2: Microcalorimeter Analysis Software Suite</h1>
+                <h1 id="mass-2-microcalorimeter-analysis-software-suite">Mass 2: Microcalorimeter Analysis Software Suite</h1>
 <center>
 <img src="mass2_logo_128.png" alt="Mass 2 logo">
 </center>
 
 <h2 id="overview-of-mass-2">Overview of Mass 2</h2>
-<p>MASS is a Python software suite designed to analyze pulse records from high-resolution, cryogenic microcalorimeters. We use MASS with pulse records from x-ray and gamma-ray spectrometers, performing a sequence of analysis, or "calibration" steps to extract a high-precision estimate of the energy from each record.</p>
-<p>With raw pulse records and MASS, you can:</p>
+<p>Mass is a Python software suite designed to analyze pulse records from high-resolution, cryogenic microcalorimeters. We use Mass with pulse records from x-ray and gamma-ray spectrometers, performing a sequence of analysis, or "calibration" steps to extract a high-precision estimate of the energy from each record.</p>
+<p>With raw pulse records and Mass, you can:</p>
 <ul>
 <li>Analyze data from one or multiple detectors at one time.</li>
 <li>Analyze data from one or more raw pulse data files per detector.</li>
 <li>Analyze a fixed dataset taken in the past, or perform "online" analysis of a dataset still being acquired.</li>
 <li>Analyze data from time-division multiplexed (TDM) and microwave-multiplexed (µMUX) systems.</li>
-<li>Choose and apply data cuts.</li>
 <li>Compute and apply "optimal filters" of various types.</li>
+</ul>
+<p>With or without raw pulse records, further analysis tasks that Mass helps with include:</p>
+<ul>
+<li>Choose and apply data cuts.</li>
 <li>Fix complex line shapes in an energy spectrum.</li>
 <li>Estimate and apply accurate functions for absolute-energy calibration.</li>
 <li>Win friends and influence people.</li>
 </ul>
 <h2 id="major-concepts">Major concepts</h2>
-<p>Mass2 is built on a few core technologies:</p>
+<p>Mass2 is built around a few core technologies:</p>
 <ol>
-<li><a href="https://pola.rs/">Pola.rs</a>, a high-performance modern dataframe library. Organizes the data structures.</li>
+<li><a href="https://pola.rs/">Pola.rs</a>, a high-performance modern dataframe library. Organizes the data structures and provides data I/O.</li>
 <li><a href="https://numpy.org/">Numpy</a>. For numerical arrays and scientific computation.</li>
 <li><a href="https://scipy.org/">Scipy</a>. Additional algorithms for scientific computation.</li>
+<li><a href="https://lmfit.github.io/lmfit-py/">LMFIT</a>. Convenient non-linear curve fitting.</li>
 </ol>
-<p>Unlike Mass version 1, Mass 2 leverages existing libraries for data organization. This offers the advantage that documentation, bug fixes, and testing are provided by the larger open-source software community.</p>
+<p>A particularly important change is that Mass 2 leverages Pola.rs for data organization. Therefore, for a critical portion of the code, the larger open-source software community provides the documentation, bug fixes, and testing.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="LJHfiles/" class="btn btn-neutral float-right" title="LJH file format">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="docstrings/" class="btn btn-neutral float-right" title="Docstrings">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -135,7 +168,7 @@
     
     
     
-      <span><a href="LJHfiles/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="docstrings/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
@@ -155,5 +188,5 @@
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2025-08-13 22:39:22.815033+00:00
+Build Date UTC : 2025-08-14 20:07:38.998492+00:00
 -->
