@@ -9,12 +9,15 @@ from mktestdocs import check_md_file
     and check it for runnable python, and be sure that mktestdocs is happy.
 
     See https://github.com/koaning/mktestdocs for where this script comes from.
+
+    Note the use of `ids=str`, makes for pretty output
 """
 
-# Note the use of `str`, makes for pretty output
+
+doc_paths = pathlib.Path("docs").glob("**/*.md")
 
 
-@pytest.mark.parametrize("fpath", pathlib.Path("docs").glob("**/*.md"), ids=str)
+@pytest.mark.parametrize("fpath", doc_paths, ids=str)
 def test_files_good(fpath):
     print(f"Testing {fpath}")
     check_md_file(fpath=fpath, memory=True)
