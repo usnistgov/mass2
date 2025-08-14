@@ -6,6 +6,7 @@ nav:
   - Fluorescence lines: fluorescence.md
   - HCI lines: hci_lines_from_asd.md
   - LJH file format: LJHfiles.md
+  - Testing: tests.md
   - About: about.md
 
 theme: readthedocs
