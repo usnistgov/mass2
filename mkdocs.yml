@@ -1,8 +1,14 @@
 site_name: Mass2
 nav:
   - Home: index.md
+  - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
   - Fluorescence lines: fluorescence.md
   - LJH file format: LJHfiles.md
   - About: about.md
+
 theme: readthedocs
+
+plugins:
+- search
+- mkdocstrings
