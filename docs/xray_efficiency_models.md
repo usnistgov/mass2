@@ -139,9 +139,12 @@ Usage examples and efficiency curves of these classes are shown below.
 
 ```python
   premade_filter_stack = mass2.materials.FilterStack(name='A Stack of Premade Filters')
-  premade_filter_stack.add_AlFilmWithOxide(name='My Oxidized Al Filter', Al_thickness_nm=50.0)
-  premade_filter_stack.add_AlFilmWithPolymer(name='My Polymer Backed Al Filter', Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
-  premade_filter_stack.add_LEX_HT(name='My LEX HT Filter')
+  f1 = mass2.materials.AlFilmWithOxide(name='My Oxidized Al Filter', Al_thickness_nm=50.0)
+  f2 = mass2.materials.AlFilmWithPolymer(name='My Polymer Backed Al Filter', Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
+  f3 = mass2.materials.LEX_HT(name="My LEX HT Filter")
+  premade_filter_stack.add(f1)
+  premade_filter_stack.add(f2)
+  premade_filter_stack.add(f3)
   low_xray_energies_eV = np.arange(100,3000,5)
   premade_filter_stack.plot_efficiency(low_xray_energies_eV)
 ```
