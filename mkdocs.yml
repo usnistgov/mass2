@@ -4,6 +4,7 @@ nav:
   - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
   - Fluorescence lines: fluorescence.md
+  - Line fitting: line_fitting.md
   - HCI lines: hci_lines_from_asd.md
   - X-ray models: xray_efficiency_models.md
   - LJH file format: LJHfiles.md

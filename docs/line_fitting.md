@@ -2,7 +2,7 @@
 
 Joe Fowler, January 2020.
 
-Previously, we wrote our own modification to the Levenberg-Marquardt optimizer in order to reach maximum-likelihood (not least-squares) fits. This appears in mass as the `LineFitter` class and its subclasses. In its place, we want to use the `LMFIT package <https://lmfit.github.io/lmfit-py/>`_ and the new MASS class `GenericLineModel` and its subclasses.
+Previously, we wrote our own modification to the Levenberg-Marquardt optimizer in order to reach maximum-likelihood (not least-squares) fits. This appears in mass as the `LineFitter` class and its subclasses. In its place, we want to use the `LMFIT package` <https://lmfit.github.io/lmfit-py/> and the new MASS class `GenericLineModel` and its subclasses.
 
 ## LMFit vs Scipy
 
@@ -25,8 +25,8 @@ Advantages of LMFIT over the earlier, homemade method of the `LineFitter` includ
   * a choice of over a dozen optimizers with highly technical documentation,
   * some optimizers that aim for true global (not just local) optimization, and
   * the countless expert-years that have been invested in perfecting it.
-* LMFIT automatically computes numerous statistics of each fit including estimated uncertainties, correlations, and multiple quality-of-fit statistics (information criteria as well as chi-square) and offers user-friendly fit reports. See the `MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result>`_ object.
-* It's the work of Matt Newville, an x-ray scientist responsible for the excellent `ifeffit <http://cars9.uchicago.edu/ifeffit/>`_ and its successor `Larch <https://xraypy.github.io/xraylarch/>`_.
+* LMFIT automatically computes numerous statistics of each fit including estimated uncertainties, correlations, and multiple quality-of-fit statistics (information criteria as well as chi-square) and offers user-friendly fit reports. See the `MinimizerResult` <https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result> object.
+* It's the work of Matt Newville, an x-ray scientist responsible for the excellent `ifeffit` <http://cars9.uchicago.edu/ifeffit/> and its successor `Larch` <https://xraypy.github.io/xraylarch/>.
 * Above all, *its documentation is complete, already written, and maintained by not-us.*
 
 ## Usage guide
@@ -234,8 +234,7 @@ When you fit with a non-trivial QE model, the fit parameters that refer to signa
 That is, the fit values must be multiplied by the local QE to give the number of _observed_ signal counts, background counts per bin, or background slope.
 With or without a QE model, "integral" refers to the number of photons that would be seen across all energies (not just in the range being fit).
 
-Fitting a simple Gaussian, Lorentzian, or Voigt function
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### Fitting a simple Gaussian, Lorentzian, or Voigt function
 
 .. testcode::
 
@@ -306,8 +305,7 @@ Fitting a simple Gaussian, Lorentzian, or Voigt function
   :width: 40%
 
 
-How to convert your personal analysis code from the old to the new method
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### How to convert your personal analysis code from the old to the new method
 
 The old "Fitter" methods are very simple to use in the usual case, but they were increasingly klunky if you want to vary
 what usually doesn't vary, to hold what usually isn't held, and to skip plotting, etc. The `fitter = mass.MnKAlpha.fitter()`
@@ -315,11 +313,11 @@ is an example of using the old fitters. Don't do that!
 
 An overview of how to convert is:
 
-#. Get a Model object instead of a Fitter object.
-#. Use `p=model.guess(data, bin_centers=e, dph_de=dph_de)` to create a heuristic for the starting parameters.
-#. Change starting values and toggle the `vary` attribute on parameters, as needed. For example: `p["dph_de"].set(1.0, vary=False)`
-#. Use `result=model.fit(data, p, bin_centers=e)` to perform the fit and store the result.
-#. The result holds many attributes and methods (see `MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result>`_ for full documentation). These include:
+1. Get a Model object instead of a Fitter object.
+1. Use `p=model.guess(data, bin_centers=e, dph_de=dph_de)` to create a heuristic for the starting parameters.
+1. Change starting values and toggle the `vary` attribute on parameters, as needed. For example: `p["dph_de"].set(1.0, vary=False)`
+1. Use `result=model.fit(data, p, bin_centers=e)` to perform the fit and store the result.
+1. The result holds many attributes and methods (see `MinimizerResult` <https://lmfit.github.io/lmfit-py/fitting.html#minimizerresult-the-optimization-result> for full documentation). These include:
 
   * `result.params` = the model's best-fit parameters object
   * `result.best_values` = a dictionary of the best-fit parameter values
@@ -334,12 +332,3 @@ An overview of how to convert is:
 
 
 One detail that's changed: the new models parameterize the tau values (scale lengths of exponential tails) in eV units. The old fitters assumed tau were given in units of bins. Another is that the parameter "integral" refers to the integrated number of counts across all energies; the old parameter "amplitude" was the same but scaled by the bin width in eV. The old way didn't make sense, but that's how it was.
-
-To do
-^^^^^
-
-* [x] We probably should restructure the `SpectralLine`, `GenericLineModel`, and perhaps also the older `LineFitter` objects such that the specific versions for (say) Mn Kα become not subclasses but instances of them. See `issue 182 <https://github.com/usnistgov/mass/issues/182>`_ on the question of whether this change might speed up loading of MASS. Done by PR#120.
-* [x] Add to `GenericLineModel` one or more methods to make plots comparing data and fit with parameter values printed on the plot.
-* [x] The LMFIT view of models is such that we would probably find it easy to fit one histogram for the sum of (say) a Mn Kα and a Cr Kβ line simultaneously. Add features to our object, as needed, and document the procedure here.
-* [ ] We could implement convolution between two models (see just below `CompositeModel <https://lmfit.github.io/lmfit-py/model.html#lmfit.model.CompositeModel>`_ in the docs for how to do this).
-* [x] At some point, we ought to remove the deprecated `LineFitter` object and subclasses thereof.
