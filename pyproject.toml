@@ -69,6 +69,13 @@ mass2-nb = "mass2.core.mass2notebook:main"
 requires = ["setuptools>=61", "setuptools_scm>=8", "wheel", "numpy>=1.14"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = false # Set to false if you're explicitly defining includes/excludes
+
+[tool.setuptools.packages.find]
+include = ["mass2*"]
+exclude = ["site*", "docs*"]
+
 [tool.setuptools.package-data]
 mass2 = [
     "calibration/nist_xray_data.dat",
