@@ -46,8 +46,8 @@ def _(Path, np):
     min_frames_from_last = 4000
     energy_of_highest_peak_ev = 5245.0314e3
 
-    npre = 400
-    npost = 700
+    npre = 1500
+    npost = 1500
     return (
         bin_path,
         energy_of_highest_peak_ev,
@@ -937,7 +937,45 @@ def _(ch_combo):
 
 
 @app.cell
-def _():
+def _(mass2):
+    model1=mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
+    model2=mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
+    model = model1+model2
+    params = model.make_params()
+    params["Bintegral"].set(1000)
+    params["integral"].set(10000)
+    params["fwhm"].set(4000, max=6000)
+
+    params["Bfwhm"].set(expr="fwhm")
+    params["Btail_frac"].set(expr="tail_frac")
+    params["Btail_tau"].set(expr="tail_tau")
+    params["Bpeak_ph"].set(expr="peak_ph+Bshift")
+    params.add("Bshift",0.011e6, min=0.01e6, vary=False)
+    params["tail_frac"].set(vary=True)
+    params["tail_tau"].set(vary=True)
+    params["Bdph_de"].set(1, vary=False)
+    params["dph_de"].set(1, vary=False)
+
+
+    return model, params
+
+
+@app.cell
+def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
+    def _():
+        energies, live_time_s = livetime_clean_energies(ch_in=extra_ch)
+        energies_withco, live_time_s_withco = livetime_clean_energies(ch_in=ch5)
+        bin_edges = np.arange(5_100_000, 5_300_000, 250.0)
+        _, counts = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
+        _, counts_withco = mass2.misc.hist_of_series(energies_withco, bin_edges=bin_edges)
+        bin_centers, bin_size = mass2.misc.midpoints_and_step_size(bin_edges)
+        plt.plot(bin_centers, counts_withco)
+        plt.plot(bin_centers, model.eval(params=params, bin_centers=bin_centers))
+        result =  model.fit(counts_withco, params, bin_centers=bin_centers)
+        result.plotm()
+
+    _()
+    mass2.show()
     return
 
 
