@@ -4,6 +4,7 @@ import pylab as plt  # type: ignore
 import mass2
 from dataclasses import dataclass
 from numpy import ndarray
+from typing import Union
 
 
 def calc_autocorrelation(data):
@@ -75,13 +76,17 @@ def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=Fal
     return NoisePSD(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
 
 
-def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
+def noise_psd_mass(data, dt, window=None, skip_autocorr_if_length_over=10000) -> "NoisePSD":
     assert window is None, "windowing not implemented"
 
     (n_pulses, len_pulse) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
-    autocorr_vec = calc_autocorrelation(data)
+    if len_pulse <= skip_autocorr_if_length_over:
+        autocorr_vec = calc_autocorrelation(data)
+    else:
+        print("warning: noise_psd_mass skipping autocorrelation calculation for long traces, use skip_autocorr_if_length_over argument to override this")
+        autocorr_vec = None
     # nbins = len(psd_mass)
     # frequencies = calc_psd_frequencies(nbins, dt)
     return NoisePSD(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
@@ -90,7 +95,7 @@ def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
 @dataclass
 class NoisePSD:
     psd: np.ndarray
-    autocorr_vec: np.ndarray
+    autocorr_vec: Union[np.ndarray, None]
     frequencies: np.ndarray
 
     def plot(

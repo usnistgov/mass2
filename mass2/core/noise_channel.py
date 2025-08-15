@@ -74,9 +74,12 @@ class NoiseChannel:
         excursion_nsigma=5,
         trunc_front=0,
         trunc_back=0,
+        skip_autocorr_if_length_over=10000
     ):
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
-        spectrum = mass2.core.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
+        spectrum = mass2.core.noise_algorithms.noise_psd_mass(records, 
+                                                              dt=self.frametime_s, 
+                                                              skip_autocorr_if_length_over=skip_autocorr_if_length_over)
         return spectrum
 
     def __hash__(self):
