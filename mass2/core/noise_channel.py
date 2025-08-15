@@ -88,6 +88,12 @@ class NoiseChannel:
     def __eq__(self, other):
         return id(self) == id(other)
 
+    @property
+    def is_continuous(self):
+        if "continuous" in self.header_df:
+            return self.header_df["continuous"][0]
+        return False
+
     @classmethod
     def from_ljh(cls, path):
         ljh = mass2.LJHFile.open(path)
