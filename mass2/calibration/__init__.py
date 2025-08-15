@@ -14,4 +14,3 @@ from . import algorithms
 from . import energy_calibration
 from . import fluorescence_lines
 from . import line_models
-
