@@ -201,7 +201,7 @@ class Channel:
         plt.tight_layout()
 
     def good_series(self, col, use_expr=True):
-        return mass2.good_series(self.df, col, self.good_expr, use_expr)
+        return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_cal_combinatoric(
         self,
@@ -212,7 +212,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = mass2.RoughCalibrationStep.learn_combinatoric(
+        step = mass2.core.RoughCalibrationStep.learn_combinatoric(
             self,
             line_names,
             uncalibrated_col=uncalibrated_col,
@@ -233,7 +233,7 @@ class Channel:
         n_extra=3,
         use_expr=True,
     ) -> "Channel":
-        step = mass2.RoughCalibrationStep.learn_combinatoric_height_info(
+        step = mass2.core.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
             line_names,
             line_heights_allowed,
@@ -257,7 +257,7 @@ class Channel:
         n_extra_peaks: int = 10,
         acceptable_rms_residual_e: float = 10,
     ) -> "Channel":
-        step = mass2.RoughCalibrationStep.learn_3peak(
+        step = mass2.core.RoughCalibrationStep.learn_3peak(
             self,
             line_names,
             uncalibrated_col,

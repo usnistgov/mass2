@@ -49,7 +49,7 @@ class FitSpec:
         return result
 
     def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr):
-        series = mass2.good_series(df, col, good_expr, use_expr=self.use_expr)
+        series = mass2.misc.good_series(df, col, good_expr, use_expr=self.use_expr)
         return self.fit_series_without_use_expr(series)
 
     def fit_ch(self, ch, col: str):

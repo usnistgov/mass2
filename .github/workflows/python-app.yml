@@ -5,9 +5,9 @@ name: Python application
 
 on:
   push:
-    branches: [ "main" ]
-  # If you don't have a "branches: [...]" entry here, the action runs on any push.
-  # At first, let's run actions only on main pushes.
+    # branches: [ "main" ]
+    # If you don't have a "branches: [...]" entry here, the action runs on any push.
+    # At first, we ran actions only on main pushes, but let's try all branches as of Aug 15, 2025
   pull_request:
     branches: [ "main" ]
 
@@ -24,9 +24,8 @@ jobs:
       # max-parallel: 8
       fail-fast: false
       matrix:
-        include:
-        - python-version: '3.10' # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989)
-        - python-version: 3.13
+        python-version: ["3.10", "3.13"]
+        # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989), or 3.10 specifically will be read as 3.1
 
     steps:
     - uses: actions/checkout@v4
@@ -41,16 +40,19 @@ jobs:
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
 
+    - name: Run ruff formatter (only on most recent Python version)
+      if: ${{ matrix.python-version == 3.13 }}
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "format --check --diff"
+
+    - name: Detect changed files during a Workflow run and commit them back to the repository
+      uses: stefanzweifel/git-auto-commit-action@v6
+      with:
+        commit_message: 'automatic style fixes by ruff'
+
     - name: Install the project
       run: uv sync --all-extras --dev
-
-    - name: Lint with flake8 and ruff (only on most recent Python version)
-      # Run ruff, but don't fail tests regarless of result.
-      # (DISABLED Jan 2025) Stop the build if there are Python syntax errors or undefined names, as found by flake8.
-      if: ${{ matrix.python-version == 3.13 }}
-      run: |
-        ruff check --preview || ruff check --preview --statistics --exit-zero
-        # flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --extend-exclude nonstandard
 
     - name: Test with pytest
       run: pytest

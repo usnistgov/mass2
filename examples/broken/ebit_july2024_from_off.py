@@ -30,7 +30,7 @@ def _(mo):
 
 @app.cell
 def _(mass, mass2, pulsedata):
-    off_paths = mass2.ljhutil.find_ljh_files(
+    off_paths = mass2.core.ljhutil.find_ljh_files(
         str(pulsedata.off["ebit_20240723_0000"]), ext=".off"
     )
     off = mass.off.OffFile(off_paths[0])

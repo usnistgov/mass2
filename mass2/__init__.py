@@ -1,13 +1,13 @@
 """
-Mass: a Microcalorimeter Analysis Software Suite
+Mass2: a Microcalorimeter Analysis Software Suite
 
 Python tools to analyze microcalorimeter data offline.
 
 
-Joe Fowler, NIST Boulder Labs.  November 2010--
+Joe Fowler, Galen O'Neil, NIST Boulder Labs.  November 2010--
 """
 
-# ruff: noqa: F403, F401
+# ruff: noqa: F401, F403
 
 try:
     from ._version import version as __version__
@@ -20,9 +20,5 @@ from . import calibration
 from . import common
 from . import mathstat
 from . import core
-from .calibration import *
-from .mathstat import *
-from .common import *
-from .core import *
-
-__all__ = ["calibration", "common", "mathstat", "core"]
+from .calibration import STANDARD_FEATURES, spectra
+from .core import LJHFile, Channel, Channels, NoiseChannel, NoisePSD, misc, show, FilterMaker, ChannelHeader, MultiFit
