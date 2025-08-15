@@ -87,6 +87,11 @@ mass2 = [
 [tool.setuptools_scm]
 version_file = "mass2/_version.py"
 
+[tool.ruff]
+# The minimum ruff version. Unlikely that we care, but GH Actions complains if left empty
+required-version = ">=0.12.0"
+
+
 [tool.mypy]
 disable_error_code = ["import-untyped"]
 exclude = [
