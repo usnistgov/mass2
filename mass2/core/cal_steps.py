@@ -41,6 +41,9 @@ class PretrigMeanJumpFixStep(CalStep):
         plt.ylabel("pretrig mean")
         plt.tight_layout()
         return plt.gca()
+    
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
+        pass
 
 
 @dataclass(frozen=True)
@@ -54,7 +57,7 @@ class SummarizeStep(CalStep):
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []
-        for df_iter in df.iter_slices():
+        for df_iter in df.select(self.inputs).iter_slices():
             raw = df_iter[self.pulse_col].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
@@ -73,9 +76,44 @@ class SummarizeStep(CalStep):
         df2 = pl.concat(summaries).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
-        pass
 
+
+@dataclass(frozen=True)
+class ColumnAsNumpyMapStep(CalStep):
+    """
+    This step is meant for interactive exploration, it takes a column and applies a function to it, 
+    and makes a new column with the result. It makes it easy to test functions on a column without having to write a whole new step class,
+    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps on another channel.
+    
+    example usage:
+    >>> def my_function(x):
+    ...     return x * 2
+    >>> step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)
+    >>> ch2 = ch.with_step(step)
+    """
+    f: Callable[[np.ndarray], np.ndarray]
+
+    def __post_init__(self):
+        assert len(self.inputs) == 1, "ColumnMapStep expects exactly one input"
+        assert len(self.output) == 1, "ColumnMapStep expects exactly one output"
+        if not callable(self.f):
+            raise ValueError(f"f must be a callable, got {self.f}")
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        input_col = self.inputs[0]
+        output_col = self.output[0]
+        serieses = []
+        for df_iter in df.select(self.inputs).iter_slices():
+            series1 = df_iter[self.inputs[0]]
+            output_numpy = self.f(series1.to_numpy())
+            series2 = pl.Series(output_col, output_numpy)
+            serieses.append(series2)
+
+
+        combined = pl.concat(serieses)
+        # Put into a DataFrame with one column
+        df2 = pl.DataFrame({output_col: combined})
+        return df2
 
 @dataclass(frozen=True)
 class CalSteps:

@@ -20,8 +20,10 @@ from . import calibration
 from . import common
 from . import mathstat
 from . import core
+# at the top level lets import things we image people will want to use regularly, and try to avoid importing
+# implementation details
 from .calibration import STANDARD_FEATURES, spectra
-from .core import LJHFile, Channel, Channels, NoiseChannel, NoisePSD, misc, show, FilterMaker, ChannelHeader, MultiFit
+from .core import LJHFile, TrueBqBin, Channel, Channels, NoiseChannel, NoisePSD, misc, show, FilterMaker, ChannelHeader, MultiFit
 # from .mathstat import 
 # from .common import *
 # from .core import *
