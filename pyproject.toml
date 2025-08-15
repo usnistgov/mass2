@@ -37,6 +37,13 @@ dependencies = [
     "xraydb",
 ]
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "mkdocstrings[python]>=0.18",
+    "mktestdocs",
+]
+
 [dependency-groups]
 # Use `uv sync --dev` to get the development packages
 dev = [
@@ -45,11 +52,6 @@ dev = [
     "flake8",
     "pre-commit",
     "tox",
-]
-# Use `uv sync --group docs` to get the packages needed to create documentation
-docs = [
-    "mkdocs",
-    "mkdocstrings[python]>=0.18",
 ]
 
 [project.urls]
