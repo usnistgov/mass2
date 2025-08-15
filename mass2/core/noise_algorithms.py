@@ -23,26 +23,6 @@ def calc_autocorrelation_times(n, dt):
     return np.arange(n) * dt
 
 
-def autocorrelation(data, dt):
-    return AutoCorrelation(calc_autocorrelation(data), calc_autocorrelation_times(data.shape[1], dt))
-
-
-@dataclass
-class AutoCorrelation:
-    ac: np.ndarray
-    times: np.ndarray
-
-    def plot(self, axis=None, **plotkwarg):
-        if axis is None:
-            plt.figure()
-            axis = plt.gca()
-        axis.plot(self.times[1:], self.ac[1:], **plotkwarg)
-        axis.grid()
-        axis.set_ylabel("Autocorrelation (abrs?)")
-        axis.set_xlabel("Lag Time (s)")
-        axis.figure.tight_layout()
-
-
 def psd_2d(Nt: ndarray, dt: float) -> ndarray:
     # Nt is size (n,m) with m records of length n
     (n, _m) = Nt.shape

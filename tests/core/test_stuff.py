@@ -142,7 +142,7 @@ def test_noise_autocorr():
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(noise_autocorr_mass[1:])) == pytest.approx(0, abs=1e-2)
 
-    ac_direct = mass2.core.noise_algorithms.autocorrelation(noise_traces, dt=frametime_s).ac
+    ac_direct = mass2.core.noise_algorithms.calc_autocorrelation(noise_traces)
     assert len(ac_direct) == 500
     assert ac_direct[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(ac_direct[1:])) == pytest.approx(0, abs=1e-2)
