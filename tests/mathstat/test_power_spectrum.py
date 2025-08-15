@@ -42,12 +42,12 @@ def test_creating_filter_from_non_LJH_data():
     avg_pulse_values = 1000 * np.arange(record_len, dtype=float)
     # ^ we're just testing math here, this "average pulse" is easier than making an actual pulse shape
 
-    noise_traces = rng.standard_normal((record_len, n_noise_records))
-    noise_autocorr = mass2.mathstat.power_spectrum.autocorrelation_broken_from_pulses(noise_traces)
+    noise_traces = rng.standard_normal((n_noise_records, record_len))
+    noise_autocorr = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
     noise_psd_calculator = mass2.mathstat.power_spectrum.PowerSpectrum(record_len // 2, dt=frametime_s)
     window = np.ones(record_len)
     for i in range(n_noise_records):
-        noise_psd_calculator.addDataSegment(noise_traces[:, i], window=window)
+        noise_psd_calculator.addDataSegment(noise_traces[i], window=window)
     # test that we can plot the noise spectrum
     noise_psd_calculator.plot()
     plt.close()

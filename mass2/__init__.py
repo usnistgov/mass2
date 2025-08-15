@@ -21,4 +21,4 @@ from . import common
 from . import mathstat
 from . import core
 from .calibration import STANDARD_FEATURES, spectra
-from .core import LJHFile, Channel, Channels, NoiseChannel, NoisePSD, misc, show, FilterMaker, ChannelHeader, MultiFit
+from .core import LJHFile, Channel, Channels, NoiseChannel, NoiseResult, misc, show, FilterMaker, ChannelHeader, MultiFit

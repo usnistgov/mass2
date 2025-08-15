@@ -3,14 +3,14 @@ import polars as pl
 from dataclasses import dataclass
 from collections.abc import Callable
 from mass2.core.cal_steps import CalStep
-from mass2.core.noise_algorithms import NoisePSD
+from mass2.core.noise_algorithms import NoiseResult
 from mass2.core.optimal_filtering import Filter
 
 
 @dataclass(frozen=True)
 class Filter5LagStep(CalStep):
     filter: Filter
-    spectrum: NoisePSD
+    spectrum: NoiseResult
     transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:

@@ -36,9 +36,14 @@ F5 = maker.compute_5lag()
 print(f"Filter peak value:            {F5.nominal_peak:.1f}")
 print(f"Filter rms value:             {F5.variance**0.5:.4f}")
 print(f"Filter predicted V/dV (FWHM): {F5.predicted_v_over_dv:.4f}")
+
+from numpy.testing import assert_allclose
+assert_allclose(F5.nominal_peak, 1000)
+assert_allclose(F5.variance**0.5, 0.1549, rtol=1e-3)
+assert_allclose(F5.predicted_v_over_dv, 2741.6517)
 ```
 
-This code should produce an optimal filter ``F5`` and a filter maker ``maker`` and generate the following output:
+This code should produce a filter maker ``maker`` and an optimal filter ``F5`` and generate the following output:
 ```text
     Filter peak value:            1000.0
     Filter rms value:             0.1549

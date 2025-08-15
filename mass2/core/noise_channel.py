@@ -76,7 +76,7 @@ class NoiseChannel:
         trunc_back=0,
     ):
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
-        spectrum = mass2.core.noise_algorithms.noise_psd_mass(records, dt=self.frametime_s)
+        spectrum = mass2.core.noise_algorithms.calc_noise_result(records, continuous=self.is_continuous, dt=self.frametime_s)
         return spectrum
 
     def __hash__(self):
@@ -87,6 +87,12 @@ class NoiseChannel:
 
     def __eq__(self, other):
         return id(self) == id(other)
+
+    @property
+    def is_continuous(self):
+        if "continuous" in self.header_df:
+            return self.header_df["continuous"][0]
+        return False
 
     @classmethod
     def from_ljh(cls, path):
