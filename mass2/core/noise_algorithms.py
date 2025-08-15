@@ -198,14 +198,15 @@ def noise_psd_mass(data: ArrayLike, dt: float, continuous: bool, window: Callabl
     NoiseResult
         The derived noise spectrum and autocorrelation
     """
-    data = np.asarray(data) - np.mean(data)
-    (n_pulses, nsamples) = data.shape
+    data = np.asarray(data)
+    data_zeromean = data - np.mean(data)
+    (n_pulses, nsamples) = data_zeromean.shape
     # see test_ravel_behavior to be sure this is written correctly
-    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt, window=window)
+    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
     if continuous:
-        autocorr_vec = calc_continuous_autocorrelation(data, n_lags=nsamples)
+        autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples)
     else:
-        autocorr_vec = calc_discontinuous_autocorrelation(data)
+        autocorr_vec = calc_discontinuous_autocorrelation(data_zeromean)
     return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
 
 
