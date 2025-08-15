@@ -221,6 +221,7 @@ With or without a QE model, "integral" refers to the number of photons that woul
 ### Fitting a simple Gaussian, Lorentzian, or Voigt function
 
 ```python
+  import dataclasses
   e_ctr = 1000.0
   Nsig = 10000
   Nbg = 1000
@@ -236,7 +237,7 @@ With or without a QE model, "integral" refers to the number of photons that woul
   c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
   line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", e_ctr, 0, 0)
-  line.linetype = "Gaussian"
+  line = dataclasses.replace(line, linetype="Gaussian")
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params["fwhm"].set(2.3548*sigma)
@@ -249,7 +250,7 @@ With or without a QE model, "integral" refers to the number of photons that woul
   c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
   line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, 0)
-  line.linetype = "Lorentzian"
+  line = dataclasses.replace(line, linetype="Lorentzian")
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params["fwhm"].set(2.3548*sigma)
@@ -262,7 +263,7 @@ With or without a QE model, "integral" refers to the number of photons that woul
   c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
   line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, sigma)
-  line.linetype = "Voigt"
+  line = dataclasses.replace(line, linetype="Voigt")
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params["fwhm"].set(2.3548*sigma)
