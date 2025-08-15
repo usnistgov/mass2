@@ -12,6 +12,7 @@ import pathlib
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel
+from . import ljhutil
 
 
 @dataclass(frozen=True)  # noqa: PLR0904
@@ -203,13 +204,13 @@ class Channels:
         if exclude_ch_nums is None:
             exclude_ch_nums = []
         if noise_folder is None:
-            paths = mass2.core.ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
+            paths = ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
             if limit is not None:
                 paths = paths[:limit]
             pairs = [(path, "") for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
-            pairs = mass2.core.ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
+            pairs = ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"   from_ljh_folder has {len(pairs)} pairs")
@@ -231,7 +232,7 @@ class Channels:
     def get_experiment_state_df(self, experiment_state_path=None):
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
-            experiment_state_path = mass2.core.ljhutil.experiment_state_path_from_ljh_path(ljh_path)
+            experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         # _col0, _col1 = df.columns
         df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
