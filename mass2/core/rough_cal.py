@@ -15,6 +15,9 @@ import mass2
 from .channel import Channel
 from .cal_steps import CalStep
 
+# from . import rough_cal
+from mass2.calibration.algorithms import line_names_and_energies
+
 
 def rank_3peak_assignments(
     ph,
@@ -459,7 +462,7 @@ def find_optimal_assignment2(ph, e, line_names):
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
         pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
-    result = mass2.core.rough_cal.BestAssignmentPfitGainResult(
+    result = BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
         residual_e=None,
@@ -480,7 +483,7 @@ def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed
         pfit_gain = np.polynomial.Polynomial(gain)
     else:
         pfit_gain = np.polynomial.Polynomial.fit(pha, gain, deg=min(len(e) - 1, 2))
-    result = mass2.core.rough_cal.BestAssignmentPfitGainResult(
+    result = BestAssignmentPfitGainResult(
         rms_e_residual,
         ph_assigned=pha,
         residual_e=None,
@@ -636,7 +639,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
         return np.inf, "assignments should be unique"
 
     # now we evaluate the assignment and create a result object
-    residual_e, pfit_gain = mass2.core.rough_cal.find_pfit_gain_residual(df["possible_ph"].to_numpy(), df["line_energy"].to_numpy())
+    residual_e, pfit_gain = find_pfit_gain_residual(df["possible_ph"].to_numpy(), df["line_energy"].to_numpy())
     if pfit_gain(1e5) < 0:
         # well formed calibration have positive gain at 1e5
         return np.inf, "pfit_gain should be above zero at 100k ph"
@@ -644,7 +647,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
         # well formed calibrations have real roots
         return np.inf, "pfit_gain should not have complex roots"
     rms_residual_e = mass2.misc.root_mean_squared(residual_e)
-    result = mass2.core.rough_cal.BestAssignmentPfitGainResult(
+    result = BestAssignmentPfitGainResult(
         rms_residual_e,
         ph_assigned=df["possible_ph"].to_numpy(),
         residual_e=residual_e,
@@ -719,13 +722,11 @@ class RoughCalibrationStep(CalStep):
         n_extra: int,
         use_expr: bool = True,
     ) -> "RoughCalibrationStep":
-        (names, ee) = mass2.calibration.algorithms.line_names_and_energies(line_names)
+        (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = mass2.core.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = mass2.core.rough_cal.find_optimal_assignment2(
-            pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names
-        )
+        pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
 
         step = cls(
             [uncalibrated_col],
@@ -751,11 +752,11 @@ class RoughCalibrationStep(CalStep):
         n_extra: int,
         use_expr: bool = True,
     ) -> "RoughCalibrationStep":
-        (names, ee) = mass2.calibration.algorithms.line_names_and_energies(line_names)
+        (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
-        pfresult = mass2.core.rough_cal.peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
-        assignment_result = mass2.core.rough_cal.find_optimal_assignment2_height_info(
+        pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
+        assignment_result = find_optimal_assignment2_height_info(
             pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra],
             ee,
             names,
@@ -790,11 +791,9 @@ class RoughCalibrationStep(CalStep):
     ) -> "RoughCalibrationStep":
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
-        (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)
+        (line_names, line_energies) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        pfresult = mass2.core.rough_cal.peakfind_local_maxima_of_smoothed_hist(
-            uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
-        )
+        pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units)
         possible_phs = pfresult.ph_sorted_by_prominence()[: len(line_names) + n_extra_peaks]
         df3peak, _dfe = rank_3peak_assignments(
             possible_phs,
