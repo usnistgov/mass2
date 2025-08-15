@@ -21,6 +21,12 @@ class CalStep:
         # TODO: should this be an abstract method?
         return df.filter(self.good_expr)
 
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
+        # this is a no-op, subclasses can override this to plot something
+        plt.figure()
+        plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
+        return plt.gca()
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):

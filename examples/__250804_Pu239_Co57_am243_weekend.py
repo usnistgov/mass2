@@ -206,7 +206,7 @@ def _(
 
 
 @app.cell
-def _(ch2, mass2, max_residual_rms, mo, np, npre, pl):
+def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     def make_template():
         # when accessing pulse, avoid keeping references to copies
         avg_pulse = (
@@ -261,7 +261,9 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, pl):
         return pulse[-1] - pulse[0]
 
 
+
     ch3 = ch2.with_column_map_step("pulse", "frontload", frontload)
+    ch3 = ch3.correct_pretrig_mean_jumps(period=phi0_dac_units)
     ch3 = ch3.with_column_map_step("pulse", "last_minus_first", last_minus_first)
     ch3 = ch3.with_column_map_step("pulse", "residual_rms", residual_rms)
     # ch3 = ch2.with_columns(make_residual_rms_df(ch2.df))
@@ -349,7 +351,7 @@ def _(
     mo.md("""#categorization
     assign pulses to categories based on things we calculated about the pulse
     this isn't perfect, it's just the best I've done""")
-    return (ch4,)
+    return category_condition_dict, ch4
 
 
 @app.cell
@@ -402,7 +404,7 @@ def _(ch4, mass2, mo):
 
 @app.cell
 def _(ch3, mass2):
-    ch3.plot_scatter("pretrig_mean", "energy_5lagy", color_col="residual_rms_range")
+    ch3.plot_scatter("ptm_jf", "energy_5lagy", color_col="residual_rms_range")
     mass2.show()
     return
 
@@ -410,20 +412,13 @@ def _(ch3, mass2):
 @app.cell
 def _(ch4, mo, pl):
     ch5 = ch4.driftcorrect(
-        indicator_col="pretrig_mean",
+        indicator_col="ptm_jf",
         uncorrected_col="energy_5lagy",
         corrected_col="energy_5lagy_dc",
         use_expr=pl.col("category") == "clean",
     )
-    mo.md("#### drift correction.... wow it's slow!!!")
+    mo.md("#### drift correction")
     return (ch5,)
-
-
-@app.cell
-def _(ch4):
-    df_testcase = ch4.df.select("pretrig_mean", "energy_5lagy")
-    df_testcase.write_parquet("slow_drift_correct_testcase")
-    return
 
 
 @app.cell
@@ -511,10 +506,10 @@ def _(ch5, mass2, mo):
 
 
 @app.cell
-def _(cat_cond, mo):
+def _(category_condition_dict, mo):
     dropdown_pulse_category = mo.ui.dropdown(
-        cat_cond.keys(),
-        value=list(cat_cond.keys())[0],
+        category_condition_dict.keys(),
+        value=list(category_condition_dict.keys())[0],
         label="choose pulse category to plot",
     )
     mo.md("###boiler plate for pulse category viewer")
@@ -637,13 +632,13 @@ def _(
     bin_centers,
     bin_edges,
     bin_size,
-    cat_cond,
+    category_condition_dict,
     livetime_clean_energies,
     mass2,
     mo,
     plt,
 ):
-    for cat in list(cat_cond.keys())[::-1]:
+    for cat in list(category_condition_dict.keys())[::-1]:
         _energies, _ = livetime_clean_energies(cat)
         _, _counts = mass2.misc.hist_of_series(_energies, bin_edges=bin_edges)
         plt.plot(bin_centers, _counts, label=cat)
@@ -878,33 +873,6 @@ def _(Path, ch5, mass2, mo, npost, npre, pl, threshold, trigger_filter):
 
 
 @app.cell
-def _():
-    # reproduce the parts that are not steps... they should be made into steps!
-    # extra_ch2 = extra_ch.with_columns(
-    #     extra_ch.df.select(
-    #         frames_until_next=pl.col("framecount").shift(-1) - pl.col("framecount"),
-    #         frames_from_last=pl.col("framecount") - pl.col("framecount").shift(),
-    #     )
-    # )
-    # # extra_ch2 = extra_ch2.with_columns(extra_ch2.df.select(pretrig_mean_orig=pl.col("pretrig_mean"),
-    # #                        pretrig_mean=pl.col("pretrig_mean") % phi0_dac_units))
-    # extra_ch2 = extra_ch2.with_columns(make_residual_rms_df(extra_ch.df))
-    # extra_ch2 = extra_ch2.with_columns(
-    #     extra_ch2.df.select(
-    #         residual_rms_range=pl.col("residual_rms").cut([0, max_residual_rms, 10000])
-    #     )
-    # )
-    # extra_ch2 = extra_ch2.with_columns(make_frontload_df(extra_ch.df))
-    # extra_ch2 = extra_ch2.with_columns(
-    #     extra_ch2.df.select(
-    #         last_minus_first=pl.col("pulse").arr.last() - pl.col("pulse").arr.first()
-    #     )
-    # )
-    # extra_ch2 = extra_ch2.with_columns(categorize_df(extra_ch2.df, cat_cond))
-    return
-
-
-@app.cell
 def _(ch5, extra_ch):
     ch_combo = extra_ch.concat_ch(ch5)
     return (ch_combo,)
@@ -917,9 +885,9 @@ def _(ch5, extra_ch):
 
 
 @app.cell
-def _(ch5, extra_ch2, livetime_clean_energies, mass2, np, plt):
+def _(ch5, extra_ch, livetime_clean_energies, mass2, np, plt):
     def _():
-        energies, live_time_s = livetime_clean_energies(ch_in=extra_ch2)
+        energies, live_time_s = livetime_clean_energies(ch_in=extra_ch)
         energies_withco, live_time_s_withco = livetime_clean_energies(ch_in=ch5)
         bin_edges = np.arange(0, 6000000, 250.0)
         _, counts = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
