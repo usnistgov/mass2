@@ -2,7 +2,7 @@
 mass2.calibration - Collection of tools related to energy calibration.
 """
 
-# ruff: noqa: F403
+# ruff: noqa: F401, F403
 
 from .algorithms import *
 from .energy_calibration import *
