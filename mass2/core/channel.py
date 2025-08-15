@@ -412,6 +412,22 @@ class Channel:
         )
         return self.with_step(step)
 
+    def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col="category") -> "Channel":
+        # ensure the first condition is True, to be used as a fallback
+        if next(iter(category_condition_dict.values())) is not True:
+            category_condition_dict = {"fallback": True, **category_condition_dict}
+        extract = mass2.misc.extract_column_names_from_polars_expr
+        inputs = [extract(expr) for expr in category_condition_dict.values()]
+        inputs = list(set([col for expr in inputs for col in expr]))
+        step = mass2.core.cal_steps.CategorizeStep(
+            inputs=inputs,
+            output=[output_col],
+            good_expr=self.good_expr,
+            use_expr=True,
+            category_condition_dict=category_condition_dict,
+        )
+        return self.with_step(step)
+
     def filter5lag(
         self,
         pulse_col="pulse",

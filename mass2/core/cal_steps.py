@@ -4,7 +4,6 @@ import polars as pl
 import numpy as np
 import pylab as plt
 from . import pulse_algorithms
-from typing import Dict, Any
 
 
 @dataclass(frozen=True)
@@ -43,9 +42,6 @@ class PretrigMeanJumpFixStep(CalStep):
         plt.tight_layout()
         return plt.gca()
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
-        pass
-
 
 @dataclass(frozen=True)
 class SummarizeStep(CalStep):
@@ -82,8 +78,10 @@ class SummarizeStep(CalStep):
 class ColumnAsNumpyMapStep(CalStep):
     """
     This step is meant for interactive exploration, it takes a column and applies a function to it,
-    and makes a new column with the result. It makes it easy to test functions on a column without having to write a whole new step class,
-    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps on another channel.
+    and makes a new column with the result. It makes it easy to test functions on a column without
+    having to write a whole new step class,
+    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps
+    on another channel.
 
     example usage:
     >>> def my_function(x):
@@ -101,7 +99,6 @@ class ColumnAsNumpyMapStep(CalStep):
             raise ValueError(f"f must be a callable, got {self.f}")
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        input_col = self.inputs[0]
         output_col = self.output[0]
         serieses = []
         for df_iter in df.select(self.inputs).iter_slices():
@@ -117,13 +114,44 @@ class ColumnAsNumpyMapStep(CalStep):
 
 
 @dataclass(frozen=True)
+class CategorizeStep(CalStep):
+    category_condition_dict: dict[str, pl.Expr]
+
+    def __post_init__(self):
+        err_msg = "The first condition must be True, to be used as a fallback"
+        assert next(iter(self.category_condition_dict.values())) is True, err_msg
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        output_col = self.output[0]
+
+        def categorize_df(df, category_condition_dict, output_col):
+            """returns a series showing which category each pulse is in
+            pulses will be assigned to the last category for which the condition evaluates to True"""
+            dtype = pl.Enum(category_condition_dict.keys())
+            physical = np.zeros(len(df), dtype=int)
+            for category_int, (category_str, condition_expr) in enumerate(category_condition_dict.items()):
+                if condition_expr is True:
+                    in_category = np.ones(len(df), dtype=bool)
+                else:
+                    in_category = df.select(a=condition_expr).fill_null(False).to_numpy().flatten()
+                assert in_category.dtype == bool
+                physical[in_category] = category_int
+            series = pl.Series(name=output_col, values=physical).cast(dtype)
+            df = pl.DataFrame({output_col: series})
+            return df
+
+        df2 = categorize_df(df, self.category_condition_dict, output_col).with_columns(df)
+        return df2
+
+
+@dataclass(frozen=True)
 class SelectStep(CalStep):
     """
     This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
 
     """
 
-    col_expr_dict: Dict[str, pl.Expr]
+    col_expr_dict: dict[str, pl.Expr]
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         df2 = df.select(**self.col_expr_dict).with_columns(df)

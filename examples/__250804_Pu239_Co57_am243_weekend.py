@@ -262,7 +262,7 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, pl):
 
 
     ch3 = ch2.with_column_map_step("pulse", "frontload", frontload)
-    ch3 = ch3.with_column_map_step("pulse", "last_minux_first", last_minus_first)
+    ch3 = ch3.with_column_map_step("pulse", "last_minus_first", last_minus_first)
     ch3 = ch3.with_column_map_step("pulse", "residual_rms", residual_rms)
     # ch3 = ch2.with_columns(make_residual_rms_df(ch2.df))
     ch3 = ch3.with_select_step({"residual_rms_range": pl.col("residual_rms").cut([0, max_residual_rms, 10000])})
@@ -282,7 +282,7 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, pl):
     2. calculate residual_rms
     3. calculate frontload
     results in `ch3`, the 3rd update of the Channel""")
-    return ch3, residual_rms
+    return (ch3,)
 
 
 @app.cell
@@ -327,11 +327,10 @@ def _(
     min_frames_until_next,
     min_last_minus_first,
     mo,
-    np,
     pl,
 ):
     # these condditions are applied top down, so something will only be first_and_last if no other condition is met
-    cat_cond = {
+    category_condition_dict = {
         "first_and_last": True,
         "clean": pl.all_horizontal(pl.all().is_not_null()),
         "large_residual_rms": pl.col("residual_rms") > max_residual_rms,
@@ -345,30 +344,12 @@ def _(
     }
 
 
-    def categorize_df(df, cat_cond):
-        """returns a series showing which category each pulse is in
-        pulses will be assigned to the last category for which the condition evaluates to True"""
-        dtype = pl.Enum(cat_cond.keys())
-        physical = np.zeros(len(df), dtype=int)
-        for category_int, (category_str, condition_expr) in enumerate(cat_cond.items()):
-            if condition_expr is True:
-                in_category = np.ones(len(df), dtype=bool)
-            else:
-                in_category = (
-                    df.select(a=condition_expr).fill_null(False).to_numpy().flatten()
-                )
-            assert in_category.dtype == bool
-            physical[in_category] = category_int
-        category = pl.Series("category", physical).cast(dtype)
-        return category
-
-
-    ch4 = ch3.with_columns(categorize_df(ch3.df, cat_cond))
+    ch4 = ch3.with_categorize_step(category_condition_dict=category_condition_dict)
     # ch4 = ch4.driftcorrect(indicator_col="pretrig_mean", uncorrected_col="energy_5lagy", corrected_col="energy_5lagy_dc", use_expr=pl.col("category")=="clean")
     mo.md("""#categorization
     assign pulses to categories based on things we calculated about the pulse
     this isn't perfect, it's just the best I've done""")
-    return cat_cond, categorize_df, ch4
+    return (ch4,)
 
 
 @app.cell
@@ -436,6 +417,13 @@ def _(ch4, mo, pl):
     )
     mo.md("#### drift correction.... wow it's slow!!!")
     return (ch5,)
+
+
+@app.cell
+def _(ch4):
+    df_testcase = ch4.df.select("pretrig_mean", "energy_5lagy")
+    df_testcase.write_parquet("slow_drift_correct_testcase")
+    return
 
 
 @app.cell
@@ -890,61 +878,42 @@ def _(Path, ch5, mass2, mo, npost, npre, pl, threshold, trigger_filter):
 
 
 @app.cell
-def _(ch5, np, phi0_dac_units, residual_rms):
-    ch6 = ch5.correct_pretrig_mean_jumps(period=phi0_dac_units)
-
-
-    def residual_rms_batch_numpy(pulses):
-        n_pulses, _ = pulses.shape
-        out = np.zeros(n_pulses)
-        for i in range(n_pulses):
-            out[i] = residual_rms(pulses[i, :])
-        return out
-
-
-    ch6 = ch6.with_column_map("pulse", "residual_rms", f=residual_rms_batch_numpy)
+def _():
+    # reproduce the parts that are not steps... they should be made into steps!
+    # extra_ch2 = extra_ch.with_columns(
+    #     extra_ch.df.select(
+    #         frames_until_next=pl.col("framecount").shift(-1) - pl.col("framecount"),
+    #         frames_from_last=pl.col("framecount") - pl.col("framecount").shift(),
+    #     )
+    # )
+    # # extra_ch2 = extra_ch2.with_columns(extra_ch2.df.select(pretrig_mean_orig=pl.col("pretrig_mean"),
+    # #                        pretrig_mean=pl.col("pretrig_mean") % phi0_dac_units))
+    # extra_ch2 = extra_ch2.with_columns(make_residual_rms_df(extra_ch.df))
+    # extra_ch2 = extra_ch2.with_columns(
+    #     extra_ch2.df.select(
+    #         residual_rms_range=pl.col("residual_rms").cut([0, max_residual_rms, 10000])
+    #     )
+    # )
+    # extra_ch2 = extra_ch2.with_columns(make_frontload_df(extra_ch.df))
+    # extra_ch2 = extra_ch2.with_columns(
+    #     extra_ch2.df.select(
+    #         last_minus_first=pl.col("pulse").arr.last() - pl.col("pulse").arr.first()
+    #     )
+    # )
+    # extra_ch2 = extra_ch2.with_columns(categorize_df(extra_ch2.df, cat_cond))
     return
 
 
 @app.cell
-def _(
-    cat_cond,
-    categorize_df,
-    extra_ch,
-    make_frontload_df,
-    make_residual_rms_df,
-    max_residual_rms,
-    pl,
-):
-    # reproduce the parts that are not steps... they should be made into steps!
-    extra_ch2 = extra_ch.with_columns(
-        extra_ch.df.select(
-            frames_until_next=pl.col("framecount").shift(-1) - pl.col("framecount"),
-            frames_from_last=pl.col("framecount") - pl.col("framecount").shift(),
-        )
-    )
-    # extra_ch2 = extra_ch2.with_columns(extra_ch2.df.select(pretrig_mean_orig=pl.col("pretrig_mean"),
-    #                        pretrig_mean=pl.col("pretrig_mean") % phi0_dac_units))
-    extra_ch2 = extra_ch2.with_columns(make_residual_rms_df(extra_ch.df))
-    extra_ch2 = extra_ch2.with_columns(
-        extra_ch2.df.select(
-            residual_rms_range=pl.col("residual_rms").cut([0, max_residual_rms, 10000])
-        )
-    )
-    extra_ch2 = extra_ch2.with_columns(make_frontload_df(extra_ch.df))
-    extra_ch2 = extra_ch2.with_columns(
-        extra_ch2.df.select(
-            last_minus_first=pl.col("pulse").arr.last() - pl.col("pulse").arr.first()
-        )
-    )
-    extra_ch2 = extra_ch2.with_columns(categorize_df(extra_ch2.df, cat_cond))
-    return (extra_ch2,)
+def _(ch5, extra_ch):
+    ch_combo = extra_ch.concat_ch(ch5)
+    return (ch_combo,)
 
 
 @app.cell
-def _(ch5, extra_ch2):
-    ch_combo = extra_ch2.concat_ch(ch5)
-    return (ch_combo,)
+def _(ch5, extra_ch):
+    set(extra_ch.df.columns) ^ set(ch5.df.columns)
+    return
 
 
 @app.cell
