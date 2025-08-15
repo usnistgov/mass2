@@ -153,3 +153,21 @@ def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_st
 
     df_out = pl.concat([df1, df2], how="vertical")
     return df_out
+
+def extract_column_names_from_polars_expr(expr: pl.Expr) -> list[str]:
+    """
+    Recursively extract all column names from a Polars expression.
+    """
+    names = set()
+    if hasattr(expr, "meta"):
+        meta = expr.meta
+        if hasattr(meta, "root_names"):
+            # For polars >=0.19.0
+            names.update(meta.root_names())
+        elif hasattr(meta, "output_name"):
+            # For older polars
+            names.add(meta.output_name())
+        if hasattr(meta, "inputs"):
+            for subexpr in meta.inputs():
+                names.update(extract_column_names_from_polars_expr(subexpr))
+    return list(names)

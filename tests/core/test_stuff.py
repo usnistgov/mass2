@@ -286,6 +286,9 @@ def test_col_map_step():
     ch2 = ch.with_column_map("pulse", "std_of_pulses", std_of_pulses_chunk)
     print(ch2.df)
     assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0,:])
+    step = ch2.steps[-1]
+    assert step.inputs == ["pulse"]
+    assert step.output == ["std_of_pulses"]
 
 def test_pretrig_mean_jump_fix_step():
     ch = dummy_channel()
@@ -294,5 +297,24 @@ def test_pretrig_mean_jump_fix_step():
     ch2 = ch.correct_pretrig_mean_jumps(period=50)
     assert "pulse" in ch2.df.columns
     assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
+    step = ch2.steps[-1]
+    assert step.inputs == ["pretrig_mean"]
+    assert step.output == ["ptm_jf"]
 
 
+def test_extract_column_names_from_polars_expr():
+    extract = mass2.core.misc.extract_column_names_from_polars_expr
+    assert set(extract(pl.col("a"))) == set(["a"])
+    assert set(extract(pl.col("a") + pl.col("b"))) == set(["a", "b"])
+    assert set(extract(pl.col("a") * pl.col("b"))) == set(["a", "b"])
+
+def test_select_step():
+    ch = dummy_channel()
+    ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
+    ch2 = ch.with_select_step({"a*5": pl.col("a")*5, "a+b": pl.col("a") + pl.col("b")})
+    assert "pulse"  in ch2.df.columns
+    assert all(ch2.df["a*5"].to_numpy() == ch.df["a"].to_numpy() * 5)
+    assert all(ch2.df["a+b"].to_numpy() == ch.df["a"].to_numpy() + ch.df["b"].to_numpy())
+    step = ch2.steps[-1]
+    assert set(step.inputs) == set(["a", "b"])
+    assert set(step.output) == set(["a*5", "a+b"])

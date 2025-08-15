@@ -4,6 +4,7 @@ import polars as pl
 import numpy as np
 import pylab as plt
 from . import pulse_algorithms
+from typing import Dict, Any
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,18 @@ class ColumnAsNumpyMapStep(CalStep):
         combined = pl.concat(serieses)
         # Put into a DataFrame with one column
         df2 = pl.DataFrame({output_col: combined}).with_columns(df)
+        return df2
+    
+@dataclass(frozen=True)
+class SelectStep(CalStep):
+    """
+    This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
+
+    """
+    col_expr_dict: Dict[str, pl.Expr]
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        df2 = df.select(**self.col_expr_dict).with_columns(df)
         return df2
 
 @dataclass(frozen=True)
