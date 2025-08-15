@@ -18,7 +18,7 @@ def test_dict():
     for k in expected_models:
         assert k in mass2.materials.filterstack_models
     for k, model in mass2.materials.filterstack_models.items():
-        assert isinstance(model, mass2.materials.FilterStack), f"mass2.filterstack_models['{k}'] not a mass2.FilterStack"
+        assert isinstance(model, mass2.materials.FilterStack), f"mass2.core.Filterstack_models['{k}'] not a mass2.core.FilterStack"
 
 
 def test_ensure_uncertain():

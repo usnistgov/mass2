@@ -128,7 +128,7 @@ class Test_ratio_weighted_averages:
             0,
         ])
         self.x = np.linspace(-1.98, 1.98, 100) + 10
-        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(
+        line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line(
             "testline", energy=10, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
         )
         self.model = line.model()
@@ -229,7 +229,7 @@ class Test_gaussian_basic:
         nbins = 100
         nfits = 30
 
-        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(
+        line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line(
             "testline", energy=ctr, lorentzian_fwhm=0.0, intrinsic_sigma=0.0
         )
         self.model = line.model()
@@ -251,7 +251,7 @@ class Test_Gaussian:
         self.y = np.exp(-0.5 * (self.x - self.center) ** 2 / (sigma**2))
         self.y *= self.integral / self.y.sum()
 
-        line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", self.center, 0, 0)
+        line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line("testline", self.center, 0, 0)
         self.model = line.model()
         self.params = self.model.guess(self.y, bin_centers=self.x, dph_de=1)
         self.params["fwhm"].set(2.3548 * sigma)

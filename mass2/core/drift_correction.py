@@ -15,7 +15,7 @@ def drift_correct_mass(indicator, uncorrected):
 
 
 def drift_correct_wip(indicator, uncorrected):
-    opt_result, offset = mass2.rough_cal.minimize_entropy_linear(
+    opt_result, offset = mass2.core.rough_cal.minimize_entropy_linear(
         indicator,
         uncorrected,
         bin_edges=np.arange(0, 60000, 1),
@@ -58,7 +58,7 @@ class DriftCorrectStep(CalStep):
         if corrected_col is None:
             corrected_col = uncorrected_col + "_dc"
         indicator_s, uncorrected_s = ch.good_serieses([indicator_col, uncorrected_col], use_expr)
-        dc = mass2.drift_correct(
+        dc = mass2.core.drift_correct(
             indicator=indicator_s.to_numpy(),
             uncorrected=uncorrected_s.to_numpy(),
         )

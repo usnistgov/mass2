@@ -53,7 +53,7 @@ def test_creating_filter_from_non_LJH_data():
     plt.close()
     noise_psd = noise_psd_calculator.spectrum()
 
-    maker = mass2.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr, noise_psd=noise_psd, sample_time_sec=frametime_s)
+    maker = mass2.core.FilterMaker(avg_pulse_values, npre, noise_autocorr=noise_autocorr, noise_psd=noise_psd, sample_time_sec=frametime_s)
     filter_obj = maker.compute_5lag()
     print("predicted resolutions")
     filter_obj.report(std_energy=1000)

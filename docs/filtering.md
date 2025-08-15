@@ -30,7 +30,7 @@ truncated_signal = signal[2:-2]
 noise_covar = np.zeros(n)
 noise_covar[0] = sigma_noise**2
 
-maker = mass2.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
+maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
 F5 = maker.compute_5lag()
 
 print(f"Filter peak value:            {F5.nominal_peak:.1f}")
@@ -70,7 +70,7 @@ def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
 
     noise_covar = np.zeros(n)
     noise_covar[0] = sigma_noise**2
-    maker = mass2.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
+    maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
     F5 = maker.compute_5lag()
 
     # Check filter's normalization
