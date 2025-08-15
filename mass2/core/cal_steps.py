@@ -42,7 +42,7 @@ class PretrigMeanJumpFixStep(CalStep):
         plt.ylabel("pretrig mean")
         plt.tight_layout()
         return plt.gca()
-    
+
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
         pass
 
@@ -78,20 +78,20 @@ class SummarizeStep(CalStep):
         return df2
 
 
-
 @dataclass(frozen=True)
 class ColumnAsNumpyMapStep(CalStep):
     """
-    This step is meant for interactive exploration, it takes a column and applies a function to it, 
+    This step is meant for interactive exploration, it takes a column and applies a function to it,
     and makes a new column with the result. It makes it easy to test functions on a column without having to write a whole new step class,
     while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps on another channel.
-    
+
     example usage:
     >>> def my_function(x):
     ...     return x * 2
     >>> step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)
     >>> ch2 = ch.with_step(step)
     """
+
     f: Callable[[np.ndarray], np.ndarray]
 
     def __post_init__(self):
@@ -110,23 +110,25 @@ class ColumnAsNumpyMapStep(CalStep):
             series2 = pl.Series(output_col, output_numpy)
             serieses.append(series2)
 
-
         combined = pl.concat(serieses)
         # Put into a DataFrame with one column
         df2 = pl.DataFrame({output_col: combined}).with_columns(df)
         return df2
-    
+
+
 @dataclass(frozen=True)
 class SelectStep(CalStep):
     """
     This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
 
     """
+
     col_expr_dict: Dict[str, pl.Expr]
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         df2 = df.select(**self.col_expr_dict).with_columns(df)
         return df2
+
 
 @dataclass(frozen=True)
 class CalSteps:

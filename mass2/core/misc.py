@@ -154,6 +154,7 @@ def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_st
     df_out = pl.concat([df1, df2], how="vertical")
     return df_out
 
+
 def extract_column_names_from_polars_expr(expr: pl.Expr) -> list[str]:
     """
     Recursively extract all column names from a Polars expression.

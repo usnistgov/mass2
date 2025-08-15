@@ -15,7 +15,7 @@ def test_ljh_to_polars():
     df, header_df = ljh.to_polars()
 
 
-def dummy_channel(npulses=100, seed=4, signal = np.zeros(50)):
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50)):
     rng = np.random.default_rng(seed)
     n = len(signal)
     noise_traces = rng.standard_normal((npulses, n))
@@ -35,6 +35,7 @@ def dummy_channel(npulses=100, seed=4, signal = np.zeros(50)):
     df = pl.DataFrame({"pulse": pulse_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     return ch
+
 
 def test_ljh_fractional_record(tmp_path):
     "Verify that it's allowed to open an LJH file with an non-integer # of binary records"
@@ -277,22 +278,24 @@ def test_concat_dfs_with_concat_state():
     assert df_concat2.shape == (7, 2)
 
 
-
 def test_col_map_step():
     ch = dummy_channel()
+
     def std_of_pulses_chunk(pulses):
         n_pulses, _ = pulses.shape
         return np.std(pulses, axis=1)
+
     ch2 = ch.with_column_map("pulse", "std_of_pulses", std_of_pulses_chunk)
     print(ch2.df)
-    assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0,:])
+    assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0, :])
     step = ch2.steps[-1]
     assert step.inputs == ["pulse"]
     assert step.output == ["std_of_pulses"]
 
+
 def test_pretrig_mean_jump_fix_step():
     ch = dummy_channel()
-    pretrig_mean = np.arange(len(ch.df))%50 + 725
+    pretrig_mean = np.arange(len(ch.df)) % 50 + 725
     ch = ch.with_columns(pl.DataFrame({"pretrig_mean": pretrig_mean}))
     ch2 = ch.correct_pretrig_mean_jumps(period=50)
     assert "pulse" in ch2.df.columns
@@ -308,11 +311,12 @@ def test_extract_column_names_from_polars_expr():
     assert set(extract(pl.col("a") + pl.col("b"))) == set(["a", "b"])
     assert set(extract(pl.col("a") * pl.col("b"))) == set(["a", "b"])
 
+
 def test_select_step():
     ch = dummy_channel()
     ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
-    ch2 = ch.with_select_step({"a*5": pl.col("a")*5, "a+b": pl.col("a") + pl.col("b")})
-    assert "pulse"  in ch2.df.columns
+    ch2 = ch.with_select_step({"a*5": pl.col("a") * 5, "a+b": pl.col("a") + pl.col("b")})
+    assert "pulse" in ch2.df.columns
     assert all(ch2.df["a*5"].to_numpy() == ch.df["a"].to_numpy() * 5)
     assert all(ch2.df["a+b"].to_numpy() == ch.df["a"].to_numpy() + ch.df["b"].to_numpy())
     step = ch2.steps[-1]

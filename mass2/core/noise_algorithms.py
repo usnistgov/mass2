@@ -85,7 +85,9 @@ def noise_psd_mass(data, dt, window=None, skip_autocorr_if_length_over=10000) ->
     if len_pulse <= skip_autocorr_if_length_over:
         autocorr_vec = calc_autocorrelation(data)
     else:
-        print("warning: noise_psd_mass skipping autocorrelation calculation for long traces, use skip_autocorr_if_length_over argument to override this")
+        print(
+            "warning: noise_psd_mass skipping autocorrelation calculation for long traces, use skip_autocorr_if_length_over argument to override this"
+        )
         autocorr_vec = None
     # nbins = len(psd_mass)
     # frequencies = calc_psd_frequencies(nbins, dt)
