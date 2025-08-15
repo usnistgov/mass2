@@ -308,6 +308,15 @@ class Channel:
             steps=self.steps,
             steps_elapsed_s=self.steps_elapsed_s,
         )
+    
+    def with_column_map(self, input_col: str, output_col: str, f: Callable) -> "Channel":
+        """f should take a numpy array and return a numpy array with the same number of elements"""
+        step = mass2.core.cal_steps.ColumnAsNumpyMapStep([input_col], 
+                                                         [output_col], 
+                                                         good_expr=self.good_expr, 
+                                                         use_expr=True,
+                                                         f=f)
+        return self.with_step(step)
 
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
         self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False
@@ -382,7 +391,7 @@ class Channel:
         return self.with_step(step)
 
     def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = mass2.PretrigMeanJumpFixStep(
+        step = mass2.core.cal_steps.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,

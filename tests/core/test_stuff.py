@@ -15,6 +15,27 @@ def test_ljh_to_polars():
     df, header_df = ljh.to_polars()
 
 
+def dummy_channel(npulses=100, seed=4, signal = np.zeros(50)):
+    rng = np.random.default_rng(seed)
+    n = len(signal)
+    noise_traces = rng.standard_normal((npulses, n))
+    pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
+    header_df = pl.DataFrame()
+    frametime_s = 1e-5
+    df_noise = pl.DataFrame({"pulse": noise_traces})
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    header = mass2.ChannelHeader(
+        "dummy for test",
+        ch_num=0,
+        frametime_s=frametime_s,
+        n_presamples=n // 2,
+        n_samples=n,
+        df=header_df,
+    )
+    df = pl.DataFrame({"pulse": pulse_traces})
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    return ch
+
 def test_ljh_fractional_record(tmp_path):
     "Verify that it's allowed to open an LJH file with an non-integer # of binary records"
     # It should not be an error to open an LJH file with a non-integer number of records.
@@ -254,3 +275,24 @@ def test_concat_dfs_with_concat_state():
     assert df_concat["concat_state"].to_list() == [0] * 3 + [1] * 2
     df_concat2 = mass2.core.misc.concat_dfs_with_concat_state(df_concat, df2)
     assert df_concat2.shape == (7, 2)
+
+
+
+def test_col_map_step():
+    ch = dummy_channel()
+    def std_of_pulses_chunk(pulses):
+        n_pulses, _ = pulses.shape
+        return np.std(pulses, axis=1)
+    ch2 = ch.with_column_map("pulse", "std_of_pulses", std_of_pulses_chunk)
+    print(ch2.df)
+    assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0,:])
+
+def test_pretrig_mean_jump_fix_step():
+    ch = dummy_channel()
+    pretrig_mean = np.arange(len(ch.df))%50 + 725
+    ch = ch.with_columns(pl.DataFrame({"pretrig_mean": pretrig_mean}))
+    ch2 = ch.correct_pretrig_mean_jumps(period=50)
+    assert "pulse" in ch2.df.columns
+    assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
+
+

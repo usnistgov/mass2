@@ -112,7 +112,7 @@ class ColumnAsNumpyMapStep(CalStep):
 
         combined = pl.concat(serieses)
         # Put into a DataFrame with one column
-        df2 = pl.DataFrame({output_col: combined})
+        df2 = pl.DataFrame({output_col: combined}).with_columns(df)
         return df2
 
 @dataclass(frozen=True)
