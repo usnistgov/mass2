@@ -182,7 +182,7 @@ def test_noise_psd():
     assert psd_raw_periodogram.psd[0] == pytest.approx(0.5, rel=1e-1)  # scipy handles the 0 bin and last bin differently
     assert psd_raw_periodogram.psd[-1] == pytest.approx(0.5, rel=1e-1)
 
-    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, continuous=True, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=True, dt=frametime_s)
     assert len(psd_raw.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], expect[1:-1], atol=0.15)
@@ -207,7 +207,7 @@ def test_get_pulses_2d():
 
 
 def test_ravel_behavior():
-    # noise_algorithms.noise_psd_mass relies on this behavior
+    # noise_algorithms.calc_noise_result relies on this behavior
     # 10 pulses of length 5
     # first pulse = a[0,:]==[0 1 2 3 4]
     a = np.arange(50).reshape(10, 5)
@@ -235,7 +235,7 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
-    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, continuous=False, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
     assert len(psd_raw.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], psd_mass[1:-1], atol=0.15)

@@ -176,7 +176,7 @@ def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=Fal
     return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
 
 
-def noise_psd_mass(data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None) -> "NoiseResult":
+def calc_noise_result(data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None) -> "NoiseResult":
     """Analyze the noise as Mass has always done.
 
     * Compute autocorrelation with a lower noise at longer lags when data are known to be continuous
