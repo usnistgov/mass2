@@ -99,7 +99,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     npulses = 250
     noise_traces = rng.standard_normal((npulses, n))
     pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
-    header_df = pl.DataFrame()
+    header_df = pl.DataFrame({"continuous": [True]})
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
@@ -137,12 +137,12 @@ def test_noise_autocorr():
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
     assert len(noise_ch.df) == 250
     assert len(noise_ch.df["pulse"][0]) == 500
-    noise_autocorr_mass = mass2.mathstat.power_spectrum.autocorrelation_broken_from_pulses(noise_traces.T)
+    noise_autocorr_mass = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
     assert len(noise_autocorr_mass) == 500
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(noise_autocorr_mass[1:])) == pytest.approx(0, abs=1e-2)
 
-    ac_direct = mass2.core.noise_algorithms.calc_autocorrelation(noise_traces)
+    ac_direct = mass2.core.noise_algorithms.calc_continuous_autocorrelation(noise_traces, n_lags=500)
     assert len(ac_direct) == 500
     assert ac_direct[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(ac_direct[1:])) == pytest.approx(0, abs=1e-2)
@@ -182,7 +182,7 @@ def test_noise_psd():
     assert psd_raw_periodogram.psd[0] == pytest.approx(0.5, rel=1e-1)  # scipy handles the 0 bin and last bin differently
     assert psd_raw_periodogram.psd[-1] == pytest.approx(0.5, rel=1e-1)
 
-    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, continuous=True, dt=frametime_s)
     assert len(psd_raw.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], expect[1:-1], atol=0.15)
@@ -235,7 +235,7 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
-    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, continuous=False, dt=frametime_s)
     assert len(psd_raw.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], psd_mass[1:-1], atol=0.15)

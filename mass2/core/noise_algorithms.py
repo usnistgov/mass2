@@ -4,22 +4,142 @@ import pylab as plt  # type: ignore
 import mass2
 from dataclasses import dataclass
 from numpy import ndarray
+from numpy.typing import NDArray, ArrayLike
 
 
-def calc_autocorrelation(data):
+def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 1000) -> NDArray:
+    """Calculate the autocorrelation of the input data, assuming the rows of the array are NOT
+    continuous in time.
+
+    Parameters
+    ----------
+    data : ArrayLike
+        A 2D array of noise data. Shape is `(ntraces, nsamples)`.
+    max_excursion : int, optional
+        _description_, by default 1000
+
+    Returns
+    -------
+    NDArray
+        The mean autocorrelation of the rows ("traces") in the input `data`, from lags `[0, nsamples-1]`.
+    """
+    data = np.asarray(data)
     ntraces, nsamples = data.shape
     ac = np.zeros(nsamples, dtype=float)
 
+    traces_used = 0
     for i in range(ntraces):
         pulse = data[i, :] - data[i, :].mean()
+        if np.abs(pulse).max() > max_excursion:
+            continue
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
+        traces_used += 1
 
-    ac /= ntraces
+    ac /= traces_used
     ac /= nsamples - np.arange(nsamples, dtype=float)
     return ac
 
 
-def calc_autocorrelation_times(n, dt):
+def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion: int = 1000) -> NDArray:
+    """Calculate the autocorrelation of the input data, assuming the entire array is continuous.
+
+    Parameters
+    ----------
+    data : ArrayLike
+        Data to be autocorrelated. Arrays of 2+ dimensions will be converted to a 1D array via `.ravel()`.
+    n_lags : int
+        Compute the autocorrelation for lags in the range `[0, n_lags-1]`.
+    max_excursion : int, optional
+        Chunks of data with max absolute excursion from the mean this large will be excluded from the calculation, by default 1000
+
+    Returns
+    -------
+    NDArray
+        The autocorrelation array
+
+    Raises
+    ------
+    ValueError
+        If the data are too short to provide the requested number of lags, or the data contain apparent pulses.
+    """
+    data = np.asarray(data).ravel()
+    n_data = len(data)
+    assert n_lags < n_data
+
+    def padded_length(n):
+        """Return a sensible number in the range [n, 2n] which is not too
+        much larger than n, yet is good for FFTs.
+
+        Returns:
+            A number: (1, 3, or 5)*(a power of two), whichever is smallest.
+        """
+        pow2 = np.round(2 ** np.ceil(np.log2(n)))
+        if n == pow2:
+            return int(n)
+        elif n > 0.75 * pow2:
+            return int(pow2)
+        elif n > 0.625 * pow2:
+            return int(np.round(0.75 * pow2))
+        else:
+            return int(np.round(0.625 * pow2))
+
+    # When there are 10 million data points and only 10,000 lags wanted,
+    # it's hugely inefficient to compute the full autocorrelation, especially
+    # in memory.  Instead, compute it on chunks several times the length of the desired
+    # correlation, and average.
+    CHUNK_MULTIPLE = 15
+    if n_data < CHUNK_MULTIPLE * n_lags:
+        msg = f"There are too few data values ({n_data=}) to compute at least {n_lags} lags."
+        raise ValueError(msg)
+
+    # Be sure to pad chunksize samples by AT LEAST n_lags zeros, to prevent
+    # unwanted wraparound in the autocorrelation.
+    # padded_data is what we do DFT/InvDFT on; ac is the unnormalized output.
+    chunksize = CHUNK_MULTIPLE * n_lags
+    padsize = n_lags
+    padded_data = np.zeros(padded_length(padsize + chunksize), dtype=float)
+
+    ac = np.zeros(n_lags, dtype=float)
+
+    entries = 0
+
+    Nchunks = n_data // chunksize
+    datachunks = data[: Nchunks * chunksize].reshape(Nchunks, chunksize)
+    for data in datachunks:
+        padded_data[:chunksize] = data - np.asarray(data).mean()
+        if np.abs(padded_data).max() > max_excursion:
+            continue
+
+        ft = np.fft.rfft(padded_data)
+        ft[0] = 0  # this redundantly removes the mean of the data set
+        power = (ft * ft.conj()).real
+        acsum = np.fft.irfft(power)
+        ac += acsum[:n_lags]
+        entries += 1
+
+    if entries == 0:
+        raise ValueError("Apparently all 'noise' chunks had large excursions from baseline, so no autocorrelation was computed")
+
+    ac /= entries
+    ac /= np.arange(chunksize, chunksize - n_lags + 0.5, -1.0, dtype=float)
+    return ac
+
+
+def calc_autocorrelation_times(n: int, dt: float) -> NDArray:
+    """Compute the timesteps for an autocorrelation function
+
+    Parameters
+    ----------
+    n : int
+        Number of lags
+    dt : float
+        Sample time
+
+    Returns
+    -------
+    NDArray
+        The time delays for each lag
+    """
     return np.arange(n) * dt
 
 
@@ -45,30 +165,30 @@ def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 
-def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoisePSD":
+def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoiseResult":
     f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
     Pxx_mean = np.mean(Pxx, axis=0)
     # Pxx_mean[j] is the averaged PSD at frequency f[j] over all traces
-    autocorr_vec = calc_autocorrelation(data)
-    return NoisePSD(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
+    autocorr_vec = calc_discontinuous_autocorrelation(data)
+    return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
 
 
-def noise_psd_mass(data, dt, window=None) -> "NoisePSD":
-    assert window is None, "windowing not implemented"
-
-    (n_pulses, len_pulse) = data.shape
+def noise_psd_mass(data: ArrayLike, dt: float, continuous: bool, window=None) -> "NoiseResult":
+    data = np.asarray(data)
+    (n_pulses, nsamples) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
-    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt)
-    autocorr_vec = calc_autocorrelation(data)
-    # nbins = len(psd_mass)
-    # frequencies = calc_psd_frequencies(nbins, dt)
-    return NoisePSD(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
+    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt, window=window)
+    if continuous:
+        autocorr_vec = calc_continuous_autocorrelation(data, n_lags=nsamples)
+    else:
+        autocorr_vec = calc_discontinuous_autocorrelation(data)
+    return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
 
 
 @dataclass
-class NoisePSD:
+class NoiseResult:
     psd: np.ndarray
     autocorr_vec: np.ndarray
     frequencies: np.ndarray
