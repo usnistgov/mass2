@@ -5,6 +5,7 @@ import mass2
 from dataclasses import dataclass
 from numpy import ndarray
 from numpy.typing import NDArray, ArrayLike
+from collections.abc import Callable
 
 
 def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 1000) -> NDArray:
@@ -175,8 +176,29 @@ def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=Fal
     return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
 
 
-def noise_psd_mass(data: ArrayLike, dt: float, continuous: bool, window=None) -> "NoiseResult":
-    data = np.asarray(data)
+def noise_psd_mass(data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None) -> "NoiseResult":
+    """Analyze the noise as Mass has always done.
+
+    * Compute autocorrelation with a lower noise at longer lags when data are known to be continuous
+    * Subtract the mean before computing the power spectrum
+
+    Parameters
+    ----------
+    data : ArrayLike
+        A 2d array of noise data, of shape `(npulses, nsamples)`
+    dt : float
+        Periodic sampling time, in seconds
+    continuous : bool
+        Whether the "pulses" in the `data` array are continuous in time
+    window : callable, optional
+        A function to compute a data window (or if None, no windowing), by default None
+
+    Returns
+    -------
+    NoiseResult
+        The derived noise spectrum and autocorrelation
+    """
+    data = np.asarray(data) - np.mean(data)
     (n_pulses, nsamples) = data.shape
     # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data.ravel(), segfactor=n_pulses, dt=dt, window=window)
