@@ -281,11 +281,10 @@ def test_concat_dfs_with_concat_state():
 def test_col_map_step():
     ch = dummy_channel()
 
-    def std_of_pulses_chunk(pulses):
-        n_pulses, _ = pulses.shape
-        return np.std(pulses, axis=1)
+    def std_of_pulses_chunk(pulse):
+        return np.std(pulse)
 
-    ch2 = ch.with_column_map("pulse", "std_of_pulses", std_of_pulses_chunk)
+    ch2 = ch.with_column_map_step("pulse", "std_of_pulses", std_of_pulses_chunk)
     print(ch2.df)
     assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0, :])
     step = ch2.steps[-1]

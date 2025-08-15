@@ -106,7 +106,7 @@ class ColumnAsNumpyMapStep(CalStep):
         serieses = []
         for df_iter in df.select(self.inputs).iter_slices():
             series1 = df_iter[self.inputs[0]]
-            output_numpy = self.f(series1.to_numpy())
+            output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
             series2 = pl.Series(output_col, output_numpy)
             serieses.append(series2)
 

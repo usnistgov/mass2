@@ -309,7 +309,7 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
-    def with_column_map(self, input_col: str, output_col: str, f: Callable) -> "Channel":
+    def with_column_map_step(self, input_col: str, output_col: str, f: Callable) -> "Channel":
         """f should take a numpy array and return a numpy array with the same number of elements"""
         step = mass2.core.cal_steps.ColumnAsNumpyMapStep([input_col], [output_col], good_expr=self.good_expr, use_expr=True, f=f)
         return self.with_step(step)
