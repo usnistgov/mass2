@@ -313,7 +313,7 @@ class LJHFile:
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
-        header_df = pl.DataFrame(self.header)
+        header_df = pl.DataFrame(self.header).with_columns(continuous=self.is_continuous)
         return df, header_df
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
