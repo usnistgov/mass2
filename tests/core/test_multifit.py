@@ -58,7 +58,7 @@ def generate_and_fit_fake_data(
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
     )
-    mass2.line_models.VALIDATE_BIN_SIZE = False
+    mass2.calibration.line_models.VALIDATE_BIN_SIZE = False
     ch = ch.rough_cal_combinatoric(
         ["MnKAlpha", gaussian_centers_ev[0], gaussian_centers_ev[1]],
         ph_smoothing_fwhm=4,

@@ -66,7 +66,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     rng = np.random.default_rng(3)
 
-    # make a pulse and call mass2.FilterMaker directly
+    # make a pulse and call mass2.core.FilterMaker directly
     # test that the calculated values are correct per the mass docs
     n = 504
     Maxsignal = 1000.0
@@ -80,7 +80,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     noise_covar = np.zeros(n)
     noise_covar[0] = sigma_noise**2
-    maker = mass2.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
+    maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
     mass_filter = maker.compute_5lag()
 
     assert mass_filter.nominal_peak == pytest.approx(1000, rel=1e-2)
@@ -114,9 +114,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     df = pl.DataFrame({"pulse": pulse_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     ch = ch.filter5lag()
-    step: mass2.Filter5LagStep = ch.steps[-1]
-    assert isinstance(step, mass2.Filter5LagStep)
-    filter: mass2.Filter = step.filter
+    step: mass2.core.Filter5LagStep = ch.steps[-1]
+    assert isinstance(step, mass2.core.Filter5LagStep)
+    filter: mass2.core.Filter = step.filter
     assert filter.predicted_v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
     # test that the mass normaliztion in place
     # a pulse filtered value (5lagy) should roughly equal its peak height
@@ -137,12 +137,12 @@ def test_noise_autocorr():
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
     assert len(noise_ch.df) == 250
     assert len(noise_ch.df["pulse"][0]) == 500
-    noise_autocorr_mass = mass2.power_spectrum.autocorrelation_broken_from_pulses(noise_traces.T)
+    noise_autocorr_mass = mass2.mathstat.power_spectrum.autocorrelation_broken_from_pulses(noise_traces.T)
     assert len(noise_autocorr_mass) == 500
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(noise_autocorr_mass[1:])) == pytest.approx(0, abs=1e-2)
 
-    ac_direct = mass2.noise_algorithms.autocorrelation(noise_traces, dt=frametime_s).ac
+    ac_direct = mass2.core.noise_algorithms.autocorrelation(noise_traces, dt=frametime_s).ac
     assert len(ac_direct) == 500
     assert ac_direct[0] == pytest.approx(1, rel=1e-1)
     assert np.mean(np.abs(ac_direct[1:])) == pytest.approx(0, abs=1e-2)
@@ -170,19 +170,19 @@ def test_noise_psd():
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
-    f_mass, psd_mass = mass2.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=1000, dt=frametime_s)
+    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=1000, dt=frametime_s)
     assert len(f_mass) == 251  # half the length of the noise traces + 1
     expect = np.ones(251)
     assert np.allclose(psd_mass, expect, atol=0.15)
 
-    psd_raw_periodogram = mass2.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
+    psd_raw_periodogram = mass2.core.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
     assert len(psd_raw_periodogram.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], expect[1:-1], atol=0.15)
     assert psd_raw_periodogram.psd[0] == pytest.approx(0.5, rel=1e-1)  # scipy handles the 0 bin and last bin differently
     assert psd_raw_periodogram.psd[-1] == pytest.approx(0.5, rel=1e-1)
 
-    psd_raw = mass2.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
     assert len(psd_raw.frequencies) == 251  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], expect[1:-1], atol=0.15)
@@ -226,16 +226,16 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
-    f_mass, psd_mass = mass2.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=5, dt=frametime_s)
+    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=5, dt=frametime_s)
     assert len(f_mass) == 6  # half the length of the noise traces + 1
     # expect = np.ones(6)
 
-    psd_raw_periodogram = mass2.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
+    psd_raw_periodogram = mass2.core.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
     assert len(psd_raw_periodogram.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
-    psd_raw = mass2.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
+    psd_raw = mass2.core.noise_algorithms.noise_psd_mass(noise_traces, dt=frametime_s)
     assert len(psd_raw.frequencies) == 6  # half the length of the noise traces + 1
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], psd_mass[1:-1], atol=0.15)

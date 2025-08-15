@@ -97,7 +97,7 @@ def plot_a_vs_b_series(a, b, axis=None, **plotkwarg):
 
 
 def launch_examples():
-    examples_folder = pathlib.Path(__file__).parent.parent / "examples"
+    examples_folder = pathlib.Path(__file__).parent.parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
     examples_folder_relative = examples_folder.relative_to(pathlib.Path.cwd())
     # Prepare the command

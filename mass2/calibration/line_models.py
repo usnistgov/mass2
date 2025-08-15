@@ -454,6 +454,6 @@ Bins per FWHM = {bins_per_fwhm:.3g}, Minimum Bins per FWHM = {minimum_bins_per_f
 To avoid this error:
 1. use smaller bins, or
 2. pass a smaller value of `minimum_bins_per_fwhm` to .fit, or
-3. set `mass2.line_models.VALIDATE_BIN_SIZE = False`.
+3. set `mass2.calibration.line_models.VALIDATE_BIN_SIZE = False`.
 See https://github.com/usnistgov/mass/issues/162 for discussion on this issue"""
                     raise ValueError(msg)

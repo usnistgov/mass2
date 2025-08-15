@@ -91,14 +91,14 @@ def _(data, mass2, mo, plt):
 
     if calibrated_col is None:
         calibrated_col = f"energy_{uncalibrated_col}"
-    (line_names, line_energies) = mass2.algorithms.line_names_and_energies(line_names)
+    (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)
     uncalibrated = ch0.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-    pfresult = mass2.rough_cal.peakfind_local_maxima_of_smoothed_hist(
+    pfresult = mass2.core.rough_cal.peakfind_local_maxima_of_smoothed_hist(
         uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units
     )
     pfresult.plot()
     possible_phs = pfresult.ph_sorted_by_prominence()[: len(line_names) + n_extra_peaks]
-    df3peak, dfe = mass2.rough_cal.rank_3peak_assignments(
+    df3peak, dfe = mass2.core.rough_cal.rank_3peak_assignments(
         possible_phs,
         line_energies,
         line_names,
@@ -603,7 +603,7 @@ def _(data2):
 def _(ch6, mass2, np):
     indicator = ch6.good_series("pretrig_mean", use_expr=True).to_numpy()
     uncorrected = ch6.good_series("energy_5lagy_dc", use_expr=True).to_numpy()
-    dc_result = mass2.rough_cal.minimize_entropy_linear(
+    dc_result = mass2.core.rough_cal.minimize_entropy_linear(
         indicator, uncorrected, bin_edges=np.arange(0, 9000, 1), fwhm_in_bin_number_units=4
     )
     print(dc_result)
