@@ -1,0 +1,56 @@
+#LJH Memorial File Format
+Save File Format Version: 2.2.0
+Software Version: MATTER Client 1.1.3
+Software Driver Version: unknown
+Server Start Time: 25 Apr 2018, 20:35:04 GMT
+Acquisition Mode: 0
+Digitized Word Size in Bytes: 2
+File First Record Time: 25 Apr 2018, 23:02:48 GMT
+Channel: 99
+Number of columns: 8
+Number of rows: 8
+Column number (from 0-7 inclusive): 6
+Row number (from 0-7 inclusive): 1
+Location: Blg 81
+Cryostat: Horton
+Bias level (% Rn):
+T set point (mK): 70
+"Heater" output (%):
+Magnetic field (mg):
+Sample: 6 sided metrology
+Photon source: easyXSI
+Operator(s): Y. Joe, GCO
+System comment:
+#End of description
+Number of Digitizers: 1
+Number of Active Channels: 1
+Timestamp offset (s): 1524688504.806504
+Digitizer: 1
+Description: n/a
+Master: yes
+Bits: 16
+Effective Bits: unknown
+Anti-alias low-pass cutoff frequency (Hz): n/a
+Timebase: 2.560000e-06
+Number of samples per point: 1
+Presamples: 100
+Total Samples: 200
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Digitizer Channel: 1.0
+Dummy: 0
+Range: 0.500000
+Offset: 0.500000
+Coupling: DC
+Impedance: n/a
+Inverted: No
+Preamp gain: 1.0
+Discrimination level: n/a
+#End of Header
