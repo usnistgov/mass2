@@ -40,6 +40,9 @@ class LJHFile:
 
     OVERLONG_HEADER: ClassVar[int] = 100
 
+    def __repr__(self):
+        return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
+
     @classmethod
     def open(cls, filename: str, max_pulses: int | None = None) -> "LJHFile":
         header_dict, header_string, header_size = cls.read_header(filename)
@@ -73,8 +76,7 @@ class LJHFile:
         binary_size = os.path.getsize(filename) - header_size
 
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
-        # It adds 3 to the "true value" of nPresamples. For now, assume that only
-        # DASTARD clients have this figure correct.
+        # It adds 3 to the "true value" of nPresamples. Assume only DASTARD clients have value correct.
         if "DASTARD" not in client:
             npresamples += 3
 
@@ -297,6 +299,8 @@ class LJHFile:
             header_df: a one-row dataframe containing the information from the LJH file header
         """
         if self.ljh_version < Version("2.2.0"):
+            # If we ever need to handle LJH 2.1 files, see `mass.core.files.LJHFile2_1`
+            # specifically the constructor and the `_parse_times(self)` method.
             raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
 
         data = {
