@@ -59,7 +59,13 @@ class LJHFile:
             subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
-        if ljh_version < Version("2.2.0"):
+        if ljh_version < Version("2.1.0"):
+            dtype = np.dtype([
+                ("internal_unused", np.uint16),
+                ("internal_ms", np.uint32),
+                ("data", np.uint16, nsamples),
+            ])
+        elif ljh_version < Version("2.2.0"):
             dtype = np.dtype([
                 ("internal_us", np.uint8),
                 ("internal_unused", np.uint8),
@@ -142,7 +148,7 @@ class LJHFile:
 
         # Convert values from header_dict into numeric types, when appropriate
         header_dict["Filename"] = filename
-        for name, datatype in {
+        for name, datatype in (
             ("Channel", int),
             ("Timebase", float),
             ("Total Samples", int),
@@ -150,8 +156,10 @@ class LJHFile:
             ("Number of columns", int),
             ("Number of rows", int),
             ("Subframe divisions", int),
-        }:
-            header_dict[name] = datatype(header_dict.get(name, -1))
+            ("Timestamp offset (s)", float),
+        ):
+            # Have to convert to float first, as some early LJH have "Channel: 1.0"
+            header_dict[name] = datatype(float(header_dict.get(name, -1)))
         return header_dict, header_string, header_size
 
     @property
@@ -228,15 +236,34 @@ class LJHFile:
         np.ndarray
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
-        mmap = self._mmap["posix_usec"]
-        subframecount = np.zeros(self.npulses, dtype=np.int64)
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        if "posix_usec" in self.dtype.names:
+            mmap = self._mmap["posix_usec"]
+            scale = 1
+            offset = 0
+        else:
+            mmap = self._mmap["internal_ms"]
+            scale = 1000
+            offset = round(self.header["Timestamp offset (s)"] * 1e6)
+
         MAXSEGMENT = 4096
         first = 0
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            subframecount[first:last] = mmap[first:last]
+            usec[first:last] = mmap[first:last]
             first = last
-        return subframecount
+        usec = usec * scale + offset
+
+        # Add the 4 µs units found in LJH version 2.1
+        if "internal_us" in self.dtype.names:
+            first = 0
+            mmap = self._mmap["internal_us"]
+            while first < self.npulses:
+                last = min(first + MAXSEGMENT, self.npulses)
+                usec[first:last] += mmap[first:last] * 4
+                first = last
+
+        return usec
 
     @property
     def datatimes_float(self):
@@ -251,15 +278,7 @@ class LJHFile:
         np.ndarray
             An array of pulse record times in floating-point (seconds since the 1970 epoch).
         """
-        raw = self._mmap["posix_usec"]
-        datatimes_float = np.zeros(self.npulses, dtype=np.float64)
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            datatimes_float[first:last] = raw[first:last] / 1e6
-            first = last
-        return datatimes_float
+        return self.datatimes_raw / 1e6
 
     def read_trace(self, i: int) -> npt.NDArray:
         """Return a single pulse record from an LJH file.
