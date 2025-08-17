@@ -213,8 +213,10 @@ class LJHFile:
         np.ndarray
             An array of subframecount values for each pulse record.
         """
-        mmap = self._mmap["subframecount"]
         subframecount = np.zeros(self.npulses, dtype=np.int64)
+        if "subframecount" not in self.dtype.names:
+            return subframecount
+        mmap = self._mmap["subframecount"]
         MAXSEGMENT = 4096
         first = 0
         while first < self.npulses:
@@ -317,15 +319,10 @@ class LJHFile:
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
         """
-        if self.ljh_version < Version("2.2.0"):
-            # If we ever need to handle LJH 2.1 files, see `mass.core.files.LJHFile2_1`
-            # specifically the constructor and the `_parse_times(self)` method.
-            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
-
         data = {
             "pulse": self._mmap["data"][first_pulse:],
-            "posix_usec": self._mmap["posix_usec"][first_pulse:],
-            "subframecount": self._mmap["subframecount"][first_pulse:],
+            "posix_usec": self.datatimes_raw[first_pulse:],
+            "subframecount": self.subframecount[first_pulse:],
         }
         schema: pl._typing.SchemaDict = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
@@ -336,6 +333,8 @@ class LJHFile:
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
+        if self.ljh_version < Version("2.2.0"):
+            df = df.select(pl.exclude("subframecount"))
         header_df = pl.DataFrame(self.header)
         return df, header_df
 

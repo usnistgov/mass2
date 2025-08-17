@@ -71,3 +71,11 @@ def test_ljh_all_versions(tmp_path):
             assert np.all(file.subframecount == rowcount)
         for i in range(npulse):
             assert np.all(file.read_trace(i) == pulses[i, :])
+
+        # Check that the dataframe values are also correct
+        df, _ = file.to_polars(keep_posix_usec=True)
+        print(df.columns)
+        assert np.all(df["pulse"].to_numpy() == pulses)
+        if version == v220:
+            assert np.all(df["subframecount"].to_numpy() == rowcount)
+        assert np.all(df["posix_usec"].to_numpy() == times_microsec + time_offset)
