@@ -270,7 +270,9 @@ class LJHFile(ABC):
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
 
-    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -279,6 +281,9 @@ class LJHFile(ABC):
             The pulse dataframe starts with this pulse record number, by default 0
         keep_posix_usec : bool, optional
             Whether to keep the raw `posix_usec` field in the pulse dataframe, by default False
+        force_continuous: bool
+            Whether to claim that the data stream is actually continuous (because it cannot be learned from
+            data for LJH files before version 2.2.0). Only relevant for noise data files.
 
         Returns
         -------
@@ -301,7 +306,8 @@ class LJHFile(ABC):
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
-        header_df = pl.DataFrame(self.header).with_columns(continuous=self.is_continuous)
+        continuous = self.is_continuous or force_continuous
+        header_df = pl.DataFrame(self.header).with_columns(continuous=continuous)
         return df, header_df
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
@@ -323,17 +329,15 @@ class LJHFile(ABC):
     def is_continuous(self) -> bool:
         """Is this LJH file made of a perfectly continuous data stream?
 
-        We generally do take noise data in this mode, and it's useful to analyze the noise
-        data by gluing many records together. This property says whether such gluing is valid.
+        For pre-version 2.2 LJH files, we cannot discern from the data.
+        So just claim False. (LJH_2_2 subtype will override by actually computing.)
 
         Returns
         -------
         bool
             Whether every record is strictly continuous with the ones before and after
         """
-        expected_subframe_diff = self.nsamples * self.subframediv
-        subframe = self._mmap["subframecount"]
-        return np.max(np.diff(subframe)) <= expected_subframe_diff
+        return False
 
 
 class LJHFile_2_2(LJHFile):
@@ -385,6 +389,22 @@ class LJHFile_2_2(LJHFile):
             first = last
         return usec
 
+    @property
+    def is_continuous(self) -> bool:
+        """Is this LJH file made of a perfectly continuous data stream?
+
+        We generally do take noise data in this mode, and it's useful to analyze the noise
+        data by gluing many records together. This property says whether such gluing is valid.
+
+        Returns
+        -------
+        bool
+            Whether every record is strictly continuous with the ones before and after
+        """
+        expected_subframe_diff = self.nsamples * self.subframediv
+        subframe = self._mmap["subframecount"]
+        return np.max(np.diff(subframe)) <= expected_subframe_diff
+
 
 class LJHFile_2_1(LJHFile):
     @property
@@ -424,8 +444,10 @@ class LJHFile_2_1(LJHFile):
 
         return usec
 
-    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec)
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
         return df.select(pl.exclude("subframecount")), df_header
 
 
@@ -458,6 +480,8 @@ class LJHFile_2_0(LJHFile):
 
         return usec
 
-    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec)
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
         return df.select(pl.exclude("subframecount")), df_header
