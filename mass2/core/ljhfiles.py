@@ -36,6 +36,7 @@ class LJHFile(ABC):
     header_size: int
     binary_size: int
     _mmap: np.memmap
+    ljh_version: Version
     max_pulses: int | None = None
 
     OVERLONG_HEADER: ClassVar[int] = 100
@@ -111,6 +112,7 @@ class LJHFile(ABC):
             header_size,
             binary_size,
             mmap,
+            ljh_version,
             max_pulses,
         )
 
