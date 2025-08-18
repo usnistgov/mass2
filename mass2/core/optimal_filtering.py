@@ -563,69 +563,6 @@ class FilterMaker:
         )
         return maker.compute_5lag(fmax=fmax, f_3db=f_3db)
 
-    def compute_5lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
-        """Compute a single filter, with optional low-pass filtering, and with optional zero
-        weights at the pre-trigger or post-trigger end of the filter.
-
-        Either or both of `fmax` and `f_3db` are allowed.
-
-        Parameters
-        ----------
-        fmax : Optional[float], optional
-            The strict maximum frequency to be passed in all filters, by default None
-        f_3db : Optional[float], optional
-            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
-        cut_pre : int
-            The number of initial samples to be given zero weight, by default 0
-        cut_post : int
-            The number of samples at the end of a record to be given zero weight, by default 0
-
-        Returns
-        -------
-        Filter
-            A 5-lag optimal filter.
-
-        Raises
-        ------
-        ValueError
-            Under various conditions where arguments are inconsistent with the data
-        """
-        if self.noise_autocorr is None and self.whitener is None:
-            raise ValueError("FilterMaker must have noise_autocorr or whitener arguments to generate 5-lag filters")
-        noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
-        avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
-
-        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
-            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
-        if cut_pre < 0 or cut_post < 0:
-            raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
-
-        # Time domain filters
-        shorten = 2
-        truncated_signal = avg_signal[shorten:-shorten]
-        n = len(truncated_signal)
-        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
-
-        noise_corr = noise_autocorr[:n]
-        TS = ToeplitzSolver(noise_corr, symmetric=True)
-        Rinv_sig = TS(truncated_signal)
-        Rinv_1 = TS(np.ones(n))
-        filt_noconst = Rinv_1.sum() * Rinv_sig - Rinv_sig.sum() * Rinv_1
-
-        band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
-
-        self._normalize_5lag_filter(filt_noconst, avg_signal)
-        variance = bracketR(filt_noconst, noise_corr)
-
-        # Set weights in the cut_pre and cut_post windows to 0
-        if cut_pre > 0 or cut_post > 0:
-            filt_noconst = np.hstack([np.zeros(cut_pre), filt_noconst, np.zeros(cut_post)])
-
-        vdv = peak / (8 * np.log(2) * variance) ** 0.5
-        return Filter5Lag(
-            filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
-        )
-
     def compute_constrained_5lag(
         self,
         constraints: npt.ArrayLike | None = None,
@@ -664,9 +601,6 @@ class FilterMaker:
         ValueError
             Under various conditions where arguments are inconsistent with the data
         """
-        if constraints is None:
-            return self.compute_5lag(fmax=fmax, f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
-        constraints = np.asarray(constraints)
 
         if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
             raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
@@ -678,18 +612,19 @@ class FilterMaker:
         noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
         avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
 
-        # Time domain filters
-        shorten = 2
+        shorten = 2  # for 5-lag convolution
         truncated_signal = avg_signal[shorten:-shorten]
         n = len(truncated_signal)
-        assert n == constraints.shape[-1]
         assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
-        pulse_model = np.hstack((truncated_signal, np.ones_like(truncated_signal), constraints))
+        pulse_model = np.vstack((truncated_signal, np.ones_like(truncated_signal)))
+        if constraints is not None:
+            pulse_model = np.vstack((pulse_model, constraints))
+        assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
         TS = ToeplitzSolver(noise_corr, symmetric=True)
-        Rinv_model = [TS(r) for r in pulse_model]
-        A = pulse_model.T.dot(Rinv_model)
+        Rinv_model = np.vstack([TS(r) for r in pulse_model])
+        A = pulse_model.dot(Rinv_model.T)
         all_filters = np.linalg.solve(A, Rinv_model)
         filt_noconst = all_filters[0]
 
@@ -706,6 +641,72 @@ class FilterMaker:
         return Filter5Lag(
             filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
         )
+
+    def compute_5lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
+        """Compute a single filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 5-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+        return self.compute_constrained_5lag(None, fmax=fmax, f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+
+    def compute_5lag_noexp(
+        self, exp_time_seconds: float, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0
+    ) -> Filter:
+        """Compute a single filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        exp_time_seconds: float
+            Generate a filter orthogonal to decaying exponentials of this time constant (must be positive)
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 5-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+        assert exp_time_seconds > 0
+        n = len(self.signal_model) - 4 - (cut_pre + cut_post)
+        log_per_sample = self.sample_time_sec / exp_time_seconds
+        constraint = np.exp(-np.arange(n) * log_per_sample)
+        return self.compute_constrained_5lag(constraint, fmax=fmax, f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
 
     def compute_fourier(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
         """Compute a single Fourier-domain filter, with optional low-pass filtering, and with optional
