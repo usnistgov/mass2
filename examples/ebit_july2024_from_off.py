@@ -207,12 +207,12 @@ def _(data2, mo, plt):
 
 
 @app.cell
-def _(data3, dropdown_ch, mass, pl):
+def _(data3, dropdown_ch, mass2, pl):
     def label_lines(ch, previous_step_index, line_names=None, line_width=80):
         previous_step, previous_step_index = ch.get_step(previous_step_index)
         if line_names is None:
             line_names = previous_step.assignment_result.names_target
-        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)
         df_close = pl.DataFrame(
             {"line_name": line_names, "line_energy": line_energies}
         ).sort(by="line_energy")
