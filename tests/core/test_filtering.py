@@ -57,8 +57,9 @@ def test_dc_insensitive():
         assert np.abs(mean) < 1e-10 * std, f"{filter_to_test} failed DC test w/ fmax"
 
 
-def test_exponential_insensitive():
-    "Make sure that filters are insensitive to a given exponential when required (but not in general)"
+def test_constrained_filtering():  # noqa: PLR0914
+    """Make sure that filters are insensitive to a given exponential when required (but not in general)
+    and also general constraints"""
     nSamples = 100
     nPresamples = 50
     nPost = nSamples - nPresamples
@@ -91,12 +92,27 @@ def test_exponential_insensitive():
     f_noexp = maker.compute_5lag_noexp(tau)
     f_constrained = maker.compute_constrained_5lag(expmodel)
 
-    print(f_usual.filter_records(expdata))
-    print(f_noexp.filter_records(expdata))
-    print(f_constrained.filter_records(expdata))
-    assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-6, "compute_5lag is insensitive to an exponential"
-    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-10, "compute_5lag_noexp is sensitive to an exponential"
-    assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-10, "compute_constrained_5lag is sensitive to an exponential"
+    assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
+    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-11, "compute_5lag_noexp is sensitive to an exponential"
+    assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-11, "compute_constrained_5lag is sensitive to an exponential"
+
+    # Now make multiple exponential constraints
+    insensitive_models = [expdata, 1 - expdata, expdata**3.5]
+    constraints = [m[2:-2] for m in insensitive_models]
+    f_constrained = maker.compute_constrained_5lag(constraints)
+    msg1 = "compute_5lag is unexpectedly insensitive to an arbitrary shape"
+    msg2 = "compute_constrained_5lag is sensitive to constraint"
+    assert np.all(np.abs(f_usual.filter_records(insensitive_models)[0]) > 1e-4), msg1
+    assert np.all(np.abs(f_constrained.filter_records(insensitive_models)[0]) < 1e-11), msg2
+
+    # And add a non-exponential constraint. This won't be strictly insensitive when we 5-lag filter it.
+    # But it _will_ have zero inner product with the shortened-by-4 model. So test only that
+    insensitive_models.append(np.cos(np.linspace(0, 7, nSamples)))
+    constraints.append(insensitive_models[-1][2:-2])
+    f_constrained = maker.compute_constrained_5lag(constraints)
+    for i, vec in enumerate(constraints):
+        msg2 = f"compute_constrained_5lag filter values are not orthogonal to constraint # {i}"
+        assert np.abs(f_constrained.values.dot(vec)) < 1e-11, msg2
 
 
 def test_no_concrete_baseFilter():
