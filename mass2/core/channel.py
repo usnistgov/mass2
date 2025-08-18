@@ -749,6 +749,15 @@ class Channel:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")
 
+    def fit_pulse(self, index=0, col="pulse", verbose=True):
+        pulse = self.df[col][index].to_numpy()
+        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
+        if verbose:
+            print(f"ch={self}")
+            print(f"pulse index={index}")
+            print(result.fit_report())
+        return result
+
 
 @dataclass(frozen=True)
 class BadChannel:

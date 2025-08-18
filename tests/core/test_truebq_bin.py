@@ -15,7 +15,7 @@ def test_basic():
 
     with TemporaryDirectory(delete=False) as tmpdir:
         tmpfile = Path(tmpdir) / "2A" / "test.bin"
-        tmpdir.mkdir(parents=True, exist_ok=False)
+        tmpfile.parent.mkdir(parents=True, exist_ok=True)
         truebq_bin.write_truebq_bin_file(tmpfile, data_true, sample_rate_hz=1e5)
         assert (tmpfile).exists()
         assert (tmpfile).stat().st_size > 0

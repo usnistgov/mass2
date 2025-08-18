@@ -979,5 +979,12 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
     return
 
 
+@app.cell
+def _(ch):
+    result = ch.fit_pulse(7)
+    result.plot()
+    return
+
+
 if __name__ == "__main__":
     app.run()

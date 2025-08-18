@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray
+import lmfit
 
 # Define the dtype for the structured array
 result_dtype = np.dtype([
@@ -21,6 +22,13 @@ result_dtype = np.dtype([
 ResultArrayType = NDArray
 
 
+# this cache code works, but it's not clear it's faster than just running the function
+# from joblib import Memory
+# cache_dir = Path.cwd()/"_summarize_data_cache"
+# memory = Memory(cache_dir, mmap_mode="r", verbose=0)
+
+
+# @memory.cache
 @njit
 def summarize_data_numba(  # noqa: PLR0914
     rawdata: NDArray[np.uint16],
@@ -161,3 +169,49 @@ def summarize_data_numba(  # noqa: PLR0914
         results["postpeak_deriv"][j] = 0.1 * t_max_deriv
 
     return results
+
+
+def pulse_2exp_with_tail(t, t0, a_tail, tau_tail, a, tau_rise, tau_fall_factor, baseline):
+    tt = t - t0
+    tau_fall = tau_rise * tau_fall_factor
+    assert tau_fall_factor >= 1
+
+    if tau_fall_factor > 1:
+        # location of peak
+        t_peak = (tau_rise * tau_fall) / (tau_fall - tau_rise) * np.log(tau_fall / tau_rise)
+        # value at peak
+        max_val = np.exp(-t_peak / tau_fall) - np.exp(-t_peak / tau_rise)
+    else:  # tau_fall == tau_rise
+        max_val = 1 / np.e
+
+    return (
+        a_tail * np.exp(-tt / tau_tail) / np.exp(-tt[0] / tau_tail)  # normalized tail
+        + a * (np.exp(-tt / tau_fall) - np.exp(-tt / tau_rise)) * np.greater(tt, 0) / max_val
+        + baseline
+    )
+
+
+def fit_pulse_2exp_with_tail(data, npre, dt=1, guess_tau=None):
+    if guess_tau is None:
+        guess_tau = dt * len(data) / 5
+    model = lmfit.Model(pulse_2exp_with_tail)
+    baseline = np.amin(data)
+    params = model.make_params(
+        t0=npre * dt,
+        a_tail=data[0] - baseline,
+        baseline=baseline,
+        a=np.amax(data) - baseline,
+        tau_tail=guess_tau,
+        tau_rise=guess_tau,
+        tau_fall_factor=2.0,
+    )
+    params["a_tail"].set(min=0)
+    params["a"].set(min=0)
+    params["tau_tail"].set(min=dt / 5)
+    params["tau_rise"].set(min=dt / 5)
+    params["tau_fall_factor"].set(min=1)
+    params.add("tau_fall", expr="tau_rise*tau_fall_factor")
+
+    result = model.fit(data, params, t=np.arange(len(data)) * dt)
+
+    return result
