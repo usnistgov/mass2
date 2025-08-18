@@ -4,7 +4,7 @@
 
 <!-- Couldn't figure out how to get markdown to resize the drawing w/o going to full HTML -->
 <p align="left">
-    <img src="doc/mass2_logo_128.png", width="160" title="Microcal Analysis">
+    <img src="docs/mass2_logo_128.png", width="160" title="Microcal Analysis">
 </p>
 
 

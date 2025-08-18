@@ -5,10 +5,11 @@ import os
 import numpy as np
 import polars as pl
 from packaging.version import Version
+from abc import ABC, abstractmethod
 
 
 @dataclass(frozen=True)
-class LJHFile:
+class LJHFile(ABC):
     """Represents the header and binary information of a single LJH file.
 
     Includes the complete ASCII header stored both as a dictionary and a string, and
@@ -40,6 +41,9 @@ class LJHFile:
 
     OVERLONG_HEADER: ClassVar[int] = 100
 
+    def __repr__(self):
+        return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
+
     @classmethod
     def open(cls, filename: str, max_pulses: int | None = None) -> "LJHFile":
         header_dict, header_string, header_size = cls.read_header(filename)
@@ -56,25 +60,35 @@ class LJHFile:
             subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
-        if ljh_version < Version("2.2.0"):
+        if ljh_version < Version("2.0.0"):
+            raise NotImplementedError("LJH files version 1 are not supported")
+        if ljh_version < Version("2.1.0"):
+            dtype = np.dtype([
+                ("internal_unused", np.uint16),
+                ("internal_ms", np.uint32),
+                ("data", np.uint16, nsamples),
+            ])
+            concrete_LJHFile_type = LJHFile_2_0
+        elif ljh_version < Version("2.2.0"):
             dtype = np.dtype([
                 ("internal_us", np.uint8),
                 ("internal_unused", np.uint8),
                 ("internal_ms", np.uint32),
                 ("data", np.uint16, nsamples),
             ])
+            concrete_LJHFile_type = LJHFile_2_1
         else:
             dtype = np.dtype([
                 ("subframecount", np.int64),
                 ("posix_usec", np.int64),
                 ("data", np.uint16, nsamples),
             ])
+            concrete_LJHFile_type = LJHFile_2_2
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
-        # It adds 3 to the "true value" of nPresamples. For now, assume that only
-        # DASTARD clients have this figure correct.
+        # It adds 3 to the "true value" of nPresamples. Assume only DASTARD clients have value correct.
         if "DASTARD" not in client:
             npresamples += 3
 
@@ -83,7 +97,7 @@ class LJHFile:
             npulses = min(max_pulses, npulses)
         mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
 
-        return LJHFile(
+        return concrete_LJHFile_type(
             filename,
             channum,
             dtype,
@@ -140,7 +154,7 @@ class LJHFile:
 
         # Convert values from header_dict into numeric types, when appropriate
         header_dict["Filename"] = filename
-        for name, datatype in {
+        for name, datatype in (
             ("Channel", int),
             ("Timebase", float),
             ("Total Samples", int),
@@ -148,8 +162,10 @@ class LJHFile:
             ("Number of columns", int),
             ("Number of rows", int),
             ("Subframe divisions", int),
-        }:
-            header_dict[name] = datatype(header_dict.get(name, -1))
+            ("Timestamp offset (s)", float),
+        ):
+            # Have to convert to float first, as some early LJH have "Channel: 1.0"
+            header_dict[name] = datatype(float(header_dict.get(name, -1)))
         return header_dict, header_string, header_size
 
     @property
@@ -194,26 +210,17 @@ class LJHFile:
     def subframecount(self):
         """Return a copy of the subframecount memory map.
 
-        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
-        expensive for large files. To prevent problems, copy chunks of no more than
-        `MAXSEGMENT` records at once.
+        Old LJH versions don't have this: return zeros, unless overridden by derived class (LJHFile_2_2 will be the only one).
 
         Returns
         -------
         np.ndarray
             An array of subframecount values for each pulse record.
         """
-        mmap = self._mmap["subframecount"]
-        subframecount = np.zeros(self.npulses, dtype=np.int64)
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            subframecount[first:last] = mmap[first:last]
-            first = last
-        return subframecount
+        return np.zeros(self.npulses, dtype=np.int64)
 
     @property
+    @abstractmethod
     def datatimes_raw(self):
         """Return a copy of the raw timestamp (posix usec) memory map.
 
@@ -226,15 +233,7 @@ class LJHFile:
         np.ndarray
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
-        mmap = self._mmap["posix_usec"]
-        subframecount = np.zeros(self.npulses, dtype=np.int64)
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            subframecount[first:last] = mmap[first:last]
-            first = last
-        return subframecount
+        raise NotImplementedError("illegal: this is an abstract base class")
 
     @property
     def datatimes_float(self):
@@ -249,15 +248,7 @@ class LJHFile:
         np.ndarray
             An array of pulse record times in floating-point (seconds since the 1970 epoch).
         """
-        raw = self._mmap["posix_usec"]
-        datatimes_float = np.zeros(self.npulses, dtype=np.float64)
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            datatimes_float[first:last] = raw[first:last] / 1e6
-            first = last
-        return datatimes_float
+        return self.datatimes_raw / 1e6
 
     def read_trace(self, i: int) -> npt.NDArray:
         """Return a single pulse record from an LJH file.
@@ -279,7 +270,9 @@ class LJHFile:
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
 
-    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -288,6 +281,9 @@ class LJHFile:
             The pulse dataframe starts with this pulse record number, by default 0
         keep_posix_usec : bool, optional
             Whether to keep the raw `posix_usec` field in the pulse dataframe, by default False
+        force_continuous: bool
+            Whether to claim that the data stream is actually continuous (because it cannot be learned from
+            data for LJH files before version 2.2.0). Only relevant for noise data files.
 
         Returns
         -------
@@ -296,13 +292,10 @@ class LJHFile:
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
         """
-        if self.ljh_version < Version("2.2.0"):
-            raise NotImplementedError("cannot convert LJH pre-2.2 files to Polars dataframes yet")
-
         data = {
             "pulse": self._mmap["data"][first_pulse:],
-            "posix_usec": self._mmap["posix_usec"][first_pulse:],
-            "subframecount": self._mmap["subframecount"][first_pulse:],
+            "posix_usec": self.datatimes_raw[first_pulse:],
+            "subframecount": self.subframecount[first_pulse:],
         }
         schema: pl._typing.SchemaDict = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
@@ -313,7 +306,8 @@ class LJHFile:
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
-        header_df = pl.DataFrame(self.header)
+        continuous = self.is_continuous or force_continuous
+        header_df = pl.DataFrame(self.header).with_columns(continuous=continuous)
         return df, header_df
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
@@ -335,6 +329,70 @@ class LJHFile:
     def is_continuous(self) -> bool:
         """Is this LJH file made of a perfectly continuous data stream?
 
+        For pre-version 2.2 LJH files, we cannot discern from the data.
+        So just claim False. (LJH_2_2 subtype will override by actually computing.)
+
+        Returns
+        -------
+        bool
+            Whether every record is strictly continuous with the ones before and after
+        """
+        return False
+
+
+class LJHFile_2_2(LJHFile):
+    @property
+    def subframecount(self):
+        """Return a copy of the subframecount memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of subframecount values for each pulse record.
+        """
+        subframecount = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["subframecount"]
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            subframecount[first:last] = mmap[first:last]
+            first = last
+        return subframecount
+
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        assert "posix_usec" in self.dtype.names
+        mmap = self._mmap["posix_usec"]
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        return usec
+
+    @property
+    def is_continuous(self) -> bool:
+        """Is this LJH file made of a perfectly continuous data stream?
+
         We generally do take noise data in this mode, and it's useful to analyze the noise
         data by gluing many records together. This property says whether such gluing is valid.
 
@@ -346,3 +404,84 @@ class LJHFile:
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
         return np.max(np.diff(subframe)) <= expected_subframe_diff
+
+
+class LJHFile_2_1(LJHFile):
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["internal_ms"]
+        scale = 1000
+        offset = round(self.header["Timestamp offset (s)"] * 1e6)
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        usec = usec * scale + offset
+
+        # Add the 4 µs units found in LJH version 2.1
+        assert "internal_us" in self.dtype.names
+        first = 0
+        mmap = self._mmap["internal_us"]
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] += mmap[first:last] * 4
+            first = last
+
+        return usec
+
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        return df.select(pl.exclude("subframecount")), df_header
+
+
+class LJHFile_2_0(LJHFile):
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["internal_ms"]
+        scale = 1000
+        offset = round(self.header["Timestamp offset (s)"] * 1e6)
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        usec = usec * scale + offset
+
+        return usec
+
+    def to_polars(
+        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        return df.select(pl.exclude("subframecount")), df_header

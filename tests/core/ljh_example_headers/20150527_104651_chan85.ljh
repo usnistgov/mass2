@@ -1,0 +1,56 @@
+#LJH Memorial File Format
+Save File Format Version: 2.1.0
+Software Version: MATTER Client 0.2.8
+Software Driver Version: unknown
+Server Start Time: 27 May 2015, 16:38:36 GMT
+Acquisition Mode: 0
+Digitized Word Size in Bytes: 2
+File First Record Time: 27 May 2015, 16:46:57 GMT
+Channel: 85
+Number of columns: 8
+Number of rows: 30
+Column number (from 0-7 inclusive): 1
+Row number (from 0-29 inclusive): 12
+Location: Building 81
+Cryostat: Tupac
+Bias level (% Rn):
+T set point (mK): 75
+"Heater" output (%):
+Magnetic field (mg):
+Sample: calibronium
+Photon source:
+Operator(s): Galen
+System comment:
+#End of description
+Number of Digitizers: 1
+Number of Active Channels: 1
+Timestamp offset (s): 1432744716.359757
+Digitizer: 1
+Description: n/a
+Master: yes
+Bits: 16
+Effective Bits: unknown
+Anti-alias low-pass cutoff frequency (Hz): n/a
+Timebase: 9.600000e-06
+Number of samples per point: 1
+Presamples: 100
+Total Samples: 200
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Dummy: 0
+Digitizer Channel: 1.0
+Dummy: 0
+Range: 0.500000
+Offset: 0.500000
+Coupling: DC
+Impedance: n/a
+Inverted: No
+Preamp gain: 1.0
+Discrimination level: n/a
+#End of Header

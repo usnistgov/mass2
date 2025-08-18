@@ -30,7 +30,7 @@ from .core import (
     Channel,
     Channels,
     NoiseChannel,
-    NoisePSD,
+    NoiseResult,
     misc,
     show,
     FilterMaker,

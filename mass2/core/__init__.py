@@ -15,7 +15,7 @@ from . import noise_algorithms
 from . import ljhutil
 from . import misc
 from .misc import good_series, show
-from .noise_algorithms import NoisePSD
+from .noise_algorithms import NoiseResult
 from .noise_channel import NoiseChannel
 from .cal_steps import CalSteps, CalStep, SummarizeStep, PretrigMeanJumpFixStep, ColumnAsNumpyMapStep
 from .multifit import (
