@@ -151,7 +151,7 @@ def _(mo, npost, npre, trigger_result):
 def _(mass2, mo, trigger_result):
     long_noise = trigger_result.get_noise(
         n_dead_samples_after_pulse_trigger=10000,
-        n_record_samples=40000,
+        n_record_samples=100000,
         max_noise_triggers=50,
     )
     long_noise.spectrum().plot()
