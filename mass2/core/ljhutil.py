@@ -75,7 +75,7 @@ def extract_channel_number(file_path: str) -> int:
     Returns:
     - int: The channel number.
     """
-    match = re.search(r"_chan(\d+)\.ljh$", file_path)
+    match = re.search(r"_chan(\d+)\..*$", file_path)
     if match:
         return int(match.group(1))
     else:

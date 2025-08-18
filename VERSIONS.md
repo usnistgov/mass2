@@ -7,7 +7,7 @@
 * Complete rewrite of MASS for version 2. Base data wrangling on [Pola.rs](https://pola.rs/).
 * Allow `Channel` objects to have callable to transform raw data (e.g., by inverting it) (issue 12).
 * Raise minimum python version to 3.10 for type annotations to work.
-* Support LJH file standards version 2.2, 2.1, and 2.0.
+* Support reading LJH file version 2.2, 2.1, and 2.0, and also OFF versions 0.1, 0.2, and 0.3.
 * Use mass1-style noise analysis, where (if available), continuous noise is used to estimate high-lag autocorrelation better.
 * Add `FilterMaker.compute_5lag_noexp()` and `.compute_5lag_constrained()` for constrained optimal filters.
 
