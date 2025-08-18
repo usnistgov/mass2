@@ -10,6 +10,7 @@ from . import phase_correct
 
 
 from .ljhfiles import LJHFile
+from .offfiles import OffFile
 from . import pulse_algorithms
 from . import noise_algorithms
 from . import ljhutil

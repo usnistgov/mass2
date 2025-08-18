@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.14.17"
 app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
@@ -17,23 +17,15 @@ def _():
 def _():
     import mass2
     import pulsedata
-    import mass
     import pathlib
-    return mass, mass2, pulsedata
+    return mass2, pulsedata
 
 
 @app.cell
-def _(mo):
-    mo.md("# This is broken in MASS v2")
-    return
-
-
-@app.cell
-def _(mass, mass2, pulsedata):
+def _(mass2, pulsedata):
     off_paths = mass2.core.ljhutil.find_ljh_files(
         str(pulsedata.off["ebit_20240723_0000"]), ext=".off"
     )
-    off = mass.off.OffFile(off_paths[0])
     return (off_paths,)
 
 
