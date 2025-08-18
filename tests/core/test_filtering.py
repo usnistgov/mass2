@@ -68,7 +68,8 @@ def test_constrained_filtering():  # noqa: PLR0914
     pulse_like = np.append(np.zeros(nPresamples), np.linspace(nPost - 1, 0, nPost))
     deriv_like = np.append(np.zeros(nPresamples), -np.ones(nPost))
 
-    fake_noise = np.random.default_rng().standard_normal(nSamples)
+    rng = np.random.default_rng(1492)
+    fake_noise = rng.standard_normal(nSamples)
     fake_noise[0] = 10.0
     dt = 6.72e-6
 
