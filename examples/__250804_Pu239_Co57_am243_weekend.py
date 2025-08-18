@@ -170,18 +170,14 @@ def _(
 ):
     ch2 = ch.summarize_pulses()
     ch2 = ch2.filter5lag(time_constant_s_of_exp_to_be_orthogonal_to=0.003)
+    ch2 = ch2.filter5lag(peak_y_col="5lagy_normal", peak_x_col="5lagx_normal")
     ch2 = ch2.rough_cal_combinatoric(
         [energy_of_highest_peak_ev],
         uncalibrated_col="5lagy",
         calibrated_col="energy_5lagy",
         ph_smoothing_fwhm=5,
     )
-    # ch2 = ch2.with_columns(
-    #     ch2.df.select(
-    #         frames_until_next=pl.col("framecount").shift(-1) - pl.col("framecount"),
-    #         frames_from_last=pl.col("framecount") - pl.col("framecount").shift(),
-    #     )
-    # )
+
     ch2 = ch2.with_select_step(
         {
             "frames_until_next": pl.col("framecount").shift(-1) - pl.col("framecount"),
@@ -403,16 +399,9 @@ def _(ch4, mass2, mo):
 
 
 @app.cell
-def _(ch3, mass2):
-    ch3.plot_scatter("ptm_jf", "energy_5lagy", color_col="residual_rms_range")
-    mass2.show()
-    return
-
-
-@app.cell
 def _(ch4, mo, pl):
     ch5 = ch4.driftcorrect(
-        indicator_col="ptm_jf",
+        indicator_col="pretrig_mean",
         uncorrected_col="energy_5lagy",
         corrected_col="energy_5lagy_dc",
         use_expr=pl.col("category") == "clean",
@@ -506,7 +495,37 @@ def _(ch5, mass2, mo):
 
 
 @app.cell
+def _(ch5, mass2, min_frames_from_last, mo, plt):
+    ch5.plot_scatter(
+        "frames_from_last", "5lagy", use_good_expr=False
+    )
+    ch5.plot_scatter(
+        "frames_from_last", "5lagy_normal", use_good_expr=False, ax=plt.gca()
+    )
+    plt.legend(["5lagy_noexp", "5lagy_normal"])
+    plt.axvline(min_frames_from_last, color="k")
+    plt.xlim(0,6000)
+    plt.ylim(6000,7000)
+    mo.vstack(
+        [
+            mo.md(
+                "## see how orthogonal to 3 ms exponential works"
+            ),
+            mass2.show(),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(ch5):
+    ch5.df
+    return
+
+
+@app.cell
 def _(category_condition_dict, mo):
+
     dropdown_pulse_category = mo.ui.dropdown(
         category_condition_dict.keys(),
         value=list(category_condition_dict.keys())[0],
@@ -966,7 +985,7 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
         energies, live_time_s = livetime_clean_energies(ch_in=extra_ch)
         energies_withco, live_time_s_withco = livetime_clean_energies(ch_in=ch5)
         bin_edges = np.arange(5_100_000, 5_300_000, 250.0)
-        _, counts = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
+        _, counts_noco = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
         _, counts_withco = mass2.misc.hist_of_series(energies_withco, bin_edges=bin_edges)
         bin_centers, bin_size = mass2.misc.midpoints_and_step_size(bin_edges)
         plt.plot(bin_centers, counts_withco)
@@ -983,6 +1002,45 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
 def _(ch):
     result = ch.fit_pulse(7)
     result.plot()
+    return
+
+
+@app.cell
+def _(ch5, np):
+    #predicted resolution vs filter length
+    filter_step = ch5.steps[2]
+    filter_maker = filter_step.filter_maker
+    vdv_pre_cut = []
+    vdv_post_cut = []
+    n_vals = np.arange(0,1500,50)
+    for n in n_vals:
+        filter = filter_maker.compute_5lag(cut_pre=n, cut_post=0)
+        vdv_pre_cut.append(filter.predicted_v_over_dv)
+    for n in n_vals:
+        filter = filter_maker.compute_5lag(cut_pre=0, cut_post=n)
+        vdv_post_cut.append(filter.predicted_v_over_dv)
+    return filter_maker, n_vals, vdv_post_cut, vdv_pre_cut
+
+
+@app.cell
+def _(filter_maker, mass2, n_vals, plt, vdv_post_cut):
+    plt.figure()
+    plt.plot(filter_maker.n_pretrigger-n_vals, vdv_post_cut)
+    plt.ylabel("predicted resolving power (V/dV)")
+    plt.xlabel("post trigger length")
+    plt.grid()
+    mass2.show()
+    return
+
+
+@app.cell
+def _(filter_maker, mass2, n_vals, plt, vdv_pre_cut):
+    plt.figure()
+    plt.plot(len(filter_maker.signal_model)-filter_maker.n_pretrigger-n_vals, vdv_pre_cut)
+    plt.ylabel("predicted resolving power (V/dV)")
+    plt.xlabel("pre trigger length")
+    plt.grid()
+    mass2.show()
     return
 
 

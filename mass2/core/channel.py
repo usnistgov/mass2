@@ -468,6 +468,7 @@ class Channel:
             use_expr=use_expr,
             filter=filter5lag,
             spectrum=spectrum5lag,
+            filter_maker=filter_maker,
             transform_raw=self.transform_raw,
         )
         return self.with_step(step)

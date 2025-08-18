@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from collections.abc import Callable
 from mass2.core.cal_steps import CalStep
 from mass2.core.noise_algorithms import NoiseResult
-from mass2.core.optimal_filtering import Filter
+from mass2.core.optimal_filtering import Filter, FilterMaker
 
 
 @dataclass(frozen=True)
 class Filter5LagStep(CalStep):
     filter: Filter
     spectrum: NoiseResult
+    filter_maker: "FilterMaker"
     transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
