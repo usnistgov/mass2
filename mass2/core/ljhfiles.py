@@ -1,5 +1,5 @@
 from dataclasses import dataclass, replace
-from typing import ClassVar
+from typing import ClassVar, Any
 import numpy.typing as npt
 import os
 import numpy as np
@@ -68,7 +68,7 @@ class LJHFile(ABC):
                 ("internal_ms", np.uint32),
                 ("data", np.uint16, nsamples),
             ])
-            concrete_LJHFile_type = LJHFile_2_0
+            concrete_LJHFile_type: type[LJHFile] = LJHFile_2_0
         elif ljh_version < Version("2.2.0"):
             dtype = np.dtype([
                 ("internal_us", np.uint8),
@@ -129,7 +129,7 @@ class LJHFile(ABC):
             filename: path to the file to be opened.
         """
         # parse header into a dictionary
-        header_dict = {}
+        header_dict: dict[str, Any] = {}
         with open(filename, "rb") as fp:
             i = 0
             lines = []

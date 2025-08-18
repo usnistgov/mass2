@@ -506,11 +506,11 @@ class FilterMaker:
         An object that can make a variety of optimal filters, assuming a single signal and noise analysis.
     """
 
-    signal_model: npt.ArrayLike
+    signal_model: npt.NDArray
     n_pretrigger: int
-    noise_autocorr: npt.ArrayLike | None = None
-    noise_psd: npt.ArrayLike | None = None
-    dt_model: npt.ArrayLike | None = None
+    noise_autocorr: npt.NDArray | None = None
+    noise_psd: npt.NDArray | None = None
+    dt_model: npt.NDArray | None = None
     whitener: ToeplitzWhitener | None = None
     sample_time_sec: float = 0.0
     peak: float = 0.0
@@ -556,8 +556,8 @@ class FilterMaker:
         maker = cls(
             avg_signal,
             n_pretrigger,
-            noise_psd=noise_psd,
-            noise_autocorr=noise_autocorr_vec,
+            noise_psd=np.asarray(noise_psd),
+            noise_autocorr=np.asarray(noise_autocorr_vec),
             sample_time_sec=dt,
             peak=peak_signal,
         )
