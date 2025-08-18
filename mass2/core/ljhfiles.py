@@ -5,10 +5,11 @@ import os
 import numpy as np
 import polars as pl
 from packaging.version import Version
+from abc import ABC, abstractmethod
 
 
 @dataclass(frozen=True)
-class LJHFile:
+class LJHFile(ABC):
     """Represents the header and binary information of a single LJH file.
 
     Includes the complete ASCII header stored both as a dictionary and a string, and
@@ -35,7 +36,6 @@ class LJHFile:
     header_size: int
     binary_size: int
     _mmap: np.memmap
-    ljh_version: Version
     max_pulses: int | None = None
 
     OVERLONG_HEADER: ClassVar[int] = 100
@@ -59,12 +59,15 @@ class LJHFile:
             subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
+        if ljh_version < Version("2.0.0"):
+            raise NotImplementedError("LJH files version 1 are not supported")
         if ljh_version < Version("2.1.0"):
             dtype = np.dtype([
                 ("internal_unused", np.uint16),
                 ("internal_ms", np.uint32),
                 ("data", np.uint16, nsamples),
             ])
+            concrete_LJHFile_type = LJHFile_2_0
         elif ljh_version < Version("2.2.0"):
             dtype = np.dtype([
                 ("internal_us", np.uint8),
@@ -72,12 +75,14 @@ class LJHFile:
                 ("internal_ms", np.uint32),
                 ("data", np.uint16, nsamples),
             ])
+            concrete_LJHFile_type = LJHFile_2_1
         else:
             dtype = np.dtype([
                 ("subframecount", np.int64),
                 ("posix_usec", np.int64),
                 ("data", np.uint16, nsamples),
             ])
+            concrete_LJHFile_type = LJHFile_2_2
         pulse_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
@@ -91,7 +96,7 @@ class LJHFile:
             npulses = min(max_pulses, npulses)
         mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
 
-        return LJHFile(
+        return concrete_LJHFile_type(
             filename,
             channum,
             dtype,
@@ -106,7 +111,6 @@ class LJHFile:
             header_size,
             binary_size,
             mmap,
-            ljh_version,
             max_pulses,
         )
 
@@ -204,28 +208,17 @@ class LJHFile:
     def subframecount(self):
         """Return a copy of the subframecount memory map.
 
-        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
-        expensive for large files. To prevent problems, copy chunks of no more than
-        `MAXSEGMENT` records at once.
+        Old LJH versions don't have this: return zeros, unless overridden by derived class (LJHFile_2_2 will be the only one).
 
         Returns
         -------
         np.ndarray
             An array of subframecount values for each pulse record.
         """
-        subframecount = np.zeros(self.npulses, dtype=np.int64)
-        if "subframecount" not in self.dtype.names:
-            return subframecount
-        mmap = self._mmap["subframecount"]
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            subframecount[first:last] = mmap[first:last]
-            first = last
-        return subframecount
+        return np.zeros(self.npulses, dtype=np.int64)
 
     @property
+    @abstractmethod
     def datatimes_raw(self):
         """Return a copy of the raw timestamp (posix usec) memory map.
 
@@ -238,34 +231,7 @@ class LJHFile:
         np.ndarray
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
-        usec = np.zeros(self.npulses, dtype=np.int64)
-        if "posix_usec" in self.dtype.names:
-            mmap = self._mmap["posix_usec"]
-            scale = 1
-            offset = 0
-        else:
-            mmap = self._mmap["internal_ms"]
-            scale = 1000
-            offset = round(self.header["Timestamp offset (s)"] * 1e6)
-
-        MAXSEGMENT = 4096
-        first = 0
-        while first < self.npulses:
-            last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] = mmap[first:last]
-            first = last
-        usec = usec * scale + offset
-
-        # Add the 4 µs units found in LJH version 2.1
-        if "internal_us" in self.dtype.names:
-            first = 0
-            mmap = self._mmap["internal_us"]
-            while first < self.npulses:
-                last = min(first + MAXSEGMENT, self.npulses)
-                usec[first:last] += mmap[first:last] * 4
-                first = last
-
-        return usec
+        raise NotImplementedError("illegal: this is an abstract base class")
 
     @property
     def datatimes_float(self):
@@ -333,8 +299,6 @@ class LJHFile:
         df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
-        if self.ljh_version < Version("2.2.0"):
-            df = df.select(pl.exclude("subframecount"))
         header_df = pl.DataFrame(self.header)
         return df, header_df
 
@@ -368,3 +332,130 @@ class LJHFile:
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
         return np.max(np.diff(subframe)) <= expected_subframe_diff
+
+
+class LJHFile_2_2(LJHFile):
+    @property
+    def subframecount(self):
+        """Return a copy of the subframecount memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of subframecount values for each pulse record.
+        """
+        subframecount = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["subframecount"]
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            subframecount[first:last] = mmap[first:last]
+            first = last
+        return subframecount
+
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        assert "posix_usec" in self.dtype.names
+        mmap = self._mmap["posix_usec"]
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        return usec
+
+
+class LJHFile_2_1(LJHFile):
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["internal_ms"]
+        scale = 1000
+        offset = round(self.header["Timestamp offset (s)"] * 1e6)
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        usec = usec * scale + offset
+
+        # Add the 4 µs units found in LJH version 2.1
+        assert "internal_us" in self.dtype.names
+        first = 0
+        mmap = self._mmap["internal_us"]
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] += mmap[first:last] * 4
+            first = last
+
+        return usec
+
+    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec)
+        return df.select(pl.exclude("subframecount")), df_header
+
+
+class LJHFile_2_0(LJHFile):
+    @property
+    def datatimes_raw(self):
+        """Return a copy of the raw timestamp (posix usec) memory map.
+
+        In mass issue #337, we found that computing on the entire memory map at once was prohibitively
+        expensive for large files. To prevent problems, copy chunks of no more than
+        `MAXSEGMENT` records at once.
+
+        Returns
+        -------
+        np.ndarray
+            An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
+        """
+        usec = np.zeros(self.npulses, dtype=np.int64)
+        mmap = self._mmap["internal_ms"]
+        scale = 1000
+        offset = round(self.header["Timestamp offset (s)"] * 1e6)
+
+        MAXSEGMENT = 4096
+        first = 0
+        while first < self.npulses:
+            last = min(first + MAXSEGMENT, self.npulses)
+            usec[first:last] = mmap[first:last]
+            first = last
+        usec = usec * scale + offset
+
+        return usec
+
+    def to_polars(self, first_pulse: int = 0, keep_posix_usec: bool = False) -> tuple[pl.DataFrame, pl.DataFrame]:
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec)
+        return df.select(pl.exclude("subframecount")), df_header
