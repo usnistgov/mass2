@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.14.17"
 app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
@@ -17,23 +17,15 @@ def _():
 def _():
     import mass2
     import pulsedata
-    import mass
     import pathlib
-    return mass, mass2, pulsedata
+    return mass2, pulsedata
 
 
 @app.cell
-def _(mo):
-    mo.md("# This is broken in MASS v2")
-    return
-
-
-@app.cell
-def _(mass, mass2, pulsedata):
+def _(mass2, pulsedata):
     off_paths = mass2.core.ljhutil.find_ljh_files(
         str(pulsedata.off["ebit_20240723_0000"]), ext=".off"
     )
-    off = mass.off.OffFile(off_paths[0])
     return (off_paths,)
 
 
@@ -215,12 +207,12 @@ def _(data2, mo, plt):
 
 
 @app.cell
-def _(data3, dropdown_ch, mass, pl):
+def _(data3, dropdown_ch, mass2, pl):
     def label_lines(ch, previous_step_index, line_names=None, line_width=80):
         previous_step, previous_step_index = ch.get_step(previous_step_index)
         if line_names is None:
             line_names = previous_step.assignment_result.names_target
-        (line_names, line_energies) = mass.algorithms.line_names_and_energies(line_names)
+        (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)
         df_close = pl.DataFrame(
             {"line_name": line_names, "line_energy": line_energies}
         ).sort(by="line_energy")

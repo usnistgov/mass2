@@ -188,7 +188,7 @@ class Channels:
     def from_off_paths(cls, off_paths, description):
         channels = {}
         for path in off_paths:
-            ch = Channel.from_off(mass2.off.OffFile(path))
+            ch = Channel.from_off(mass2.core.OffFile(path))
             channels[ch.header.ch_num] = ch
         return cls(channels, description)
 

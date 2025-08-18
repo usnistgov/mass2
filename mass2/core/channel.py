@@ -538,7 +538,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header, off.nPulses)
+        channel = cls(df, header, off.nRecords)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
