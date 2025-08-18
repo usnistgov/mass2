@@ -97,7 +97,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-11, "compute_constrained_5lag is sensitive to an exponential"
 
     # Now make multiple exponential constraints
-    insensitive_models = [expdata, 1 - expdata, expdata**3.5]
+    insensitive_models = [expdata, 1 - expdata**1.5, expdata**3.5]
     constraints = [m[2:-2] for m in insensitive_models]
     f_constrained = maker.compute_constrained_5lag(constraints)
     msg1 = "compute_5lag is unexpectedly insensitive to an arbitrary shape"
