@@ -1,0 +1,53 @@
+#LJH Memorial File Format
+Save File Format Version: 2.0.0
+Software Version: Labwindows/MSVC++ GagePls 2.0.0
+Software Driver Version: Gage Driver 3.60.00
+Date: 12 Sep 2011, 21:23:42 GMT
+Acquisition Mode: 0
+Digitized Word Size in bytes: 2
+Location: NIST
+Cryostat: Amber
+Thermometer: Unknown
+Temperature (mK): 100.0000
+Bridge range: 20000
+Magnetic field (mGauss): 100.0000
+Detector:
+Sample:
+Excitation/Source:
+Operator: Frank Schima
+SYSTEM DESCRIPTION OF THIS FILE:
+USER DESCRIPTION OF THIS FILE:
+
+#End of description
+Number of Digitizers: 1
+Number of Active Channels: 1
+Timestamp offset (s): 1315862622.901058
+Digitizer: 1
+Description: CS1450-1 1M ver 1.16
+Master: Yes
+Bits: 14
+Effective Bits: 0
+Anti-alias low-pass cutoff frequency (Hz): 0.000
+Timebase: 6.400000e-07
+Number of samples per point: 1
+Presamples: 100
+Total Samples: 200
+Trigger (V): 3000.000000
+Trigger Hysteresis: 0
+Trigger Slope: +
+Trigger Coupling: DC
+Trigger Impedance: 1 MOhm
+Trigger Source: CH A
+Trigger Mode: 0 Normal
+Trigger Time out: 351321
+Use discrimination: No
+Channel: 1.0
+Description: A (Voltage)
+Range: 2.000092
+Offset: 2.000092
+Coupling: DC
+Impedance: 1 Ohms
+Inverted: No
+Preamp gain: 1.000000
+Discrimination level (%): 1.000000
+#End of Header
