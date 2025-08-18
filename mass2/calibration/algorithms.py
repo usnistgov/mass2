@@ -161,7 +161,7 @@ class FailedToGetModelException(Exception):
     pass
 
 
-def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False):
+def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False, prefix=""):
     if isinstance(lineNameOrEnergy, mass2.calibration.GenericLineModel):
         line = lineNameOrEnergy.spect
     elif isinstance(lineNameOrEnergy, mass2.calibration.SpectralLine):

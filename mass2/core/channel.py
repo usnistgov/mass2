@@ -435,6 +435,7 @@ class Channel:
         peak_x_col="5lagx",
         f_3db=25e3,
         use_expr=True,
+        time_constant_s_of_exp_to_be_orthogonal_to=None,
     ) -> "Channel":
         avg_pulse = (
             self.df.lazy()
@@ -449,14 +450,17 @@ class Channel:
         )
         assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
-        filter5lag = FilterMaker.create_5lag(
-            avg_signal=avg_pulse,
+        filter_maker = FilterMaker(
+            signal_model=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
-            noise_autocorr_vec=spectrum5lag.autocorr_vec,
-            dt=self.header.frametime_s,
-            f_3db=f_3db,
+            noise_autocorr=spectrum5lag.autocorr_vec,
+            sample_time_sec=self.header.frametime_s,
         )
+        if time_constant_s_of_exp_to_be_orthogonal_to is None:
+            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+        else:
+            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
         step = Filter5LagStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],

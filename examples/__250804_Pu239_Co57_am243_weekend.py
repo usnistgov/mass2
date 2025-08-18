@@ -169,7 +169,7 @@ def _(
     pl,
 ):
     ch2 = ch.summarize_pulses()
-    ch2 = ch2.filter5lag()
+    ch2 = ch2.filter5lag(time_constant_s_of_exp_to_be_orthogonal_to=0.003)
     ch2 = ch2.rough_cal_combinatoric(
         [energy_of_highest_peak_ev],
         uncalibrated_col="5lagy",

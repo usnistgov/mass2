@@ -2,8 +2,11 @@ from mass2.core import truebq_bin
 import numpy as np
 from tempfile import TemporaryDirectory
 from pathlib import Path
+import sys
+import pytest
 
 
+@pytest.mark.skipif(sys.version_info <= (3, 11), reason="TempDirectory delete argument requires python 3.12+")
 def test_basic():
     data_true = np.zeros(11_000)
     pulse_shape = np.exp(-np.arange(500) / 50)
