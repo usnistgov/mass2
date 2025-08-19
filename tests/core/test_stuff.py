@@ -16,10 +16,10 @@ def test_ljh_to_polars():
     _df, _header_df = ljh.to_polars()
 
 
-def dummy_channel(npulses=100, seed=4, signal=np.zeros(50)):
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16)):
     rng = np.random.default_rng(seed)
     n = len(signal)
-    noise_traces = rng.standard_normal((npulses, n))
+    noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 10 + 5000, dtype=np.int16)
     pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
     header_df = pl.DataFrame()
     frametime_s = 1e-5
