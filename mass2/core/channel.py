@@ -372,9 +372,10 @@ class Channel:
     def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
+        outputs = list(mass2.core.pulse_algorithms.result_dtype.names)
         step = SummarizeStep(
             inputs=[col],
-            output=["many"],
+            output=outputs,
             good_expr=self.good_expr,
             use_expr=True,
             frametime_s=self.header.frametime_s,
