@@ -1046,7 +1046,7 @@ def _(bin_path):
 
 @app.cell
 def _(ch_combo):
-    output_df = ch_combo.df.select(["energy_5lagy_dc","category", "frames_until_next", "frames_from_last", "framecount","concat_state"])
+    output_df = ch_combo.df.select(["energy_5lagy","category", "frames_until_next", "frames_from_last", "framecount","concat_state"])
     output_df.write_parquet("./20umfoilPu239.parquet")
     return
 

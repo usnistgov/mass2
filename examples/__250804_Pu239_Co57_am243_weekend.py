@@ -65,7 +65,13 @@ def _():
     max_frontload = 0.08
     max_residual_rms = 40
     min_last_minus_first = -1000
-    return max_frontload, max_residual_rms, min_last_minus_first
+    time_constant_s_of_exp_to_be_orthogonal_to = 0.003
+    return (
+        max_frontload,
+        max_residual_rms,
+        min_last_minus_first,
+        time_constant_s_of_exp_to_be_orthogonal_to,
+    )
 
 
 @app.cell
@@ -89,6 +95,7 @@ def _(
     npre,
     phi0_dac_units,
     threshold,
+    time_constant_s_of_exp_to_be_orthogonal_to,
     trigger_filter,
 ):
     mo.md(
@@ -109,6 +116,7 @@ def _(
     * {max_residual_rms=}
     * {min_last_minus_first=}
     * {phi0_dac_units=}
+    * {time_constant_s_of_exp_to_be_orthogonal_to=}
     """
     )
     return
@@ -151,10 +159,10 @@ def _(mo, npost, npre, trigger_result):
 def _(mass2, mo, trigger_result):
     long_noise = trigger_result.get_noise(
         n_dead_samples_after_pulse_trigger=10000,
-        n_record_samples=100000,
+        n_record_samples=400000,
         max_noise_triggers=50,
     )
-    long_noise.spectrum().plot()
+    long_noise.spectrum().plot_log_rebinned()
     mo.vstack([mo.md("#long trace noise plot to see low f response"), mass2.show()])
     return
 
@@ -167,9 +175,12 @@ def _(
     min_frames_until_next,
     mo,
     pl,
+    time_constant_s_of_exp_to_be_orthogonal_to,
 ):
     ch2 = ch.summarize_pulses()
-    ch2 = ch2.filter5lag(time_constant_s_of_exp_to_be_orthogonal_to=0.003)
+    ch2 = ch2.filter5lag(
+        time_constant_s_of_exp_to_be_orthogonal_to=time_constant_s_of_exp_to_be_orthogonal_to
+    )
     ch2 = ch2.filter5lag(peak_y_col="5lagy_normal", peak_x_col="5lagx_normal")
     ch2 = ch2.rough_cal_combinatoric(
         [energy_of_highest_peak_ev],
@@ -250,12 +261,16 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     def last_minus_first(pulse):
         return pulse[-1] - pulse[0]
 
+
+
     ch3 = ch2.with_column_map_step("pulse", "frontload", frontload)
     ch3 = ch3.correct_pretrig_mean_jumps(period=phi0_dac_units)
     ch3 = ch3.with_column_map_step("pulse", "last_minus_first", last_minus_first)
     ch3 = ch3.with_column_map_step("pulse", "residual_rms", residual_rms)
     # ch3 = ch2.with_columns(make_residual_rms_df(ch2.df))
-    ch3 = ch3.with_select_step({"residual_rms_range": pl.col("residual_rms").cut([0, max_residual_rms, 10000])})
+    ch3 = ch3.with_select_step(
+        {"residual_rms_range": pl.col("residual_rms").cut([0, max_residual_rms, 10000])}
+    )
     # ch3 = ch3.with_columns(
     #     ch3.df.select(
     #         residual_rms_range=pl.col("residual_rms").cut([0, max_residual_rms, 10000])
@@ -486,21 +501,15 @@ def _(ch5, mass2, mo):
 
 @app.cell
 def _(ch5, mass2, min_frames_from_last, mo, plt):
-    ch5.plot_scatter(
-        "frames_from_last", "5lagy", use_good_expr=False
-    )
-    ch5.plot_scatter(
-        "frames_from_last", "5lagy_normal", use_good_expr=False, ax=plt.gca()
-    )
+    ch5.plot_scatter("frames_from_last", "5lagy", use_good_expr=False)
+    ch5.plot_scatter("frames_from_last", "5lagy_normal", use_good_expr=False, ax=plt.gca())
     plt.legend(["5lagy_noexp", "5lagy_normal"])
     plt.axvline(min_frames_from_last, color="k")
     plt.xlim(0, 6000)
     plt.ylim(6000, 7000)
     mo.vstack(
         [
-            mo.md(
-                "## see how orthogonal to 3 ms exponential works"
-            ),
+            mo.md("## see how orthogonal to 3 ms exponential works"),
             mass2.show(),
         ]
     )
@@ -515,7 +524,6 @@ def _(ch5):
 
 @app.cell
 def _(category_condition_dict, mo):
-
     dropdown_pulse_category = mo.ui.dropdown(
         category_condition_dict.keys(),
         value=list(category_condition_dict.keys())[0],
@@ -942,8 +950,8 @@ def _(ch_combo):
 
 @app.cell
 def _(mass2):
-    model1 = mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
-    model2 = mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
+    model1=mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
+    model2=mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
     model = model1+model2
     params = model.make_params()
     params["Bintegral"].set(1000)
@@ -959,6 +967,7 @@ def _(mass2):
     params["tail_tau"].set(vary=True)
     params["Bdph_de"].set(1, vary=False)
     params["dph_de"].set(1, vary=False)
+
 
     return model, params
 
@@ -976,6 +985,7 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
         plt.plot(bin_centers, model.eval(params=params, bin_centers=bin_centers))
         result = model.fit(counts_withco, params, bin_centers=bin_centers)
         result.plotm()
+
 
     _()
     mass2.show()
@@ -1009,7 +1019,7 @@ def _(ch5, np):
 @app.cell
 def _(filter_maker, mass2, n_vals, plt, vdv_post_cut):
     plt.figure()
-    plt.plot(filter_maker.n_pretrigger-n_vals, vdv_post_cut)
+    plt.plot(filter_maker.n_pretrigger - n_vals, vdv_post_cut)
     plt.ylabel("predicted resolving power (V/dV)")
     plt.xlabel("post trigger length")
     plt.grid()
@@ -1020,7 +1030,9 @@ def _(filter_maker, mass2, n_vals, plt, vdv_post_cut):
 @app.cell
 def _(filter_maker, mass2, n_vals, plt, vdv_pre_cut):
     plt.figure()
-    plt.plot(len(filter_maker.signal_model)-filter_maker.n_pretrigger-n_vals, vdv_pre_cut)
+    plt.plot(
+        len(filter_maker.signal_model) - filter_maker.n_pretrigger - n_vals, vdv_pre_cut
+    )
     plt.ylabel("predicted resolving power (V/dV)")
     plt.xlabel("pre trigger length")
     plt.grid()
