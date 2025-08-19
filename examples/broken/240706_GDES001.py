@@ -125,7 +125,7 @@ def _(
 @app.cell
 def _(ch2, moss, np, pl):
     pulses = ch2.df["pulse"].to_numpy()
-    avg_pulse = ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
+    avg_pulse = ch2.good_series("pulse", use_expr=pl.lit(True)).limit(1000).to_numpy().mean(axis=0)
     template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
 
     def residual_rms(pulse, template):

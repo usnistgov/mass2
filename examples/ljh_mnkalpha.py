@@ -601,8 +601,8 @@ def _(data2):
 
 @app.cell
 def _(ch6, mass2, np):
-    indicator = ch6.good_series("pretrig_mean", use_expr=True).to_numpy()
-    uncorrected = ch6.good_series("energy_5lagy_dc", use_expr=True).to_numpy()
+    indicator = ch6.good_series("pretrig_mean", use_expr=pl.lit(True)).to_numpy()
+    uncorrected = ch6.good_series("energy_5lagy_dc", use_expr=pl.lit(True)).to_numpy()
     dc_result = mass2.core.rough_cal.minimize_entropy_linear(
         indicator, uncorrected, bin_edges=np.arange(0, 9000, 1), fwhm_in_bin_number_units=4
     )

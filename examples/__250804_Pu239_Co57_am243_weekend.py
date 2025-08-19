@@ -206,7 +206,7 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     def make_template():
         # when accessing pulse, avoid keeping references to copies
         avg_pulse = (
-            ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
+            ch2.good_series("pulse", use_expr=pl.lit(True)).limit(1000).to_numpy().mean(axis=0)
         )
         avg_pulse = avg_pulse - np.mean(avg_pulse)
         template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))

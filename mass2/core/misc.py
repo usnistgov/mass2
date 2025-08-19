@@ -172,3 +172,14 @@ def extract_column_names_from_polars_expr(expr: pl.Expr) -> list[str]:
             for subexpr in meta.inputs():
                 names.update(extract_column_names_from_polars_expr(subexpr))
     return list(names)
+
+
+def alwaysTrue() -> pl.Expr:
+    """alwaysTrue: a factory function to generate a new copy of polars literal True for class construction
+
+    Returns
+    -------
+    pl.Expr
+        Literal True
+    """
+    return pl.lit(True)
