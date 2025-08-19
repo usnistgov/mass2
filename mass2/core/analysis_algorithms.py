@@ -189,11 +189,16 @@ class HistogramSmoother:
         # Choose a reasonable # of bins, at least 1024 and a power of 2
         stepsize = 0.4 * smooth_sigma
         dlimits = self.limits[1] - self.limits[0]
-        nbins = int(dlimits / stepsize + 0.5)
-        pow2 = 1024
-        while pow2 < nbins:
-            pow2 *= 2
-        self.nbins = pow2
+        nbins_guess = int(dlimits / stepsize + 0.5)
+        min_nbins = 1024
+        max_nbins = 32768  # 32k bins, 2**15
+
+        # Clamp nbins_guess to at least min_nbins
+        clamped_nbins = np.clip(nbins_guess, min_nbins, max_nbins)
+        nbins_forced_to_power_of_2 = int(2 ** np.ceil(np.log2(clamped_nbins)))
+        if nbins_forced_to_power_of_2 == max_nbins:
+            print(f"Warning: Limiting histogram bins to {max_nbins} (requested {nbins_guess})")
+        self.nbins = nbins_forced_to_power_of_2
         self.stepsize = dlimits / self.nbins
 
         # Compute the Fourier-space smoothing kernel
@@ -264,6 +269,7 @@ def drift_correct(indicator, uncorrected, limit=None):
         limit = 1.25 * pct99
 
     smoother = HistogramSmoother(0.5, [0, limit])
+    assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
     def entropy(param, indicator, uncorrected, smoother):
         corrected = uncorrected * (1 + indicator * param)

@@ -5,12 +5,11 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
-# import pyarrow as pa
 
+# import pyarrow as pa
 from .channel import Channel, ChannelHeader
 from .noise_channel import NoiseChannel
 from . import misc
-from . import pulse_algorithms
 
 
 header_dtype = np.dtype([
@@ -84,13 +83,15 @@ class TriggerResult:
             n_record_samples,
             max_noise_triggers,
         )
+        inds = noise_trigger_inds[noise_trigger_inds > 0]  # ensure all inds are greater than 0
+        inds = inds[inds < (len(self.data_source.data) - n_record_samples)]  # ensure all inds inbounds
         pulses = gather_pulses_from_inds_numpy_contiguous(
             self.data_source.data,
             npre=0,
             nsamples=n_record_samples,
-            inds=noise_trigger_inds,
+            inds=inds,
         )
-        df = pl.DataFrame({"pulse": pulses})
+        df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         noise = NoiseChannel(
             df,
             header_df=self.data_source.header_df,
@@ -104,11 +105,14 @@ class TriggerResult:
             npre + npost,
             max_noise_triggers=1000,
         )
-        pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=self.trig_inds)
+        inds = self.trig_inds[self.trig_inds > npre]
+        inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
+        pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=inds)
+        assert pulses.shape[0] == len(inds), "pulses and trig_inds must have the same length"
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": self.trig_inds})
+            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
         else:
-            df = pl.DataFrame({"pulse": pulses, "framecount": self.trig_inds})
+            df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
             self.data_source.description,
             self.data_source.channel_number,
@@ -133,18 +137,20 @@ class TriggerResult:
             npre + npost,
             max_noise_triggers=1000,
         )
+        inds = self.trig_inds[self.trig_inds > npre]  # ensure all inds inbounds
+        inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
         pulses = gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
             self.data_source.data,
             npre=npre,
             nsamples=npre + npost,
-            inds=self.trig_inds,
+            inds=inds,
             bin_path=self.data_source.bin_path,
             verbose=verbose,
         )
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": self.trig_inds})
+            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
         else:
-            df = pl.DataFrame({"pulse": pulses, "framecount": self.trig_inds})
+            df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
             self.data_source.description,
             self.data_source.channel_number,
@@ -156,64 +162,67 @@ class TriggerResult:
         ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
         return ch
 
-    def to_summarized_channel(
-        self,
-        noise_n_dead_samples_after_pulse_trigger,
-        npre,
-        npost,
-        peak_index=None,
-        pretrigger_ignore=0,
-        invert=False,
-    ):
-        batch_size = 10000
-        n = len(self.trig_inds)
-        n_batches = np.ceil(n / batch_size).astype(int)
-        dfs = []
-        for i_batch in range(n_batches):
-            # i0 = i_batch*batch_size
-            # i1 = min((i_batch+1)*batch_size, n)
-            # inds = self.trig_inds[i0:i1]
-            pulses, used_pulse_inds = gather_pulses_from_inds_numpy_contiguous(
-                self.data_source.data,
-                npre=npre,
-                nsamples=npre + npost,
-                inds=self.trig_inds,
-            )
-            if invert:
-                pulses *= -1
-            if i_batch == 0 and peak_index is None:  # learn peak index
-                peak_index = int(np.median(np.amax(pulses, axis=1)))
-            assert isinstance(peak_index, int), "peak_index must be an integer"
-            print(f"summarizing batch {i_batch=}/{n_batches=}")
-            print(f"{self.data_source.frametime_s=}, {peak_index=}, {pretrigger_ignore=}, {npre=}")
-            summary_np = pulse_algorithms.summarize_data_numba(
-                pulses,
-                self.data_source.frametime_s,
-                peak_samplenumber=peak_index,
-                pretrigger_ignore_samples=pretrigger_ignore,
-                nPresamples=npre,
-            )
-            df_batch = pl.from_numpy(summary_np)
-            df_batch = df_batch.with_columns(pl.DataFrame({"framecount": used_pulse_inds + npre}))
-            dfs.append(df_batch)
-        df = pl.concat(dfs)
-        ch_header = ChannelHeader(
-            self.data_source.description,
-            self.data_source.channel_number,
-            self.data_source.frametime_s,
-            npre,
-            npre + npost,
-            self.data_source.header_df,
-        )
-        noise = self.get_noise(
-            noise_n_dead_samples_after_pulse_trigger,
-            npre + npost,
-            max_noise_triggers=1000,
-        )
-        # The following lines are broken August 8, 2025. Replace them with something non-broken.
-        # pulse_storage = PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
-        # ch = Channel(df, ch_header, noise, pulse_storage=pulse_storage)
-        return Channel(df, ch_header, npulses=len(df), noise=noise)
+    # def to_summarized_channel(
+    #     self,
+    #     noise_n_dead_samples_after_pulse_trigger,
+    #     npre,
+    #     npost,
+    #     peak_index=None,
+    #     pretrigger_ignore=0,
+    #     invert=False,
+    # ):
+    #     batch_size = 10000
+    #     n = len(self.trig_inds)
+    #     n_batches = np.ceil(n / batch_size).astype(int)
+    #     dfs = []
+    #     for i_batch in range(n_batches):
+    #         # i0 = i_batch*batch_size
+    #         # i1 = min((i_batch+1)*batch_size, n)
+    #         # inds = self.trig_inds[i0:i1]
+    #         inds = self.trig_inds
+    #         inds = inds[inds > npre]  # ensure all inds inbounds
+    #         inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
+    #         pulses = gather_pulses_from_inds_numpy_contiguous(
+    #             self.data_source.data,
+    #             npre=npre,
+    #             nsamples=npre + npost,
+    #             inds=inds,
+    #         )
+    #         if invert:
+    #             pulses *= -1
+    #         if i_batch == 0 and peak_index is None:  # learn peak index
+    #             peak_index = int(np.median(np.amax(pulses, axis=1)))
+    #         assert isinstance(peak_index, int), "peak_index must be an integer"
+    #         print(f"summarizing batch {i_batch=}/{n_batches=}")
+    #         print(f"{self.data_source.frametime_s=}, {peak_index=}, {pretrigger_ignore=}, {npre=}")
+    #         summary_np = pulse_algorithms.summarize_data_numba(
+    #             pulses,
+    #             self.data_source.frametime_s,
+    #             peak_samplenumber=peak_index,
+    #             pretrigger_ignore_samples=pretrigger_ignore,
+    #             nPresamples=npre,
+    #         )
+    #         df_batch = pl.from_numpy(summary_np)
+    #         df_batch = df_batch.with_columns(pl.DataFrame({"framecount": np.array(inds) + npre}))
+    #         dfs.append(df_batch)
+    #     df = pl.concat(dfs)
+    #     ch_header = ChannelHeader(
+    #         self.data_source.description,
+    #         self.data_source.channel_number,
+    #         self.data_source.frametime_s,
+    #         npre,
+    #         npre + npost,
+    #         self.data_source.header_df,
+    #     )
+    #     noise = self.get_noise(
+    #         noise_n_dead_samples_after_pulse_trigger,
+    #         npre + npost,
+    #         max_noise_triggers=1000,
+    #     )
+    #     # The following lines are broken August 8, 2025. Replace them with something non-broken.
+    #     # pulse_storage = PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
+    #     # ch = Channel(df, ch_header, noise, pulse_storage=pulse_storage)
+    #     return Channel(df, ch_header, npulses=len(df), noise=noise)
 
 
 @dataclass(frozen=True)
@@ -254,17 +263,103 @@ class TrueBqBin:
             data,
         )
 
-    def trigger(self, filter_in, threshold, limit_hours=None):
+    def trigger(self, filter_in, threshold, limit_hours=None, verbose=True):
         if limit_hours is None:
             limit_samples = len(self.data)
         else:
             limit_samples = int(limit_hours * 3600 / self.frametime_s)
-        trig_inds = _fasttrig_filter_trigger_with_cache(self.data, filter_in, threshold, limit_samples, self.bin_path, verbose=True)
+        trig_inds = _fasttrig_filter_trigger_with_cache(self.data, filter_in, threshold, limit_samples, self.bin_path, verbose=verbose)
         return TriggerResult(self, filter_in, threshold, trig_inds, limit_samples)
 
 
+def write_truebq_bin_file(
+    path: str | Path,
+    data: np.ndarray,
+    sample_rate_hz: float,
+    *,  # force keyword only
+    voltage_scale: float = 1.0,
+    format_version: int = 1,
+    schema_version: int = 1,
+    data_reduction_factor: int = 1,
+    acquisition_flags: int = 0,
+    start_time: np.ndarray | None = None,
+    stop_time: np.ndarray | None = None,
+) -> None:
+    """
+    Write a binary file that can be opened by TrueBqBin.load().
+
+    This function writes data efficiently without copying by using memory mapping
+    and direct file operations.
+
+    Args:
+        path: Output file path
+        data: Data array to write (will be converted to int16 if not already)
+        sample_rate_hz: Sample rate in Hz
+        voltage_scale: Voltage scaling factor
+        format_version: File format version (default: 1)
+        schema_version: Schema version (default: 1)
+        data_reduction_factor: Data reduction factor (default: 1)
+        acquisition_flags: Acquisition flags (default: 0)
+        start_time: Start time as uint64 array of length 2 (optional)
+        stop_time: Stop time as uint64 array of length 2 (optional)
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Ensure data is int16 (convert if necessary, but avoid unnecessary copying)
+    if data.dtype != np.int16:
+        if not np.can_cast(data.dtype, np.int16, casting="safe"):
+            print(f"Warning: Converting data from {data.dtype} to int16 may cause data loss")
+        data = data.astype(np.int16)
+
+    # Prepare header
+    num_samples = len(data)
+
+    # Default time values if not provided
+    if start_time is None:
+        start_time = np.array([0, 0], dtype=np.uint64)
+    if stop_time is None:
+        stop_time = np.array([0, 0], dtype=np.uint64)
+
+    # Create header array
+    header = np.array(
+        [
+            (
+                format_version,
+                schema_version,
+                sample_rate_hz,
+                data_reduction_factor,
+                voltage_scale,
+                acquisition_flags,
+                start_time,
+                stop_time,
+                num_samples,
+            )
+        ],
+        dtype=header_dtype,
+    )
+
+    # Create the file with the correct size
+    with open(path, "wb") as f:
+        # Write header
+        f.write(header.tobytes())
+
+        # For large data arrays, write in chunks to avoid memory issues
+        chunk_size = 1024 * 1024  # 1MB chunks
+
+        if data.nbytes <= chunk_size:
+            # Small data, write directly
+            f.write(data.tobytes())
+        else:
+            # Large data, write in chunks
+            data_flat = data.ravel()  # Flatten without copying if possible
+            for i in range(0, len(data_flat), chunk_size // data.itemsize):
+                chunk = data_flat[i : i + chunk_size // data.itemsize]
+                f.write(chunk.tobytes())
+
+
 @njit
-def fasttrig_filter_trigger(data, filter_in, threshold):
+def fasttrig_filter_trigger(data, filter_in, threshold, verbose):
     assert threshold > 0, "algorithm assumes we trigger with positiv threshold, change sign of filter_in to accomodate"
     filter_len = len(filter_in)
     inds = []
@@ -288,7 +383,8 @@ def fasttrig_filter_trigger(data, filter_in, threshold):
     while j <= jmax:
         if j % prog_step == 0:
             prog_ticks += 1
-            print(f"fasttrig_filter_trigger {prog_ticks}/{100}")
+            if verbose:
+                print(f"fasttrig_filter_trigger {prog_ticks}/{100}")
         a, b = b, c
         cache[:] = data[j : (j + filter_len)]
         c = np.dot(cache, filter)
@@ -302,8 +398,8 @@ def fasttrig_filter_trigger(data, filter_in, threshold):
 
 
 def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
-    inds = inds[inds > npre]  # ensure all inds inbounds
-    inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
+    assert all(inds > npre), "all inds must be greater than npre"
+    assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
     pulses = np.zeros((len(offsets), nsamples), dtype=np.int16)
     for i, offset in enumerate(offsets):
@@ -312,8 +408,8 @@ def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
 
 
 def gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=".mmapped_pulses.npy"):
-    inds = inds[inds > npre]  # ensure all inds inbounds
-    inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
+    assert all(inds > npre), "all inds must be greater than npre"
+    assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
     pulses = np.memmap(filename, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
     for i, offset in enumerate(offsets):
@@ -430,13 +526,15 @@ def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_sample
         if verbose:
             print(f"trigger cache miss for {file_path}")
         data_trunc = data[:actual_n_samples]
-        trig_inds = fasttrig_filter_trigger(data_trunc, filter_in, threshold)
+        trig_inds = fasttrig_filter_trigger(data_trunc, filter_in, threshold, verbose=verbose)
         np.save(file_path, trig_inds)
     return trig_inds
 
 
 def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(data, npre, nsamples, inds, bin_path, verbose=True):
     bin_full_path = Path(bin_path).absolute()
+    inds = inds[inds > npre]  # ensure all inds inbounds
+    inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
     inds_hash = hashlib.sha256(inds.tobytes()).hexdigest()
     to_hash_str = str(npre) + str(nsamples) + str(bin_full_path) + inds_hash
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
@@ -445,10 +543,27 @@ def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(data, npre, nsample
     cache_dir_path.mkdir(exist_ok=True)
     file_path = cache_dir_path / fname
     inds = np.array(inds)
-    try:
-        pulses = np.memmap(file_path, dtype=np.int16, mode="r", shape=(len(inds), nsamples))
+    if file_path.is_file():
+        # check if the file is the right size
+        Nbytes = len(inds) * nsamples * 2  # 2 bytes per int16
+        if file_path.stat().st_size != Nbytes:
+            # on windows the error if the file is the wrong size makes it sound like you don't have enough memory
+            # and python doesn't seem to catch the exception, so we check the size here
+            if verbose:
+                print(f"pulse cache is corrupted, re-gathering pulses for {file_path}")
+            file_path.unlink()
+            cache_hit = False
+        else:
+            cache_hit = True
+    else:
+        cache_hit = False
+
+    if cache_hit:
         if verbose:
-            print(f"cache hit for {file_path}")
-    except FileNotFoundError:
+            print(f"pulse cache hit for {file_path}")
+        pulses = np.memmap(file_path, dtype=np.int16, mode="r", shape=(len(inds), nsamples))
+    else:
+        if verbose:
+            print(f"pulse cache miss for {file_path}")
         pulses = gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=file_path)
     return pulses

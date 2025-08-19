@@ -5,14 +5,37 @@ import polars as pl
 
 import mass2
 import pulsedata
+import tempfile
 
 
 def test_ljh_to_polars():
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     ljh_noise = mass2.LJHFile.open(p.noise_folder / "20230626_run0000_chan4102.ljh")
-    df_noise, header_df_noise = ljh_noise.to_polars()
+    _df_noise, _header_df_noise = ljh_noise.to_polars()
     ljh = mass2.LJHFile.open(p.pulse_folder / "20230626_run0001_chan4102.ljh")
-    df, header_df = ljh.to_polars()
+    _df, _header_df = ljh.to_polars()
+
+
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50)):
+    rng = np.random.default_rng(seed)
+    n = len(signal)
+    noise_traces = rng.standard_normal((npulses, n))
+    pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
+    header_df = pl.DataFrame()
+    frametime_s = 1e-5
+    df_noise = pl.DataFrame({"pulse": noise_traces})
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    header = mass2.ChannelHeader(
+        "dummy for test",
+        ch_num=0,
+        frametime_s=frametime_s,
+        n_presamples=n // 2,
+        n_samples=n,
+        df=header_df,
+    )
+    df = pl.DataFrame({"pulse": pulse_traces})
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    return ch
 
 
 def test_ljh_fractional_record(tmp_path):
@@ -254,3 +277,81 @@ def test_concat_dfs_with_concat_state():
     assert df_concat["concat_state"].to_list() == [0] * 3 + [1] * 2
     df_concat2 = mass2.core.misc.concat_dfs_with_concat_state(df_concat, df2)
     assert df_concat2.shape == (7, 2)
+
+
+def test_col_map_step():
+    ch = dummy_channel()
+
+    def std_of_pulses_chunk(pulse):
+        return np.std(pulse)
+
+    ch2 = ch.with_column_map_step("pulse", "std_of_pulses", std_of_pulses_chunk)
+    assert ch2.df["std_of_pulses"][0] == np.std(ch2.df["pulse"].to_numpy()[0, :])
+    step = ch2.steps[-1]
+    assert step.inputs == ["pulse"]
+    assert step.output == ["std_of_pulses"]
+
+
+def test_pretrig_mean_jump_fix_step():
+    ch = dummy_channel()
+    pretrig_mean = np.arange(len(ch.df)) % 50 + 725
+    ch = ch.with_columns(pl.DataFrame({"pretrig_mean": pretrig_mean}))
+    ch2 = ch.correct_pretrig_mean_jumps(period=50)
+    assert "pulse" in ch2.df.columns
+    assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
+    step = ch2.steps[-1]
+    assert step.inputs == ["pretrig_mean"]
+    assert step.output == ["ptm_jf"]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfilename = os.path.join(tmpdir, "steps.pkl")
+        ch2.save_steps(tmpfilename)
+        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        assert len(steps2) == 1
+        assert isinstance(steps2[0][0], mass2.core.cal_steps.PretrigMeanJumpFixStep)
+
+
+def test_extract_column_names_from_polars_expr():
+    extract = mass2.core.misc.extract_column_names_from_polars_expr
+    assert set(extract(pl.col("a"))) == set(["a"])
+    assert set(extract(pl.col("a") + pl.col("b"))) == set(["a", "b"])
+    assert set(extract(pl.col("a") * pl.col("b"))) == set(["a", "b"])
+
+
+def test_select_step():
+    ch = dummy_channel()
+    ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
+    ch2 = ch.with_select_step({"a*5": pl.col("a") * 5, "a+b": pl.col("a") + pl.col("b")})
+    assert "pulse" in ch2.df.columns
+    assert all(ch2.df["a*5"].to_numpy() == ch.df["a"].to_numpy() * 5)
+    assert all(ch2.df["a+b"].to_numpy() == ch.df["a"].to_numpy() + ch.df["b"].to_numpy())
+    step = ch2.steps[-1]
+    assert set(step.inputs) == set(["a", "b"])
+    assert set(step.output) == set(["a*5", "a+b"])
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfilename = os.path.join(tmpdir, "steps.pkl")
+        ch2.save_steps(tmpfilename)
+        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        assert len(steps2) == 1
+        assert isinstance(steps2[0][0], mass2.core.cal_steps.SelectStep)
+
+
+def test_categorize_step():
+    ch = dummy_channel(npulses=10)
+    ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
+    category_condition_dict = {
+        "alessthan5": pl.col("a") < 5,
+        "b10": pl.col("b") == 10,
+    }
+    ch2 = ch.with_categorize_step(category_condition_dict=category_condition_dict)
+    assert "pulse" in ch2.df.columns
+    step = ch2.steps[-1]
+    assert set(step.inputs) == set(["a", "b"])
+    assert step.output == ["category"]
+    df = ch2.df.with_columns(pl.Series("expected", ["alessthan5"] * 5 + ["b10"] + ["fallback"] * 4))
+    assert (df["expected"] == df["category"].cast(str)).all()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfilename = os.path.join(tmpdir, "steps.pkl")
+        ch2.save_steps(tmpfilename)
+        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        assert len(steps2) == 1
+        assert isinstance(steps2[0][0], mass2.core.cal_steps.CategorizeStep)

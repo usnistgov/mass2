@@ -176,7 +176,9 @@ def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=Fal
     return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
 
 
-def calc_noise_result(data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None) -> "NoiseResult":
+def calc_noise_result(
+    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 10000
+) -> "NoiseResult":
     """Analyze the noise as Mass has always done.
 
     * Compute autocorrelation with a lower noise at longer lags when data are known to be continuous
@@ -203,17 +205,26 @@ def calc_noise_result(data: ArrayLike, dt: float, continuous: bool, window: Call
     (n_pulses, nsamples) = data_zeromean.shape
     # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
-    if continuous:
-        autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples)
+    if nsamples <= skip_autocorr_if_length_over:
+        if continuous:
+            autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples)
+        else:
+            autocorr_vec = calc_discontinuous_autocorrelation(data_zeromean)
     else:
-        autocorr_vec = calc_discontinuous_autocorrelation(data_zeromean)
+        print(
+            """warning: noise_psd_mass skipping autocorrelation calculation for long traces,
+            use skip_autocorr_if_length_over argument to override this"""
+        )
+        autocorr_vec = None
+    # nbins = len(psd_mass)
+    # frequencies = calc_psd_frequencies(nbins, dt)
     return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
 
 
 @dataclass
 class NoiseResult:
     psd: np.ndarray
-    autocorr_vec: np.ndarray
+    autocorr_vec: np.ndarray | None
     frequencies: np.ndarray
 
     def plot(

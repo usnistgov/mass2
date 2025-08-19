@@ -21,6 +21,12 @@ class CalStep:
         # TODO: should this be an abstract method?
         return df.filter(self.good_expr)
 
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
+        # this is a no-op, subclasses can override this to plot something
+        plt.figure()
+        plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
+        return plt.gca()
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):
@@ -54,7 +60,7 @@ class SummarizeStep(CalStep):
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []
-        for df_iter in df.iter_slices():
+        for df_iter in df.select(self.inputs).iter_slices():
             raw = df_iter[self.pulse_col].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
@@ -73,8 +79,89 @@ class SummarizeStep(CalStep):
         df2 = pl.concat(summaries).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> None:
-        pass
+
+@dataclass(frozen=True)
+class ColumnAsNumpyMapStep(CalStep):
+    """
+    This step is meant for interactive exploration, it takes a column and applies a function to it,
+    and makes a new column with the result. It makes it easy to test functions on a column without
+    having to write a whole new step class,
+    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps
+    on another channel.
+
+    example usage:
+    >>> def my_function(x):
+    ...     return x * 2
+    >>> step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)
+    >>> ch2 = ch.with_step(step)
+    """
+
+    f: Callable[[np.ndarray], np.ndarray]
+
+    def __post_init__(self):
+        assert len(self.inputs) == 1, "ColumnMapStep expects exactly one input"
+        assert len(self.output) == 1, "ColumnMapStep expects exactly one output"
+        if not callable(self.f):
+            raise ValueError(f"f must be a callable, got {self.f}")
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        output_col = self.output[0]
+        serieses = []
+        for df_iter in df.select(self.inputs).iter_slices():
+            series1 = df_iter[self.inputs[0]]
+            output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
+            series2 = pl.Series(output_col, output_numpy)
+            serieses.append(series2)
+
+        combined = pl.concat(serieses)
+        # Put into a DataFrame with one column
+        df2 = pl.DataFrame({output_col: combined}).with_columns(df)
+        return df2
+
+
+@dataclass(frozen=True)
+class CategorizeStep(CalStep):
+    category_condition_dict: dict[str, pl.Expr]
+
+    def __post_init__(self):
+        err_msg = "The first condition must be True, to be used as a fallback"
+        assert next(iter(self.category_condition_dict.values())) is True, err_msg
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        output_col = self.output[0]
+
+        def categorize_df(df, category_condition_dict, output_col):
+            """returns a series showing which category each pulse is in
+            pulses will be assigned to the last category for which the condition evaluates to True"""
+            dtype = pl.Enum(category_condition_dict.keys())
+            physical = np.zeros(len(df), dtype=int)
+            for category_int, (category_str, condition_expr) in enumerate(category_condition_dict.items()):
+                if condition_expr is True:
+                    in_category = np.ones(len(df), dtype=bool)
+                else:
+                    in_category = df.select(a=condition_expr).fill_null(False).to_numpy().flatten()
+                assert in_category.dtype == bool
+                physical[in_category] = category_int
+            series = pl.Series(name=output_col, values=physical).cast(dtype)
+            df = pl.DataFrame({output_col: series})
+            return df
+
+        df2 = categorize_df(df, self.category_condition_dict, output_col).with_columns(df)
+        return df2
+
+
+@dataclass(frozen=True)
+class SelectStep(CalStep):
+    """
+    This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
+
+    """
+
+    col_expr_dict: dict[str, pl.Expr]
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        df2 = df.select(**self.col_expr_dict).with_columns(df)
+        return df2
 
 
 @dataclass(frozen=True)

@@ -515,54 +515,6 @@ class FilterMaker:
     sample_time_sec: float = 0.0
     peak: float = 0.0
 
-    @classmethod
-    def create_5lag(
-        cls,
-        avg_signal: npt.ArrayLike,
-        n_pretrigger: int,
-        noise_psd: npt.ArrayLike,
-        noise_autocorr_vec: npt.ArrayLike,
-        dt: float,
-        fmax: float | None = None,
-        f_3db: float | None = None,
-    ):
-        """create_5lag creates a 5-lag filter directly, first creating, then using and deleting a `FilterMaker`.
-
-        Parameters
-        ----------
-        avg_signal : npt.ArrayLike
-            The average signal to be used for filter construction
-        n_pretrigger : int
-            Number of samples before the trigger
-        noise_psd : npt.ArrayLike
-            Noise power-spectral density (starting at 0 and ending at the critical/Nyquist frequency)
-        noise_autocorr_vec : npt.ArrayLike
-            Noise autocorrelation
-        dt : float
-            Sampling period
-        fmax : Optional[float], optional
-            A hard low-pass limit, Fourier frequencies above this (in Hz) will be given zero amplitude, by default None
-        f_3db : Optional[float], optional
-            A soft low-pass limit, Fourier frequencies above this (in Hz) will be rolled off by a
-            1-pole filter with this 3 dB point (in Hz), by default None
-
-        Returns
-        -------
-        Filter
-            A 5-lag optimal filter.
-        """
-        avg_signal = np.asarray(avg_signal)
-        peak_signal = np.amax(avg_signal) - avg_signal[0]
-        maker = cls(
-            avg_signal,
-            n_pretrigger,
-            noise_psd=np.asarray(noise_psd),
-            noise_autocorr=np.asarray(noise_autocorr_vec),
-            sample_time_sec=dt,
-            peak=peak_signal,
-        )
-        return maker.compute_5lag(fmax=fmax, f_3db=f_3db)
-
     def compute_constrained_5lag(
         self,
         constraints: npt.ArrayLike | None = None,

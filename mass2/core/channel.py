@@ -309,6 +309,11 @@ class Channel:
             steps_elapsed_s=self.steps_elapsed_s,
         )
 
+    def with_column_map_step(self, input_col: str, output_col: str, f: Callable) -> "Channel":
+        """f should take a numpy array and return a numpy array with the same number of elements"""
+        step = mass2.core.cal_steps.ColumnAsNumpyMapStep([input_col], [output_col], good_expr=self.good_expr, use_expr=True, f=f)
+        return self.with_step(step)
+
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
         self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False
     ) -> "Channel":
@@ -382,12 +387,44 @@ class Channel:
         return self.with_step(step)
 
     def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = mass2.PretrigMeanJumpFixStep(
+        step = mass2.core.cal_steps.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,
             use_expr=True,
             period=period,
+        )
+        return self.with_step(step)
+
+    def with_select_step(self, col_expr_dict: dict[str, pl.Expr]) -> "Channel":
+        """
+        This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
+        """
+        extract = mass2.misc.extract_column_names_from_polars_expr
+        inputs = [extract(expr) for expr in col_expr_dict.values()]  # list of lists
+        inputs = list(set([col for expr in inputs for col in expr]))  # flatten the list of lists and get unique values
+        step = mass2.core.cal_steps.SelectStep(
+            inputs=inputs,
+            output=list(col_expr_dict.keys()),
+            good_expr=self.good_expr,
+            use_expr=True,
+            col_expr_dict=col_expr_dict,
+        )
+        return self.with_step(step)
+
+    def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col="category") -> "Channel":
+        # ensure the first condition is True, to be used as a fallback
+        if next(iter(category_condition_dict.values())) is not True:
+            category_condition_dict = {"fallback": True, **category_condition_dict}
+        extract = mass2.misc.extract_column_names_from_polars_expr
+        inputs = [extract(expr) for expr in category_condition_dict.values()]
+        inputs = list(set([col for expr in inputs for col in expr]))
+        step = mass2.core.cal_steps.CategorizeStep(
+            inputs=inputs,
+            output=[output_col],
+            good_expr=self.good_expr,
+            use_expr=True,
+            category_condition_dict=category_condition_dict,
         )
         return self.with_step(step)
 
@@ -398,6 +435,7 @@ class Channel:
         peak_x_col="5lagx",
         f_3db=25e3,
         use_expr=True,
+        time_constant_s_of_exp_to_be_orthogonal_to=None,
     ) -> "Channel":
         avg_pulse = (
             self.df.lazy()
@@ -412,14 +450,17 @@ class Channel:
         )
         assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
-        filter5lag = FilterMaker.create_5lag(
-            avg_signal=avg_pulse,
+        filter_maker = FilterMaker(
+            signal_model=avg_pulse,
             n_pretrigger=self.header.n_presamples,
             noise_psd=spectrum5lag.psd,
-            noise_autocorr_vec=spectrum5lag.autocorr_vec,
-            dt=self.header.frametime_s,
-            f_3db=f_3db,
+            noise_autocorr=spectrum5lag.autocorr_vec,
+            sample_time_sec=self.header.frametime_s,
         )
+        if time_constant_s_of_exp_to_be_orthogonal_to is None:
+            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+        else:
+            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
         step = Filter5LagStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
@@ -427,6 +468,7 @@ class Channel:
             use_expr=use_expr,
             filter=filter5lag,
             spectrum=spectrum5lag,
+            filter_maker=filter_maker,
             transform_raw=self.transform_raw,
         )
         return self.with_step(step)
@@ -711,6 +753,15 @@ class Channel:
             if log:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")
+
+    def fit_pulse(self, index=0, col="pulse", verbose=True):
+        pulse = self.df[col][index].to_numpy()
+        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
+        if verbose:
+            print(f"ch={self}")
+            print(f"pulse index={index}")
+            print(result.fit_report())
+        return result
 
 
 @dataclass(frozen=True)
