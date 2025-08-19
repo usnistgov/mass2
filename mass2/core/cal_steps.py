@@ -4,6 +4,9 @@ import polars as pl
 import numpy as np
 import pylab as plt
 from . import pulse_algorithms
+from . import ParquetCache
+
+cache = ParquetCache()
 
 
 @dataclass(frozen=True)
@@ -17,9 +20,15 @@ class CalStep:
     def description(self):
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
+        return df.with_columns({output: pl.lit(True) for output in self.outputs})
+
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        # TODO: should this be an abstract method?
-        return df.filter(self.good_expr)
+        df_small = df.select(self.inputs)
+        df_new = self.calc_from_df_only_outputs(df_small)
+        df2 = df.with_columns(df_new)
+        return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
         # this is a no-op, subclasses can override this to plot something
@@ -27,12 +36,22 @@ class CalStep:
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
         return plt.gca()
 
+    def parquet_cache_hash(self):
+        l = []
+        for k, v in self.__dict__.items():
+            ss = str(v)
+            l.append(ss)
+            print(f"{k=} {ss=} {l=}")
+        # print(s)
+        return hash("".join(l))
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):
     period: float
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
         ptm1 = df[self.inputs[0]].to_numpy()
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
@@ -58,7 +77,8 @@ class SummarizeStep(CalStep):
     n_presamples: int
     transform_raw: Callable | None = None
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
         summaries = []
         for df_iter in df.select(self.inputs).iter_slices():
             raw = df_iter[self.pulse_col].to_numpy()
@@ -104,7 +124,8 @@ class ColumnAsNumpyMapStep(CalStep):
         if not callable(self.f):
             raise ValueError(f"f must be a callable, got {self.f}")
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
         serieses = []
         for df_iter in df.select(self.inputs).iter_slices():
@@ -127,7 +148,8 @@ class CategorizeStep(CalStep):
         err_msg = "The first condition must be True, to be used as a fallback"
         assert next(iter(self.category_condition_dict.values())) is True, err_msg
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
 
         def categorize_df(df, category_condition_dict, output_col):
@@ -159,7 +181,8 @@ class SelectStep(CalStep):
 
     col_expr_dict: dict[str, pl.Expr]
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
         df2 = df.select(**self.col_expr_dict).with_columns(df)
         return df2
 

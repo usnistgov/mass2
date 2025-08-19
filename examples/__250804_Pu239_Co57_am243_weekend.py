@@ -159,7 +159,7 @@ def _(mo, npost, npre, trigger_result):
 def _(mass2, mo, trigger_result):
     long_noise = trigger_result.get_noise(
         n_dead_samples_after_pulse_trigger=10000,
-        n_record_samples=400000,
+        n_record_samples=200000,
         max_noise_triggers=50,
     )
     long_noise.spectrum().plot_log_rebinned()
@@ -1049,6 +1049,24 @@ def _(filter_maker, mass2, n_vals, plt, vdv_pre_cut):
     plt.xlabel("pre trigger length")
     plt.grid()
     mass2.show()
+    return
+
+
+@app.cell
+def _():
+    import joblib
+    from joblib import memory
+    import time
+    return joblib, time
+
+
+@app.cell
+def _(ch5, joblib, time):
+    start = time.time()
+    jl_hash = joblib.hash(ch5.df.select("pulse"))
+    end = time.time()
+    print(end-start)
+    print(jl_hash)
     return
 
 

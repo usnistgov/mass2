@@ -355,3 +355,12 @@ def test_categorize_step():
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.cal_steps.CategorizeStep)
+
+
+def test_step_with_cache():
+    print("STARTSTART")
+    cache = mass2.core.cal_steps.cache
+    _set_counter = cache._set_counter
+    ch = dummy_channel()
+    ch2 = ch.summarize_pulses()
+    assert cache._set_counter == _set_counter + 1
