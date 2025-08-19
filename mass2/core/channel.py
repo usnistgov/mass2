@@ -45,7 +45,7 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
-    subframediv: int = 64
+    subframediv: int = 0
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)

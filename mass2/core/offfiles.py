@@ -90,13 +90,16 @@ class OffFile:
         )
         self.framePeriodSeconds = float(self.header["FramePeriodSeconds"])
         try:
+            self.subframediv: int = 0
             self.subframediv = self.header["ReadoutInfo"]["Subframedivisions"]
         except KeyError:
-            if self.header["CreationInfo"]["SourceName"] == "Lancero":
-                self.subframediv = self.header["ReadoutInfo"]["NumberOfRows"]
-            else:
-                # TODO: is there a better way to estimate subframe divisions?
-                self.subframediv = 64
+            try:
+                if self.header["CreationInfo"]["SourceName"] == "Lancero":
+                    self.subframediv = self.header["ReadoutInfo"]["NumberOfRows"]
+            except KeyError:
+                self.subframediv = 0
+                # TODO: is there any way to estimate subframe divisions if these 2 fail?
+
         self.validateHeader()
         self._mmap = None
         self.projectors = None
