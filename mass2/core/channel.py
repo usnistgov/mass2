@@ -293,7 +293,7 @@ class Channel:
     def with_good_expr(self, good_expr, replace=False) -> "Channel":
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        if not replace and good_expr is not True:
+        if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
             good_expr = good_expr.and_(self.good_expr)
         return Channel(
             df=self.df,
@@ -327,9 +327,7 @@ class Channel:
         med = np.median(self.df[col].to_numpy())
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
-    def with_good_expr_below_nsigma_outlier_resistant(
-        self, col_nsigma_pairs, replace=False, use_prev_good_expr=pl.lit(True)
-    ) -> "Channel":
+    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -346,9 +344,7 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    def with_good_expr_nsigma_range_outlier_resistant(
-        self, col_nsigma_pairs, replace=False, use_prev_good_expr=pl.lit(True)
-    ) -> "Channel":
+    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -418,7 +414,7 @@ class Channel:
     def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col="category") -> "Channel":
         # ensure the first condition is True, to be used as a fallback
         first_expr = next(iter(category_condition_dict.values()))
-        if first_expr is not True and not first_expr.meta.eq(pl.lit(True)):
+        if not first_expr.meta.eq(pl.lit(True)):
             category_condition_dict = {"fallback": pl.lit(True), **category_condition_dict}
         extract = mass2.misc.extract_column_names_from_polars_expr
         inputs = [extract(expr) for expr in category_condition_dict.values()]
@@ -477,13 +473,19 @@ class Channel:
         )
         return self.with_step(step)
 
-    def good_df(self, cols=pl.all(), use_expr=True):
-        return self.df.lazy().filter(self.good_expr).filter(use_expr).select(cols).collect()
+    def good_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+        good_df = self.df.lazy().filter(self.good_expr)
+        if use_expr is not True:
+            good_df = good_df.filter(use_expr)
+        return good_df.select(cols).collect()
 
-    def bad_df(self, cols=pl.all(), use_expr=True):
-        return self.df.lazy().filter(self.good_expr.not_()).filter(use_expr).select(cols).collect()
+    def bad_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+        bad_df = self.df.lazy().filter(self.good_expr.not_())
+        if use_expr is not True:
+            bad_df = bad_df.filter(use_expr)
+        return bad_df.select(cols).collect()
 
-    def good_serieses(self, cols, use_expr):
+    def good_serieses(self, cols, use_expr: bool | pl.Expr):
         df2 = self.good_df(cols, use_expr)
         return [df2[col] for col in cols]
 

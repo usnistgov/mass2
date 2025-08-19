@@ -34,10 +34,13 @@ def smallest_positive_real(arr):
     return np.min(positive_real_numbers)
 
 
-def good_series(df, col, good_expr, use_expr):
+def good_series(df, col, good_expr, use_expr: bool | pl.Expr):
     # this uses lazy before filting to hopefully allow polars to only access the data needed to filter
     # and the data needed to output what we want
-    return df.lazy().filter(good_expr).filter(use_expr).select(pl.col(col)).collect().to_series()
+    good_df = df.lazy().filter(good_expr)
+    if use_expr is not True:
+        good_df = good_df.filter(use_expr)
+    return good_df.select(pl.col(col)).collect().to_series()
 
 
 def median_absolute_deviation(x):
