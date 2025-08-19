@@ -401,10 +401,11 @@ class Channel:
         This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
         """
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in col_expr_dict.values()]  # list of lists
-        inputs = list(set([col for expr in inputs for col in expr]))  # flatten the list of lists and get unique values
+        inputs: set[str] = set()
+        for expr in col_expr_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.SelectStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=list(col_expr_dict.keys()),
             good_expr=self.good_expr,
             use_expr=True,
@@ -417,10 +418,11 @@ class Channel:
         if next(iter(category_condition_dict.values())) is not True:
             category_condition_dict = {"fallback": True, **category_condition_dict}
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in category_condition_dict.values()]
-        inputs = list(set([col for expr in inputs for col in expr]))
+        inputs: set[str] = set()
+        for expr in category_condition_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.CategorizeStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=[output_col],
             good_expr=self.good_expr,
             use_expr=True,
