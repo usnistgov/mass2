@@ -58,11 +58,6 @@ class DriftCorrectStep(CalStep):
         if corrected_col is None:
             corrected_col = uncorrected_col + "_dc"
         indicator_s, uncorrected_s = ch.good_serieses([indicator_col, uncorrected_col], use_expr)
-        # def stats(arr):
-        #     print("mean=", arr.mean(), "median=", np.median(arr), "std=", arr.std(), "mad=", np.median(np.abs(arr - np.median(arr))))
-        # print(f"{stats(indicator_s.to_numpy())=}")
-        # print(f"{stats(uncorrected_s.to_numpy())=}")
-        # print(len(indicator_s), len(uncorrected_s))
         dc = mass2.core.drift_correct(
             indicator=indicator_s.to_numpy(),
             uncorrected=uncorrected_s.to_numpy(),

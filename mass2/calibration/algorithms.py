@@ -183,7 +183,7 @@ def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False, pre
                 " to float or a str in mass2.spectra or mass2.STANDARD_FEATURES"
             )
         line = mass2.calibration.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
-    return line.model(has_linear_background=has_linear_background, has_tails=has_tails)
+    return line.model(has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix)
 
 
 def multifit(ph, line_names, fit_lo_hi, binsize_ev, slopes_de_dph, hide_deprecation=False):

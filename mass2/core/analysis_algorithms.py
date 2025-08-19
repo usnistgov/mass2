@@ -187,7 +187,6 @@ class HistogramSmoother:
         self.smooth_sigma = smooth_sigma
 
         # Choose a reasonable # of bins, at least 1024 and a power of 2
-        # GCO: why a power of 2, don't FFTs not care anymore?
         stepsize = 0.4 * smooth_sigma
         dlimits = self.limits[1] - self.limits[0]
         nbins_guess = int(dlimits / stepsize + 0.5)
