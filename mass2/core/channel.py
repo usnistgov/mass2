@@ -45,6 +45,7 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
+    subframediv: int = 64
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: bool | pl.Expr = True
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
@@ -279,6 +280,7 @@ class Channel:
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
@@ -302,6 +304,7 @@ class Channel:
             df=self.df,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=good_expr,
             df_history=self.df_history,
@@ -561,7 +564,9 @@ class Channel:
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = Channel(df, header=header, npulses=ljh.npulses, noise=noise_channel, transform_raw=transform_raw)
+        channel = cls(
+            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+        )
         return channel
 
     @classmethod
@@ -582,7 +587,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header, off.nRecords)
+        channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
@@ -595,15 +600,20 @@ class Channel:
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame):
-        # df2 = self.df.join_asof(df_ext, )
-        raise NotImplementedError("not implemented")
+    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+        df2 = (
+            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        )
+        return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2) -> "Channel":
         return Channel(
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
             df_history=self.df_history,
@@ -648,7 +658,14 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df: pl.DataFrame) -> "Channel":
-        ch2 = Channel(mass2.core.misc.concat_dfs_with_concat_state(self.df, df), self.header, self.npulses, self.noise, self.good_expr)
+        ch2 = Channel(
+            mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
+            self.header,
+            self.npulses,
+            subframediv=self.subframediv,
+            noise=self.noise,
+            good_expr=self.good_expr,
+        )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 

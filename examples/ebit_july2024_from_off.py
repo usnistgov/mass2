@@ -34,7 +34,7 @@ def _(mass2, off_paths):
     data = mass2.Channels.from_off_paths(
         off_paths, "ebit_20240723_0000"
     ).with_experiment_state_by_path()
-    data
+    data.channels[3].df
     return (data,)
 
 
