@@ -89,6 +89,14 @@ class OffFile:
             self.header["FileFormatVersion"], self.header["NumberOfBases"], descriptive_coefs_names=False
         )
         self.framePeriodSeconds = float(self.header["FramePeriodSeconds"])
+        try:
+            self.subframediv = self.header["ReadoutInfo"]["Subframedivisions"]
+        except KeyError:
+            if self.header["CreationInfo"]["SourceName"] == "Lancero":
+                self.subframediv = self.header["ReadoutInfo"]["NumberOfRows"]
+            else:
+                # TODO: is there a better way to estimate subframe divisions?
+                self.subframediv = 64
         self.validateHeader()
         self._mmap = None
         self.projectors = None
