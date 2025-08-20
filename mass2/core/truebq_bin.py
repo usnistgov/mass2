@@ -33,43 +33,61 @@ class TriggerResult:
     trig_inds: np.ndarray
     limit_samples: int
 
-    def plot(self, decimate=10, n_limit=100000, offset=0, x_axis_time_s=False, ax=None):
+    def plot(self, decimate=10, n_limit=100000, offset_raw=0, x_axis_time_s=False, ax=None):
         if ax is None:
             plt.figure()
             ax = plt.gca()
         plt.sca(ax)
-        Noffset = offset * decimate
-        N = Noffset + n_limit * decimate
+
+        # raw (full-resolution) index ranges
+        raw_start = offset_raw
+        raw_stop = raw_start + n_limit * decimate
+
         data = self.data_source.data
-        if x_axis_time_s:
-            x_axis_scale = self.data_source.frametime_s * decimate
-        else:
-            x_axis_scale = 1
-        filter_out = fast_apply_filter(data[Noffset:N], self.filter_in)
-        plt.plot(
-            np.arange(n_limit) * x_axis_scale,
-            data[Noffset:N:decimate],
-            ".",
-            label="data",
-        )
-        filter_out_decimated = filter_out[::decimate]
-        plt.plot(
-            np.arange(len(filter_out_decimated)) * x_axis_scale,
-            filter_out_decimated,
-            label="filter_out",
-        )
+
+        # scaling for x-axis (applied after decimation)
+        x_scale = self.data_source.frametime_s * decimate if x_axis_time_s else 1
+
+        # raw filter output
+        filt_raw = fast_apply_filter(data[raw_start:raw_stop], self.filter_in)
+
+        # decimated data and filter
+        data_dec = data[raw_start:raw_stop:decimate]
+        filt_dec = filt_raw[::decimate]
+
+        # truncate to the same length
+        n = min(len(data_dec), len(filt_dec))
+        data_dec = data_dec[:n]
+        filt_dec = filt_dec[:n]
+
+        # shared x-axis
+        x_dec = np.arange(n) * x_scale
+
+        # plot data + filter
+        plt.plot(x_dec, data_dec, ".", label="data")
+        plt.plot(x_dec, filt_dec, label="filter_out")
+
         plt.axhline(self.threshold, label="threshold")
-        df = pl.DataFrame({"trig_inds": self.trig_inds})
-        # use int division so the trigger points always lie on data that is plotted
-        trig_inds_plot = df.filter(pl.col("trig_inds").is_between(Noffset, N)).to_series().to_numpy() // decimate
-        plt.plot((trig_inds_plot - Noffset) * x_axis_scale, filter_out_decimated[trig_inds_plot - Noffset], "o", label="trig_inds")
+
+        # trigger indices (raw) → restrict to plotted window → convert to decimated indices
+        trig_inds_raw = (
+            pl.DataFrame({"trig_inds": self.trig_inds})
+            .filter(pl.col("trig_inds").is_between(raw_start, raw_stop))
+            .to_series()
+            .to_numpy()
+        )
+        trig_inds_dec = (trig_inds_raw - raw_start) // decimate
+        # clip to avoid indexing past n
+        trig_inds_dec = trig_inds_dec[trig_inds_dec < n]
+        plt.plot(x_dec[trig_inds_dec], filt_dec[trig_inds_dec], "o", label="trig_inds filt")
+        plt.plot(x_dec[trig_inds_dec], data_dec[trig_inds_dec], "o", label="trig_inds data")
+
+        # labels
         plt.title(f"{self.data_source.description}, trigger result debug plot")
         plt.legend()
-        if x_axis_time_s:
-            plt.xlabel(f"time with arb offset / s ({decimate=})")
-        else:
-            plt.xlabel(f"sample number with arb offset after decimation={decimate}")
+        plt.xlabel("time with arb offset / s" if x_axis_time_s else "sample number (decimated)")
         plt.ylabel("signal (arb)")
+
 
     def get_noise(
         self,
