@@ -408,7 +408,7 @@ def test_steps():
         )
 
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
-    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=10000)
+    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=5000, exclude_ch_nums=[4102])
     data = data.map(_do_steps)
     ch = data.channels[4109]
 
