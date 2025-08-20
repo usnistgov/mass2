@@ -29,7 +29,7 @@ class LJHFile(ABC):
     timebase: float
     nsamples: int
     npresamples: int
-    subframediv: int
+    subframediv: int | None
     client: str
     header: dict
     header_string: str
@@ -52,12 +52,11 @@ class LJHFile(ABC):
         nsamples = header_dict["Total Samples"]
         npresamples = header_dict["Presamples"]
         client = header_dict.get("Software Version", "UNKNOWN")
+        subframediv: int | None = None
         if "Subframe divisions" in header_dict:
             subframediv = header_dict["Subframe divisions"]
         elif "Number of rows" in header_dict:
             subframediv = header_dict["Number of rows"]
-        else:
-            subframediv = 0
 
         ljh_version = Version(header_dict["Save File Format Version"])
         if ljh_version < Version("2.0.0"):
@@ -401,6 +400,8 @@ class LJHFile_2_2(LJHFile):
         bool
             Whether every record is strictly continuous with the ones before and after
         """
+        if self.subframediv is None:
+            return False
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
         return np.max(np.diff(subframe)) <= expected_subframe_diff

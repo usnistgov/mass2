@@ -77,7 +77,7 @@ class OffFile:
     plot(x,y) # plot record 0
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename: str):
         self.filename = filename
         with open(self.filename, "rb") as f:
             self.headerString = readJsonString(f)
@@ -89,16 +89,19 @@ class OffFile:
             self.header["FileFormatVersion"], self.header["NumberOfBases"], descriptive_coefs_names=False
         )
         self.framePeriodSeconds = float(self.header["FramePeriodSeconds"])
+
+        # Estimate subframe division rate. If explicitly given in ReadoutInfo, use that.
+        # Otherwise, if it's a Lancero-TDM system, then we know it's equal to the # of rows.
+        # Otherwise, we don't know any way to estimate subframe divisions. (But add it if you think of any!)
+        self.subframediv: int | None = None
         try:
-            self.subframediv: int = 0
             self.subframediv = self.header["ReadoutInfo"]["Subframedivisions"]
         except KeyError:
             try:
                 if self.header["CreationInfo"]["SourceName"] == "Lancero":
                     self.subframediv = self.header["ReadoutInfo"]["NumberOfRows"]
             except KeyError:
-                self.subframediv = 0
-                # TODO: is there any way to estimate subframe divisions if these 2 fail?
+                self.subframediv = None
 
         self.validateHeader()
         self._mmap = None
