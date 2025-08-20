@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 import pylab as plt  # type: ignore
 import polars as pl
@@ -14,6 +14,7 @@ import itertools
 import mass2
 from .channel import Channel
 from .cal_steps import CalStep
+from .misc import alwaysTrue
 
 # from . import rough_cal
 from mass2.calibration.algorithms import line_names_and_energies
@@ -720,7 +721,7 @@ class RoughCalibrationStep(CalStep):
         calibrated_col: str,
         ph_smoothing_fwhm: int,
         n_extra: int,
-        use_expr: bool = True,
+        use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":
         (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
@@ -750,7 +751,7 @@ class RoughCalibrationStep(CalStep):
         calibrated_col: str,
         ph_smoothing_fwhm: int,
         n_extra: int,
-        use_expr: bool = True,
+        use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":
         (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
@@ -782,7 +783,7 @@ class RoughCalibrationStep(CalStep):
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: bool | pl.Expr = True,
+        use_expr: pl.Expr = field(default_factory=alwaysTrue),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,
