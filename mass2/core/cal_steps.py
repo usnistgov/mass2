@@ -10,8 +10,8 @@ from . import pulse_algorithms
 class CalStep:
     inputs: list[str]
     output: list[str]
-    good_expr: bool | pl.Expr
-    use_expr: bool | pl.Expr
+    good_expr: pl.Expr
+    use_expr: pl.Expr
 
     @property
     def description(self):
@@ -125,7 +125,8 @@ class CategorizeStep(CalStep):
 
     def __post_init__(self):
         err_msg = "The first condition must be True, to be used as a fallback"
-        assert next(iter(self.category_condition_dict.values())) is True, err_msg
+        first_condition = next(iter(self.category_condition_dict.values()))
+        assert first_condition is True or first_condition.meta.eq(pl.lit(True)), err_msg
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
@@ -136,10 +137,10 @@ class CategorizeStep(CalStep):
             dtype = pl.Enum(category_condition_dict.keys())
             physical = np.zeros(len(df), dtype=int)
             for category_int, (category_str, condition_expr) in enumerate(category_condition_dict.items()):
-                if condition_expr is True:
+                if condition_expr is True or condition_expr.meta.eq(pl.lit(True)):
                     in_category = np.ones(len(df), dtype=bool)
                 else:
-                    in_category = df.select(a=condition_expr).fill_null(False).to_numpy().flatten()
+                    in_category = df.select(condition_expr).fill_null(False).to_numpy().flatten()
                 assert in_category.dtype == bool
                 physical[in_category] = category_int
             series = pl.Series(name=output_col, values=physical).cast(dtype)

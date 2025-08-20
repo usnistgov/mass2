@@ -34,7 +34,7 @@ def _(mass2, off_paths):
     data = mass2.Channels.from_off_paths(
         off_paths, "ebit_20240723_0000"
     ).with_experiment_state_by_path()
-    data
+    data.channels[3].df
     return (data,)
 
 
@@ -264,7 +264,7 @@ def _(data4, mo, pl, plt):
         x_col=pl.col("timestamp"),
         y_col="energy_filtValue_dc_pc",
         color_col="state_label2",
-        use_expr=True,
+        use_expr=pl.lit(True),
     )
     plt.grid()
     mo.mpl.interactive(plt.gcf())

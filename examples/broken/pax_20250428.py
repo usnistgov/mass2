@@ -200,7 +200,7 @@ def _(ch_num, data3, mass2):
 
 @app.cell
 def _(ch_num, data3, mass2, np, plt):
-    def plot_pulses(ch: mass2.Channel, n_good_pulses=10, spread_col="timestamp", pulse_col="pulse", n_bad_pulses=5, x_as_time=False, use_expr=True, subtract_pretrig_mean_locally_calculated=True):
+    def plot_pulses(ch: mass2.Channel, n_good_pulses=10, spread_col="timestamp", pulse_col="pulse", n_bad_pulses=5, x_as_time=False, use_expr=pl.lit(True), subtract_pretrig_mean_locally_calculated=True):
         df = ch.good_df(use_expr=use_expr).sort(by=spread_col)
         df_small = df.sort(by=spread_col).gather_every(len(df)//n_good_pulses)
         good_pulses = df_small[pulse_col].to_numpy()

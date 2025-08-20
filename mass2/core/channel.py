@@ -15,6 +15,7 @@ from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
+from .misc import alwaysTrue
 from . import misc
 import mass2
 
@@ -45,8 +46,9 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
+    subframediv: int | None = None
     noise: NoiseChannel | None = field(default=None, repr=False)
-    good_expr: bool | pl.Expr = True
+    good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
     steps: CalSteps = field(default_factory=CalSteps.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
@@ -108,8 +110,8 @@ class Channel:
         bin_edges,
         group_by_col,
         axis=None,
-        use_good_expr=True,
-        use_expr=True,
+        use_good_expr=pl.lit(True),
+        use_expr=pl.lit(True),
         skip_none=True,
     ):
         """
@@ -165,8 +167,8 @@ class Channel:
         x_col,
         y_col,
         color_col=None,
-        use_expr=True,
-        use_good_expr=True,
+        use_expr=pl.lit(True),
+        use_good_expr=pl.lit(True),
         skip_none=True,
         ax=None,
     ):
@@ -174,12 +176,7 @@ class Channel:
             plt.figure()
             ax = plt.gca()
         plt.sca(ax)  # set current axis so I can use plt api
-        if use_good_expr and self.good_expr is not True:
-            # True doesn't implement .and_, haven't found a exper literal equivalent that does
-            # so we special case True
-            filter_expr = self.good_expr.and_(use_expr)
-        else:
-            filter_expr = use_expr
+        filter_expr = self.good_expr.and_(use_expr)
         df_small = self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
@@ -200,7 +197,7 @@ class Channel:
             plt.legend(title=color_col)
         plt.tight_layout()
 
-    def good_series(self, col, use_expr=True):
+    def good_series(self, col, use_expr=pl.lit(True)):
         return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_cal_combinatoric(
@@ -210,7 +207,7 @@ class Channel:
         calibrated_col,
         ph_smoothing_fwhm,
         n_extra=3,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         step = mass2.core.RoughCalibrationStep.learn_combinatoric(
             self,
@@ -231,7 +228,7 @@ class Channel:
         calibrated_col,
         ph_smoothing_fwhm,
         n_extra=3,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         step = mass2.core.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
@@ -250,7 +247,7 @@ class Channel:
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: bool | pl.Expr = True,
+        use_expr: pl.Expr = field(default_factory=alwaysTrue),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,
@@ -279,6 +276,7 @@ class Channel:
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
@@ -294,14 +292,15 @@ class Channel:
         return ch2
 
     def with_good_expr(self, good_expr, replace=False) -> "Channel":
-        # the default value of self.good_expr is True
+        # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        if not replace and good_expr is not True:
+        if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
             good_expr = good_expr.and_(self.good_expr)
         return Channel(
             df=self.df,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=good_expr,
             df_history=self.df_history,
@@ -311,7 +310,9 @@ class Channel:
 
     def with_column_map_step(self, input_col: str, output_col: str, f: Callable) -> "Channel":
         """f should take a numpy array and return a numpy array with the same number of elements"""
-        step = mass2.core.cal_steps.ColumnAsNumpyMapStep([input_col], [output_col], good_expr=self.good_expr, use_expr=True, f=f)
+        step = mass2.core.cal_steps.ColumnAsNumpyMapStep(
+            [input_col], [output_col], good_expr=self.good_expr, use_expr=pl.lit(True), f=f
+        )
         return self.with_step(step)
 
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
@@ -377,7 +378,7 @@ class Channel:
             inputs=[col],
             output=outputs,
             good_expr=self.good_expr,
-            use_expr=True,
+            use_expr=pl.lit(True),
             frametime_s=self.header.frametime_s,
             peak_index=peak_index,
             pulse_col=col,
@@ -392,7 +393,7 @@ class Channel:
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,
-            use_expr=True,
+            use_expr=pl.lit(True),
             period=period,
         )
         return self.with_step(step)
@@ -402,29 +403,32 @@ class Channel:
         This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
         """
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in col_expr_dict.values()]  # list of lists
-        inputs = list(set([col for expr in inputs for col in expr]))  # flatten the list of lists and get unique values
+        inputs: set[str] = set()
+        for expr in col_expr_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.SelectStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=list(col_expr_dict.keys()),
             good_expr=self.good_expr,
-            use_expr=True,
+            use_expr=pl.lit(True),
             col_expr_dict=col_expr_dict,
         )
         return self.with_step(step)
 
     def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col="category") -> "Channel":
         # ensure the first condition is True, to be used as a fallback
-        if next(iter(category_condition_dict.values())) is not True:
-            category_condition_dict = {"fallback": True, **category_condition_dict}
+        first_expr = next(iter(category_condition_dict.values()))
+        if not first_expr.meta.eq(pl.lit(True)):
+            category_condition_dict = {"fallback": pl.lit(True), **category_condition_dict}
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in category_condition_dict.values()]
-        inputs = list(set([col for expr in inputs for col in expr]))
+        inputs: set[str] = set()
+        for expr in category_condition_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.CategorizeStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=[output_col],
             good_expr=self.good_expr,
-            use_expr=True,
+            use_expr=pl.lit(True),
             category_condition_dict=category_condition_dict,
         )
         return self.with_step(step)
@@ -435,7 +439,7 @@ class Channel:
         peak_y_col="5lagy",
         peak_x_col="5lagx",
         f_3db=25e3,
-        use_expr=True,
+        use_expr=pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to=None,
     ) -> "Channel":
         avg_pulse = (
@@ -474,13 +478,19 @@ class Channel:
         )
         return self.with_step(step)
 
-    def good_df(self, cols=pl.all(), use_expr=True):
-        return self.df.lazy().filter(self.good_expr).filter(use_expr).select(cols).collect()
+    def good_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+        good_df = self.df.lazy().filter(self.good_expr)
+        if use_expr is not True:
+            good_df = good_df.filter(use_expr)
+        return good_df.select(cols).collect()
 
-    def bad_df(self, cols=pl.all(), use_expr=True):
-        return self.df.lazy().filter(self.good_expr.not_()).filter(use_expr).select(cols).collect()
+    def bad_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+        bad_df = self.df.lazy().filter(self.good_expr.not_())
+        if use_expr is not True:
+            bad_df = bad_df.filter(use_expr)
+        return bad_df.select(cols).collect()
 
-    def good_serieses(self, cols, use_expr):
+    def good_serieses(self, cols, use_expr: bool | pl.Expr):
         df2 = self.good_df(cols, use_expr)
         return [df2[col] for col in cols]
 
@@ -489,7 +499,7 @@ class Channel:
         indicator_col="pretrig_mean",
         uncorrected_col="5lagy",
         corrected_col=None,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
@@ -506,7 +516,7 @@ class Channel:
         self,
         line,
         col,
-        use_expr=True,
+        use_expr=pl.lit(True),
         has_linear_background=False,
         has_tails=False,
         dlo=50,
@@ -560,7 +570,9 @@ class Channel:
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = Channel(df, header=header, npulses=ljh.npulses, noise=noise_channel, transform_raw=transform_raw)
+        channel = cls(
+            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+        )
         return channel
 
     @classmethod
@@ -581,7 +593,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header, off.nRecords)
+        channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
@@ -594,15 +606,20 @@ class Channel:
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame):
-        # df2 = self.df.join_asof(df_ext, )
-        raise NotImplementedError("not implemented")
+    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+        df2 = (
+            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        )
+        return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2) -> "Channel":
         return Channel(
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
             df_history=self.df_history,
@@ -619,7 +636,7 @@ class Channel:
         multifit: MultiFit,
         previous_cal_step_index,
         calibrated_col,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         step = MultiFitQuadraticGainCalStep.learn(
             self,
@@ -635,7 +652,7 @@ class Channel:
         multifit: MultiFit,
         previous_cal_step_index,
         calibrated_col,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         step = MultiFitMassCalibrationStep.learn(
             self,
@@ -647,7 +664,14 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df: pl.DataFrame) -> "Channel":
-        ch2 = Channel(mass2.core.misc.concat_dfs_with_concat_state(self.df, df), self.header, self.npulses, self.noise, self.good_expr)
+        ch2 = Channel(
+            mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
+            self.header,
+            self.npulses,
+            subframediv=self.subframediv,
+            noise=self.noise,
+            good_expr=self.good_expr,
+        )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
@@ -662,7 +686,7 @@ class Channel:
         line_names,
         previous_cal_step_index,
         corrected_col=None,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"

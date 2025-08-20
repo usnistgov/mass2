@@ -45,7 +45,7 @@ class Channels:
         self,
         line,
         col,
-        use_expr=True,
+        use_expr=pl.lit(True),
         has_linear_background=False,
         has_tails=False,
         dlo=50,
@@ -74,7 +74,7 @@ class Channels:
         )
         return result
 
-    def plot_hist(self, col, bin_edges, use_expr=True, axis=None):
+    def plot_hist(self, col, bin_edges, use_expr=pl.lit(True), axis=None):
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
@@ -245,11 +245,22 @@ class Channels:
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
-    def with_external_trigger_by_path(self, path=None):
-        raise NotImplementedError("not implemented")
+    def with_external_trigger_by_path(self, path: str | None = None) -> "Channels":
+        if path is None:
+            raise NotImplementedError("cannot infer external trigger path yet")
+        with open(path, "rb") as _f:
+            _header_line = _f.readline()  # read the one header line before opening the binary data
+            external_trigger_subframe_count = np.fromfile(_f, "int64")
+        df_ext = pl.DataFrame({
+            "subframecount": external_trigger_subframe_count,
+        })
+        return self.with_external_trigger_df(df_ext)
 
-    def with_external_trigger_df(self, df_ext):
-        raise NotImplementedError("not implemented")
+    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channels":
+        def with_etrig_df(channel: Channel):
+            return channel.with_external_trigger_df(df_ext)
+
+        return self.map(with_etrig_df)
 
     def with_experiment_state_df(self, df_es):
         # this is not as performant as making use_exprs for states

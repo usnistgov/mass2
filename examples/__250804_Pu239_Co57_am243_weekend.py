@@ -212,9 +212,7 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
         template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
         return template
 
-
     template = make_template()
-
 
     def residual_rms(pulse):
         pulse = pulse - np.mean(pulse)
@@ -222,7 +220,6 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
         pulse2 = dot * template
         residual = pulse2 - pulse
         return mass2.misc.root_mean_squared(residual)
-
 
     # def make_residual_rms_df(df1, col="pulse"):
     #     # when accessing pulse, avoid keeping references to copies
@@ -234,14 +231,12 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     #     df2 = pl.concat(dfs)
     #     return df2
 
-
     def frontload(pulse):
         a, b = npre, npre + 20
         pulse_pt_sub = pulse - np.mean(pulse[:npre])
         area_front = np.sum(pulse_pt_sub[a:b])
         area_rest = np.sum(pulse_pt_sub[b:])
         return area_front / area_rest
-
 
     # def make_frontload_df(df1, col="pulse"):
     #     dfs = []
@@ -252,11 +247,8 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     #     df2 = pl.concat(dfs)
     #     return df2
 
-
     def last_minus_first(pulse):
         return pulse[-1] - pulse[0]
-
-
 
     ch3 = ch2.with_column_map_step("pulse", "frontload", frontload)
     ch3 = ch3.correct_pretrig_mean_jumps(period=phi0_dac_units)
@@ -340,7 +332,6 @@ def _(
             pl.col("frames_from_last") < min_frames_from_last
         ).and_(pl.col("frames_until_next") < min_frames_until_next),
     }
-
 
     ch4 = ch3.with_categorize_step(category_condition_dict=category_condition_dict)
     # ch4 = ch4.driftcorrect(indicator_col="pretrig_mean", uncorrected_col="energy_5lagy", corrected_col="energy_5lagy_dc", use_expr=pl.col("category")=="clean")
@@ -431,7 +422,6 @@ def _(mo, np):
 
         return result
 
-
     mo.md("#### define a helper function")
     return (pulses_with_subtracted_pretrigger_mean,)
 
@@ -504,8 +494,8 @@ def _(ch5, mass2, min_frames_from_last, mo, plt):
     )
     plt.legend(["5lagy_noexp", "5lagy_normal"])
     plt.axvline(min_frames_from_last, color="k")
-    plt.xlim(0,6000)
-    plt.ylim(6000,7000)
+    plt.xlim(0, 6000)
+    plt.ylim(6000, 7000)
     mo.vstack(
         [
             mo.md(
@@ -620,7 +610,6 @@ def _(ch4, ch5, mass2, min_frames_from_last, mo, np, pl, plt):
         live_frames = np.sum(df["frames_from_last"].to_numpy() - min_frames_from_last)
         live_time_s = live_frames * ch4.header.frametime_s
         return df["energy_5lagy_dc"], live_time_s
-
 
     energies, live_time_s = livetime_clean_energies()
     bin_edges = np.arange(0, 6000000, 250.0)
@@ -778,7 +767,6 @@ def _(mo, pl):
         print(s)
         return s
 
-
     def estimate_dataframe_size(df: pl.DataFrame) -> str:
         """
         Estimate the memory/storage size of a Polars DataFrame containing only
@@ -819,7 +807,6 @@ def _(mo, pl):
 
         return human_readable_size(total_bytes)
 
-
     def write_and_measure_parquet(df: pl.DataFrame):
         """
         Write a Polars DataFrame to a temporary folder as a Parquet file,
@@ -849,7 +836,6 @@ def _(mo, pl):
             readable_size = human_readable_size(file_size_bytes)
             print(f"Parquet file size: {readable_size}")
             return readable_size
-
 
     mo.md("helper code for checking file size is reasonable")
     return estimate_dataframe_size, human_readable_size
@@ -919,7 +905,6 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, np, plt):
         # plt.title("they dont have the same gain!!!")
         plt.legend()
 
-
     _()
     mass2.show()
     return
@@ -957,8 +942,8 @@ def _(ch_combo):
 
 @app.cell
 def _(mass2):
-    model1=mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
-    model2=mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
+    model1 = mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
+    model2 = mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
     model = model1+model2
     params = model.make_params()
     params["Bintegral"].set(1000)
@@ -969,12 +954,11 @@ def _(mass2):
     params["Btail_frac"].set(expr="tail_frac")
     params["Btail_tau"].set(expr="tail_tau")
     params["Bpeak_ph"].set(expr="peak_ph+Bshift")
-    params.add("Bshift",0.011e6, min=0.01e6, vary=False)
+    params.add("Bshift", 0.011e6, min=0.01e6, vary=False)
     params["tail_frac"].set(vary=True)
     params["tail_tau"].set(vary=True)
     params["Bdph_de"].set(1, vary=False)
     params["dph_de"].set(1, vary=False)
-
 
     return model, params
 
@@ -990,7 +974,7 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
         bin_centers, bin_size = mass2.misc.midpoints_and_step_size(bin_edges)
         plt.plot(bin_centers, counts_withco)
         plt.plot(bin_centers, model.eval(params=params, bin_centers=bin_centers))
-        result =  model.fit(counts_withco, params, bin_centers=bin_centers)
+        result = model.fit(counts_withco, params, bin_centers=bin_centers)
         result.plotm()
 
     _()
@@ -1007,12 +991,12 @@ def _(ch):
 
 @app.cell
 def _(ch5, np):
-    #predicted resolution vs filter length
+    # predicted resolution vs filter length
     filter_step = ch5.steps[2]
     filter_maker = filter_step.filter_maker
     vdv_pre_cut = []
     vdv_post_cut = []
-    n_vals = np.arange(0,1500,50)
+    n_vals = np.arange(0, 1500, 50)
     for n in n_vals:
         filter = filter_maker.compute_5lag(cut_pre=n, cut_post=0)
         vdv_pre_cut.append(filter.predicted_v_over_dv)
