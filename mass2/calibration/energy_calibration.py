@@ -192,7 +192,7 @@ class EnergyCalibrationMaker:
         if e_error is None:
             e_error = 0.01  # Assume 0.01 eV error if none given
 
-        update_index = None
+        update_index: int | None = None
         if self.npts > 0:
             if name and name in self.names:  # Update an existing point by name
                 if not replace:
@@ -202,7 +202,7 @@ class EnergyCalibrationMaker:
             elif np.abs(energy - self.energy).min() <= e_error:  # Update existing point
                 if not replace:
                     raise ValueError(f"Calibration point at energy {energy:.2f} eV is already known and overwrite is False")
-                update_index = np.abs(energy - self.energy).argmin()
+                update_index = int(np.abs(energy - self.energy).argmin())
 
         if update_index is None:  # Add a new calibration anchor point
             new_ph = np.hstack((self.ph, ph))

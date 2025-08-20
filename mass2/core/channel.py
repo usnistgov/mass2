@@ -774,11 +774,7 @@ class Channel:
 
             # Histogram (right-hand panels)
             plt.subplot(len(plottables), 2, 2 + i * 2)
-            if limits is None:
-                in_limit = np.ones(len(y), dtype=bool)
-            else:
-                in_limit = np.logical_and(y[:] > limits[0], y[:] < limits[1])
-            contents, _, _ = plt.hist(y[in_limit], 200, log=log, histtype="stepfilled", fc=color, alpha=0.5)
+            contents, _, _ = plt.hist(y, 200, range=limits, log=log, histtype="stepfilled", fc=color, alpha=0.5)
             if log:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")
