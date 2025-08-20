@@ -33,7 +33,7 @@ def test_phase_correct(plot=False):
         resolutions.append(result.best_values["fwhm"])
         if plot:
             result.plotm()
-    print(resolutions)
+    # print(resolutions)
     assert resolutions[0] <= 4.5
     assert resolutions[1] <= 4.4
     assert resolutions[2] <= 4.0

@@ -50,6 +50,6 @@ def test_inverted_data():
     ds2 = ds2.summarize_pulses()
     df1 = ds1.df.drop("pulse")
     df2 = ds2.df.drop("pulse")
-    print(df1.limit(5))
-    print(df2.limit(5))
+    # print(df1.limit(5))
+    # print(df2.limit(5))
     assert_frame_equal(df1, df2, check_exact=False)

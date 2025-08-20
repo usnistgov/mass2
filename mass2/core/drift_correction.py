@@ -5,7 +5,7 @@ import typing
 import pylab as plt
 
 import mass2
-from mass2.core.cal_steps import CalStep
+from mass2.core.cal_steps import CalStep, cache
 
 
 def drift_correct_mass(indicator, uncorrected):
@@ -31,12 +31,11 @@ drift_correct = drift_correct_mass
 class DriftCorrectStep(CalStep):
     dc: typing.Any
 
-    def calc_from_df(self, df):
+    @cache.cached_method()
+    def calc_from_df_only_outputs(self, df):
         indicator_col, uncorrected_col = self.inputs
         slope, offset = self.dc.slope, self.dc.offset
-        df2 = df.select((pl.col(uncorrected_col) * (1 + slope * (pl.col(indicator_col) - offset))).alias(self.output[0])).with_columns(
-            df
-        )
+        df2 = df.select((pl.col(uncorrected_col) * (1 + slope * (pl.col(indicator_col) - offset))).alias(self.output[0]))
         return df2
 
     def dbg_plot(self, df):

@@ -5,6 +5,12 @@ import numpy as np
 import pylab as plt
 from . import pulse_algorithms
 from . import ParquetCache
+import types
+import re
+
+def strip_expr_memory_locations(s):
+    pattern = r'(<Expr\s+\[.*?\])\s+at\s+0x[0-9A-Fa-f]+(?=>)'
+    return re.sub(pattern, r'\1', s)
 
 cache = ParquetCache()
 
@@ -22,6 +28,7 @@ class CalStep:
 
     @cache.cached_method()
     def calc_from_df_only_outputs(self, df: pl.DataFrame) -> pl.DataFrame:
+        assert set(self.inputs) == set(df.columns), "for caching"
         return df.with_columns({output: pl.lit(True) for output in self.outputs})
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -36,13 +43,21 @@ class CalStep:
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
         return plt.gca()
 
-    def parquet_cache_hash(self):
+    def _parquet_cache_hash(self):
+        """
+        the goal is to have a hash that is the same if the step will do the same thing
+        so we hash on the str representation of Expr, but leave off the at #### part that 
+        is pointer like and is not the same for two copies of pl.lit(True)
+        for functions we keep in the pointer, since we have no idea if you changed the
+        function"""
         l = []
         for k, v in self.__dict__.items():
-            ss = str(v)
+            ss = f"{k}:{v}"
+            ss = strip_expr_memory_locations(ss)
+            if " at 0x" in ss and not isinstance(v, types.FunctionType):
+                raise Exception(f"at shouldn't be in there for {ss}")
             l.append(ss)
-            print(f"{k=} {ss=} {l=}")
-        # print(s)
+        # print(l)
         return hash("".join(l))
 
 

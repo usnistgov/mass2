@@ -35,7 +35,7 @@ class ParquetCache:
 
     def compute_key(self, step, df: pl.DataFrame) -> str:
         # select only the columns needed
-        key_str = str(hash((hash_df_by_sampling(df), step.parquet_cache_hash())))
+        key_str = str(hash((hash_df_by_sampling(df), step._parquet_cache_hash())))
         return key_str
 
     def _file_path(self, key_hash: str) -> Path:
