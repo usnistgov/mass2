@@ -46,7 +46,7 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
-    subframe_divisions: int = 64
+    subframediv: int | None = None
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
@@ -276,6 +276,7 @@ class Channel:
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
@@ -299,6 +300,7 @@ class Channel:
             df=self.df,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=good_expr,
             df_history=self.df_history,
@@ -400,10 +402,11 @@ class Channel:
         This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
         """
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in col_expr_dict.values()]  # list of lists
-        inputs = list(set([col for expr in inputs for col in expr]))  # flatten the list of lists and get unique values
+        inputs: set[str] = set()
+        for expr in col_expr_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.SelectStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=list(col_expr_dict.keys()),
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
@@ -417,10 +420,11 @@ class Channel:
         if not first_expr.meta.eq(pl.lit(True)):
             category_condition_dict = {"fallback": pl.lit(True), **category_condition_dict}
         extract = mass2.misc.extract_column_names_from_polars_expr
-        inputs = [extract(expr) for expr in category_condition_dict.values()]
-        inputs = list(set([col for expr in inputs for col in expr]))
+        inputs: set[str] = set()
+        for expr in category_condition_dict.values():
+            inputs.update(extract(expr))
         step = mass2.core.cal_steps.CategorizeStep(
-            inputs=inputs,
+            inputs=list(inputs),
             output=[output_col],
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
@@ -566,12 +570,7 @@ class Channel:
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
-            df,
-            header=header,
-            npulses=ljh.npulses,
-            subframe_divisions=ljh.subframediv,
-            noise=noise_channel,
-            transform_raw=transform_raw,
+            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
         )
         return channel
 
@@ -593,7 +592,7 @@ class Channel:
             off._mmap["recordSamples"][0],
             df_header,
         )
-        channel = cls(df, header, off.nRecords, subframe_divisions=off.subframe_divisions)
+        channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
     def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
@@ -606,15 +605,20 @@ class Channel:
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame):
-        # df2 = self.df.join_asof(df_ext, )
-        raise NotImplementedError("not implemented")
+    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+        df2 = (
+            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        )
+        return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2) -> "Channel":
         return Channel(
             df=df2,
             header=self.header,
             npulses=self.npulses,
+            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
             df_history=self.df_history,
@@ -663,9 +667,9 @@ class Channel:
             mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
             self.header,
             self.npulses,
-            self.subframe_divisions,
-            self.noise,
-            self.good_expr,
+            subframediv=self.subframediv,
+            noise=self.noise,
+            good_expr=self.good_expr,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
