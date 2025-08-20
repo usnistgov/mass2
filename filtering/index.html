@@ -135,14 +135,19 @@ truncated_signal = signal[2:-2]
 noise_covar = np.zeros(n)
 noise_covar[0] = sigma_noise**2
 
-maker = mass2.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
+maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
 F5 = maker.compute_5lag()
 
 print(f&quot;Filter peak value:            {F5.nominal_peak:.1f}&quot;)
 print(f&quot;Filter rms value:             {F5.variance**0.5:.4f}&quot;)
 print(f&quot;Filter predicted V/dV (FWHM): {F5.predicted_v_over_dv:.4f}&quot;)
+
+from numpy.testing import assert_allclose
+assert_allclose(F5.nominal_peak, 1000)
+assert_allclose(F5.variance**0.5, 0.1549, rtol=1e-3)
+assert_allclose(F5.predicted_v_over_dv, 2741.6517)
 </code></pre>
-<p>This code should produce an optimal filter <code>F5</code> and a filter maker <code>maker</code> and generate the following output:</p>
+<p>This code should produce a filter maker <code>maker</code> and an optimal filter <code>F5</code> and generate the following output:</p>
 <pre><code class="language-text">    Filter peak value:            1000.0
     Filter rms value:             0.1549
     Filter predicted V/dV (FWHM): 2741.6517
@@ -169,7 +174,7 @@ def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
 
     noise_covar = np.zeros(n)
     noise_covar[0] = sigma_noise**2
-    maker = mass2.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
+    maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
     F5 = maker.compute_5lag()
 
     # Check filter's normalization

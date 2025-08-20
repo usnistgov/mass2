@@ -168,7 +168,7 @@
   N = 100000
   energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
   plt.clf()
-  sim, bin_edges, _ = plt.hist(energies, 120, [5865, 5925], histtype=&quot;step&quot;);
+  sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype=&quot;step&quot;);
   binsize = bin_edges[1] - bin_edges[0]
   e = bin_edges[:-1] + 0.5*binsize
   plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, &quot;k&quot;)
@@ -313,7 +313,9 @@
 <p>That is, the fit values must be multiplied by the local QE to give the number of <em>observed</em> signal counts, background counts per bin, or background slope.
 With or without a QE model, "integral" refers to the number of photons that would be seen across all energies (not just in the range being fit).</p>
 <h3 id="fitting-a-simple-gaussian-lorentzian-or-voigt-function">Fitting a simple Gaussian, Lorentzian, or Voigt function</h3>
-<pre><code class="language-python">  e_ctr = 1000.0
+<pre><code class="language-python">  import dataclasses
+  from mass2.calibration.fluorescence_lines import SpectralLine
+  e_ctr = 1000.0
   Nsig = 10000
   Nbg = 1000
 
@@ -327,8 +329,8 @@ With or without a QE model, "integral" refers to the number of photons that woul
   # Gaussian fit
   c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, 0, 0)
-  line.linetype = &quot;Gaussian&quot;
+  line = SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, 0, 0)
+  line = dataclasses.replace(line, linetype=&quot;Gaussian&quot;)
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params[&quot;fwhm&quot;].set(2.3548*sigma)
@@ -340,8 +342,8 @@ With or without a QE model, "integral" refers to the number of photons that woul
   # Lorentzian fit
   c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, 0)
-  line.linetype = &quot;Lorentzian&quot;
+  line = SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, 0)
+  line = dataclasses.replace(line, linetype=&quot;Lorentzian&quot;)
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params[&quot;fwhm&quot;].set(2.3548*sigma)
@@ -353,8 +355,8 @@ With or without a QE model, "integral" refers to the number of photons that woul
   # Voigt fit
   c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
   bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = mass2.fluorescence_lines.SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, sigma)
-  line.linetype = &quot;Voigt&quot;
+  line = SpectralLine.quick_monochromatic_line(&quot;testline&quot;, e_ctr, hwhm*2, sigma)
+  line = dataclasses.replace(line, linetype=&quot;Voigt&quot;)
   model = line.model()
   params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
   params[&quot;fwhm&quot;].set(2.3548*sigma)

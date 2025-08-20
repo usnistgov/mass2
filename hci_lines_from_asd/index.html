@@ -438,18 +438,49 @@ Paul Szypryt</p>
 <span class="normal">157</span>
 <span class="normal">158</span>
 <span class="normal">159</span>
-<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NIST_ASD</span><span class="p">:</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NIST_ASD</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class for working with a pickled atomic spectra database&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pickleFilename</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pickleFilename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Loads ASD pickle file (optionally gzipped)</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            pickleFilename: (default None) ASD pickle file name, as str, if not using default</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        pickleFilename : str | None, optional</span>
+<span class="sd">            ASD pickle file name, as str, or if none then `mass2.calibration.hci_lines.DEFAULT_PICKLE_PATH` (default None)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">pickleFilename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">pickleFilename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">DEFAULT_PICKLE_PATH</span><span class="p">)</span>
+            <span class="n">pickleFilename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">DEFAULT_PICKLE_PATH</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="n">pickleFilename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.gz&quot;</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">pickleFilename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
@@ -463,40 +494,64 @@ Paul Szypryt</p>
 
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">getAvailableSpectralCharges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getAvailableSpectralCharges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;For a given element, returns a list of all available charge states from the ASD pickle file</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : str</span>
+<span class="sd">            atomic symbol of element, e.g. &#39;Ne&#39;</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[int]</span>
+<span class="sd">            Available charge states</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">getAvailableLevels</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">element</span><span class="p">,</span>
-        <span class="n">spectralCharge</span><span class="p">,</span>
-        <span class="n">requiredConf</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">requiredTerm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">requiredJVal</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">maxLevels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">units</span><span class="o">=</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span>
-        <span class="n">getUncertainty</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="p">):</span>
+        <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">spectralCharge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">requiredConf</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requiredTerm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requiredJVal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">maxLevels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">units</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span><span class="p">,</span>
+        <span class="n">getUncertainty</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;For a given element and spectral charge state, return a dict of all known levels from the ASD pickle file</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
-<span class="sd">            spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
-<span class="sd">            requiredConf: (default None) filters results to those with ``conf == requiredConf``</span>
-<span class="sd">            requiredTerm: (default None) filters results to those with ``term == requiredTerm``</span>
-<span class="sd">            requiredJVal: (default None) filters results to those with ``JVal == requiredJVal``</span>
-<span class="sd">            maxLevels: (default None) the maximum number of levels (sorted by energy) to return</span>
-<span class="sd">            units: (default &#39;eV&#39;) &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : str</span>
+<span class="sd">            Elemental atomic symbol, e.g. &#39;Ne&#39;</span>
+<span class="sd">        spectralCharge : int</span>
+<span class="sd">            spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
+<span class="sd">        requiredConf : str | None, optional</span>
+<span class="sd">            if not None, limits results to those with `conf == requiredConf`, by default None</span>
+<span class="sd">        requiredTerm : str | None, optional</span>
+<span class="sd">            if not None, limits results to those with `term == requiredTerm`, by default None</span>
+<span class="sd">        requiredJVal : str | None, optional</span>
+<span class="sd">            if not None, limits results to those with `a == requiredJVal`, by default None</span>
+<span class="sd">        maxLevels : int | None, optional</span>
+<span class="sd">            the maximum number of levels (sorted by energy) to return, by default None</span>
+<span class="sd">        units : str, optional</span>
+<span class="sd">            &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values, by default &quot;eV&quot;</span>
+<span class="sd">        getUncertainty : bool, optional</span>
+<span class="sd">            whether to return uncertain values, by default True</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            A dictionary of energy level strings to energy levels.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">units</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="s2">&quot;cm-1&quot;</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
 
         <span class="n">spectralCharge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">spectralCharge</span><span class="p">)</span>
-        <span class="n">levelsDict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">levelsDict</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">numLevels</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">iLevel</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
             <span class="k">try</span><span class="p">:</span>
@@ -505,23 +560,14 @@ Paul Szypryt</p>
                     <span class="k">if</span> <span class="n">numLevels</span> <span class="o">==</span> <span class="n">maxLevels</span><span class="p">:</span>
                         <span class="k">return</span> <span class="n">levelsDict</span>
                 <span class="c1"># If required, check to see if level matches search conf, term, JVal</span>
-                <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">False</span>
                 <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">False</span>
                 <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">False</span>
                 <span class="n">conf</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">j_str</span> <span class="o">=</span> <span class="n">iLevel</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
                 <span class="n">JVal</span> <span class="o">=</span> <span class="n">j_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">requiredConf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">elif</span> <span class="n">conf</span> <span class="o">==</span> <span class="n">requiredConf</span><span class="p">:</span>
-                    <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">if</span> <span class="n">requiredTerm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">elif</span> <span class="n">term</span> <span class="o">==</span> <span class="n">requiredTerm</span><span class="p">:</span>
-                    <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">if</span> <span class="n">requiredJVal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">elif</span> <span class="n">JVal</span> <span class="o">==</span> <span class="n">requiredJVal</span><span class="p">:</span>
-                    <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">includeConf</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredConf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">conf</span> <span class="o">==</span> <span class="n">requiredConf</span>
+                <span class="n">includeTerm</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredTerm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">term</span> <span class="o">==</span> <span class="n">requiredTerm</span>
+                <span class="n">includeJVal</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredJVal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">JVal</span> <span class="o">==</span> <span class="n">requiredJVal</span>
+
                 <span class="c1"># Include levels that match, in either cm-1 or eV</span>
                 <span class="k">if</span> <span class="n">includeConf</span> <span class="ow">and</span> <span class="n">includeTerm</span> <span class="ow">and</span> <span class="n">includeJVal</span><span class="p">:</span>
                     <span class="n">numLevels</span> <span class="o">+=</span> <span class="mi">1</span>
@@ -537,25 +583,38 @@ Paul Szypryt</p>
                             <span class="p">]</span>
                         <span class="k">else</span><span class="p">:</span>
                             <span class="n">levelsDict</span><span class="p">[</span><span class="n">iLevel</span><span class="p">]</span> <span class="o">=</span> <span class="n">INVCM_TO_EV</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">][</span><span class="n">iLevel</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="n">levelsDict</span> <span class="o">=</span> <span class="kc">None</span>
-                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
                 <span class="sa">f</span><span class="s2">&quot;Warning: cannot parse level: </span><span class="si">{</span><span class="n">iLevel</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="k">return</span> <span class="n">levelsDict</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">getSingleLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">spectralCharge</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">JVal</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="n">getUncertainty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getSingleLevel</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">spectralCharge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">conf</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">JVal</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">units</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="n">getUncertainty</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the level data for a fully defined element, charge state, conf, term, and JVal.</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
-<span class="sd">            spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
-<span class="sd">            conf: str representing nuclear configuration, e.g. &#39;2p&#39;</span>
-<span class="sd">            term: str representing nuclear term, e.g. &#39;2P*&#39;</span>
-<span class="sd">            JVal: str representing total angular momentum J, e.g. &#39;3/2&#39;</span>
-<span class="sd">            units: (default &#39;eV&#39;) &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values</span>
-<span class="sd">            getUncertainty: (default True) if True, includes uncertainties in list of levels</span>
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        element : str</span>
+<span class="sd">            atomic symbol of element, e.g. &#39;Ne&#39;</span>
+<span class="sd">        spectralCharge : int</span>
+<span class="sd">            spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
+<span class="sd">        conf : str</span>
+<span class="sd">            nuclear configuration, e.g. &#39;2p&#39;</span>
+<span class="sd">        term : str</span>
+<span class="sd">            nuclear term, e.g. &#39;2P*&#39;</span>
+<span class="sd">        JVal : str</span>
+<span class="sd">            total angular momentum J, e.g. &#39;3/2&#39;</span>
+<span class="sd">        units : str, optional</span>
+<span class="sd">            &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values, by default &quot;eV&quot;</span>
+<span class="sd">        getUncertainty : bool, optional</span>
+<span class="sd">            includes uncertainties in list of levels, by default True</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        float</span>
+<span class="sd">            _description_</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="n">levelString</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">conf</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">term</span><span class="si">}</span><span class="s2"> J=</span><span class="si">{</span><span class="n">JVal</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="k">if</span> <span class="n">units</span> <span class="o">==</span> <span class="s2">&quot;cm-1&quot;</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">getUncertainty</span><span class="p">:</span>
@@ -568,8 +627,7 @@ Paul Szypryt</p>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">levelEnergy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">][</span><span class="n">levelString</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">INVCM_TO_EV</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">levelEnergy</span> <span class="o">=</span> <span class="kc">None</span>
-            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">levelEnergy</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -612,9 +670,12 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>pickleFilename</code></b>
+                  (<code><span title="str">str</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default None) ASD pickle file name, as str, if not using default</p>
+                <p>ASD pickle file name, as str, or if none then <code>mass2.calibration.hci_lines.DEFAULT_PICKLE_PATH</code> (default None)</p>
               </div>
             </li>
         </ul>
@@ -640,15 +701,19 @@ Paul Szypryt</p>
 <span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
-<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pickleFilename</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pickleFilename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Loads ASD pickle file (optionally gzipped)</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        pickleFilename: (default None) ASD pickle file name, as str, if not using default</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pickleFilename : str | None, optional</span>
+<span class="sd">        ASD pickle file name, as str, or if none then `mass2.calibration.hci_lines.DEFAULT_PICKLE_PATH` (default None)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">pickleFilename</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">pickleFilename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="n">DEFAULT_PICKLE_PATH</span><span class="p">)</span>
+        <span class="n">pickleFilename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">DEFAULT_PICKLE_PATH</span><span class="p">))</span>
 
     <span class="k">if</span> <span class="n">pickleFilename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.gz&quot;</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">pickleFilename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
@@ -678,10 +743,10 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_lines.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableElements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableElements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a list of all available elements from the ASD pickle file&quot;&quot;&quot;</span>
 
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -717,51 +782,101 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>element</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing atomic symbol of element, e.g. 'Ne'</p>
+                <p>Elemental atomic symbol, e.g. 'Ne'</p>
               </div>
             </li>
             <li>
               <b><code>spectralCharge</code></b>
+                  (<code><span title="int">int</span></code>)
               –
               <div class="doc-md-description">
-                <p>int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</p>
+                <p>spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</p>
               </div>
             </li>
             <li>
               <b><code>requiredConf</code></b>
+                  (<code><span title="str">str</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default None) filters results to those with <code>conf == requiredConf</code></p>
+                <p>if not None, limits results to those with <code>conf == requiredConf</code>, by default None</p>
               </div>
             </li>
             <li>
               <b><code>requiredTerm</code></b>
+                  (<code><span title="str">str</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default None) filters results to those with <code>term == requiredTerm</code></p>
+                <p>if not None, limits results to those with <code>term == requiredTerm</code>, by default None</p>
               </div>
             </li>
             <li>
               <b><code>requiredJVal</code></b>
+                  (<code><span title="str">str</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default None) filters results to those with <code>JVal == requiredJVal</code></p>
+                <p>if not None, limits results to those with <code>a == requiredJVal</code>, by default None</p>
               </div>
             </li>
             <li>
               <b><code>maxLevels</code></b>
+                  (<code><span title="int">int</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default None) the maximum number of levels (sorted by energy) to return</p>
+                <p>the maximum number of levels (sorted by energy) to return, by default None</p>
               </div>
             </li>
             <li>
               <b><code>units</code></b>
+                  (<code><span title="str">str</span></code>, default:
+                      <code>&#39;eV&#39;</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default 'eV') 'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values</p>
+                <p>'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values, by default "eV"</p>
+              </div>
+            </li>
+            <li>
+              <b><code>getUncertainty</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>True</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>whether to return uncertain values, by default True</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="dict">dict</span></code>
+              –
+              <div class="doc-md-description">
+                <p>A dictionary of energy level strings to energy levels.</p>
               </div>
             </li>
         </ul>
@@ -772,16 +887,7 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_lines.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
@@ -842,31 +948,62 @@ Paul Szypryt</p>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableLevels</span><span class="p">(</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableLevels</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">element</span><span class="p">,</span>
-    <span class="n">spectralCharge</span><span class="p">,</span>
-    <span class="n">requiredConf</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">requiredTerm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">requiredJVal</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">maxLevels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">units</span><span class="o">=</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span>
-    <span class="n">getUncertainty</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">spectralCharge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">requiredConf</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">requiredTerm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">requiredJVal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">maxLevels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">units</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span><span class="p">,</span>
+    <span class="n">getUncertainty</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;For a given element and spectral charge state, return a dict of all known levels from the ASD pickle file</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
-<span class="sd">        spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
-<span class="sd">        requiredConf: (default None) filters results to those with ``conf == requiredConf``</span>
-<span class="sd">        requiredTerm: (default None) filters results to those with ``term == requiredTerm``</span>
-<span class="sd">        requiredJVal: (default None) filters results to those with ``JVal == requiredJVal``</span>
-<span class="sd">        maxLevels: (default None) the maximum number of levels (sorted by energy) to return</span>
-<span class="sd">        units: (default &#39;eV&#39;) &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : str</span>
+<span class="sd">        Elemental atomic symbol, e.g. &#39;Ne&#39;</span>
+<span class="sd">    spectralCharge : int</span>
+<span class="sd">        spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
+<span class="sd">    requiredConf : str | None, optional</span>
+<span class="sd">        if not None, limits results to those with `conf == requiredConf`, by default None</span>
+<span class="sd">    requiredTerm : str | None, optional</span>
+<span class="sd">        if not None, limits results to those with `term == requiredTerm`, by default None</span>
+<span class="sd">    requiredJVal : str | None, optional</span>
+<span class="sd">        if not None, limits results to those with `a == requiredJVal`, by default None</span>
+<span class="sd">    maxLevels : int | None, optional</span>
+<span class="sd">        the maximum number of levels (sorted by energy) to return, by default None</span>
+<span class="sd">    units : str, optional</span>
+<span class="sd">        &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values, by default &quot;eV&quot;</span>
+<span class="sd">    getUncertainty : bool, optional</span>
+<span class="sd">        whether to return uncertain values, by default True</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    dict</span>
+<span class="sd">        A dictionary of energy level strings to energy levels.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">units</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="s2">&quot;cm-1&quot;</span><span class="p">}:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
 
     <span class="n">spectralCharge</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">spectralCharge</span><span class="p">)</span>
-    <span class="n">levelsDict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">levelsDict</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">numLevels</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">iLevel</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -875,23 +1012,14 @@ Paul Szypryt</p>
                 <span class="k">if</span> <span class="n">numLevels</span> <span class="o">==</span> <span class="n">maxLevels</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">levelsDict</span>
             <span class="c1"># If required, check to see if level matches search conf, term, JVal</span>
-            <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="n">conf</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">j_str</span> <span class="o">=</span> <span class="n">iLevel</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
             <span class="n">JVal</span> <span class="o">=</span> <span class="n">j_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="k">if</span> <span class="n">requiredConf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="k">elif</span> <span class="n">conf</span> <span class="o">==</span> <span class="n">requiredConf</span><span class="p">:</span>
-                <span class="n">includeConf</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="k">if</span> <span class="n">requiredTerm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="k">elif</span> <span class="n">term</span> <span class="o">==</span> <span class="n">requiredTerm</span><span class="p">:</span>
-                <span class="n">includeTerm</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="k">if</span> <span class="n">requiredJVal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="k">elif</span> <span class="n">JVal</span> <span class="o">==</span> <span class="n">requiredJVal</span><span class="p">:</span>
-                <span class="n">includeJVal</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">includeConf</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredConf</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">conf</span> <span class="o">==</span> <span class="n">requiredConf</span>
+            <span class="n">includeTerm</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredTerm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">term</span> <span class="o">==</span> <span class="n">requiredTerm</span>
+            <span class="n">includeJVal</span> <span class="o">=</span> <span class="p">(</span><span class="n">requiredJVal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="n">JVal</span> <span class="o">==</span> <span class="n">requiredJVal</span>
+
             <span class="c1"># Include levels that match, in either cm-1 or eV</span>
             <span class="k">if</span> <span class="n">includeConf</span> <span class="ow">and</span> <span class="n">includeTerm</span> <span class="ow">and</span> <span class="n">includeJVal</span><span class="p">:</span>
                 <span class="n">numLevels</span> <span class="o">+=</span> <span class="mi">1</span>
@@ -907,9 +1035,6 @@ Paul Szypryt</p>
                         <span class="p">]</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">levelsDict</span><span class="p">[</span><span class="n">iLevel</span><span class="p">]</span> <span class="o">=</span> <span class="n">INVCM_TO_EV</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">][</span><span class="n">iLevel</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">levelsDict</span> <span class="o">=</span> <span class="kc">None</span>
-                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
             <span class="sa">f</span><span class="s2">&quot;Warning: cannot parse level: </span><span class="si">{</span><span class="n">iLevel</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="k">return</span> <span class="n">levelsDict</span>
@@ -945,9 +1070,33 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>element</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing atomic symbol of element, e.g. 'Ne'</p>
+                <p>atomic symbol of element, e.g. 'Ne'</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="list">list</span>[<span title="int">int</span>]</code>
+              –
+              <div class="doc-md-description">
+                <p>Available charge states</p>
               </div>
             </li>
         </ul>
@@ -958,18 +1107,32 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_lines.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
 <span class="normal">59</span>
-<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableSpectralCharges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getAvailableSpectralCharges</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;For a given element, returns a list of all available charge states from the ASD pickle file</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : str</span>
+<span class="sd">        atomic symbol of element, e.g. &#39;Ne&#39;</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list[int]</span>
+<span class="sd">        Available charge states</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -1005,51 +1168,85 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>element</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing atomic symbol of element, e.g. 'Ne'</p>
+                <p>atomic symbol of element, e.g. 'Ne'</p>
               </div>
             </li>
             <li>
               <b><code>spectralCharge</code></b>
+                  (<code><span title="int">int</span></code>)
               –
               <div class="doc-md-description">
-                <p>int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</p>
+                <p>spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</p>
               </div>
             </li>
             <li>
               <b><code>conf</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing nuclear configuration, e.g. '2p'</p>
+                <p>nuclear configuration, e.g. '2p'</p>
               </div>
             </li>
             <li>
               <b><code>term</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing nuclear term, e.g. '2P*'</p>
+                <p>nuclear term, e.g. '2P*'</p>
               </div>
             </li>
             <li>
               <b><code>JVal</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str representing total angular momentum J, e.g. '3/2'</p>
+                <p>total angular momentum J, e.g. '3/2'</p>
               </div>
             </li>
             <li>
               <b><code>units</code></b>
+                  (<code><span title="str">str</span></code>, default:
+                      <code>&#39;eV&#39;</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default 'eV') 'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values</p>
+                <p>'cm-1' or 'eV' for returned line position. If 'eV', converts from database 'cm-1' values, by default "eV"</p>
               </div>
             </li>
             <li>
               <b><code>getUncertainty</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>True</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default True) if True, includes uncertainties in list of levels</p>
+                <p>includes uncertainties in list of levels, by default True</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="float">float</span></code>
+              –
+              <div class="doc-md-description">
+                <p><em>description</em></p>
               </div>
             </li>
         </ul>
@@ -1060,21 +1257,7 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_lines.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
@@ -1086,18 +1269,63 @@ Paul Szypryt</p>
 <span class="normal">157</span>
 <span class="normal">158</span>
 <span class="normal">159</span>
-<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getSingleLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">spectralCharge</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">JVal</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="n">getUncertainty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">getSingleLevel</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">spectralCharge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">conf</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">JVal</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">units</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;eV&quot;</span><span class="p">,</span> <span class="n">getUncertainty</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the level data for a fully defined element, charge state, conf, term, and JVal.</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        element: str representing atomic symbol of element, e.g. &#39;Ne&#39;</span>
-<span class="sd">        spectralCharge: int representing spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
-<span class="sd">        conf: str representing nuclear configuration, e.g. &#39;2p&#39;</span>
-<span class="sd">        term: str representing nuclear term, e.g. &#39;2P*&#39;</span>
-<span class="sd">        JVal: str representing total angular momentum J, e.g. &#39;3/2&#39;</span>
-<span class="sd">        units: (default &#39;eV&#39;) &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values</span>
-<span class="sd">        getUncertainty: (default True) if True, includes uncertainties in list of levels</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : str</span>
+<span class="sd">        atomic symbol of element, e.g. &#39;Ne&#39;</span>
+<span class="sd">    spectralCharge : int</span>
+<span class="sd">        spectral charge state, e.g. 1 for neutral atoms, 10 for H-like Ne</span>
+<span class="sd">    conf : str</span>
+<span class="sd">        nuclear configuration, e.g. &#39;2p&#39;</span>
+<span class="sd">    term : str</span>
+<span class="sd">        nuclear term, e.g. &#39;2P*&#39;</span>
+<span class="sd">    JVal : str</span>
+<span class="sd">        total angular momentum J, e.g. &#39;3/2&#39;</span>
+<span class="sd">    units : str, optional</span>
+<span class="sd">        &#39;cm-1&#39; or &#39;eV&#39; for returned line position. If &#39;eV&#39;, converts from database &#39;cm-1&#39; values, by default &quot;eV&quot;</span>
+<span class="sd">    getUncertainty : bool, optional</span>
+<span class="sd">        includes uncertainties in list of levels, by default True</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    float</span>
+<span class="sd">        _description_</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">levelString</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">conf</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">term</span><span class="si">}</span><span class="s2"> J=</span><span class="si">{</span><span class="n">JVal</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="k">if</span> <span class="n">units</span> <span class="o">==</span> <span class="s2">&quot;cm-1&quot;</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">getUncertainty</span><span class="p">:</span>
@@ -1110,8 +1338,7 @@ Paul Szypryt</p>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">levelEnergy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">NIST_ASD_Dict</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="n">spectralCharge</span><span class="p">][</span><span class="n">levelString</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">INVCM_TO_EV</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">levelEnergy</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit type not supported, please use eV or cm-1&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">levelEnergy</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -1192,16 +1419,43 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>generic_model</code></b>
+                  (<code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>)
               –
               <div class="doc-md-description">
-                <p>Generic lmfit model object to which to add a linear background model</p>
+                <p>object to which to add a linear background model</p>
               </div>
             </li>
             <li>
               <b><code>vary_slope</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) allows a varying linear slope rather than just constant value</p>
+                <p>allows a varying linear slope rather than just constant value, by default False</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>
+              –
+              <div class="doc-md-description">
+                <p>The input model, with background componets added</p>
               </div>
             </li>
         </ul>
@@ -1212,35 +1466,41 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_bg_model</span><span class="p">(</span><span class="n">generic_model</span><span class="p">,</span> <span class="n">vary_slope</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_bg_model</span><span class="p">(</span><span class="n">generic_model</span><span class="p">:</span> <span class="n">GenericLineModel</span><span class="p">,</span> <span class="n">vary_slope</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GenericLineModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Adds a LinearBackgroundModel to a generic lmfit model</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        generic_model: Generic lmfit model object to which to add a linear background model</span>
-<span class="sd">        vary_slope: (default False) allows a varying linear slope rather than just constant value</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    generic_model : GenericLineModel</span>
+<span class="sd">        object to which to add a linear background model</span>
+<span class="sd">    vary_slope : bool, optional</span>
+<span class="sd">        allows a varying linear slope rather than just constant value, by default False</span>
 
-    <span class="n">composite_name</span> <span class="o">=</span> <span class="n">generic_model</span><span class="o">.</span><span class="n">_name</span>
-    <span class="n">bg_prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">composite_name</span><span class="si">}</span><span class="s2">_&quot;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;J=&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
-    <span class="n">background_model</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">calibration</span><span class="o">.</span><span class="n">line_models</span><span class="o">.</span><span class="n">LinearBackgroundModel</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">composite_name</span><span class="si">}</span><span class="s2"> Background&quot;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">bg_prefix</span><span class="p">)</span>
-    <span class="n">background_model</span><span class="o">.</span><span class="n">set_param_hint</span><span class="p">(</span><span class="s2">&quot;bg_slope&quot;</span><span class="p">,</span> <span class="n">vary</span><span class="o">=</span><span class="n">vary_slope</span><span class="p">)</span>
-    <span class="n">composite_model</span> <span class="o">=</span> <span class="n">generic_model</span> <span class="o">+</span> <span class="n">background_model</span>
-    <span class="n">composite_model</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">composite_name</span>
-    <span class="k">return</span> <span class="n">composite_model</span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    GenericLineModel</span>
+<span class="sd">        The input model, with background componets added</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># composite_name = generic_model._name</span>
+    <span class="c1"># bg_prefix = f&quot;{composite_name}_&quot;.replace(&quot; &quot;, &quot;_&quot;).replace(&quot;J=&quot;, &quot;&quot;).replace(&quot;/&quot;, &quot;_&quot;).replace(&quot;*&quot;, &quot;&quot;).replace(&quot;.&quot;, &quot;&quot;)</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;No LinearBackgroundModel still exists in mass2&quot;</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1273,6 +1533,7 @@ Paul Szypryt</p>
         <ul class="first simple">
             <li>
               <b><code>element</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
                 <p>atomic symbol as str, e.g. 'Ne' or 'Ar'</p>
@@ -1280,6 +1541,7 @@ Paul Szypryt</p>
             </li>
             <li>
               <b><code>conf</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
                 <p>nuclear configuration as str, e.g. '2p' or '3p'</p>
@@ -1287,23 +1549,55 @@ Paul Szypryt</p>
             </li>
             <li>
               <b><code>has_linear_background</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include a single linear background on top of the 2 Lorentzians</p>
+                <p>include a single linear background on top of the 2 Lorentzians, by default False</p>
               </div>
             </li>
             <li>
               <b><code>has_tails</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include low energy tail in the model</p>
+                <p>include low energy tail in the model, by default False</p>
               </div>
             </li>
             <li>
               <b><code>vary_amp_ratio</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) allow the ratio of the J=3/2 to J=1/2 states to vary away from 2</p>
+                <p>allow the ratio of the J=3/2 to J=1/2 states to vary away from 2, by default False</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>
+              –
+              <div class="doc-md-description">
+                <p>The new composite line</p>
               </div>
             </li>
         </ul>
@@ -1314,31 +1608,7 @@ Paul Szypryt</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
@@ -1347,15 +1617,65 @@ Paul Szypryt</p>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
-<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_HLike_2P_model</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">conf</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vary_amp_ratio</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_HLike_2P_model</span><span class="p">(</span>
+    <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">conf</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">vary_amp_ratio</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GenericLineModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes H-like 2P models consisting of J=1/2 and J=3/2 lines</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        element: atomic symbol as str, e.g. &#39;Ne&#39; or &#39;Ar&#39;</span>
-<span class="sd">        conf: nuclear configuration as str, e.g. &#39;2p&#39; or &#39;3p&#39;</span>
-<span class="sd">        has_linear_background: (default False) include a single linear background on top of the 2 Lorentzians</span>
-<span class="sd">        has_tails: (default False) include low energy tail in the model</span>
-<span class="sd">        vary_amp_ratio: (default False) allow the ratio of the J=3/2 to J=1/2 states to vary away from 2</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : str</span>
+<span class="sd">        atomic symbol as str, e.g. &#39;Ne&#39; or &#39;Ar&#39;</span>
+<span class="sd">    conf : str</span>
+<span class="sd">        nuclear configuration as str, e.g. &#39;2p&#39; or &#39;3p&#39;</span>
+<span class="sd">    has_linear_background : bool, optional</span>
+<span class="sd">        include a single linear background on top of the 2 Lorentzians, by default False</span>
+<span class="sd">    has_tails : bool, optional</span>
+<span class="sd">        include low energy tail in the model, by default False</span>
+<span class="sd">    vary_amp_ratio : bool, optional</span>
+<span class="sd">        allow the ratio of the J=3/2 to J=1/2 states to vary away from 2, by default False</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    GenericLineModel</span>
+<span class="sd">        The new composite line</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Set up line names and lmfit prefixes</span>
@@ -1365,8 +1685,8 @@ Paul Szypryt</p>
     <span class="n">prefix_1_2</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">line_name_1_2</span><span class="si">}</span><span class="s2">_&quot;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;J=&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
     <span class="n">prefix_3_2</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">line_name_3_2</span><span class="si">}</span><span class="s2">_&quot;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;J=&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
     <span class="c1"># Initialize individual lines and models</span>
-    <span class="n">line_1_2</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name_1_2</span><span class="p">]()</span>
-    <span class="n">line_3_2</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name_3_2</span><span class="p">]()</span>
+    <span class="n">line_1_2</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name_1_2</span><span class="p">]</span>
+    <span class="n">line_3_2</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name_3_2</span><span class="p">]</span>
     <span class="n">model_1_2</span> <span class="o">=</span> <span class="n">line_1_2</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="n">has_tails</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix_1_2</span><span class="p">)</span>
     <span class="n">model_3_2</span> <span class="o">=</span> <span class="n">line_3_2</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="n">has_tails</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix_3_2</span><span class="p">)</span>
     <span class="c1"># Initialize composite model and set addition H-like constraints</span>
@@ -1398,8 +1718,8 @@ Paul Szypryt</p>
 
     <div class="doc doc-contents ">
 
-        <p>Initializes 1s2s,2p He-like complexes for a given element.
-By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 lines.</p>
+        <p>Initializes 1s2s,2p He-like complexes for a given element.</p>
+<p>By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 lines.</p>
 
 
 <table class="field-list">
@@ -1414,6 +1734,7 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
         <ul class="first simple">
             <li>
               <b><code>element</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
                 <p>atomic symbol as str, e.g. 'Ne' or 'Ar'</p>
@@ -1421,23 +1742,55 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
             </li>
             <li>
               <b><code>has_linear_background</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include a single linear background on top of the Lorentzian models</p>
+                <p>include a single linear background on top of the Lorentzian models, by default False</p>
               </div>
             </li>
             <li>
               <b><code>has_tails</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include low energy tail in the model</p>
+                <p>include low energy tail in the model, by default False</p>
               </div>
             </li>
             <li>
               <b><code>additional_line_names</code></b>
+                  (<code><span title="list">list</span></code>, default:
+                      <code>[]</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default []) additional line names to include in model, e.g. low level Li/Be-like features</p>
+                <p>additional line names to include in model, e.g. low level Li/Be-like features, by default []</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>
+              –
+              <div class="doc-md-description">
+                <p>A model of the given HCI complex.</p>
               </div>
             </li>
         </ul>
@@ -1448,45 +1801,71 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_HeLike_complex_model</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">additional_line_names</span><span class="o">=</span><span class="p">[]):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_HeLike_complex_model</span><span class="p">(</span>
+    <span class="n">element</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">additional_line_names</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GenericLineModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes 1s2s,2p He-like complexes for a given element.</span>
+
 <span class="sd">    By default, uses only the 1s.2s 3S J=1, 1s.2p 3P* J=1, and 1s.2p 1P* J=1 lines.</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        element: atomic symbol as str, e.g. &#39;Ne&#39; or &#39;Ar&#39;</span>
-<span class="sd">        has_linear_background: (default False) include a single linear background on top of the Lorentzian models</span>
-<span class="sd">        has_tails: (default False) include low energy tail in the model</span>
-<span class="sd">        additional_line_names: (default []) additional line names to include in model, e.g. low level Li/Be-like features</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    element : str</span>
+<span class="sd">        atomic symbol as str, e.g. &#39;Ne&#39; or &#39;Ar&#39;</span>
+<span class="sd">    has_linear_background : bool, optional</span>
+<span class="sd">        include a single linear background on top of the Lorentzian models, by default False</span>
+<span class="sd">    has_tails : bool, optional</span>
+<span class="sd">        include low energy tail in the model, by default False</span>
+<span class="sd">    additional_line_names : list, optional</span>
+<span class="sd">        additional line names to include in model, e.g. low level Li/Be-like features, by default []</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    GenericLineModel</span>
+<span class="sd">        A model of the given HCI complex.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Set up line names</span>
@@ -1541,30 +1920,61 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
         <ul class="first simple">
             <li>
               <b><code>composite_name</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>str name given to composite line model</p>
+                <p>name given to composite line model</p>
               </div>
             </li>
             <li>
-              <b><code>line_models</code></b>
+              <b><code>individual_models</code></b>
+                  (<code><span title="list">list</span>[<span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span>]</code>)
               –
               <div class="doc-md-description">
-                <p>array of lmfit models to sum into a composite model</p>
+                <p>Models to sum into a composite</p>
               </div>
             </li>
             <li>
               <b><code>has_linear_background</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include a single linear background on top of group of lorentzians</p>
+                <p>include a single linear background on top of group of lorentzians, by default False</p>
               </div>
             </li>
             <li>
               <b><code>peak_component_name</code></b>
+                  (<code><span title="str">str</span> | None</code>, default:
+                      <code>None</code>
+)
               –
               <div class="doc-md-description">
-                <p>designate a component to be a peak for energy, all expressions are referenced to this component</p>
+                <p>designate a component to be a peak for energy, all expressions are referenced to this component, by default None</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>
+              –
+              <div class="doc-md-description">
+                <p>The new composite line</p>
               </div>
             </li>
         </ul>
@@ -1575,16 +1985,7 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
@@ -1614,17 +2015,56 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 <span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span>
-<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_hci_composite_model</span><span class="p">(</span><span class="n">composite_name</span><span class="p">,</span> <span class="n">individual_models</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">peak_component_name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_hci_composite_model</span><span class="p">(</span>
+    <span class="n">composite_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">individual_models</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">GenericLineModel</span><span class="p">],</span>
+    <span class="n">has_linear_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">peak_component_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GenericLineModel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes composite lmfit model from the sum of input models</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        composite_name: str name given to composite line model</span>
-<span class="sd">        line_models: array of lmfit models to sum into a composite model</span>
-<span class="sd">        has_linear_background: (default False) include a single linear background on top of group of lorentzians</span>
-<span class="sd">        peak_component_name: designate a component to be a peak for energy, all expressions are referenced to this component</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    composite_name : str</span>
+<span class="sd">        name given to composite line model</span>
+<span class="sd">    individual_models : list[GenericLineModel]</span>
+<span class="sd">        Models to sum into a composite</span>
+<span class="sd">    has_linear_background : bool, optional</span>
+<span class="sd">        include a single linear background on top of group of lorentzians, by default False</span>
+<span class="sd">    peak_component_name : str | None, optional</span>
+<span class="sd">        designate a component to be a peak for energy, all expressions are referenced to this component, by default None</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    GenericLineModel</span>
+<span class="sd">        The new composite line</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">composite_model</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">individual_models</span><span class="p">)</span>
+    <span class="n">composite_model</span><span class="p">:</span> <span class="n">GenericLineModel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">individual_models</span><span class="p">)</span>
     <span class="n">composite_model</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">composite_name</span>
     <span class="k">if</span> <span class="n">has_linear_background</span><span class="p">:</span>
         <span class="n">composite_model</span> <span class="o">=</span> <span class="n">add_bg_model</span><span class="p">(</span><span class="n">composite_model</span><span class="p">)</span>
@@ -1671,7 +2111,7 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 
     <div class="doc doc-contents ">
 
-        <p>Initializes a single lorentzian hci lmfit model. Reformats line_name to create a lmfit valid prefix.</p>
+        <p>Initializes a single lorentzian HCI line model. Reformats line_name to create a lmfit valid prefix.</p>
 
 
 <table class="field-list">
@@ -1686,23 +2126,53 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
         <ul class="first simple">
             <li>
               <b><code>line_name</code></b>
+                  (<code><span title="str">str</span></code>)
               –
               <div class="doc-md-description">
-                <p>name of line within mass2.spectra</p>
+                <p>name of line to use in mass2.spectra</p>
               </div>
             </li>
             <li>
               <b><code>has_linear_background</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include linear background in the model</p>
+                <p>include linear background in the model, by default False</p>
               </div>
             </li>
             <li>
               <b><code>has_tails</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include low energy tail in the model</p>
+                <p>include low-energy tail in the model, by default False</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="mass2.calibration.line_models.GenericLineModel">GenericLineModel</span></code>
+              –
+              <div class="doc-md-description">
+                <p>New HCI line.</p>
               </div>
             </li>
         </ul>
@@ -1713,8 +2183,7 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
-<span class="normal">17</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
@@ -1726,16 +2195,33 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_hci_line_model</span><span class="p">(</span><span class="n">line_name</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes a single lorentzian hci lmfit model. Reformats line_name to create a lmfit valid prefix.</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">initialize_hci_line_model</span><span class="p">(</span><span class="n">line_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">has_linear_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GenericLineModel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes a single lorentzian HCI line model. Reformats line_name to create a lmfit valid prefix.</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        line_name: name of line within mass2.spectra</span>
-<span class="sd">        has_linear_background: (default False) include linear background in the model</span>
-<span class="sd">        has_tails: (default False) include low energy tail in the model</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    line_name : str</span>
+<span class="sd">        name of line to use in mass2.spectra</span>
+<span class="sd">    has_linear_background : bool, optional</span>
+<span class="sd">        include linear background in the model, by default False</span>
+<span class="sd">    has_tails : bool, optional</span>
+<span class="sd">        include low-energy tail in the model, by default False</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    GenericLineModel</span>
+<span class="sd">        New HCI line.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">line</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name</span><span class="p">]()</span>
+    <span class="n">line</span> <span class="o">=</span> <span class="n">spectra</span><span class="p">[</span><span class="n">line_name</span><span class="p">]</span>
     <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">line_name</span><span class="si">}</span><span class="s2">_&quot;</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;J=&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
     <span class="n">line_model</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">has_linear_background</span><span class="o">=</span><span class="n">has_linear_background</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="n">has_tails</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
     <span class="n">line_model</span><span class="o">.</span><span class="n">shortname</span> <span class="o">=</span> <span class="n">line_name</span>
@@ -1772,25 +2258,65 @@ By default, uses only the 1s.2s 3S J=1, 1s.2p 3P<em> J=1, and 1s.2p 1P</em> J=1 
         <ul class="first simple">
             <li>
               <b><code>has_linear_background</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include a single linear background on top of the 2 Lorentzians</p>
+                <p>include a single linear background on top of the 2 Lorentzians, by default False</p>
               </div>
             </li>
             <li>
               <b><code>has_tails</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) include low energy tail in the model</p>
+                <p>nclude low-energy tail in the model, by default False</p>
               </div>
             </li>
             <li>
               <b><code>vary_Hlike_amp_ratio</code></b>
+                  (<code><span title="bool">bool</span></code>, default:
+                      <code>False</code>
+)
               –
               <div class="doc-md-description">
-                <p>(default False) allow the ratio of the J=3/2 to J=1/2 H-like states to vary
-additional_Helike_complex_lines: (default []) additional line names to include inHe-like complex
-model, e.g. low level Li/Be-like features</p>
+                <p>allow the ratio of the J=3/2 to J=1/2 H-like states to vary, by default False</p>
+              </div>
+            </li>
+            <li>
+              <b><code>additional_Helike_complex_lines</code></b>
+                  (<code><span title="list">list</span></code>, default:
+                      <code>[]</code>
+)
+              –
+              <div class="doc-md-description">
+                <p>additional line names to include inHe-like complex model, e.g. low level Li/Be-like features, by default []</p>
+              </div>
+            </li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<table class="field-list">
+  <colgroup>
+    <col class="field-name" />
+    <col class="field-body" />
+  </colgroup>
+  <tbody valign="top">
+    <tr class="field">
+      <th class="field-name">Returns:</th>
+      <td class="field-body">
+        <ul class="first simple">
+            <li>
+                  <code><span title="_type_">_type_</span></code>
+              –
+              <div class="doc-md-description">
+                <p>Dictionary of mass2.calibration.fluorescence_lines.SpectralLine objects, containing commonly used HCI lines.</p>
               </div>
             </li>
         </ul>
@@ -1801,65 +2327,7 @@ model, e.g. low level Li/Be-like features</p>
 
             <details class="quote">
               <summary>Source code in <code>mass2/calibration/hci_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">218</span>
 <span class="normal">219</span>
 <span class="normal">220</span>
 <span class="normal">221</span>
@@ -1883,16 +2351,100 @@ model, e.g. low level Li/Be-like features</p>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">models</span><span class="p">(</span><span class="n">has_linear_background</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">has_tails</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vary_Hlike_amp_ratio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">additional_Helike_complex_lines</span><span class="o">=</span><span class="p">[]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Generates some commonly used HCI line models that can be used for energy calibration, etc.</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">models</span><span class="p">(</span>
+    <span class="n">has_linear_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">has_tails</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">vary_Hlike_amp_ratio</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">additional_Helike_complex_lines</span><span class="o">=</span><span class="p">[],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates some commonly used HCI line models that can be used for energy calibration, etc.</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        has_linear_background: (default False) include a single linear background on top of the 2 Lorentzians</span>
-<span class="sd">        has_tails: (default False) include low energy tail in the model</span>
-<span class="sd">        vary_Hlike_amp_ratio: (default False) allow the ratio of the J=3/2 to J=1/2 H-like states to vary</span>
-<span class="sd">            additional_Helike_complex_lines: (default []) additional line names to include inHe-like complex</span>
-<span class="sd">            model, e.g. low level Li/Be-like features</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    has_linear_background : bool, optional</span>
+<span class="sd">        include a single linear background on top of the 2 Lorentzians, by default False</span>
+<span class="sd">    has_tails : bool, optional</span>
+<span class="sd">        nclude low-energy tail in the model, by default False</span>
+<span class="sd">    vary_Hlike_amp_ratio : bool, optional</span>
+<span class="sd">        allow the ratio of the J=3/2 to J=1/2 H-like states to vary, by default False</span>
+<span class="sd">    additional_Helike_complex_lines : list, optional</span>
+<span class="sd">        additional line names to include inHe-like complex model, e.g. low level Li/Be-like features, by default []</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    _type_</span>
+<span class="sd">        Dictionary of mass2.calibration.fluorescence_lines.SpectralLine objects, containing commonly used HCI lines.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">models_dict</span> <span class="o">=</span> <span class="p">{}</span>
