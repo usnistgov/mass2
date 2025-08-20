@@ -195,3 +195,48 @@ class CalSteps:
     def with_step(self, step: CalStep) -> "CalSteps":
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
+
+    def trim_dead_ends(self, required_fields: list[str] | tuple[str] | set[str]) -> "CalSteps":
+        """Create a new CalSteps object with all dead-end steps removed.
+
+        Dead-end steps are defined as any step that can be omitted without affecting the ability to
+        compute any of the fields given in `required_fields`. The result of this method is to return
+        a CalSteps where any step is remove if it does not contribute to computing any of the `required_fields`
+        (i.e., if it is a dead end).
+
+        Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.
+
+        Parameters
+        ----------
+        required_fields : list[str] | tuple[str] | set[str]
+            Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
+            found recursively among the inputs to any such steps.
+
+        Returns
+        -------
+        CalSteps
+            _description_
+        """
+        all_fields_out: set[str] = set(required_fields)
+        nsteps = len(self)
+        required = np.zeros(nsteps, dtype=bool)
+
+        # The easiest approach is to traverse the steps from last to first to build our list of required
+        # fields, because necessarily no later step can produce the inputs needed by an earlier step.
+        for istep in range(nsteps - 1, -1, -1):
+            step = self[istep]
+            for field in step.output:
+                if field in all_fields_out:
+                    required[istep] = True
+                    all_fields_out.update(step.inputs)
+                    print(f"We require step #{istep}")
+                    print(all_fields_out)
+                    break
+
+        if np.all(required):
+            return self
+        steps = []
+        for i in range(nsteps):
+            if required[i]:
+                steps.append(self[i])
+        return CalSteps(steps)
