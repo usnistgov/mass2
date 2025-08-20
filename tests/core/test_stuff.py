@@ -359,19 +359,19 @@ def test_categorize_step():
 
 def test_step_with_cache():
     cache = mass2.core.cal_steps.cache
-    _set_counter = cache._set_counter # record the number of caches at start
+    _set_counter = cache._set_counter  # record the number of caches at start
     ch = dummy_channel()
     ch2 = ch.summarize_pulses()
-    assert cache._set_counter == _set_counter + 1 # increased by one, it was cached
+    assert cache._set_counter == _set_counter + 1  # increased by one, it was cached
     ch2 = ch.summarize_pulses()
-    assert cache._set_counter == _set_counter + 1 # no change, retrieved from cache
-    ch3 = ch2.with_select_step({"double_pulse_rms":pl.col("pulse_rms")*2})
-    assert cache._set_counter == _set_counter + 2 # increased by one, it was cached
-    ch3 = ch2.with_select_step({"double_pulse_rms":pl.col("pulse_rms")*2})
-    assert cache._set_counter == _set_counter + 2 # no change, retrieved from cache
+    assert cache._set_counter == _set_counter + 1  # no change, retrieved from cache
+    ch3 = ch2.with_select_step({"double_pulse_rms": pl.col("pulse_rms") * 2})
+    assert cache._set_counter == _set_counter + 2  # increased by one, it was cached
+    ch3 = ch2.with_select_step({"double_pulse_rms": pl.col("pulse_rms") * 2})
+    assert cache._set_counter == _set_counter + 2  # no change, retrieved from cache
     ch4 = ch3.driftcorrect(uncorrected_col="pulse_rms")
     assert "pulse_rms_dc" in ch4.df.columns
     # print(ch4.df)
-    assert cache._set_counter == _set_counter + 3 # increased by one, it was cached
+    assert cache._set_counter == _set_counter + 3  # increased by one, it was cached
     ch4 = ch3.driftcorrect(uncorrected_col="pulse_rms")
-    assert cache._set_counter == _set_counter + 3 # no change, retrieved from cache
+    assert cache._set_counter == _set_counter + 3  # no change, retrieved from cache

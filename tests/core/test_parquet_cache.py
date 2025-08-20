@@ -16,7 +16,7 @@ def test_cached_method(tmp_path):
         def _parquet_cache_hash(self):
             h = hash(str(self.inputs))  # only hash inputs so that call_count doesnt affect hash
             return h
-        
+
         @cache.cached_method()
         def compute(self, df: pl.DataFrame) -> pl.DataFrame:
             assert set(self.inputs) == set(df.columns)

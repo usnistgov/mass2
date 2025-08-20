@@ -8,9 +8,11 @@ from . import ParquetCache
 import types
 import re
 
+
 def strip_expr_memory_locations(s):
-    pattern = r'(<Expr\s+\[.*?\])\s+at\s+0x[0-9A-Fa-f]+(?=>)'
-    return re.sub(pattern, r'\1', s)
+    pattern = r"(<Expr\s+\[.*?\])\s+at\s+0x[0-9A-Fa-f]+(?=>)"
+    return re.sub(pattern, r"\1", s)
+
 
 cache = ParquetCache()
 
@@ -46,7 +48,7 @@ class CalStep:
     def _parquet_cache_hash(self):
         """
         the goal is to have a hash that is the same if the step will do the same thing
-        so we hash on the str representation of Expr, but leave off the at #### part that 
+        so we hash on the str representation of Expr, but leave off the at #### part that
         is pointer like and is not the same for two copies of pl.lit(True)
         for functions we keep in the pointer, since we have no idea if you changed the
         function"""
