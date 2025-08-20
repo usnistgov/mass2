@@ -388,3 +388,51 @@ def test_external_trigger_experiment_state():
     assert sprev.unique().count() == 48750
     assert sthis.unique().count() == 92090
     assert snext.unique().count() == 48751
+
+
+def test_steps():
+    "Apply some steps, and be sure that `CalSteps.trim_dead_ends(...) works"
+
+    def squareme(d):
+        return d**2
+
+    # Perform 5 offical CalSteps: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
+    def _do_steps(ch: mass2.Channel) -> mass2.Channel:
+        return (
+            ch.summarize_pulses()
+            .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
+            .filter5lag(f_3db=10000)
+            .with_column_map_step("pretrig_rms", "pointless_pretrig_meansq", squareme)
+            .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=True)
+            .with_column_map_step("postpeak_deriv", "pointless_otherthing", squareme)
+        )
+
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=5000, exclude_ch_nums=[4102])
+    data = data.map(_do_steps)
+    ch = data.channels[4109]
+
+    # Check that the result has 5 steps
+    steps = ch.steps
+    assert len(steps) == 5
+
+    # Check that keeping only 5lagy_dc means step 2 is trimmed
+    trim_steps = steps.trim_dead_ends(["5lagy_dc"])
+    assert len(trim_steps) == 3
+    for i, expect in enumerate((True, True, False, True, False)):
+        assert (steps[i] in trim_steps) == expect
+
+    # Check that keeping 5lagy_dc and some other things don't change the trim result
+    trim_steps = steps.trim_dead_ends(["5lagy_dc", "pretrig_rms", "5lagx"])
+    assert len(trim_steps) == 3
+    for i, expect in enumerate((True, True, False, True, False)):
+        assert (steps[i] in trim_steps) == expect
+
+    # Check that keeping only pointless_pretrig_meansq means only steps 0 and 2 survive
+    trim_steps = steps.trim_dead_ends(["pointless_pretrig_meansq"])
+    assert len(trim_steps) == 2
+    for i, expect in enumerate((True, False, True, False, False)):
+        assert (steps[i] in trim_steps) == expect
+
+    with pytest.raises(ValueError):
+        steps.trim_dead_ends("this is a string, not a list")

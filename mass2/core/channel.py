@@ -373,9 +373,13 @@ class Channel:
     def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
+        out_names = mass2.core.pulse_algorithms.result_dtype.names
+        # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
+        assert out_names is not None
+        outputs = list(out_names)
         step = SummarizeStep(
             inputs=[col],
-            output=["many"],
+            output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
             frametime_s=self.header.frametime_s,
@@ -769,11 +773,7 @@ class Channel:
 
             # Histogram (right-hand panels)
             plt.subplot(len(plottables), 2, 2 + i * 2)
-            if limits is None:
-                in_limit = np.ones(len(y), dtype=bool)
-            else:
-                in_limit = np.logical_and(y[:] > limits[0], y[:] < limits[1])
-            contents, _, _ = plt.hist(y[in_limit], 200, log=log, histtype="stepfilled", fc=color, alpha=0.5)
+            contents, _, _ = plt.hist(y, 200, range=limits, log=log, histtype="stepfilled", fc=color, alpha=0.5)
             if log:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")

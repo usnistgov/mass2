@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections.abc import Iterable
 from collections.abc import Callable
 import polars as pl
 import numpy as np
@@ -106,14 +107,18 @@ class ColumnAsNumpyMapStep(CalStep):
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
-        serieses = []
+        output_segments = []
         for df_iter in df.select(self.inputs).iter_slices():
             series1 = df_iter[self.inputs[0]]
-            output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
-            series2 = pl.Series(output_col, output_numpy)
-            serieses.append(series2)
+            # Have to apply the function differently when series elements are arrays vs scalars
+            if series1.dtype.base_type() is pl.Array:
+                output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
+            else:
+                output_numpy = self.f(series1.to_numpy())
+            this_output_segment = pl.Series(output_col, output_numpy)
+            output_segments.append(this_output_segment)
 
-        combined = pl.concat(serieses)
+        combined = pl.concat(output_segments)
         # Put into a DataFrame with one column
         df2 = pl.DataFrame({output_col: combined}).with_columns(df)
         return df2
@@ -196,3 +201,56 @@ class CalSteps:
     def with_step(self, step: CalStep) -> "CalSteps":
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
+
+    def trim_dead_ends(self, required_fields: Iterable[str]) -> "CalSteps":
+        """Create a new CalSteps object with all dead-end steps removed.
+
+        Dead-end steps are defined as any step that can be omitted without affecting the ability to
+        compute any of the fields given in `required_fields`. The result of this method is to return
+        a CalSteps where any step is remove if it does not contribute to computing any of the `required_fields`
+        (i.e., if it is a dead end).
+
+        Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.
+
+        Parameters
+        ----------
+        required_fields : list[str] | tuple[str] | set[str]
+            Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
+            found recursively among the inputs to any such steps.
+
+        Returns
+        -------
+        CalSteps
+            A copy of `self`, except that any steps not required to compute any of `required_fields` is omitted.
+
+        Raises
+        ------
+        ValueError
+            if the argument is a single string (it should be a tuple, list, or set of strings)
+        """
+        if isinstance(required_fields, str):
+            raise ValueError("CalSteps.trim_dead_ends(rf) wants rf to be Iterable[str], but was passed a string")
+
+        all_fields_out: set[str] = set(required_fields)
+        nsteps = len(self)
+        required = np.zeros(nsteps, dtype=bool)
+
+        # The easiest approach is to traverse the steps from last to first to build our list of required
+        # fields, because necessarily no later step can produce the inputs needed by an earlier step.
+        for istep in range(nsteps - 1, -1, -1):
+            step = self[istep]
+            for field in step.output:
+                if field in all_fields_out:
+                    required[istep] = True
+                    all_fields_out.update(step.inputs)
+                    print(f"We require step #{istep}")
+                    print(all_fields_out)
+                    break
+
+        if np.all(required):
+            return self
+        steps = []
+        for i in range(nsteps):
+            if required[i]:
+                steps.append(self[i])
+        return CalSteps(steps)

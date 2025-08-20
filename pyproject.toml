@@ -49,6 +49,7 @@ docs = [
 dev = [
     "pytest",
     "ruff",
+    "mypy",
     "flake8",
     "pre-commit",
     "tox",
