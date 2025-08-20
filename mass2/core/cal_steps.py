@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections.abc import Iterable
 from collections.abc import Callable
 import polars as pl
 import numpy as np
@@ -201,7 +202,7 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: list[str] | tuple[str] | set[str]) -> "CalSteps":
+    def trim_dead_ends(self, required_fields: Iterable[str]) -> "CalSteps":
         """Create a new CalSteps object with all dead-end steps removed.
 
         Dead-end steps are defined as any step that can be omitted without affecting the ability to
@@ -220,8 +221,16 @@ class CalSteps:
         Returns
         -------
         CalSteps
-            _description_
+            A copy of `self`, except that any steps not required to compute any of `required_fields` is omitted.
+
+        Raises
+        ------
+        ValueError
+            if the argument is a single string (it should be a tuple, list, or set of strings)
         """
+        if isinstance(required_fields, str):
+            raise ValueError("CalSteps.trim_dead_ends(rf) wants rf to be Iterable[str], but was passed a string")
+
         all_fields_out: set[str] = set(required_fields)
         nsteps = len(self)
         required = np.zeros(nsteps, dtype=bool)
