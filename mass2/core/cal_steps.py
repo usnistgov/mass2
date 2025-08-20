@@ -106,14 +106,18 @@ class ColumnAsNumpyMapStep(CalStep):
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
-        serieses = []
+        output_segments = []
         for df_iter in df.select(self.inputs).iter_slices():
             series1 = df_iter[self.inputs[0]]
-            output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
-            series2 = pl.Series(output_col, output_numpy)
-            serieses.append(series2)
+            # Have to apply the function differently when series elements are arrays vs scalars
+            if series1.dtype.base_type() is pl.Array:
+                output_numpy = np.array([self.f(v.to_numpy()) for v in series1])
+            else:
+                output_numpy = self.f(series1.to_numpy())
+            this_output_segment = pl.Series(output_col, output_numpy)
+            output_segments.append(this_output_segment)
 
-        combined = pl.concat(serieses)
+        combined = pl.concat(output_segments)
         # Put into a DataFrame with one column
         df2 = pl.DataFrame({output_col: combined}).with_columns(df)
         return df2
