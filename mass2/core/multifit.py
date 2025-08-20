@@ -248,7 +248,7 @@ class MultiFitQuadraticGainCalStep(CalStep):
         multifit_spec: MultiFit,
         previous_cal_step_index,
         calibrated_col,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ):
         previous_cal_step = ch.steps[previous_cal_step_index]
         rough_energy_col = previous_cal_step.output[0]
@@ -319,7 +319,7 @@ class MultiFitMassCalibrationStep(CalStep):
         multifit_spec: MultiFit,
         previous_cal_step_index,
         calibrated_col,
-        use_expr=True,
+        use_expr=pl.lit(True),
     ):
         """multifit then make a mass calibration object with curve_type=Curvetypes.GAIN and approx=False
         TODO: support more options"""

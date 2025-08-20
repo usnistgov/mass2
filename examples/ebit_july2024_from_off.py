@@ -264,7 +264,7 @@ def _(data4, mo, pl, plt):
         x_col=pl.col("timestamp"),
         y_col="energy_filtValue_dc_pc",
         color_col="state_label2",
-        use_expr=True,
+        use_expr=pl.lit(True),
     )
     plt.grid()
     mo.mpl.interactive(plt.gcf())

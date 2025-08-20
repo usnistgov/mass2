@@ -45,7 +45,7 @@ class Channels:
         self,
         line,
         col,
-        use_expr=True,
+        use_expr=pl.lit(True),
         has_linear_background=False,
         has_tails=False,
         dlo=50,
@@ -74,7 +74,7 @@ class Channels:
         )
         return result
 
-    def plot_hist(self, col, bin_edges, use_expr=True, axis=None):
+    def plot_hist(self, col, bin_edges, use_expr=pl.lit(True), axis=None):
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
