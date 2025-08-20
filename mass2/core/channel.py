@@ -374,10 +374,9 @@ class Channel:
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
         out_names = mass2.core.pulse_algorithms.result_dtype.names
-        if out_names is None:
-            outputs = []
-        else:
-            outputs = list(out_names)
+        # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
+        assert out_names is not None
+        outputs = list(out_names)
         step = SummarizeStep(
             inputs=[col],
             output=outputs,
