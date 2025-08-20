@@ -373,7 +373,11 @@ class Channel:
     def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
-        outputs = list(mass2.core.pulse_algorithms.result_dtype.names)
+        out_names = mass2.core.pulse_algorithms.result_dtype.names
+        if out_names is None:
+            outputs = []
+        else:
+            outputs = list(out_names)
         step = SummarizeStep(
             inputs=[col],
             output=outputs,
