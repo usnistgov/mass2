@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -286,6 +286,24 @@ class Channels:
             steps[channum] = ch.steps[:]
         mass2.misc.pickle_object(steps, filename)
         return steps
+
+    def save_recipe(self, filename: str, required_fields: str | Iterable[str]):
+        """Save a "recipe", a minimal series of steps required to reproduce the required field(s)
+
+        Method `save_steps` is similar but more complete, because it does not remove debugging info nor trim
+        dead-end steps. This method does both space-saving activities.
+
+        Parameters
+        ----------
+        filename : str
+            Filename to store recipe in, typically of the form "*.pkl"
+        required_fields : str | Iterable[str]
+            The field (str) or fields (Iterable[str]) that the recipe should be able to generate from a raw LJH file.
+        """
+        recipe = {}
+        for channum, ch in self.channels.items():
+            recipe[channum] = ch.steps.trim_dead_ends(required_fields=required_fields)
+        mass2.misc.pickle_object(recipe, filename)
 
     def load_steps(self, filename):
         steps = mass2.misc.unpickle_object(filename)
