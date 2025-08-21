@@ -416,23 +416,33 @@ def test_steps():
     steps = ch.steps
     assert len(steps) == 5
 
+    def is_in_calsteps(x, steps):
+        """An approximate test whether `x` is in the list `steps`, testing only equality of name, inputs, outputs"""
+        for s in steps:
+            if x.name == s.name and set(x.inputs) == set(s.inputs) and set(x.output) == set(s.output):
+                return True
+        return False
+
     # Check that keeping only 5lagy_dc means step 2 is trimmed
     trim_steps = steps.trim_dead_ends(["5lagy_dc"])
     assert len(trim_steps) == 3
+    assert trim_steps[1].spectrum is None
     for i, expect in enumerate((True, True, False, True, False)):
-        assert (steps[i] in trim_steps) == expect
+        assert is_in_calsteps(steps[i], trim_steps) == expect
 
     # Check that keeping 5lagy_dc and some other things don't change the trim result
     trim_steps = steps.trim_dead_ends(["5lagy_dc", "pretrig_rms", "5lagx"])
+    assert trim_steps[1].spectrum is None
     assert len(trim_steps) == 3
     for i, expect in enumerate((True, True, False, True, False)):
-        assert (steps[i] in trim_steps) == expect
+        assert is_in_calsteps(steps[i], trim_steps) == expect
 
     # Check that keeping only pointless_pretrig_meansq means only steps 0 and 2 survive
     trim_steps = steps.trim_dead_ends(["pointless_pretrig_meansq"])
     assert len(trim_steps) == 2
+    assert trim_steps[1] is steps[2]
     for i, expect in enumerate((True, False, True, False, False)):
-        assert (steps[i] in trim_steps) == expect
+        assert is_in_calsteps(steps[i], trim_steps) == expect
 
     no_steps = steps.trim_dead_ends("this field doesn't exist")
     assert len(no_steps) == 0
