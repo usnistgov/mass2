@@ -400,7 +400,7 @@ class LJHFile_2_2(LJHFile):
         bool
             Whether every record is strictly continuous with the ones before and after
         """
-        if self.subframediv is None:
+        if self.subframediv is None or self.npulses <= 1:
             return False
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
