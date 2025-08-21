@@ -32,6 +32,10 @@ class CalStep:
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
         return plt.gca()
 
+    def drop_debug(self) -> "CalStep":
+        "Return self, or a copy of it with debug information removed"
+        return self
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):
@@ -206,8 +210,13 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: Iterable[str] | str) -> "CalSteps":
-        """Create a new CalSteps object with all dead-end steps removed.
+    def trim_dead_ends(self, required_fields: Iterable[str] | str, drop_debug: bool = True) -> "CalSteps":
+        """Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.
+
+        The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can
+        repeat the current steps as a "recipe" without having the extra information from which the recipe
+        was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel
+        to 30 kB per channel, or a 112x size reduction (with `drop_debug=True`).
 
         Dead-end steps are defined as any step that can be omitted without affecting the ability to
         compute any of the fields given in `required_fields`. The result of this method is to return
@@ -222,10 +231,13 @@ class CalSteps:
             Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
             found recursively among the inputs to any such steps.
 
+        drop_debug : bool
+            Whether to run `step.drop_debug()` to remove debugging information from the preserved steps.
+
         Returns
         -------
         CalSteps
-            A copy of `self`, except that any steps not required to compute any of `required_fields` is omitted.
+            A copy of `self`, except that any steps not required to compute any of `required_fields` are omitted.
         """
         if isinstance(required_fields, str):
             required_fields = [required_fields]
@@ -249,5 +261,8 @@ class CalSteps:
         steps = []
         for i in range(nsteps):
             if required[i]:
-                steps.append(self[i])
+                if drop_debug:
+                    steps.append(self[i].drop_debug())
+                else:
+                    steps.append(self[i])
         return CalSteps(steps)

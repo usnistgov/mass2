@@ -1,6 +1,6 @@
 import polars as pl
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from collections.abc import Callable
 from mass2.core.cal_steps import CalStep
 from mass2.core.noise_algorithms import NoiseResult
@@ -10,7 +10,7 @@ from mass2.core.optimal_filtering import Filter, FilterMaker
 @dataclass(frozen=True)
 class Filter5LagStep(CalStep):
     filter: Filter
-    spectrum: NoiseResult
+    spectrum: NoiseResult | None
     filter_maker: "FilterMaker"
     transform_raw: Callable | None = None
 
@@ -28,3 +28,6 @@ class Filter5LagStep(CalStep):
 
     def dbg_plot(self, _):
         return self.filter.plot()
+
+    def drop_debug(self):
+        return replace(self, spectrum=None)

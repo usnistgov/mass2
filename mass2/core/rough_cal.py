@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import numpy as np
 import pylab as plt  # type: ignore
 import polars as pl
@@ -663,7 +663,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
 
 @dataclass(frozen=True)
 class RoughCalibrationStep(CalStep):
-    pfresult: SmoothedLocalMaximaResult
+    pfresult: SmoothedLocalMaximaResult | None
     assignment_result: BestAssignmentPfitGainResult | None
     ph2energy: typing.Callable
     success: bool
@@ -675,6 +675,9 @@ class RoughCalibrationStep(CalStep):
         out = self.ph2energy(inputs_np[0])
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
+
+    def drop_debug(self):
+        return replace(self, pfresult=None, assignment_result=None)
 
     def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
         series = mass2.misc.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
