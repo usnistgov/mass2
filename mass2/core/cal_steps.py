@@ -15,6 +15,10 @@ class CalStep:
     use_expr: pl.Expr
 
     @property
+    def name(self):
+        return type(self)
+
+    @property
     def description(self):
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
@@ -238,8 +242,6 @@ class CalSteps:
                 if field in all_fields_out:
                     required[istep] = True
                     all_fields_out.update(step.inputs)
-                    print(f"We require step #{istep}")
-                    print(all_fields_out)
                     break
 
         if np.all(required):
