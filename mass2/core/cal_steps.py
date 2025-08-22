@@ -260,6 +260,11 @@ class CalSteps:
                         all_fields_out.update(step.inputs)
                         break
 
+        if not np.any(required):
+            # If this error ever because a problem, where user _acutally_ wants an empty series of steps
+            # to be a non-err, then add argument `error_on_empty_output=True` to this method.
+            raise ValueError("trim_dead_ends found no steps to be preserved")
+
         steps = []
         for i in range(nsteps):
             if required[i]:

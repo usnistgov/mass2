@@ -447,5 +447,5 @@ def test_steps():
     for i, expect in enumerate((True, False, True, False, False)):
         assert is_in_calsteps(steps[i], trim_steps) == expect
 
-    no_steps = steps.trim_dead_ends("this field doesn't exist")
-    assert len(no_steps) == 0
+    with pytest.raises(ValueError):
+        steps.trim_dead_ends("this field doesn't exist")
