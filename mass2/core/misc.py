@@ -66,6 +66,8 @@ def outlier_resistant_nsigma_range_from_mid(x, nsigma=5):
 
 
 def midpoints_and_step_size(x):
+    """
+    return midpoints, step_size"""
     d = np.diff(x)
     step_size = d[0]
     assert np.allclose(d, step_size, atol=1e-9), f"{d=}"

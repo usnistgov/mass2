@@ -963,7 +963,7 @@ def _(mass2):
     params["Btail_frac"].set(expr="tail_frac")
     params["Btail_tau"].set(expr="tail_tau")
     params["Bpeak_ph"].set(expr="peak_ph+Bshift")
-    params.add("Bshift", 0.011e6, min=0.01e6, vary=False)
+    params.add("Bshift", 0.011e6, min=0.01e6, vary=True)
     params["tail_frac"].set(vary=True)
     params["tail_tau"].set(vary=True)
     params["Bdph_de"].set(1, vary=False)
@@ -1048,6 +1048,7 @@ def _(bin_path):
 def _(ch_combo):
     output_df = ch_combo.df.select(["energy_5lagy","category", "frames_until_next", "frames_from_last", "framecount","concat_state"])
     output_df.write_parquet("./20umfoilPu239.parquet")
+    # ch_combo.df.write_parquet("./20umfoilPu239_full.parquet")
     return
 
 

@@ -131,7 +131,7 @@ def _(bin_path, mass2, mo, threshold, trigger_filter):
     # I believe the memory fills due to how the OS optimizes the mmap access.... it's better to use as much ram as available
     # so as we iterate through the large file, the OS just doesn't release the memory because it doesn't need to
     # it should be able to release that memory as needed to keep the computer running well
-    trigger_result.plot(decimate=10, n_limit=100000, offset=0, x_axis_time_s=True)
+    trigger_result.plot(decimate=10, n_limit=100000, offset_raw=0, x_axis_time_s=True)
     mo.vstack([mo.md("#triggering check plot"), mass2.show()])
     return (trigger_result,)
 
@@ -156,14 +156,14 @@ def _(mo, npost, npre, trigger_result):
 
 
 @app.cell
-def _(mass2, mo, trigger_result):
-    long_noise = trigger_result.get_noise(
-        n_dead_samples_after_pulse_trigger=10000,
-        n_record_samples=400000,
-        max_noise_triggers=50,
-    )
-    long_noise.spectrum().plot_log_rebinned()
-    mo.vstack([mo.md("#long trace noise plot to see low f response"), mass2.show()])
+def _():
+    # long_noise = trigger_result.get_noise(
+    #     n_dead_samples_after_pulse_trigger=10000,
+    #     n_record_samples=400000,
+    #     max_noise_triggers=50,
+    # )
+    # long_noise.spectrum().plot_log_rebinned()
+    # mo.vstack([mo.md("#long trace noise plot to see low f response"), mass2.show()])
     return
 
 
