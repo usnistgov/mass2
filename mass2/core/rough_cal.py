@@ -701,13 +701,15 @@ class RoughCalibrationStep(CalStep):
             _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.assignment_result:
             self.assignment_result.plot(ax=axs[0])
-        self.pfresult.plot(self.assignment_result, ax=axs[1])
+        if self.pfresult:
+            self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
     def dbg_plot_failure(self, df: DataFrame, axs: None | ndarray = None):
         if axs is None:
             _, axs = plt.subplots(2, 1, figsize=(11, 6))
-        self.pfresult.plot(self.assignment_result, ax=axs[1])
+        if self.pfresult:
+            self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
     def energy2ph(self, energy: float64) -> float:
