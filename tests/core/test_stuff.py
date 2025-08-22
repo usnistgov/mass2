@@ -434,5 +434,5 @@ def test_steps():
     for i, expect in enumerate((True, False, True, False, False)):
         assert (steps[i] in trim_steps) == expect
 
-    with pytest.raises(ValueError):
-        steps.trim_dead_ends("this is a string, not a list")
+    no_steps = steps.trim_dead_ends("this field doesn't exist")
+    assert len(no_steps) == 0

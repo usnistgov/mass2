@@ -15,6 +15,10 @@ class CalStep:
     use_expr: pl.Expr
 
     @property
+    def name(self):
+        return type(self)
+
+    @property
     def description(self):
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
@@ -202,7 +206,7 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: Iterable[str]) -> "CalSteps":
+    def trim_dead_ends(self, required_fields: Iterable[str] | str) -> "CalSteps":
         """Create a new CalSteps object with all dead-end steps removed.
 
         Dead-end steps are defined as any step that can be omitted without affecting the ability to
@@ -214,7 +218,7 @@ class CalSteps:
 
         Parameters
         ----------
-        required_fields : list[str] | tuple[str] | set[str]
+        required_fields : Iterable[str] | str
             Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
             found recursively among the inputs to any such steps.
 
@@ -222,14 +226,9 @@ class CalSteps:
         -------
         CalSteps
             A copy of `self`, except that any steps not required to compute any of `required_fields` is omitted.
-
-        Raises
-        ------
-        ValueError
-            if the argument is a single string (it should be a tuple, list, or set of strings)
         """
         if isinstance(required_fields, str):
-            raise ValueError("CalSteps.trim_dead_ends(rf) wants rf to be Iterable[str], but was passed a string")
+            required_fields = [required_fields]
 
         all_fields_out: set[str] = set(required_fields)
         nsteps = len(self)
@@ -243,8 +242,6 @@ class CalSteps:
                 if field in all_fields_out:
                     required[istep] = True
                     all_fields_out.update(step.inputs)
-                    print(f"We require step #{istep}")
-                    print(all_fields_out)
                     break
 
         if np.all(required):
