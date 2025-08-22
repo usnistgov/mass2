@@ -210,7 +210,7 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: Iterable[str] | str, drop_debug: bool = True) -> "CalSteps":
+    def trim_dead_ends(self, required_fields: Iterable[str] | str | None, drop_debug: bool = True) -> "CalSteps":
         """Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.
 
         The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can
@@ -227,9 +227,10 @@ class CalSteps:
 
         Parameters
         ----------
-        required_fields : Iterable[str] | str
+        required_fields : Iterable[str] | str | None
             Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
-            found recursively among the inputs to any such steps.
+            found recursively among the inputs to any such steps. If a string, treat as a list of that one string.
+            If None, preserve all steps.
 
         drop_debug : bool
             Whether to run `step.drop_debug()` to remove debugging information from the preserved steps.
@@ -242,22 +243,23 @@ class CalSteps:
         if isinstance(required_fields, str):
             required_fields = [required_fields]
 
-        all_fields_out: set[str] = set(required_fields)
         nsteps = len(self)
         required = np.zeros(nsteps, dtype=bool)
 
         # The easiest approach is to traverse the steps from last to first to build our list of required
         # fields, because necessarily no later step can produce the inputs needed by an earlier step.
-        for istep in range(nsteps - 1, -1, -1):
-            step = self[istep]
-            for field in step.output:
-                if field in all_fields_out:
-                    required[istep] = True
-                    all_fields_out.update(step.inputs)
-                    break
+        if required_fields is None:
+            required[:] = True
+        else:
+            all_fields_out: set[str] = set(required_fields)
+            for istep in range(nsteps - 1, -1, -1):
+                step = self[istep]
+                for field in step.output:
+                    if field in all_fields_out:
+                        required[istep] = True
+                        all_fields_out.update(step.inputs)
+                        break
 
-        if np.all(required):
-            return self
         steps = []
         for i in range(nsteps):
             if required[i]:

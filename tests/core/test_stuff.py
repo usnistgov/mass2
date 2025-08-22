@@ -416,8 +416,11 @@ def test_steps():
     steps = ch.steps
     assert len(steps) == 5
 
-    def is_in_calsteps(x, steps):
-        """An approximate test whether `x` is in the list `steps`, testing only equality of name, inputs, outputs"""
+    def is_in_calsteps(x: mass2.core.CalStep, steps: mass2.core.CalSteps) -> bool:
+        """An approximate test whether CalStep `x` is in the CalStep chain `steps`, testing only equality of
+        name, inputs, outputs, rather than identity. (We don't want to check identity, because the CalStep object
+        may have been changed by a step.drop_debug() operation.)
+        """
         for s in steps:
             if x.name == s.name and set(x.inputs) == set(s.inputs) and set(x.output) == set(s.output):
                 return True

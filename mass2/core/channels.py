@@ -12,6 +12,7 @@ import pathlib
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel
+from .cal_steps import CalSteps
 from . import ljhutil
 
 
@@ -280,30 +281,35 @@ class Channels:
 
         return self.map(load_steps)
 
-    def save_steps(self, filename):
-        steps = {}
-        for channum, ch in self.channels.items():
-            steps[channum] = ch.steps[:]
-        mass2.misc.pickle_object(steps, filename)
-        return steps
+    def save_steps(self, filename, required_fields: str | Iterable[str] | None = None, drop_debug=True) -> dict[int, CalSteps]:
+        """Pickle a dictionary (one entry per channel) of CalSteps objects.
 
-    def save_recipe(self, filename: str, required_fields: str | Iterable[str]):
-        """Save a "recipe", a minimal series of steps required to reproduce the required field(s)
-
-        Method `save_steps` is similar but more complete, because it does not remove debugging info nor trim
-        dead-end steps. This method does both space-saving activities.
+        If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),
+        then set `required_fields` to be a list/tuple/set of DataFrame column names (or a single column name)
+        whose production from raw data should be possible.
 
         Parameters
         ----------
         filename : str
             Filename to store recipe in, typically of the form "*.pkl"
-        required_fields : str | Iterable[str]
+        required_fields : str | Iterable[str] | None
             The field (str) or fields (Iterable[str]) that the recipe should be able to generate from a raw LJH file.
+            Drop all steps that do not lead (directly or indireactly) to producing this field or these fields.
+            If None, then preserve all steps (default None).
+        drop_debug: bool
+            Whether to remove debugging-related data from each `CalStep`, if the subclass supports this (via the
+            `CalStep.drop_debug() method).
+
+        Returns
+        -------
+        dict
+            Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) CalSteps objects.
         """
-        recipe = {}
+        steps = {}
         for channum, ch in self.channels.items():
-            recipe[channum] = ch.steps.trim_dead_ends(required_fields=required_fields)
-        mass2.misc.pickle_object(recipe, filename)
+            steps[channum] = ch.steps.trim_dead_ends(required_fields=required_fields, drop_debug=drop_debug)
+        mass2.misc.pickle_object(steps, filename)
+        return steps
 
     def load_steps(self, filename):
         steps = mass2.misc.unpickle_object(filename)
