@@ -405,6 +405,54 @@ addline(
     element="Fe",
     material="metal",
     linetype="LAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["FeLAlpha"],
+    energies=np.array([705.6985304, 718.57610008, 703.23074425, 699.0, 717.03417234]),
+    lorentzian_fwhm=np.array([0.98118717, 1.174116, 3.96896001, 6.51887025, 4.53820114]),
+    reference_amplitude=np.array([0.26683323, 0.06164153, 0.36288108, 0.06033762, 0.24830654]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=13.0,
+    reference_plot_instrument_gaussian_fwhm=1.0,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="Ni",
+    material="metal",
+    linetype="LAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["NiLAlpha"],
+    energies=np.array([851.82078485, 868.30300937, 855.18365714, 873.44782758, 847.35036775, 850.66709731]),
+    lorentzian_fwhm=np.array([0.2, 1.97367132, 10.0, 1.63144744, 5.24081435, 1.35347669]),
+    reference_amplitude=np.array([0.2245612, 0.15441274, 0.19050909, 0.00573966, 0.09207125, 0.33270606]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=13.0,
+    reference_plot_instrument_gaussian_fwhm=1.0,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="Cu",
+    material="metal",
+    linetype="LAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["CuLAlpha"],
+    energies=np.array([929.76557047, 949.78532692, 933.71023747, 926.89103404]),
+    lorentzian_fwhm=np.array([1.34336865, 2.29712796, 3.66539276, 2.61095527]),
+    reference_amplitude=np.array([0.61012195, 0.17528826, 0.13660607, 0.07798372]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=13.0,
+    reference_plot_instrument_gaussian_fwhm=1.0,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="Fe",
+    material="guess",
+    linetype="LAlpha",
     reference_short="Rough Estimate",
     nominal_peak_energy=STANDARD_FEATURES["FeLAlpha"],
     energies=np.array([STANDARD_FEATURES["FeLAlpha"], STANDARD_FEATURES["FeLBeta"]]),
@@ -414,6 +462,7 @@ addline(
     ka12_energy_diff=np.abs(STANDARD_FEATURES["FeLAlpha"] - STANDARD_FEATURES["FeLBeta"]),
     reference_plot_instrument_gaussian_fwhm=0.2,  # a total guess
     position_uncertainty=1.5,
+    is_default_material=False,
 )
 
 addline(
