@@ -110,3 +110,5 @@ mass2/_version.py
 
 # MkDocs
 site/
+*.npy
+*.csv

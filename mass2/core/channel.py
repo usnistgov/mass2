@@ -99,10 +99,51 @@ class Channel:
             df_after = self.df_history[step_ind + 1]
         return step.dbg_plot(df_after, **kwargs)
 
-    def plot_hist(self, col, bin_edges, axis=None):
-        axis = misc.plot_hist_of_series(self.good_series(col), bin_edges, axis)
-        axis.set_title(f"ch {self.header.ch_num} plot_hist")
-        return axis
+    def hist(
+        self,
+        col,
+        bin_edges,
+        use_good_expr=True,
+        use_expr=pl.lit(True),
+    ):
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr = use_expr
+
+        # Group by the specified column and filter using good_expr
+        df_small = (self.df.lazy().filter(filter_expr).select(col)).collect()
+
+        values = df_small[col]
+        bin_centers, counts = misc.hist_of_series(values, bin_edges)
+        return bin_centers, counts
+
+    def plot_hist(
+        self,
+        col,
+        bin_edges,
+        axis=None,
+        use_good_expr=True,
+        use_expr=pl.lit(True),
+    ):
+        if axis is None:
+            _, ax = plt.subplots()  # Create a new figure if no axis is provided
+        else:
+            ax = axis
+
+        bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr, use_expr=use_expr)
+        _, step_size = misc.midpoints_and_step_size(bin_edges)
+        plt.step(bin_centers, counts, where="mid")
+
+        # Customize the plot
+        ax.set_xlabel(str(col))
+        ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
+        ax.set_title(f"Histogram of {col} for {self}")
+
+        plt.tight_layout()
+        return bin_centers, counts
 
     def plot_hists(
         self,
@@ -110,7 +151,7 @@ class Channel:
         bin_edges,
         group_by_col,
         axis=None,
-        use_good_expr=pl.lit(True),
+        use_good_expr=True,
         use_expr=pl.lit(True),
         skip_none=True,
     ):
@@ -139,28 +180,33 @@ class Channel:
         df_small = (self.df.lazy().filter(filter_expr).select(col, group_by_col)).collect().sort(group_by_col, descending=False)
 
         # Plot a histogram for each group
+        counts_dict = {}
         for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
+            _, step_size = misc.midpoints_and_step_size(bin_edges)
+            bin_centers, counts = misc.hist_of_series(values, bin_edges)
+            counts_dict[group_name] = counts
+            plt.step(bin_centers, counts, where="mid", label=str(group_name))
             # Plot the histogram for the current group
-            if group_name == "EBIT":
-                ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
-            else:
-                ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
+            # if group_name == "EBIT":
+            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+            # else:
+            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
             # bin_centers, counts = misc.hist_of_series(values, bin_edges)
             # plt.plot(bin_centers, counts, label=group_name)
-
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel("Frequency")
+        ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
 
         plt.tight_layout()
+        return bin_centers, counts_dict
 
     def plot_scatter(
         self,

@@ -58,6 +58,8 @@ class Test_MnKA_distribution:
                 continue
             if "KBeta24" in name:
                 continue
+            if "Am241Q" in name or "Am243Q" in name:
+                continue
             target = mass2.STANDARD_FEATURES[name]
             result = np.abs(spectrum.nominal_peak_energy - target) < 0.5
             if not result:

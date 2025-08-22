@@ -36,15 +36,15 @@ def _(Path, np):
         / "Box"
         / "TES Data"
         / "True Bq Data"
-        / "250804_130415_Pu239_Co57"
-        / "2A"
+        / "250805_181259_Pu239_Co57"
+        / "3B"
         / "data.bin"
     )
     trigger_filter = np.array([1] * 10 + [-1] * 10)
     threshold = 125
     min_frames_until_next = 4000
     min_frames_from_last = 4000
-    energy_of_highest_peak_ev = 5245.0314e3
+    energy_of_highest_peak_ev = 53e3
 
     npre = 1500
     npost = 1500
@@ -65,7 +65,7 @@ def _():
     max_frontload = 0.08
     max_residual_rms = 40
     min_last_minus_first = -1000
-    time_constant_s_of_exp_to_be_orthogonal_to = 0.003
+    time_constant_s_of_exp_to_be_orthogonal_to = 0.005
     return (
         max_frontload,
         max_residual_rms,
@@ -156,14 +156,14 @@ def _(mo, npost, npre, trigger_result):
 
 
 @app.cell
-def _():
-    # long_noise = trigger_result.get_noise(
-    #     n_dead_samples_after_pulse_trigger=10000,
-    #     n_record_samples=400000,
-    #     max_noise_triggers=50,
-    # )
-    # long_noise.spectrum().plot_log_rebinned()
-    # mo.vstack([mo.md("#long trace noise plot to see low f response"), mass2.show()])
+def _(mass2, mo, trigger_result):
+    long_noise = trigger_result.get_noise(
+        n_dead_samples_after_pulse_trigger=10000,
+        n_record_samples=100000,
+        max_noise_triggers=50,
+    )
+    long_noise.spectrum().plot()
+    mo.vstack([mo.md("#long trace noise plot to see low f response"), mass2.show()])
     return
 
 
@@ -178,9 +178,7 @@ def _(
     time_constant_s_of_exp_to_be_orthogonal_to,
 ):
     ch2 = ch.summarize_pulses()
-    ch2 = ch2.filter5lag(
-        time_constant_s_of_exp_to_be_orthogonal_to=time_constant_s_of_exp_to_be_orthogonal_to
-    )
+    ch2 = ch2.filter5lag(time_constant_s_of_exp_to_be_orthogonal_to=time_constant_s_of_exp_to_be_orthogonal_to)
     ch2 = ch2.filter5lag(peak_y_col="5lagy_normal", peak_x_col="5lagx_normal")
     ch2 = ch2.rough_cal_combinatoric(
         [energy_of_highest_peak_ev],
@@ -223,7 +221,9 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
         template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
         return template
 
+
     template = make_template()
+
 
     def residual_rms(pulse):
         pulse = pulse - np.mean(pulse)
@@ -231,6 +231,7 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
         pulse2 = dot * template
         residual = pulse2 - pulse
         return mass2.misc.root_mean_squared(residual)
+
 
     # def make_residual_rms_df(df1, col="pulse"):
     #     # when accessing pulse, avoid keeping references to copies
@@ -242,12 +243,14 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     #     df2 = pl.concat(dfs)
     #     return df2
 
+
     def frontload(pulse):
         a, b = npre, npre + 20
         pulse_pt_sub = pulse - np.mean(pulse[:npre])
         area_front = np.sum(pulse_pt_sub[a:b])
         area_rest = np.sum(pulse_pt_sub[b:])
         return area_front / area_rest
+
 
     # def make_frontload_df(df1, col="pulse"):
     #     dfs = []
@@ -258,9 +261,9 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
     #     df2 = pl.concat(dfs)
     #     return df2
 
+
     def last_minus_first(pulse):
         return pulse[-1] - pulse[0]
-
 
 
     ch3 = ch2.with_column_map_step("pulse", "frontload", frontload)
@@ -436,6 +439,7 @@ def _(mo, np):
         result = pulses - pretrigger_means[np.newaxis, :]
 
         return result
+
 
     mo.md("#### define a helper function")
     return (pulses_with_subtracted_pretrigger_mean,)
@@ -619,6 +623,7 @@ def _(ch4, ch5, mass2, min_frames_from_last, mo, np, pl, plt):
         live_time_s = live_frames * ch4.header.frametime_s
         return df["energy_5lagy_dc"], live_time_s
 
+
     energies, live_time_s = livetime_clean_energies()
     bin_edges = np.arange(0, 6000000, 250.0)
     _, counts = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
@@ -666,27 +671,6 @@ def _(
     plt.legend()
 
     mo.vstack([mo.md("# histogram by category plot"), mass2.show()])
-    return
-
-
-@app.cell
-def _(ch5, lmfit, mass2, mo, pl):
-    _result = ch5.linefit(
-        "Am241Q",
-        "energy_5lagy_dc",
-        use_expr=pl.col("category") == "clean",
-        dlo=2e5,
-        dhi=1e5,
-        binsize=1000,
-        params_update=lmfit.create_params(
-            fwhm={"value": 2000, "min": 500, "vary": True},
-            dph_de={"vary": False, "min": 0.9, "max": 1.1, "value": 1},
-            peak_ph=5.64e6,
-        ),
-        has_tails=True,
-    )
-    _result.plotm()
-    mo.vstack([mo.md("#Am241 fit"), mass2.show()])
     return
 
 
@@ -775,6 +759,7 @@ def _(mo, pl):
         print(s)
         return s
 
+
     def estimate_dataframe_size(df: pl.DataFrame) -> str:
         """
         Estimate the memory/storage size of a Polars DataFrame containing only
@@ -815,6 +800,7 @@ def _(mo, pl):
 
         return human_readable_size(total_bytes)
 
+
     def write_and_measure_parquet(df: pl.DataFrame):
         """
         Write a Polars DataFrame to a temporary folder as a Parquet file,
@@ -845,6 +831,7 @@ def _(mo, pl):
             print(f"Parquet file size: {readable_size}")
             return readable_size
 
+
     mo.md("helper code for checking file size is reasonable")
     return estimate_dataframe_size, human_readable_size
 
@@ -862,8 +849,8 @@ def _(Path, ch5, mass2, mo, npost, npre, pl, threshold, trigger_filter):
         / "Box"
         / "TES Data"
         / "True Bq Data"
-        / "250725_184231_Pu239_wknd"
-        / "2A"
+        / "250730_181544_Pu239more"
+        / "3B"
         / "data.bin"
     )
     extra_bin = mass2.TrueBqBin.load(extra_bin_path)
@@ -913,6 +900,7 @@ def _(ch5, extra_ch, livetime_clean_energies, mass2, np, plt):
         # plt.title("they dont have the same gain!!!")
         plt.legend()
 
+
     _()
     mass2.show()
     return
@@ -934,7 +922,7 @@ def _(ch_combo, mass2, pl):
 def _(ch_combo, mass2, pl):
     ch_combo.plot_scatter(
         "framecount",
-        "energy_5lagy_dc",
+        "energy_5lagy",
         use_expr=pl.col("category") == "clean",
         color_col="concat_state",
     )
@@ -950,9 +938,11 @@ def _(ch_combo):
 
 @app.cell
 def _(mass2):
-    model1=mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
-    model2=mass2.calibration.algorithms.get_model(5.254e6).spect.model(prefix="B", has_linear_background=False, has_tails=True)
-    model = model1+model2
+    model1 = mass2.calibration.algorithms.get_model(5.244e6, has_tails=True)
+    model2 = mass2.calibration.algorithms.get_model(5.254e6).spect.model(
+        prefix="B", has_linear_background=False, has_tails=True
+    )
+    model = model1 + model2
     params = model.make_params()
     params["Bintegral"].set(1000)
     params["integral"].set(10000)
@@ -967,28 +957,6 @@ def _(mass2):
     params["tail_tau"].set(vary=True)
     params["Bdph_de"].set(1, vary=False)
     params["dph_de"].set(1, vary=False)
-
-
-    return model, params
-
-
-@app.cell
-def _(ch5, extra_ch, livetime_clean_energies, mass2, model, np, params, plt):
-    def _():
-        energies, live_time_s = livetime_clean_energies(ch_in=extra_ch)
-        energies_withco, live_time_s_withco = livetime_clean_energies(ch_in=ch5)
-        bin_edges = np.arange(5_100_000, 5_300_000, 250.0)
-        _, counts_noco = mass2.misc.hist_of_series(energies, bin_edges=bin_edges)
-        _, counts_withco = mass2.misc.hist_of_series(energies_withco, bin_edges=bin_edges)
-        bin_centers, bin_size = mass2.misc.midpoints_and_step_size(bin_edges)
-        plt.plot(bin_centers, counts_withco)
-        plt.plot(bin_centers, model.eval(params=params, bin_centers=bin_centers))
-        result = model.fit(counts_withco, params, bin_centers=bin_centers)
-        result.plotm()
-
-
-    _()
-    mass2.show()
     return
 
 
@@ -1041,16 +1009,18 @@ def _(filter_maker, mass2, n_vals, plt, vdv_pre_cut):
 
 
 @app.cell
-def _(bin_path):
-    output_dir = bin_path.parent/"mass2output"
-    output_dir
-    return
-
-
-@app.cell
 def _(ch_combo):
-    output_df = ch_combo.df.select(["energy_5lagy_dc","category", "frames_until_next", "frames_from_last", "framecount","concat_state"])
-    output_df.write_parquet("./5umfoilPu239.parquet")
+    output_df = ch_combo.df.select(
+        [
+            "energy_5lagy",
+            "category",
+            "frames_until_next",
+            "frames_from_last",
+            "framecount",
+            "concat_state",
+        ]
+    )
+    output_df.write_parquet("./5umfoilPu239_BLANK.parquet")
     return
 
 

@@ -253,3 +253,55 @@ class NoiseResult:
         axis.set_xlabel("Frequency (Hz)")
         plt.title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
         axis.figure.tight_layout()
+
+    def plot_log_rebinned(
+        self,
+        bins_per_decade: int = 10,
+        axis: plt.Axes | None = None,
+        arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
+        sqrt_psd: bool = True,
+        **plotkwarg,
+    ):
+        """Plot PSD rebinned into logarithmically spaced frequency bins."""
+        if axis is None:
+            plt.figure()
+            axis = plt.gca()
+
+        arb_to_unit_scale, unit_label = arb_to_unit_scale_and_label
+        psd = self.psd[1:] * (arb_to_unit_scale**2)
+        freq = self.frequencies[1:]
+
+        # define logarithmically spaced bin edges
+        fmin, fmax = freq[0], freq[-1]
+        n_decades = np.log10(fmax / fmin)
+        n_bins = int(bins_per_decade * n_decades)
+        bin_edges = np.logspace(np.log10(fmin), np.log10(fmax), n_bins + 1)
+
+        # digitize frequencies into bins
+        inds = np.digitize(freq, bin_edges)
+
+        # average PSD per bin
+        binned_freqs = []
+        binned_psd = []
+        for i in range(1, len(bin_edges)):
+            mask = inds == i
+            if np.any(mask):
+                binned_freqs.append(np.exp(np.mean(np.log(freq[mask]))))  # geometric mean
+                binned_psd.append(np.mean(psd[mask]))
+
+        binned_freqs = np.array(binned_freqs)
+        binned_psd = np.array(binned_psd)
+
+        if sqrt_psd:
+            axis.plot(binned_freqs, np.sqrt(binned_psd), **plotkwarg)
+            axis.set_ylabel(f"Amplitude Spectral Density ({unit_label}$/\\sqrt{{Hz}}$)")
+        else:
+            axis.plot(binned_freqs, binned_psd, **plotkwarg)
+            axis.set_ylabel(f"Power Spectral Density ({unit_label}$^2$ Hz$^{{-1}}$)")
+
+        axis.set_xscale("log")
+        axis.set_yscale("log")
+        axis.grid(True, which="both")
+        axis.set_xlabel("Frequency (Hz)")
+        axis.set_title(f"Log-rebinned noise from {len(self.frequencies) * 2 - 2} samples")
+        axis.figure.tight_layout()
