@@ -99,13 +99,13 @@ class Channel:
             df_after = self.df_history[step_ind + 1]
         return step.dbg_plot(df_after, **kwargs)
 
-    def hist(self, 
-                col, 
-                bin_edges, 
-                use_good_expr=True,
-                use_expr=pl.lit(True),
+    def hist(
+        self,
+        col,
+        bin_edges,
+        use_good_expr=True,
+        use_expr=pl.lit(True),
     ):
-
         if use_good_expr and self.good_expr is not True:
             # True doesn't implement .and_, haven't found a exper literal equivalent that does
             # so we special case True
@@ -120,20 +120,20 @@ class Channel:
         bin_centers, counts = misc.hist_of_series(values, bin_edges)
         return bin_centers, counts
 
-    def plot_hist(self, 
-                col, 
-                bin_edges, 
-                axis=None,        
-                use_good_expr=True,
-                use_expr=pl.lit(True),
+    def plot_hist(
+        self,
+        col,
+        bin_edges,
+        axis=None,
+        use_good_expr=True,
+        use_expr=pl.lit(True),
     ):
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
             ax = axis
 
-        bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr,
-                                        use_expr=use_expr)
+        bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr, use_expr=use_expr)
         _, step_size = misc.midpoints_and_step_size(bin_edges)
         plt.step(bin_centers, counts, where="mid")
 

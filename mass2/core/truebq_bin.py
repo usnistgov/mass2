@@ -88,7 +88,6 @@ class TriggerResult:
         plt.xlabel("time with arb offset / s" if x_axis_time_s else "sample number (decimated)")
         plt.ylabel("signal (arb)")
 
-
     def get_noise(
         self,
         n_dead_samples_after_pulse_trigger,
