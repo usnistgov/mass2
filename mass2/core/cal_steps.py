@@ -32,6 +32,10 @@ class CalStep:
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
         return plt.gca()
 
+    def drop_debug(self) -> "CalStep":
+        "Return self, or a copy of it with debug information removed"
+        return self
+
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(CalStep):
@@ -206,8 +210,13 @@ class CalSteps:
         # return a new CalSteps with the step added, no mutation!
         return CalSteps(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: Iterable[str] | str) -> "CalSteps":
-        """Create a new CalSteps object with all dead-end steps removed.
+    def trim_dead_ends(self, required_fields: Iterable[str] | str | None, drop_debug: bool = True) -> "CalSteps":
+        """Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.
+
+        The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can
+        repeat the current steps as a "recipe" without having the extra information from which the recipe
+        was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel
+        to 30 kB per channel, or a 112x size reduction (with `drop_debug=True`).
 
         Dead-end steps are defined as any step that can be omitted without affecting the ability to
         compute any of the fields given in `required_fields`. The result of this method is to return
@@ -218,36 +227,49 @@ class CalSteps:
 
         Parameters
         ----------
-        required_fields : Iterable[str] | str
+        required_fields : Iterable[str] | str | None
             Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
-            found recursively among the inputs to any such steps.
+            found recursively among the inputs to any such steps. If a string, treat as a list of that one string.
+            If None, preserve all steps.
+
+        drop_debug : bool
+            Whether to run `step.drop_debug()` to remove debugging information from the preserved steps.
 
         Returns
         -------
         CalSteps
-            A copy of `self`, except that any steps not required to compute any of `required_fields` is omitted.
+            A copy of `self`, except that any steps not required to compute any of `required_fields` are omitted.
         """
         if isinstance(required_fields, str):
             required_fields = [required_fields]
 
-        all_fields_out: set[str] = set(required_fields)
         nsteps = len(self)
         required = np.zeros(nsteps, dtype=bool)
 
         # The easiest approach is to traverse the steps from last to first to build our list of required
         # fields, because necessarily no later step can produce the inputs needed by an earlier step.
-        for istep in range(nsteps - 1, -1, -1):
-            step = self[istep]
-            for field in step.output:
-                if field in all_fields_out:
-                    required[istep] = True
-                    all_fields_out.update(step.inputs)
-                    break
+        if required_fields is None:
+            required[:] = True
+        else:
+            all_fields_out: set[str] = set(required_fields)
+            for istep in range(nsteps - 1, -1, -1):
+                step = self[istep]
+                for field in step.output:
+                    if field in all_fields_out:
+                        required[istep] = True
+                        all_fields_out.update(step.inputs)
+                        break
 
-        if np.all(required):
-            return self
+        if not np.any(required):
+            # If this error ever because a problem, where user _acutally_ wants an empty series of steps
+            # to be a non-err, then add argument `error_on_empty_output=True` to this method.
+            raise ValueError("trim_dead_ends found no steps to be preserved")
+
         steps = []
         for i in range(nsteps):
             if required[i]:
-                steps.append(self[i])
+                if drop_debug:
+                    steps.append(self[i].drop_debug())
+                else:
+                    steps.append(self[i])
         return CalSteps(steps)

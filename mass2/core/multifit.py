@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import lmfit
 import copy
 import math
@@ -209,7 +209,7 @@ class MultiFit:
 @dataclass(frozen=True)
 class MultiFitQuadraticGainCalStep(CalStep):
     pfit_gain: np.polynomial.Polynomial
-    multifit: MultiFit
+    multifit: MultiFit | None
     rms_residual_energy: float
 
     def calc_from_df(self, df):
@@ -222,6 +222,10 @@ class MultiFitQuadraticGainCalStep(CalStep):
 
     def dbg_plot(self, df):
         self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.energy2ph)
+
+    def drop_debug(self) -> "MultiFitQuadraticGainCalStep":
+        "For slimmer object pickling, return a copy of self with the fat debugging info removed"
+        return replace(self, multifit=None)
 
     def ph2energy(self, ph):
         gain = self.pfit_gain(ph)
@@ -272,7 +276,7 @@ class MultiFitQuadraticGainCalStep(CalStep):
 @dataclass(frozen=True)
 class MultiFitMassCalibrationStep(CalStep):
     cal: EnergyCalibration
-    multifit: MultiFit
+    multifit: MultiFit | None
 
     def calc_from_df(self, df):
         # only works with in memory data, but just takes it as numpy data and calls function
@@ -281,6 +285,10 @@ class MultiFitMassCalibrationStep(CalStep):
         out = self.ph2energy(inputs_np[0])
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
+
+    def drop_debug(self) -> "MultiFitMassCalibrationStep":
+        "For slimmer object pickling, return a copy of self with the fat debugging info removed"
+        return replace(self, multifit=None)
 
     def dbg_plot(self, df):
         axes = self.multifit.plot_results_and_pfit(
