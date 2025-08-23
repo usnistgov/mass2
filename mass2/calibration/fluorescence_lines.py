@@ -402,6 +402,70 @@ addline = SpectralLine.addline
 
 
 addline(
+    element="C",
+    material="polymer",
+    linetype="KAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["CKAlpha"],
+    energies=np.array([275.70927309, 278.45255747, 280.98418388, 271.58546732]),
+    lorentzian_fwhm=np.array([1.24619107, 0.2, 0.2, 6.13137284]),
+    reference_amplitude=np.array([0.36120685, 0.20653011, 0.16402376, 0.26823928]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=0.0,
+    reference_plot_instrument_gaussian_fwhm=0.7,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="N",
+    material="polymer",
+    linetype="KAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["NKAlpha"],
+    energies=np.array([394.86289641, 393.08626973, 387.2119435, 378.10255388, 391.09739114]),
+    lorentzian_fwhm=np.array([0.2, 0.27931221, 1.77726347, 4.47506203, 2.38842598]),
+    reference_amplitude=np.array([0.22069068, 0.17715643, 0.11194988, 0.01504275, 0.47516025]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=0.0,
+    reference_plot_instrument_gaussian_fwhm=0.7,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="O",
+    material="polymer",
+    linetype="KAlpha",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["OKAlpha"],
+    energies=np.array([525.09026156, 523.26191089, 526.92358861, 533.24906164]),
+    lorentzian_fwhm=np.array([0.2, 2.02163789, 0.2, 0.2]),
+    reference_amplitude=np.array([0.32356316, 0.51200342, 0.16246904, 0.00196438]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=0.0,
+    reference_plot_instrument_gaussian_fwhm=0.7,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="Fe",
+    material="metal",
+    linetype="Ll",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["FeLl"],
+    energies=np.array([614.6756691578554, 626.828539876774]),
+    lorentzian_fwhm=2 * np.array([2.190383300231612, 2.932972304232089]),
+    reference_amplitude=np.array([0.84247325, 0.15752675]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=12.15,
+    reference_plot_instrument_gaussian_fwhm=1.0,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
     element="Fe",
     material="metal",
     linetype="LAlpha",
