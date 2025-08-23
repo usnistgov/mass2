@@ -488,6 +488,23 @@ addline(
 addline(
     element="Ni",
     material="metal",
+    linetype="Ll",
+    reference_short="HAUSKat 2024",
+    nominal_peak_energy=STANDARD_FEATURES["NiLl"],
+    energies=np.array([741.0471, 758.3902]),
+    lorentzian_fwhm=np.array([3.912, 3.946]),
+    reference_amplitude=np.array([0.81476414, 0.18523586]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    intrinsic_sigma=0.4167,
+    ka12_energy_diff=18,
+    reference_plot_instrument_gaussian_fwhm=1.0,  # a total guess
+    position_uncertainty=1.5,
+)
+
+
+addline(
+    element="Ni",
+    material="metal",
     linetype="LAlpha",
     reference_short="HAUSKat 2024",
     nominal_peak_energy=STANDARD_FEATURES["NiLAlpha"],
