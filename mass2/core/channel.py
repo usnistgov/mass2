@@ -10,7 +10,7 @@ import numpy as np
 import time
 
 from .noise_channel import NoiseChannel
-from .cal_steps import Recipe, SummarizeStep
+from .recipe import Recipe, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
@@ -356,9 +356,7 @@ class Channel:
 
     def with_column_map_step(self, input_col: str, output_col: str, f: Callable) -> "Channel":
         """f should take a numpy array and return a numpy array with the same number of elements"""
-        step = mass2.core.cal_steps.ColumnAsNumpyMapStep(
-            [input_col], [output_col], good_expr=self.good_expr, use_expr=pl.lit(True), f=f
-        )
+        step = mass2.core.recipe.ColumnAsNumpyMapStep([input_col], [output_col], good_expr=self.good_expr, use_expr=pl.lit(True), f=f)
         return self.with_step(step)
 
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
@@ -438,7 +436,7 @@ class Channel:
         return self.with_step(step)
 
     def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
-        step = mass2.core.cal_steps.PretrigMeanJumpFixStep(
+        step = mass2.core.recipe.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
             good_expr=self.good_expr,
@@ -455,7 +453,7 @@ class Channel:
         inputs: set[str] = set()
         for expr in col_expr_dict.values():
             inputs.update(extract(expr))
-        step = mass2.core.cal_steps.SelectStep(
+        step = mass2.core.recipe.SelectStep(
             inputs=list(inputs),
             output=list(col_expr_dict.keys()),
             good_expr=self.good_expr,
@@ -473,7 +471,7 @@ class Channel:
         inputs: set[str] = set()
         for expr in category_condition_dict.values():
             inputs.update(extract(expr))
-        step = mass2.core.cal_steps.CategorizeStep(
+        step = mass2.core.recipe.CategorizeStep(
             inputs=list(inputs),
             output=[output_col],
             good_expr=self.good_expr,

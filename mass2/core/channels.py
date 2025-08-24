@@ -12,7 +12,7 @@ import pathlib
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel
-from .cal_steps import Recipe
+from .recipe import Recipe
 from . import ljhutil
 
 

@@ -5,7 +5,7 @@ import typing
 import pylab as plt
 
 import mass2
-from mass2.core.cal_steps import RecipeStep
+from mass2.core.recipe import RecipeStep
 
 
 def drift_correct_mass(indicator, uncorrected):

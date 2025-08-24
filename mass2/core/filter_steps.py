@@ -2,7 +2,7 @@ import polars as pl
 
 from dataclasses import dataclass, replace
 from collections.abc import Callable
-from mass2.core.cal_steps import RecipeStep
+from mass2.core.recipe import RecipeStep
 from mass2.core.noise_algorithms import NoiseResult
 from mass2.core.optimal_filtering import Filter, FilterMaker
 

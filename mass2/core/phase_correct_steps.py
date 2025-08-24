@@ -2,7 +2,7 @@ import polars as pl
 import pylab as plt
 from dataclasses import dataclass
 import mass2
-from .cal_steps import RecipeStep
+from .recipe import RecipeStep
 from .phase_correct import PhaseCorrector
 
 

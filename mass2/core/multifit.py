@@ -9,7 +9,7 @@ import pylab as plt
 from mass2.calibration.algorithms import get_model
 from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
 from mass2.calibration.line_models import GenericLineModel
-from mass2.core.cal_steps import RecipeStep
+from mass2.core.recipe import RecipeStep
 import mass2
 
 

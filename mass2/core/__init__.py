@@ -18,7 +18,7 @@ from . import misc
 from .misc import good_series, show
 from .noise_algorithms import NoiseResult
 from .noise_channel import NoiseChannel
-from .cal_steps import Recipe, RecipeStep, SummarizeStep, PretrigMeanJumpFixStep, ColumnAsNumpyMapStep
+from .recipe import Recipe, RecipeStep, SummarizeStep, PretrigMeanJumpFixStep, ColumnAsNumpyMapStep
 from .multifit import (
     FitSpec,
     MultiFit,

@@ -13,7 +13,7 @@ import itertools
 
 import mass2
 from .channel import Channel
-from .cal_steps import RecipeStep
+from .recipe import RecipeStep
 from .misc import alwaysTrue
 
 # from . import rough_cal

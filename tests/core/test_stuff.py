@@ -307,7 +307,7 @@ def test_pretrig_mean_jump_fix_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.PretrigMeanJumpFixStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.PretrigMeanJumpFixStep)
 
 
 def test_extract_column_names_from_polars_expr():
@@ -332,7 +332,7 @@ def test_select_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.SelectStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.SelectStep)
 
 
 def test_categorize_step():
@@ -354,7 +354,7 @@ def test_categorize_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.CategorizeStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)
 
 
 def test_external_trigger_experiment_state():
