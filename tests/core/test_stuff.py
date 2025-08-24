@@ -391,12 +391,12 @@ def test_external_trigger_experiment_state():
 
 
 def test_steps():
-    "Apply some steps, and be sure that `CalSteps.trim_dead_ends(...) works"
+    "Apply some steps, and be sure that `Recipe.trim_dead_ends(...) works"
 
     def squareme(d):
         return d**2
 
-    # Perform 5 offical CalSteps: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
+    # Perform 5 offical Recipe: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
             ch.summarize_pulses()
@@ -416,9 +416,9 @@ def test_steps():
     steps = ch.steps
     assert len(steps) == 5
 
-    def is_in_calsteps(x: mass2.core.CalStep, steps: mass2.core.CalSteps) -> bool:
-        """An approximate test whether CalStep `x` is in the CalStep chain `steps`, testing only equality of
-        name, inputs, outputs, rather than identity. (We don't want to check identity, because the CalStep object
+    def is_in_calsteps(x: mass2.core.RecipeStep, steps: mass2.core.Recipe) -> bool:
+        """An approximate test whether RecipeStep `x` is in the RecipeStep chain `steps`, testing only equality of
+        name, inputs, outputs, rather than identity. (We don't want to check identity, because the RecipeStep object
         may have been changed by a step.drop_debug() operation.)
         """
         for s in steps:

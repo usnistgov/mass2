@@ -9,7 +9,7 @@ import pylab as plt
 from mass2.calibration.algorithms import get_model
 from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
 from mass2.calibration.line_models import GenericLineModel
-from mass2.core.cal_steps import CalStep
+from mass2.core.cal_steps import RecipeStep
 import mass2
 
 
@@ -207,7 +207,7 @@ class MultiFit:
 
 
 @dataclass(frozen=True)
-class MultiFitQuadraticGainCalStep(CalStep):
+class MultiFitQuadraticGainStep(RecipeStep):
     pfit_gain: np.polynomial.Polynomial
     multifit: MultiFit | None
     rms_residual_energy: float
@@ -223,7 +223,7 @@ class MultiFitQuadraticGainCalStep(CalStep):
     def dbg_plot(self, df):
         self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.energy2ph)
 
-    def drop_debug(self) -> "MultiFitQuadraticGainCalStep":
+    def drop_debug(self) -> "MultiFitQuadraticGainStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
         return replace(self, multifit=None)
 
@@ -274,7 +274,7 @@ class MultiFitQuadraticGainCalStep(CalStep):
 
 
 @dataclass(frozen=True)
-class MultiFitMassCalibrationStep(CalStep):
+class MultiFitMassCalibrationStep(RecipeStep):
     cal: EnergyCalibration
     multifit: MultiFit | None
 

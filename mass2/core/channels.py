@@ -12,7 +12,7 @@ import pathlib
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel
-from .cal_steps import CalSteps
+from .cal_steps import Recipe
 from . import ljhutil
 
 
@@ -281,8 +281,8 @@ class Channels:
 
         return self.map(load_steps)
 
-    def save_steps(self, filename, required_fields: str | Iterable[str] | None = None, drop_debug=True) -> dict[int, CalSteps]:
-        """Pickle a dictionary (one entry per channel) of CalSteps objects.
+    def save_steps(self, filename, required_fields: str | Iterable[str] | None = None, drop_debug=True) -> dict[int, Recipe]:
+        """Pickle a dictionary (one entry per channel) of Recipe objects.
 
         If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),
         then set `required_fields` to be a list/tuple/set of DataFrame column names (or a single column name)
@@ -297,13 +297,13 @@ class Channels:
             Drop all steps that do not lead (directly or indireactly) to producing this field or these fields.
             If None, then preserve all steps (default None).
         drop_debug: bool
-            Whether to remove debugging-related data from each `CalStep`, if the subclass supports this (via the
-            `CalStep.drop_debug() method).
+            Whether to remove debugging-related data from each `RecipeStep`, if the subclass supports this (via the
+            `RecipeStep.drop_debug() method).
 
         Returns
         -------
         dict
-            Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) CalSteps objects.
+            Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) Recipe objects.
         """
         steps = {}
         for channum, ch in self.channels.items():

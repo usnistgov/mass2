@@ -10,11 +10,11 @@ import numpy as np
 import time
 
 from .noise_channel import NoiseChannel
-from .cal_steps import CalSteps, SummarizeStep
+from .cal_steps import Recipe, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
-from .multifit import MultiFit, MultiFitQuadraticGainCalStep, MultiFitMassCalibrationStep
+from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .misc import alwaysTrue
 from . import misc
 import mass2
@@ -50,7 +50,7 @@ class Channel:
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
-    steps: CalSteps = field(default_factory=CalSteps.new_empty)
+    steps: Recipe = field(default_factory=Recipe.new_empty)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
 
@@ -687,7 +687,7 @@ class Channel:
         calibrated_col,
         use_expr=pl.lit(True),
     ) -> "Channel":
-        step = MultiFitQuadraticGainCalStep.learn(
+        step = MultiFitQuadraticGainStep.learn(
             self,
             multifit_spec=multifit,
             previous_cal_step_index=previous_cal_step_index,

@@ -13,7 +13,7 @@ import itertools
 
 import mass2
 from .channel import Channel
-from .cal_steps import CalStep
+from .cal_steps import RecipeStep
 from .misc import alwaysTrue
 
 # from . import rough_cal
@@ -662,7 +662,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
 
 
 @dataclass(frozen=True)
-class RoughCalibrationStep(CalStep):
+class RoughCalibrationStep(RecipeStep):
     pfresult: SmoothedLocalMaximaResult | None
     assignment_result: BestAssignmentPfitGainResult | None
     ph2energy: typing.Callable

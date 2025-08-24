@@ -8,7 +8,7 @@ from . import pulse_algorithms
 
 
 @dataclass(frozen=True)
-class CalStep:
+class RecipeStep:
     inputs: list[str]
     output: list[str]
     good_expr: pl.Expr
@@ -32,13 +32,13 @@ class CalStep:
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
         return plt.gca()
 
-    def drop_debug(self) -> "CalStep":
+    def drop_debug(self) -> "RecipeStep":
         "Return self, or a copy of it with debug information removed"
         return self
 
 
 @dataclass(frozen=True)
-class PretrigMeanJumpFixStep(CalStep):
+class PretrigMeanJumpFixStep(RecipeStep):
     period: float
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -59,7 +59,7 @@ class PretrigMeanJumpFixStep(CalStep):
 
 
 @dataclass(frozen=True)
-class SummarizeStep(CalStep):
+class SummarizeStep(RecipeStep):
     frametime_s: float
     peak_index: int
     pulse_col: str
@@ -90,12 +90,12 @@ class SummarizeStep(CalStep):
 
 
 @dataclass(frozen=True)
-class ColumnAsNumpyMapStep(CalStep):
+class ColumnAsNumpyMapStep(RecipeStep):
     """
     This step is meant for interactive exploration, it takes a column and applies a function to it,
     and makes a new column with the result. It makes it easy to test functions on a column without
     having to write a whole new step class,
-    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps
+    while maintaining the benefit of being able to use the step in a Recipe chain, like replaying steps
     on another channel.
 
     example usage:
@@ -133,7 +133,7 @@ class ColumnAsNumpyMapStep(CalStep):
 
 
 @dataclass(frozen=True)
-class CategorizeStep(CalStep):
+class CategorizeStep(RecipeStep):
     category_condition_dict: dict[str, pl.Expr]
 
     def __post_init__(self):
@@ -165,7 +165,7 @@ class CategorizeStep(CalStep):
 
 
 @dataclass(frozen=True)
-class SelectStep(CalStep):
+class SelectStep(RecipeStep):
     """
     This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
 
@@ -179,11 +179,11 @@ class SelectStep(CalStep):
 
 
 @dataclass(frozen=True)
-class CalSteps:
+class Recipe:
     # leaves many optimizations on the table, but is very simple
     # 1. we could calculate filt_value_5lag and filt_phase_5lag at the same time
     # 2. we could calculate intermediate quantities optionally and not materialize all of them
-    steps: list[CalStep]
+    steps: list[RecipeStep]
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
@@ -192,10 +192,10 @@ class CalSteps:
         return df
 
     @classmethod
-    def new_empty(cls) -> "CalSteps":
+    def new_empty(cls) -> "Recipe":
         return cls([])
 
-    def __getitem__(self, key: int) -> CalStep:
+    def __getitem__(self, key: int) -> RecipeStep:
         return self.steps[key]
 
     def __len__(self) -> int:
@@ -203,24 +203,24 @@ class CalSteps:
 
     # def copy(self):
     #     # copy by creating a new list containing all the entires in the old list
-    #     # a list entry, aka a CalStep, should be immutable
-    #     return CalSteps(self.steps[:])
+    #     # a list entry, aka a RecipeStep, should be immutable
+    #     return Recipe(self.steps[:])
 
-    def with_step(self, step: CalStep) -> "CalSteps":
-        # return a new CalSteps with the step added, no mutation!
-        return CalSteps(self.steps + [step])
+    def with_step(self, step: RecipeStep) -> "Recipe":
+        # return a new Recipe with the step added, no mutation!
+        return Recipe(self.steps + [step])
 
-    def trim_dead_ends(self, required_fields: Iterable[str] | str | None, drop_debug: bool = True) -> "CalSteps":
-        """Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.
+    def trim_dead_ends(self, required_fields: Iterable[str] | str | None, drop_debug: bool = True) -> "Recipe":
+        """Create a new Recipe object with all dead-end steps (and optionally also debug info) removed.
 
-        The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can
+        The purpose is to replace the fully useful interactive Recipe with a trimmed-down object that can
         repeat the current steps as a "recipe" without having the extra information from which the recipe
         was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel
         to 30 kB per channel, or a 112x size reduction (with `drop_debug=True`).
 
         Dead-end steps are defined as any step that can be omitted without affecting the ability to
         compute any of the fields given in `required_fields`. The result of this method is to return
-        a CalSteps where any step is remove if it does not contribute to computing any of the `required_fields`
+        a Recipe where any step is remove if it does not contribute to computing any of the `required_fields`
         (i.e., if it is a dead end).
 
         Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.
@@ -237,7 +237,7 @@ class CalSteps:
 
         Returns
         -------
-        CalSteps
+        Recipe
             A copy of `self`, except that any steps not required to compute any of `required_fields` are omitted.
         """
         if isinstance(required_fields, str):
@@ -272,4 +272,4 @@ class CalSteps:
                     steps.append(self[i].drop_debug())
                 else:
                     steps.append(self[i])
-        return CalSteps(steps)
+        return Recipe(steps)

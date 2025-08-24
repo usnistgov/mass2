@@ -2,13 +2,13 @@ import polars as pl
 
 from dataclasses import dataclass, replace
 from collections.abc import Callable
-from mass2.core.cal_steps import CalStep
+from mass2.core.cal_steps import RecipeStep
 from mass2.core.noise_algorithms import NoiseResult
 from mass2.core.optimal_filtering import Filter, FilterMaker
 
 
 @dataclass(frozen=True)
-class Filter5LagStep(CalStep):
+class Filter5LagStep(RecipeStep):
     filter: Filter
     spectrum: NoiseResult | None
     filter_maker: "FilterMaker"
