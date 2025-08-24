@@ -1,6 +1,7 @@
 site_name: Mass2
 nav:
   - Home: index.md
+  - Demo plot: demo_plot.md
   - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
   - Fluorescence lines: fluorescence.md
@@ -15,6 +16,7 @@ theme: readthedocs
 
 plugins:
 - search
+- mkdocs_matplotlib
 - mkdocstrings:
     handlers:
       python:
