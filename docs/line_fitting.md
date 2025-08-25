@@ -15,10 +15,8 @@ LMFIT has numerous advantages over the basic `scipy.optimize` module. Quoting fr
 
 The one disadvantage of the core LMFIT package for our purposes is that it minimizes the sum of squares of a vector instead of maximizing the Poisson likelihood. This is easily remedied, however, by replacing the usual computation of residuals with one that computes the square root of the Poisson likelihood contribution from each bin. Voilá! A maximum likelihood fitter for histograms.
 
-Advantages of LMFIT over our earlier, homemade approach to fitting line shapes include:
+Advantages of LMFIT over our earlier, homemade approach to fitting line shapes also include:
 
-* Users can forget about the order of variables and refer to Parameters by meaningful names.
-* Users can place algebraic constraints on Parameters.
 * The interface for setting upper/lower bounds on parameters and for varying or fixing them is much more elegant, memorable, and simple than our homemade version.
 * It ultimately wraps the `scipy.optimize` package and therefore inherits all of its advantages:
 
@@ -38,24 +36,25 @@ This overview is hardly complete, but we hope it can be a quick-start guide and 
 Objects of the type `SpectralLine` encode the line shape of a fluorescence line, as a sum of Voigt or Lorentzian distributions. Because they inherit from `scipy.stats.rv_continuous`, they allow computation of cumulative distribution functions and the simulation of data drawn from the distribution. An example of the creation and usage is:
 
 ```python
-  import numpy as np
-  import pylab as plt
-  import mass2
-  import mass2.materials
+# mkdocs: render
+import numpy as np
+import pylab as plt
+import mass2
+import mass2.materials
 
-  # Known lines are accessed by:
-  line = mass2.spectra["MnKAlpha"]
+# Known lines are accessed by:
+line = mass2.spectra["MnKAlpha"]
 
-  rng = np.random.default_rng(1066)
-  N = 100000
-  energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
-  plt.clf()
-  sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype="step");
-  binsize = bin_edges[1] - bin_edges[0]
-  e = bin_edges[:-1] + 0.5*binsize
-  plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, "k")
-  plt.xlabel("Energy (eV)")
-  plt.title("Mn K$\\alpha$ random deviates and theory curve")
+rng = np.random.default_rng(1066)
+N = 100000
+energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
+plt.clf()
+sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype="step", lw=2);
+binsize = bin_edges[1] - bin_edges[0]
+e = bin_edges[:-1] + 0.5*binsize
+plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, "k", lw=0.5)
+plt.xlabel("Energy (eV)")
+plt.title("Mn K$\\alpha$ random deviates and theory curve")
 ```
   <!-- plt.savefig("img/distribution_plus_theory.png"); plt.close()
 
@@ -71,26 +70,27 @@ The `SpectralLine` object is useful to you if you need to generate simulated dat
 The simplest case of line fitting requires only 3 steps: create a model instance from a `SpectralLine`, guess its parameters from the data, and perform a fit with this guess. Plotting is not done as part of the fit--you have to do that separately.
 
 ```python
-  model = line.model()
-  params = model.guess(sim, bin_centers=e, dph_de=1)
-  resultA = model.fit(sim, params, bin_centers=e)
+# mkdocs: render
+model = line.model()
+params = model.guess(sim, bin_centers=e, dph_de=1)
+resultA = model.fit(sim, params, bin_centers=e)
 
-  # Fit again but with dPH/dE held at 1.
-  # dPH/dE will be a free parameter for the fit by default, largely due to the history of MnKAlpha fits being so critical during development.
-  # This will not work for nearly monochromatic lines, however, as the resolution (fwhm) and scale (dph_de) are exactly degenerate.
-  # In practice, most fits are done with dph_de fixed.
-  params = resultA.params.copy()
-  resultB = model.fit(sim, params, bin_centers=e, dph_de=1)
-  params["dph_de"].set(1.0, vary=False)
+# Fit again but with dPH/dE held at 1.
+# dPH/dE will be a free parameter for the fit by default, largely due to the history of MnKAlpha fits being so critical during development.
+# This will not work for nearly monochromatic lines, however, as the resolution (fwhm) and scale (dph_de) are exactly degenerate.
+# In practice, most fits are done with dph_de fixed.
+params = resultA.params.copy()
+resultB = model.fit(sim, params, bin_centers=e, dph_de=1)
+params["dph_de"].set(1.0, vary=False)
 
-  # There are two plotting methods. The first is an LMfit built-in; the other ("mass-style") puts the
-  # fit parameters on the plot.
-  resultB.plot()
-  resultB.plotm()
+# There are two plotting methods. The first is an LMfit built-in; the other ("mass-style") puts the
+# fit parameters on the plot.
+resultB.plot()
+resultB.plotm()
 
-  # The best-fit params are found in resultB.params
-  # and a dictionary of their values is resultB.best_values.
-  # The parameters given as an argument to fit are unchanged.
+# The best-fit params are found in resultB.params
+# and a dictionary of their values is resultB.best_values.
+# The parameters given as an argument to fit are unchanged.
 ```
 <!-- .. testcode::
   :hide:
@@ -139,12 +139,13 @@ You can print a nicely formatted fit report with the method `fit_report()`:
 Notice when you report the fit (or check the contents of the `params` or `resultB.params` objects), there are no parameters referring to exponential tails of a Bortels response. That's because the default fitter assumes a *Gaussian* response. If you want tails, that's a constructor argument:
 
 ```python
-  model = line.model(has_tails=True)
-  params = model.guess(sim, bin_centers=e, dph_de=1)
-  params["dph_de"].set(1.0, vary=False)
-  resultC = model.fit(sim, params, bin_centers=e)
-  resultC.plot()
-  # print(resultC.fit_report())
+# mkdocs: render
+model = line.model(has_tails=True)
+params = model.guess(sim, bin_centers=e, dph_de=1)
+params["dph_de"].set(1.0, vary=False)
+resultC = model.fit(sim, params, bin_centers=e)
+resultC.plot()
+# print(resultC.fit_report())
 ```
 <!-- .. testcode::
   :hide:
@@ -221,57 +222,63 @@ With or without a QE model, "integral" refers to the number of photons that woul
 ### Fitting a simple Gaussian, Lorentzian, or Voigt function
 
 ```python
-  import dataclasses
-  from mass2.calibration.fluorescence_lines import SpectralLine
-  e_ctr = 1000.0
-  Nsig = 10000
-  Nbg = 1000
+# mkdocs: render
+import dataclasses
+from mass2.calibration.fluorescence_lines import SpectralLine
+e_ctr = 1000.0
+Nsig = 10000
+Nbg = 1000
 
-  sigma = 1.0
-  x_gauss = rng.standard_normal(Nsig)*sigma + e_ctr
-  hwhm = 1.0
-  x_lorentz = rng.standard_cauchy(Nsig)*hwhm + e_ctr
-  x_voigt = rng.standard_cauchy(Nsig)*hwhm + rng.standard_normal(Nsig)*sigma + e_ctr
-  bg = rng.uniform(e_ctr-5, e_ctr+5, size=Nbg)
+sigma = 1.0
+x_gauss = rng.standard_normal(Nsig)*sigma + e_ctr
+hwhm = 1.0
+x_lorentz = rng.standard_cauchy(Nsig)*hwhm + e_ctr
+x_voigt = rng.standard_cauchy(Nsig)*hwhm + rng.standard_normal(Nsig)*sigma + e_ctr
+bg = rng.uniform(e_ctr-5, e_ctr+5, size=Nbg)
 
-  # Gaussian fit
-  c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
-  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = SpectralLine.quick_monochromatic_line("testline", e_ctr, 0, 0)
-  line = dataclasses.replace(line, linetype="Gaussian")
-  model = line.model()
-  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-  params["fwhm"].set(2.3548*sigma)
-  params["background"].set(Nbg/len(c))
-  resultG = model.fit(c, params, bin_centers=bin_ctr)
-  resultG.plotm()
-  # print(resultG.fit_report())
+# Gaussian fit
+c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
+bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+line = SpectralLine.quick_monochromatic_line("testline", e_ctr, 0, 0)
+line = dataclasses.replace(line, linetype="Gaussian")
+model = line.model()
+params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+params["fwhm"].set(2.3548*sigma)
+params["background"].set(Nbg/len(c))
+resultG = model.fit(c, params, bin_centers=bin_ctr)
+resultG.plotm()
+# print(resultG.fit_report())
+```
 
-  # Lorentzian fit
-  c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
-  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, 0)
-  line = dataclasses.replace(line, linetype="Lorentzian")
-  model = line.model()
-  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-  params["fwhm"].set(2.3548*sigma)
-  params["background"].set(Nbg/len(c))
-  resultL = model.fit(c, params, bin_centers=bin_ctr)
-  resultL.plotm()
-  # print(resultL.fit_report())
-
-  # Voigt fit
-  c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
-  bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-  line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, sigma)
-  line = dataclasses.replace(line, linetype="Voigt")
-  model = line.model()
-  params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-  params["fwhm"].set(2.3548*sigma)
-  params["background"].set(Nbg/len(c))
-  resultV = model.fit(c, params, bin_centers=bin_ctr)
-  resultV.plotm()
-  # print(resultV.fit_report())
+```python
+# mkdocs: render
+# Lorentzian fit
+c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
+bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, 0)
+line = dataclasses.replace(line, linetype="Lorentzian")
+model = line.model()
+params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+params["fwhm"].set(2.3548*sigma)
+params["background"].set(Nbg/len(c))
+resultL = model.fit(c, params, bin_centers=bin_ctr)
+resultL.plotm()
+# print(resultL.fit_report())
+```
+```python
+# mkdocs: render
+# Voigt fit
+c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
+bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, sigma)
+line = dataclasses.replace(line, linetype="Voigt")
+model = line.model()
+params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
+params["fwhm"].set(2.3548*sigma)
+params["background"].set(Nbg/len(c))
+resultV = model.fit(c, params, bin_centers=bin_ctr)
+resultV.plotm()
+# print(resultV.fit_report())
 ```
 <!-- .. testcode::
   :hide:
@@ -305,8 +312,8 @@ With or without a QE model, "integral" refers to the number of photons that woul
     * `result.fit_report()` = return a pretty-printed string reporting on the fit
     * `result.plot_fit()` = make a plot of the data and fit
     * `result.plot_residuals()` = make a plot of the residuals (fit-data)
-    * `result.plot()` = make a plot of the data, fit, and residuals, generally `plotm` is preferred
     * `result.plotm()` = make a plot of the data, fit, and fit params with dataset filename in title
+    * `result.plot()` = make a plot of the data, fit, and residuals, generally `plotm` is preferred
 
 
-The tau values (scale lengths of exponential tails) in eV units. The parameter "integral" refers to the integrated number of counts across all energies (whether inside or beyond the fitted energy range).
+The tau values (scale lengths of exponential tails) are in eV units. The parameter "integral" refers to the integrated number of counts across all energies (whether inside or beyond the fitted energy range).

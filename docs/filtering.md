@@ -10,7 +10,7 @@ This API consists of two key objects:
 1. The ``Filter`` is a specific implementation of an optimal filter, designed to be used in one-lag or five-lag mode, and with fixed choices about low-pass filtering of the filter's values, or about giving zero weight to a number of initial or final samples in a record. Offers a `filter_records(r)` method to apply its optimal filter to one or more pulse records `r`. When `r` is a 2d array, each _row_ corresponds to a pulse record.
 1. The ``FilterMaker`` contains a model of one channel's signal and noise. It is able to create various objects of the type ``Filter`` (or subtypes thereof).
 
-The user first creates a ``FilterMaker`` from the analyzed noise and signal, then uses it to generate an optimal filter (from a subclass of ``Filter``) with the desired properties. That object has a method `filter_records(...)`. Usage looks like the following:
+The user first creates a ``FilterMaker`` from the analyzed noise and signal, then uses it to generate an optimal filter with the desired properties. The filter will be an object whose type is a subclass of ``Filter``, either `Filter5Lag` or `FilterATS`. That object has a method `filter_records(...)`. Usage looks like the following:
 
 ```python
 import numpy as np
@@ -31,25 +31,28 @@ noise_covar = np.zeros(n)
 noise_covar[0] = sigma_noise**2
 
 maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
-F5 = maker.compute_5lag()
+filt_5lag = maker.compute_5lag()
 
-print(f"Filter peak value:            {F5.nominal_peak:.1f}")
-print(f"Filter rms value:             {F5.variance**0.5:.4f}")
-print(f"Filter predicted V/dV (FWHM): {F5.predicted_v_over_dv:.4f}")
+print(f"Filter peak value:            {filt_5lag.nominal_peak:.1f}")
+print(f"Filter rms value:             {filt_5lag.variance**0.5:.4f}")
+print(f"Filter predicted V/dV (FWHM): {filt_5lag.predicted_v_over_dv:.4f}")
 
 from numpy.testing import assert_allclose
-assert_allclose(F5.nominal_peak, 1000)
-assert_allclose(F5.variance**0.5, 0.1549, rtol=1e-3)
-assert_allclose(F5.predicted_v_over_dv, 2741.6517)
+assert_allclose(filt_5lag.nominal_peak, 1000)
+assert_allclose(filt_5lag.variance**0.5, 0.1549, rtol=1e-3)
+assert_allclose(filt_5lag.predicted_v_over_dv, 2741.6517)
+
+# mkdocs: render
+# Here's what the filter looks like: a pulse minus a constant.
+filt_5lag.plot()
 ```
 
-This code should produce a filter maker ``maker`` and an optimal filter ``F5`` and generate the following output:
+This code produces a filter maker ``maker`` and an optimal filter ``filt_5lag`` and generates the following output:
 ```text
     Filter peak value:            1000.0
     Filter rms value:             0.1549
     Filter predicted V/dV (FWHM): 2741.6517
 ```
-
 
 ## A test of normalization and filter variance
 
@@ -76,20 +79,20 @@ def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
     noise_covar = np.zeros(n)
     noise_covar[0] = sigma_noise**2
     maker = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal)
-    F5 = maker.compute_5lag()
+    filt_5lag = maker.compute_5lag()
 
     # Check filter's normalization
-    f = F5.values
+    f = filt_5lag.values
     verify_close(Maxsignal, f.dot(truncated_signal), rtol=1e-5, topic = "Filter normalization")
 
     # Check filter's variance
     expected_dV = sigma_noise / n**0.5 * signal.max()/truncated_signal.std()
-    verify_close(expected_dV, F5.variance**0.5, rtol=1e-5, topic="Expected variance")
+    verify_close(expected_dV, filt_5lag.variance**0.5, rtol=1e-5, topic="Expected variance")
 
     # Check filter's V/dV calculation
     fwhm_sigma_ratio = np.sqrt(8*np.log(2))
     expected_V_dV = Maxsignal / (expected_dV * fwhm_sigma_ratio)
-    verify_close(expected_V_dV, F5.predicted_v_over_dv, rtol=1e-5, topic="Expected V/\u03b4v")
+    verify_close(expected_V_dV, filt_5lag.predicted_v_over_dv, rtol=1e-5, topic="Expected V/\u03b4v")
     print()
 
 test_mass_5lag_filters(100, 1.0, 500)
