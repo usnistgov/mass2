@@ -2,12 +2,12 @@ import polars as pl
 import pylab as plt
 from dataclasses import dataclass
 import mass2
-from .cal_steps import CalStep
+from .recipe import RecipeStep
 from .phase_correct import PhaseCorrector
 
 
 @dataclass(frozen=True)
-class PhaseCorrectMassStep(CalStep):
+class PhaseCorrectMassStep(RecipeStep):
     line_names: list[str]
     line_energies: list[float]
     previous_step_index: int
