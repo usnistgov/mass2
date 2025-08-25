@@ -12,5 +12,5 @@ MASS is the work of physicists from [Quantum Sensors Division](https://www.nist.
 * Many collaborators, who have made many bug reports, bug fixes, and feature requests.
 
 ## Major Versions
-* MASS version 2 was begin in August 2025. It is still unstable, in alpha or pre-alpha status. Find it at <https://github.com/usnistgov/mass2>
+* MASS version 2 was begin in August 2025. It is still changing rapidly, in alpha status. Find it at <https://github.com/usnistgov/mass2>
 * MASS version 1 was begun in November 2010. Bug-fix development continues. Find it at <https://github.com/usnistgov/mass>

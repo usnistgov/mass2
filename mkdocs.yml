@@ -1,12 +1,13 @@
 site_name: Mass2
 nav:
   - Home: index.md
+  - Demo plot: demo_plot.md
   - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
   - Fluorescence lines: fluorescence.md
   - Line fitting: line_fitting.md
   - HCI lines: hci_lines_from_asd.md
-  - X-ray models: xray_efficiency_models.md
+  - X-ray efficiency models: xray_efficiency_models.md
   - LJH file format: LJHfiles.md
   - Testing: tests.md
   - About: about.md
@@ -15,6 +16,7 @@ theme: readthedocs
 
 plugins:
 - search
+- mkdocs_matplotlib
 - mkdocstrings:
     handlers:
       python:

@@ -24,6 +24,7 @@ Next, we will demonstrate usage of these methods with the example of Ne,
 a commonly injected gas at the NIST EBIT.
 
 ```python
+# mkdocs: render
 import mass2
 import mass2.calibration.hci_lines
 import numpy as numpy
@@ -62,6 +63,7 @@ and populates the various fields.
 As an example, let us create a H-like Be line. Here, we assume a lorentzian width of 0.1 eV.
 
 ```python
+# mkdocs: render
 test_element = 'Be'
 test_charge = 4
 test_conf = '2p'
@@ -88,17 +90,10 @@ The name format for grabbing the line from ``mass2.spectra`` is shown above.
 The transition is uniquely specified by the element, charge, configuration, term, and J value.
 Below, we show what this line looks like assuming a zero-width Gaussian component.
 
-.. testcode::
-
-  test_line.plot()
-
-.. testcode::
-  :hide:
-
-  plt.savefig("img/Be4_line_example.png");plt.close()
-
-.. image:: img/Be4_line_example.png
-  :width: 40%
+```python
+# mkdocs: render
+test_line.plot()
+```
 
 The module contains two other functions which are used to easily generate some lines from levels that are commonly observed at the NIST EBIT.
 These functions are ``add_H_like_lines_from_asd`` and ``add_He_like_lines_from_asd``.
@@ -111,7 +106,7 @@ Below, we check that common elements are being added as spectralLine objects
 and then add some of the lower order H- and He-like Ga lines.
 
 ```python
-print([mass2.spectra['Ne10 2p 2P* J=3/2'], round(mass2.spectra['Ne10 2p 2P* J=3/2'].peak_energy,1)])
+# mkdocs: render
 print([mass2.spectra['O7 1s.2p 1P* J=1'], round(mass2.spectra['O7 1s.2p 1P* J=1'].peak_energy,1)])
 
 test_element = 'Ga'
@@ -128,6 +123,8 @@ print([[iLine, round(iLine.peak_energy, 1)] for iLine in HeLikeGaLines])
 [[SpectralLine: Ga30 1s.2s 3S J=1, np.float64(9535.6)], [SpectralLine: Ga30 1s.2p 3P* J=0, np.float64(9571.8)], [SpectralLine: Ga30 1s.2p 3P* J=1, np.float64(9574.4)], [SpectralLine: Ga30 1s.2s 1S J=0, np.float64(9574.6)], [SpectralLine: Ga30 1s.2p 3P* J=2, np.float64(9607.4)], [SpectralLine: Ga30 1s.2p 1P* J=1, np.float64(9628.2)], [SpectralLine: Ga30 1s.3s 3S J=1, np.float64(11304.6)]]
 ```
 
+# HCI lines and models docstring info
 
 ::: mass2.calibration.hci_lines
+
 ::: mass2.calibration.hci_models
