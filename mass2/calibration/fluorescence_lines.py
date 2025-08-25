@@ -323,7 +323,7 @@ class SpectralLine:
         intrinsic_sigma=0,
         reference_measurement_type=None,
         is_default_material=True,
-        allow_replacement=False,
+        allow_replacement=True,
     ):
         # require exactly one method of specifying the amplitude of each component
         assert reference_amplitude_type in {

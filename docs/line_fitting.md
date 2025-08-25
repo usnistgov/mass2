@@ -92,21 +92,10 @@ resultB.plotm()
 # and a dictionary of their values is resultB.best_values.
 # The parameters given as an argument to fit are unchanged.
 ```
-<!-- .. testcode::
-  :hide:
-
-  plt.savefig("img/mnka_fit1m.png"); plt.close()
-  plt.savefig("img/mnka_fit1.png"); plt.close()
-
-.. image:: img/mnka_fit1.png
-  :width: 40%
-
-.. image:: img/mnka_fit1m.png
-  :width: 40% -->
 
 You can print a nicely formatted fit report with the method `fit_report()`:
 ```python
-  print(resultB.fit_report())
+print(resultB.fit_report())
 ```
 
 ```text
@@ -147,14 +136,6 @@ resultC = model.fit(sim, params, bin_centers=e)
 resultC.plot()
 # print(resultC.fit_report())
 ```
-<!-- .. testcode::
-  :hide:
-
-  plt.savefig("img/mnka_fit2.png"); plt.close()
-
-.. image:: img/mnka_fit2.png
-  :width: 40% -->
-
 
 By default, the `has_tails=True` will set up a non-zero low-energy tail and allow it to vary, while the high-energy tail is set to zero amplitude and doesn't vary. Use these numbered examples if you want to fit for a high-energy tail (1), to fix the low-E tail at some non-zero level (2) or to turn off the low-E tail completely (3):
 
@@ -179,36 +160,29 @@ By default, the `has_tails=True` will set up a non-zero low-energy tail and allo
 If you want to multiply the line models by a model of the quantum efficiency, you can do that. You need a `qemodel` function or callable function object that takes an energy (scalar or vector) and returns the corresponding efficiency. For example, you can use the "Raven1 2019" QE model from `mass2.materials`. The filter-stack models are not terribly fast to run, so it's best to compute once, spline the results, and pass that spline as the `qemodel` to `line.model(qemodel=qemodel)`.
 
 ```python
-  raven_filters = mass2.materials.efficiency_models.filterstack_models["RAVEN1 2019"]
-  eknots = np.linspace(100, 20000, 1991)
-  qevalues = raven_filters(eknots)
-  qemodel = mass2.mathstat.interpolate.CubicSpline(eknots, qevalues)
+# mkdocs: render
+raven_filters = mass2.materials.efficiency_models.filterstack_models["RAVEN1 2019"]
+eknots = np.linspace(100, 20000, 1991)
+qevalues = raven_filters(eknots)
+qemodel = mass2.mathstat.interpolate.CubicSpline(eknots, qevalues)
 
-  model = line.model(qemodel=qemodel)
-  resultD = model.fit(sim, resultB.params, bin_centers=e)
-  resultD.plotm()
-  # print(resultD.fit_report())
+model = line.model(qemodel=qemodel)
+resultD = model.fit(sim, resultB.params, bin_centers=e)
+resultD.plotm()
+# print(resultD.fit_report())
 
-  fit_counts = resultD.params["integral"].value
-  localqe = qemodel(mass2.STANDARD_FEATURES["MnKAlpha"])
-  fit_observed = fit_counts*localqe
-  fit_err = resultD.params["integral"].stderr
-  count_err = fit_err*localqe
-  print("Fit finds {:.0f}±{:.0f} counts before QE, or {:.0f}±{:.0f} observed. True value {:d}.".format(
-      round(fit_counts, -1), round(fit_err, -1), round(fit_observed, -1), round(count_err, -1), N))
+fit_counts = resultD.params["integral"].value
+localqe = qemodel(mass2.STANDARD_FEATURES["MnKAlpha"])
+fit_observed = fit_counts*localqe
+fit_err = resultD.params["integral"].stderr
+count_err = fit_err*localqe
+print("Fit finds {:.0f}±{:.0f} counts before QE, or {:.0f}±{:.0f} observed. True value {:d}.".format(
+    round(fit_counts, -1), round(fit_err, -1), round(fit_observed, -1), round(count_err, -1), N))
 ```
 
 ```text
 Fit finds 168810±530 counts before QE, or 100020±320 observed. True value 100000.
 ```
-<!-- .. testcode::
-  :hide:
-
-  plt.savefig("img/mnka_fit3.png"); plt.close()
-
-.. image:: img/mnka_fit3.png
-  :width: 40% -->
-
 
 When you fit with a non-trivial QE model, all fit parameters that refer to intensities of signal or background refer to a sensor with an ideal QE=1. These parameters include:
 
@@ -280,21 +254,6 @@ resultV = model.fit(c, params, bin_centers=bin_ctr)
 resultV.plotm()
 # print(resultV.fit_report())
 ```
-<!-- .. testcode::
-  :hide:
-
-  plt.savefig("img/mnka_fitV.png"); plt.close()
-  plt.savefig("img/mnka_fitL.png"); plt.close()
-  plt.savefig("img/mnka_fitG.png"); plt.close()
-
-.. image:: img/mnka_fitG.png
-  :width: 40%
-
-.. image:: img/mnka_fitL.png
-  :width: 40%
-
-.. image:: img/mnka_fitV.png
-  :width: 40% -->
 
 
 ### More details of fitting fluorescence-line models
