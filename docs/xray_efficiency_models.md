@@ -18,16 +18,18 @@ The EBIT system was particularly well characterized, so the uncertainties are fa
 The presence of uncertainties requires some special handling in a few places, these docs will show some examples.
 
 ```python
-  import mass2
-  import mass2.materials  # you have to explicitly import mass2.materials
-  import numpy as np
-  import pylab as plt
-  from uncertainties import unumpy as unp  # useful for working with arrays with uncertainties aka uarray
-  from uncertainties import ufloat
+# mkdocs: render
+import mass2
+import mass2.materials  # you have to explicitly import mass2.materials
+import numpy as np
+import pylab as plt
+from uncertainties import unumpy as unp  # useful for working with arrays with uncertainties aka uarray
+from uncertainties import ufloat
 
-  EBIT_model = mass2.materials.filterstack_models['EBIT 2018']
-  print(EBIT_model)
+EBIT_model = mass2.materials.filterstack_models['EBIT 2018']
+print(EBIT_model)
 ```
+
 ```text
 <class 'mass2.materials.efficiency_models.FilterStack'>(
 Electroplated Au Absorber: <class 'mass2.materials.efficiency_models.Filter'>(Au 0.00186+/-0.00006 g/cm^2, fill_fraction=1.000+/-0, absorber=True)
@@ -51,18 +53,19 @@ LEX_HT Mesh: <class 'mass2.materials.efficiency_models.Filter'>(Fe 0.0564+/-0.00
 Next, we examine the function `get_efficiency(xray_energies_eV)`, which is an method of `FilterStack`. This can be called for the entire filter stack or for individual components in the filter stack. As an example, we look at the efficiency of the EBIT 2018 filter stack and the 50K filter component between 2ekV and 10 keV, at 1 keV steps.
 
 ```python
-  sparse_xray_energies_eV = np.arange(2000, 10000, 1000)
-  stack_efficiency = EBIT_model.get_efficiency(sparse_xray_energies_eV)
-  stack_efficiency_uncertain = EBIT_model.get_efficiency(sparse_xray_energies_eV, uncertain=True) # you have to opt into getting uncertainties out
-  filter50K_efficiency = EBIT_model.components[3].get_efficiency(sparse_xray_energies_eV)
+# mkdocs: render
+sparse_xray_energies_eV = np.arange(2000, 10000, 1000)
+stack_efficiency = EBIT_model.get_efficiency(sparse_xray_energies_eV)
+stack_efficiency_uncertain = EBIT_model.get_efficiency(sparse_xray_energies_eV, uncertain=True) # you have to opt into getting uncertainties out
+filter50K_efficiency = EBIT_model.components[3].get_efficiency(sparse_xray_energies_eV)
 
-  print("stack efficiencies")
-  print([f"{x}" for x in stack_efficiency_uncertain]) # this is a hack to get uarrays to print with auto chosen number of sig figs
-  print(stack_efficiency) # this is a hack to get uarrays to print with auto chosen number of sig figs
-  print(unp.nominal_values(stack_efficiency)) # you can easily strip uncertainties, see uncertains package docs for more info
+print("stack efficiencies")
+print([f"{x}" for x in stack_efficiency_uncertain]) # this is a hack to get uarrays to print with auto chosen number of sig figs
+print(stack_efficiency) # this is a hack to get uarrays to print with auto chosen number of sig figs
+print(unp.nominal_values(stack_efficiency)) # you can easily strip uncertainties, see uncertains package docs for more info
 
-  print("filter50K efficiencies")
-  print(filter50K_efficiency) # if you want to remove the uncertainties, eg for plotting
+print("filter50K efficiencies")
+print(filter50K_efficiency) # if you want to remove the uncertainties, eg for plotting
 ```
 
 ```text
@@ -75,7 +78,7 @@ stack efficiencies
 filter50K efficiencies
 [0.77672107 0.81107679 0.8233861  0.84072724 0.86670307 0.89357999
  0.9163624  0.83360284]
- ```
+```
 
 Here, we use the function `plot_efficiency(xray_energies_eV, ax)` to plot the efficiencies.
 `ax` defaults to None, but it can be used to plot the efficiencies on a user provided axis.
@@ -83,19 +86,15 @@ Just like `get_efficiency`, `plot_efficiency` works with `FilterStack` and its s
 Testing with energy range 100 to 20,000 eV, 1 eV steps.
 
 ```python
-  xray_energies_eV = np.arange(100,20000,10)
-  EBIT_model.plot_efficiency(xray_energies_eV)
-  EBIT_model.components[3].plot_efficiency(xray_energies_eV)
-  # plt.savefig("img/filter_50K_efficiency.png");plt.close()
-  # plt.savefig("img/EBIT_efficiency.png");plt.close()
+# mkdocs: render
+xray_energies_eV = np.arange(100,20000,10)
+EBIT_model.plot_efficiency(xray_energies_eV)
+```
+```python
+# mkdocs: render
+EBIT_model.components[3].plot_efficiency(xray_energies_eV)
 ```
 
-<!-- TODO: make embedded images work
- .. image:: img/EBIT_efficiency.png
-  :width: 40%
-
-.. image:: img/filter_50K_efficiency.png
-  :width: 40% -->
 
 # Creating your own custom filter stack model using `FilterStack` objects
 Now we will explore creating custom `FilterStack` objects and building up your very own filter stack model.
@@ -116,18 +115,18 @@ All numerical arguments can be passed with our without uncertainties. If you don
 a particular Film, the code will add a ±100% uncertainty on that component. This way, hopefully you will notice that your uncertainty is higher than you expect, and double check the inputs. Read up on the `uncertainties` package for more info about how it works.
 
 ```python
-  custom_model = mass2.materials.FilterStack(name='My Filter Stack')
-  custom_model.add_filter(name='My Bi Absorber', material='Bi', thickness_nm=ufloat(4.0e3, .1e3), absorber=True)
-  custom_model.add_filter(name='My Al 50mK Filter', material='Al', thickness_nm=ufloat(100.0, 10))
-  custom_model.add_filter(name='My Si 3K Filter', material='Si', thickness_nm=ufloat(500.0, 2))
-  custom_filter = mass2.materials.FilterStack(name='My meshed 50K Filter')
-  custom_filter.add_filter(name='Al Film', material='Al', thickness_nm=ufloat(100.0, 10))
-  custom_filter.add_filter(name='Ni Mesh', material='Ni', thickness_nm=ufloat(10.0e3, .1e3), fill_fraction=ufloat(0.2, 0.01))
-  custom_model.add(custom_filter)
+# mkdocs: render
+custom_model = mass2.materials.FilterStack(name='My Filter Stack')
+custom_model.add_filter(name='My Bi Absorber', material='Bi', thickness_nm=ufloat(4.0e3, .1e3), absorber=True)
+custom_model.add_filter(name='My Al 50mK Filter', material='Al', thickness_nm=ufloat(100.0, 10))
+custom_model.add_filter(name='My Si 3K Filter', material='Si', thickness_nm=ufloat(500.0, 2))
+custom_filter = mass2.materials.FilterStack(name='My meshed 50K Filter')
+custom_filter.add_filter(name='Al Film', material='Al', thickness_nm=ufloat(100.0, 10))
+custom_filter.add_filter(name='Ni Mesh', material='Ni', thickness_nm=ufloat(10.0e3, .1e3), fill_fraction=ufloat(0.2, 0.01))
+custom_model.add(custom_filter)
 
-  custom_model.plot_efficiency(xray_energies_eV)
+custom_model.plot_efficiency(xray_energies_eV)
 ```
-  <!-- plt.savefig("img/custom_filter_stack.png");plt.close() -->
 
 
 There are also some premade filter classes for filters that commonly show up in our instrument filter stacks.
@@ -138,25 +137,14 @@ At the moment, the FilterStack subclasses listed below are implemented:
 Usage examples and efficiency curves of these classes are shown below.
 
 ```python
-  premade_filter_stack = mass2.materials.FilterStack(name='A Stack of Premade Filters')
-  f1 = mass2.materials.AlFilmWithOxide(name='My Oxidized Al Filter', Al_thickness_nm=50.0)
-  f2 = mass2.materials.AlFilmWithPolymer(name='My Polymer Backed Al Filter', Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
-  f3 = mass2.materials.LEX_HT(name="My LEX HT Filter")
-  premade_filter_stack.add(f1)
-  premade_filter_stack.add(f2)
-  premade_filter_stack.add(f3)
-  low_xray_energies_eV = np.arange(100,3000,5)
-  premade_filter_stack.plot_efficiency(low_xray_energies_eV)
+# mkdocs: render
+premade_filter_stack = mass2.materials.FilterStack(name='A Stack of Premade Filters')
+f1 = mass2.materials.AlFilmWithOxide(name='My Oxidized Al Filter', Al_thickness_nm=50.0)
+f2 = mass2.materials.AlFilmWithPolymer(name='My Polymer Backed Al Filter', Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
+f3 = mass2.materials.LEX_HT(name="My LEX HT Filter")
+premade_filter_stack.add(f1)
+premade_filter_stack.add(f2)
+premade_filter_stack.add(f3)
+low_xray_energies_eV = np.arange(100,3000,5)
+premade_filter_stack.plot_efficiency(low_xray_energies_eV)
 ```
-  <!-- plt.savefig("img/premade_stack.png");plt.close() -->
-
-<!-- .. image:: img/premade_stack.png
-  :width: 40%
-
-.. image:: img/custom_filter_stack.png
-  :width: 40% -->
-
-<!--
-  # will fail tests if any figs are open
-  if (n := len(plt.get_fignums())) != 0:
-      print(f"{n} figs left open") -->

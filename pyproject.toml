@@ -40,6 +40,7 @@ dependencies = [
 [project.optional-dependencies]
 docs = [
     "mkdocs",
+    "mkdocs-matplotlib",
     "mkdocstrings[python]>=0.18",
     "mktestdocs",
 ]

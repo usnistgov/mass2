@@ -6,7 +6,7 @@
 
 ::: mass2.core.analysis_algorithms
 
-::: mass2.core.cal_steps
+::: mass2.core.recipe
 
 ::: mass2.core.drift_correction
 

@@ -169,7 +169,7 @@ class SpectralLine:
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
-    def plot(self, x=None, instrument_gaussian_fwhm=0, axis=None, components=True, label=None, setylim=True):
+    def plot(self, x=None, instrument_gaussian_fwhm=0, axis=None, components=True, label=None, setylim=True, color=None):
         """Plot the spectrum.
         x - np array of energy in eV to plot at (sensible default)
         axis - axis to plot on (default creates new figure)
@@ -188,7 +188,7 @@ class SpectralLine:
             for component in self.components(x, instrument_gaussian_fwhm):
                 axis.plot(x, component, "--")
         pdf = self.pdf(x, instrument_gaussian_fwhm)
-        axis.plot(x, pdf, "k", lw=2, label=label)
+        axis.plot(x, pdf, "k", lw=2, label=label, color=color)
         axis.set_xlabel("Energy (eV)")
         axis.set_ylabel(f"Counts per {float(x[1] - x[0]):.2} eV bin")
         axis.set_xlim(x[0], x[-1])
@@ -323,7 +323,7 @@ class SpectralLine:
         intrinsic_sigma=0,
         reference_measurement_type=None,
         is_default_material=True,
-        allow_replacement=False,
+        allow_replacement=True,
     ):
         # require exactly one method of specifying the amplitude of each component
         assert reference_amplitude_type in {

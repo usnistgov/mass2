@@ -13,9 +13,11 @@
   (issue 24).
 * Add `FilterMaker.compute_5lag_noexp()` and `.compute_5lag_constrained()` for constrained optimal filters (issue 29).
 * Read external trigger times into the Mass2 dataframe (issue 28).
-* Add `CalSteps.trim_dead_ends()` to generate a recipe that removes steps not needed to reach a certain end (issue 38).
+* Add `Recipe.trim_dead_ends()` to generate a recipe that removes steps not needed to reach a certain end (issue 38).
 * Optionally drop debugging information from steps in `trim_dead_ends()` to make MUCH smaller recipe pickles (issue 40).
 * Add sub-keV fluorescence line shapes learned from HAUSKat 2024 measurements on C, N, O, Fe, Ni, Cu (issue 37).
+* Figured out how to render matplotlib images in documentation with `mkdocs-matplotlib` plugin (issue 47).
+
 
 ## Mass Version 1 (2010-2025)
 
