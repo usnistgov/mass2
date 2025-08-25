@@ -177,28 +177,29 @@ class Channels:
     def __eq__(self, other):
         return id(self) == id(other)
 
+
 @classmethod
 def from_ljh_path_pairs(cls, pulse_noise_pairs: List[Tuple[str, str]], description: str):
     """
     Create a :class:`Channels` instance from pairs of LJH files.
 
     Args:
-        pulse_noise_pairs (List[Tuple[str, str]]):  
+        pulse_noise_pairs (List[Tuple[str, str]]):
             A list of `(pulse_path, noise_path)` tuples, where each entry contains
-            the file path to a pulse LJH file and its corresponding noise LJH file.  
-        description (str):  
+            the file path to a pulse LJH file and its corresponding noise LJH file.
+        description (str):
             A human-readable description for the resulting Channels object.
 
     Returns:
-        Channels:  
+        Channels:
             A Channels object with one :class:`Channel` per `(pulse_path, noise_path)` pair.
 
     Raises:
-        AssertionError:  
+        AssertionError:
             If two input files correspond to the same channel number.
 
     Notes:
-        Each channel is created via :meth:`Channel.from_ljh`.  
+        Each channel is created via :meth:`Channel.from_ljh`.
         The channel number is taken from the LJH file header and used as the key
         in the returned Channels mapping.
 
