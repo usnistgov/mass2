@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from collections.abc import Callable, Iterable
+from typing import List, Tuple
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -176,14 +177,46 @@ class Channels:
     def __eq__(self, other):
         return id(self) == id(other)
 
-    @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs, description):
-        channels = {}
-        for pulse_path, noise_path in pulse_noise_pairs:
-            channel = Channel.from_ljh(pulse_path, noise_path)
-            assert channel.header.ch_num not in channels.keys()
-            channels[channel.header.ch_num] = channel
-        return cls(channels, description)
+@classmethod
+def from_ljh_path_pairs(cls, pulse_noise_pairs: List[Tuple[str, str]], description: str):
+    """
+    Create a :class:`Channels` instance from pairs of LJH files.
+
+    Args:
+        pulse_noise_pairs (List[Tuple[str, str]]):  
+            A list of `(pulse_path, noise_path)` tuples, where each entry contains
+            the file path to a pulse LJH file and its corresponding noise LJH file.  
+        description (str):  
+            A human-readable description for the resulting Channels object.
+
+    Returns:
+        Channels:  
+            A Channels object with one :class:`Channel` per `(pulse_path, noise_path)` pair.
+
+    Raises:
+        AssertionError:  
+            If two input files correspond to the same channel number.
+
+    Notes:
+        Each channel is created via :meth:`Channel.from_ljh`.  
+        The channel number is taken from the LJH file header and used as the key
+        in the returned Channels mapping.
+
+    Examples:
+        >>> pairs = [
+        ...     ("datadir/run0000_ch0000.ljh", "datadir/run0001_ch0000.ljh"),
+        ...     ("datadir/run0000_ch0001.ljh", "datadir/run0001_ch0001.ljh"),
+        ... ]
+        >>> channels = Channels.from_ljh_path_pairs(pairs, description="Test run")
+        >>> list(channels.keys())
+        [0, 1]
+    """
+    channels = {}
+    for pulse_path, noise_path in pulse_noise_pairs:
+        channel = Channel.from_ljh(pulse_path, noise_path)
+        assert channel.header.ch_num not in channels.keys()
+        channels[channel.header.ch_num] = channel
+    return cls(channels, description)
 
     @classmethod
     def from_off_paths(cls, off_paths, description):
