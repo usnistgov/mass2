@@ -1,18 +1,24 @@
 site_name: Mass2
+site_url: https://usnistgov.github.io/mass2/
+
 nav:
   - Home: index.md
+  - Getting started: getting_started.md
   - Demo plot: demo_plot.md
-  - Docstrings: docstrings.md
   - Optimal filtering: filtering.md
-  - Fluorescence lines: fluorescence.md
-  - Line fitting: line_fitting.md
-  - HCI lines: hci_lines_from_asd.md
+  - Fluorescence lines:
+    - Atomic fluorescence: fluorescence.md
+    - Line fitting: line_fitting.md
+    - Highly-charge ion lines: hci_lines_from_asd.md
   - X-ray efficiency models: xray_efficiency_models.md
-  - LJH file format: LJHfiles.md
-  - Testing: tests.md
+  - Digging deeper:
+    - LJH file format: LJHfiles.md
+    - Docstrings: docstrings.md
+    - Testing: tests.md
   - About: about.md
 
-theme: readthedocs
+theme:
+  readthedocs
 
 plugins:
 - search
