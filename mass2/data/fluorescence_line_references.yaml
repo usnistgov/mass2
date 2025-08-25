@@ -53,7 +53,7 @@
 - tag: Deslattes Notebook Si
   description: |
     Scanned pages from Deslattes/Mooney's notebook provided by Csilla Szabo-Foster.
-    Added by GCO Oct 7 2019: Used the postion and width values from the from the lowest listed fit,
+    Added by GCO Oct 7 2019: Used the position and width values from the from the lowest listed fit,
     the one in energy units. Used the intensities from the Second lowest fit, the one labeled
     PLUS-POSITION SCAN (best-fit Voight profile). Also the notebook only included the Ka1 and Ka2,
     not the higher energy satellites, so I made up numbers for the small feature at higher energy.
@@ -62,16 +62,22 @@
   description: |
     Scanned pages from Deslattes/Mooney's notebook
     provided by Csilla Szabo-Foster. Added by GCO Oct 30 2019. Used
-    the postion and width values from the from the lowest listed fit, the one in energy units. Used the
+    the position and width values from the from the lowest listed fit, the one in energy units. Used the
     intensities from the Second lowest fit, the one labeled PLUS-POSITION SCAN (best-fit Voight profile). The
-    detector resolution ("width of Gauss. res. func." in MINUS-POSITON scan) is less than the Gaussian Width
-    ("Gaussian width" in PLUS-POSITON scan) I haven't accounted for that, so our models still don't match
+    detector resolution ("width of Gauss. res. func." in MINUS-POSITION scan) is less than the Gaussian Width
+    ("Gaussian width" in PLUS-POSITION scan) I haven't accounted for that, so our models still don't match
     Deslattes. We would need a gaussian_atomic_physics component added to our models. Also the notebook only
     included the Ka1 and Ka2, not the higher energy satellites, so I made up numbers for the small feature at
     higher energy or estimated them from data in Mauron, O., Dousse, J. C., Hoszowska, J., Marques, J. P.,
     Parente, F., & Polasik, M. (2000). L-shell shake processes resulting from 1s photoionization in elements
     11≤Z≤17. Physical Review A - Atomic, Molecular, and Optical Physics, 62(6), 062508–062501.
   URL: https://doi.org/10.1103/PhysRevA.62.062508
+
+- tag: HAUSKat 2024
+  description: |
+    Data are from fits to the HAUSKat calibration spectrum taken by ~1 eV TESs at BESSY-II.
+    They are NOT absolutely calibrated; the energies come from [1] in SRD-128, meaning Bearden 1967.
+    For C, N, O K lines, which don't appear in SRD-128, we use Zschornack 2007, from Bearden 1967.
 
 - tag: Hoelzer 1997
   description: |
