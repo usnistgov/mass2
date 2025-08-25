@@ -5,7 +5,7 @@ import typing
 import pylab as plt
 
 import mass2
-from mass2.core.cal_steps import CalStep
+from mass2.core.recipe import RecipeStep
 
 
 def drift_correct_mass(indicator, uncorrected):
@@ -28,7 +28,7 @@ drift_correct = drift_correct_mass
 
 
 @dataclass(frozen=True)
-class DriftCorrectStep(CalStep):
+class DriftCorrectStep(RecipeStep):
     dc: typing.Any
 
     def calc_from_df(self, df):

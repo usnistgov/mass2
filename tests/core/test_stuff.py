@@ -307,7 +307,7 @@ def test_pretrig_mean_jump_fix_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.PretrigMeanJumpFixStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.PretrigMeanJumpFixStep)
 
 
 def test_extract_column_names_from_polars_expr():
@@ -332,7 +332,7 @@ def test_select_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.SelectStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.SelectStep)
 
 
 def test_categorize_step():
@@ -354,7 +354,7 @@ def test_categorize_step():
         ch2.save_steps(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
-        assert isinstance(steps2[0][0], mass2.core.cal_steps.CategorizeStep)
+        assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)
 
 
 def test_external_trigger_experiment_state():
@@ -391,12 +391,12 @@ def test_external_trigger_experiment_state():
 
 
 def test_steps():
-    "Apply some steps, and be sure that `CalSteps.trim_dead_ends(...) works"
+    "Apply some steps, and be sure that `Recipe.trim_dead_ends(...) works"
 
     def squareme(d):
         return d**2
 
-    # Perform 5 offical CalSteps: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
+    # Perform 5 offical Recipe: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
             ch.summarize_pulses()
@@ -416,9 +416,9 @@ def test_steps():
     steps = ch.steps
     assert len(steps) == 5
 
-    def is_in_calsteps(x: mass2.core.CalStep, steps: mass2.core.CalSteps) -> bool:
-        """An approximate test whether CalStep `x` is in the CalStep chain `steps`, testing only equality of
-        name, inputs, outputs, rather than identity. (We don't want to check identity, because the CalStep object
+    def is_in_calsteps(x: mass2.core.RecipeStep, steps: mass2.core.Recipe) -> bool:
+        """An approximate test whether RecipeStep `x` is in the RecipeStep chain `steps`, testing only equality of
+        name, inputs, outputs, rather than identity. (We don't want to check identity, because the RecipeStep object
         may have been changed by a step.drop_debug() operation.)
         """
         for s in steps:
