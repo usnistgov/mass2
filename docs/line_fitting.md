@@ -56,10 +56,6 @@ plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, "k", lw=0.5)
 plt.xlabel("Energy (eV)")
 plt.title("Mn K$\\alpha$ random deviates and theory curve")
 ```
-  <!-- plt.savefig("img/distribution_plus_theory.png"); plt.close()
-
-.. image:: img/distribution_plus_theory.png
-  :width: 40% -->
 
 
 The `SpectralLine` object is useful to you if you need to generate simulated data, or to plot a line shape, as shown above. The objects that perform line fitting  use the `SpectralLine` object to hold line shape information. You don't need to create a `SpectralLine` object for fitting, though; it will be done automatically.
