@@ -500,8 +500,8 @@ By default all steps in a recipe are saved, but you might not want or need this.
 
 ```python
 required_fields = {"energy_5lagy_best", "pretrig_mean"}
-recipe_file = os.path.join(output_dir.name, "trimmed_recipes.pkl")
-data.save_recipes(recipe_file, required_fields=required_fields)
+trimmed_recipe_file = os.path.join(output_dir.name, "trimmed_recipes.pkl")
+data.save_recipes(trimmed_recipe_file, required_fields=required_fields)
 ```
 
 This version will save all the steps that produce the two specified `required_fields`, and all steps that the depend on. The two rough calibration steps, however, will be trimmed away as dead ends. (In this instance, having the pretrigger mean as a required field is superfluous. It's already required in the drift correction step, which is required before the step that takes drift-corrected optimally-filtered pulse height into energy.)
@@ -517,7 +517,7 @@ data_replay = mass2.Channels.from_ljh_folder(
     pulse_folder=pn_pair.pulse_folder,
     noise_folder=pn_pair.noise_folder
 ).with_experiment_state_by_path()
-data_replay = data_replay.load_recipes("trimmed_recipes.pkl")
+data_replay = data_replay.load_recipes(trimmed_recipe_file)
 
 ```
 
