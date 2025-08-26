@@ -24,6 +24,10 @@ def test_truebq():
     from . import truqbq_from_parquet_202508 as notebook
     notebook.app.run()
 
+def test_gamma():
+    from . import gamma_20241005 as notebook
+    notebook.app.run()
+
 # currently fails due to raising a warning on an unclosed file
 # @pytest.mark.filterwarnings("ignore:pytest.PytestUnraisableExceptionWarning")
 # def test_ebit_july2024_mass_off():

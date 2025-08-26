@@ -50,9 +50,13 @@ class Channel:
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
-    steps: Recipe = field(default_factory=Recipe.new_empty)
+    steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+
+    @property
+    def shortname(self):
+        return self.header.description
 
     def mo_stepplots(self):
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -140,7 +144,7 @@ class Channel:
         # Customize the plot
         ax.set_xlabel(str(col))
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
-        ax.set_title(f"Histogram of {col} for {self}")
+        ax.set_title(f"Histogram of {col} for {self.shortname}")
 
         plt.tight_layout()
         return bin_centers, counts

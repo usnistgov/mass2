@@ -107,7 +107,12 @@ class BestAssignmentPfitGainResult:
         # the pulse height at which the gain is zero
         # for now I'm counting on the roots being ordered, we want the positive root where gain goes zero
         # since our function is invalid outside that range
-        return self.pfit_gain.roots()[1]
+        if self.pfit_gain.degree() == 2:
+            return self.pfit_gain.roots()[1]
+        elif self.pfit_gain.degree() == 1:
+            return self.pfit_gain.roots()[0]
+        else:
+            raise ValueError()
 
     def ph2energy(self, ph: ndarray | float) -> float64 | ndarray:
         return ph / self.pfit_gain(ph)
@@ -733,11 +738,10 @@ class RoughCalibrationStep(RecipeStep):
         assert len(uncalibrated) > 10, "not enough pulses"
         pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
-
         step = cls(
             [uncalibrated_col],
             [calibrated_col],
-            ch.good_expr,
+            ch.good_expr.and_(pl.col(uncalibrated_col)<assignment_result.phzerogain()),
             use_expr=use_expr,
             pfresult=pfresult,
             assignment_result=assignment_result,
