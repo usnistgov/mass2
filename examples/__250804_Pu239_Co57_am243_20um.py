@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.15.0"
 app = marimo.App(width="medium")
 
 
@@ -535,12 +535,26 @@ def _(category_condition_dict, mo):
 
 
 @app.cell
+def _(ch4):
+    ch4.df
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
 def _(ch4, mass2, mo, pl, plt, pulses_with_subtracted_pretrigger_mean):
     _elo, _ehi = 5.5e6, 6e6
-    _pulses = (
+    _eA = 5.2465e6
+    _eB = 5.2584e6
+    _pulsesA = (
         ch4.df.lazy()
         .filter(
-            pl.col("category") == "clean", pl.col("energy_5lagy").is_between(_elo, _ehi)
+            (pl.col("category") == "clean").and_(pl.col("energy_5lagy").is_between(_eA-2000, _eA+2000)),
+            pl.col("frames_from_last")>8000
         )
         .limit(50)
         .select("pulse")
@@ -548,11 +562,35 @@ def _(ch4, mass2, mo, pl, plt, pulses_with_subtracted_pretrigger_mean):
         .to_series()
         .to_numpy()
     )
-    plt.plot(pulses_with_subtracted_pretrigger_mean(_pulses.T, 30))
-    plt.suptitle(f"pulses which are between {_elo:g} and {_ehi:g} eV and clean")
+    _pulsesB = (
+        ch4.df.lazy()
+        .filter(
+            (pl.col("category") == "clean").and_(pl.col("energy_5lagy").is_between(_eB-2000, _eB+2000)),
+            pl.col("frames_from_last")>8000
+        )
+        .limit(50)
+        .select("pulse")
+        .collect()
+        .to_series()
+        .to_numpy()
+    )
+    f1=plt.figure()
+    plt.plot(pulses_with_subtracted_pretrigger_mean(_pulsesA.T, 30))
+    plt.suptitle(f"pulses which are between {_eA-2000:g} and {_eA+2000:g} eV and clean")
     plt.xlabel("sample number")
     plt.ylabel("signal (dac units)")
-    mo.vstack([mo.md("#pulse in energy range viewer"), mass2.show()])
+    # f2=plt.figure()
+    # plt.plot(pulses_with_subtracted_pretrigger_mean(_pulsesB.T, 30))
+    # plt.suptitle(f"pulses which are between {_eB-2000:g} and {_eB+2000:g} eV and clean")
+    # plt.xlabel("sample number")
+    # plt.ylabel("signal (dac units)")
+    f2 = plt.figure()
+    plt.plot(pulses_with_subtracted_pretrigger_mean(_pulsesA.T,30),"k")
+    plt.plot(pulses_with_subtracted_pretrigger_mean(_pulsesB.T,30),"c")
+    plt.suptitle(f"comparing pulse shapes from the Pu239 and Pu240 peaks")
+    plt.xlabel("sample number")
+    plt.ylabel("signal (dac units)")
+    mo.vstack([mo.md("#pulse in energy range viewer"), mass2.show(f1), mass2.show(f2)])
     return
 
 
