@@ -542,7 +542,7 @@ for field in ("pulse_rms", "5lagy", "5lagx", "energy_5lagy_best"):
     assert(df2[field].equals(df1[field]))
 
 # But two fields remove from the trimmed recipe should NOT exist in the replay:
-for field in ("energy_pulse_rms", "energy_5lagy_dc")
+for field in ("energy_pulse_rms", "energy_5lagy_dc"):
     assert field not in df2
 ```
 
