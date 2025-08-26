@@ -4,23 +4,25 @@ The Microcalorimeter Analysis Software Suite, or Mass, is a library designed for
 
 ## Key features and methods
 
-1. Mass2 uses represents pulse data using a [Pola.rs](https://pola.rs/) DataFrame. Each row represents a single pulse, and there may be an arbitrary number of columns representing "per pulse quantities". The raw pulse record may be stored in the DataFrame as well, mass2 uses "memmap"ing to limit memory usage in this case. The use of the Polars DataFrame enables many best in class methods of slicing and dicing your data, and abstracts away the input file format and output file format, allowing Mass2 to easily handle data from many different file formats (LJH, OFF, .bin, and anything you can make a numpy array from) and export/reload from many formats as well. When in doubt, we suggest using the [Apache Parquet](https://parquet.apache.org) to save data.
-2. Mass2 is designed to do analysis on arrays of microcalorimeters, so Mass2 provides APIs and algorithsm that can operate on 100s of distinct channels all at the same time. 
-3. Mass2 creates and applies optimal filters.
-4. Mass2 creaets an applies energy-calibration functions.
-5. Mass2 Fits known fluoresence-line shapes to measurd spectra, and can generate calibrations from the fits.
-6. Mass2 supports two modes of operating a. From scratch, where you analyze detector data for the first time assuming no pre-knowledge and b. Recipes, where you "replay" an analysis Recipe. In Recipe mode, there is no learning from data, it simply does the same transformations to your DataFrame to proeduce a new DataFrame. This is intended for use in instruments that operate the same way day in and day out.
-7. Mass2 uses many programming best practices, including automated testing and doc tests. We also have adopted an immutable first approach, where the majority of objects are immutable, like the Polars DataFrame. Data transformations are reprented by binding a new variable for example `ch2 = ch.do_something()`. This makes the code easier to read and reason about.
+* Mass2 represents microcalorimeter pulse data using a [Pola.rs](https://pola.rs/) DataFrame. Each row represents a single pulse, and there may be an arbitrary number of columns representing "per pulse quantities". The raw pulse record may be stored in the DataFrame as well; Mass2 uses "memmaps" to limit memory usage in this case. The use of the Polars DataFrame enables many best-in-class methods for slicing and dicing your data. It abstracts away the input and output file formats, allowing Mass2 to easily handle data from many different file formats (LJH, OFF, .bin, and anything you can make a numpy array from). It enables export/reload from many formats as well. When in doubt, we suggest using the [Apache Parquet](https://parquet.apache.org) file format to save data in a native data frame structure.
+* Mass2 is designed to do analysis on arrays of microcalorimeters, so Mass2 provides APIs and algorithms that can perform equivalent operations on hundreds of distinct channels all at once.
+* Mass2 creates and applies optimal filters.
+* Mass2 creates and applies energy-calibration functions.
+* Mass2 Fits known fluoresence-line shapes to measured spectra, and it can generate calibrations from the fits.
+* Mass2 supports two modes of operation:
+    1. From scratch, where you analyze detector data for the first time assuming no prior knowledge and
+    2. From Recipes, where you "replay" an analysis Recipe created in the other mode. In Recipe mode, there is no learning from data, it simply does the same transformations to your DataFrame to produce a new DataFrame. This is intended for use in instruments that operate the same way day in and day out.
+* Mass2 uses many programming best practices, including automated testing and doc tests. We also have adopted an immutable-first approach, where the majority of Python objects are immutable, like the Polars DataFrame. Data transformations are reprented by binding a new variable for example `ch2 = ch.do_something()`. This makes the code easier to read and reason about.
 
 ## Comparison of Mass versions 2 vs 1
 
-Mass2 builds on many lessons learned developing Mass, and adopts many newer practices. Mass was created starting November 2010 with the goal of analyzing data from a 16 pixel array, and in many ways was an inflexible custom built Data Science library before Data Science was a common word. Pandas, a popular DataFrame library, existed in 2010 but was not widely known and had only a signle major contributor. 
+Mass2 builds on many lessons learned developing Mass and adopts many newer practices. Mass was created starting in February 2011 with the goal of analyzing data from a 16-pixel array. It was, in many ways, an inflexible, custom-built Data Science library before Data Science was a common term. Pandas, a popular DataFrame library, existed in 2011 but was not widely known and had only one major contributor. Changes from Mass version 1 include:
 
-1. Mass2 takes a different view of data wrangling and bookkeeping than version 1, leveraging the power of the [Pola.rs](https://pola.rs/) Dataframe for this purpose. Polars is a high-performance modern dataframe library. It organizes the data structures and provides data I/O. This change increases efficiency and performance for some activities. More importantly, using a Dataframe makes the arrays of per-pulse quantities both flexible (you can add fields of your own design on equal footing with standard quantities) and clearer (you can easily find a complete list of all such quantities with data types and statistics).
-2. Mass2 no longer uses HDF5 datasets to automatically cache analysis results alongside the raw data. This change removes a valuable, but often maddeningly imperfect feature. We think the cost worth paying. There are big benefits in clarity and avoiding both errors and hidden side-effects.
+1. Mass2 takes a different view of data wrangling and bookkeeping than version 1, leveraging the power of the [Pola.rs](https://pola.rs/) Dataframe for this purpose. Polars is a high-performance modern dataframe library. It organizes the data structures and provides data I/O. This change increases efficiency and performance for some activities. More importantly, using a Dataframe makes the arrays of per-pulse quantities both flexible (you can add fields of your own design on equal footing with standard quantities) and clearer (you can easily find a complete list of all such quantities, plus data types and statistics).
+2. Mass2 no longer uses HDF5 datasets to automatically cache analysis results alongside the raw data. This change removes a valuable, but often maddeningly imperfect feature. We think the cost worth paying. There are big benefits in clarity and avoiding both errors and hidden side effects.
 3. Mass2 give access to the native save/load features of Polars, making it easy to preserve and recover subsets or complete sets of analyzed data. The preferred file format is [Apache Parquet](https://parquet.apache.org), but several other choices like CSV are supported and can be used for interchange with frameworks other than Mass.
 4. Many data structures in Mass2 use Python's "frozen dataclasses" features, making them immutable. With immutable objects, it is much easier to avoid inconsistent state and sneaky bugs. They will take some getting used to at first, but (just as with the lack of HDF5 backing) we believe the benefits are worth the costs.
-5. Mass2 tries to expose all functionality as a "bare function" that takes arrays as argument, then also exposes that with a convenient `ch.do_something()` API, while in Mass much functionality was impossible to use on it's own.
+5. Mass2 tries to expose all functionality as a "bare function" that takes arrays as argument, then also exposes that with a convenient `ch.do_something()` API; in Mass version 1, many algorithms were implemented as methods of a data class and thus impossible to use on their own.
 
 Some things have not changed. Mass still makes heavy use of the libraries:
 
@@ -106,7 +108,7 @@ plt.plot(y, ".r")
 
 ### How to load pre-filtered pulses from OFF files
 
-OFF files do not record the entire microcalorimeter pulse, but only a summary of it. This means that no analysis steps that require the raw pulse can be performed. Also, many of the per-pulse summary quantities that exist in an OFF file have different names (and perhaps slightly different definitions) than the corresponding fields computed in a standard LJH-based analysis. Use of OFF files is not a primary goal of Mass2 in the initial released, but they are supported for legacy analysis.
+OFF files do not record the entire microcalorimeter pulse, but only a summary of it. This means that no analysis steps that require the raw pulse can be performed. Also, many of the per-pulse summary quantities that exist in an OFF file have different names (and perhaps slightly different definitions) than the corresponding fields computed in a standard LJH-based analysis. Use of OFF files is not a primary goal of Mass2 in the initial release, but they are supported for legacy analysis.
 
 ```python
 # Load one OFF file into an `OffFile` object'
@@ -282,7 +284,7 @@ This section concentrate on the first case, analysis of new data for which no es
 
 ### Summarizing pulses
 
-The `Channel.summarize_pulses()` method returns a new `Channel` with a much enhanced dataframe that has nearly a dozen new columns, such as `["pretrig_mean", "pulse_rms", ...]`. To use this method on all the Channels in a `Channels` object, we make use of the handy `Channels.map()` method. It takes a single, callable argument `f` which must accept a `Channel` object and returns a modifie version of it. We also often follow this up by a function that attaches a "good expression" to each channel. Here we'll consider pulses "good" when their pretrigger rms and their postpeak derivatives are no more than 8-sigma off the median. These two steps can be performed with `map()` like this:
+The `Channel.summarize_pulses()` method returns a new `Channel` with a much enhanced dataframe that has nearly a dozen new columns, such as `["pretrig_mean", "pulse_rms", ...]`. To use this method on all the `Channel`s in a `Channels` object, we make use of the handy `Channels.map()` method. It takes a single, callable argument `f` which must accept a `Channel` object and returns a modified version of it. We also often follow this up by a function that attaches a "good expression" to each channel. Here we'll consider pulses "good" when their pretrigger rms and their postpeak derivatives are no more than 8-sigma off the median. These two steps can be performed with `map()` like this:
 
 ```python
 # mkdocs: render
@@ -303,11 +305,11 @@ plt.xlabel("Pulse rms (arbs)")
 plt.title(f"The middle 99% of pulse rms values for channel {ch.header.ch_num}")
 ```
 
-You may either re-use the same variable name, eg `data=data.do_something()` here or use a new variable name eg `data2`. Most operations only _add_ to the fields in a data frame, without modifying or removing any existing fields, so preserving the old object is not usually useful. But it can be useful to build up an analysis in stages, checkpointing with new variables names as you go. Many of the example notebooks use `data`, `data2`, `data3` as checkpoints.
+You may either re-use the same variable name, e.g., `data=data.do_something()` here, or use a new variable name such as `data2`. Most operations only _add_ to the fields in a data frame, without modifying or removing any existing fields, so preserving the old object is not usually useful. It can be useful to build up an analysis in stages, however, checkpointing with new variables names as you go. Many of the example notebooks use `data`, `data2`, `data3` as checkpoints.
 
 ### Computing and applying optimal filters
 
-To compute an optimal filter for each channel, one must analyze the noise (to learn its autocorrelation function) and create a model of pulses (typically, the model is an average pulse, possibly computed over a selected subset of the records). The simplest approach is to use the `Channel.filter5lag` method. It analyzes noise a standard way, and it computes an average of all pulses designated "good" in the previous step. If you wanted to restrict those pulses further, an optional `use_expr` argument lets you pass in a Polars expression to reject pulses outside a certain range of times, or experiment states, or to select based on a range of `pulse_rms` values. The `good_expr` is remember through each step of the analsys, while the `use_expr` is used only for a single step of the analysis. We'll skip the "use" here and instead take the default choice of using all good pulses
+To compute an optimal filter for each channel, one must analyze the noise (to learn its autocorrelation function) and create a model of pulses (typically, the model is an average pulse, possibly computed over a selected subset of the records). The simplest approach is to use the `Channel.filter5lag` method. It analyzes noise a standard way, and it computes an average of all pulses designated "good" in the previous step. If you wanted to restrict those pulses further, an optional `use_expr` argument lets you pass in a Polars expression to reject pulses outside a certain range of times, or experiment states, or to select based on a range of `pulse_rms` values. The `good_expr` is remembered through each step of the analsys, while the `use_expr` is used only for a single step of the analysis. We'll skip the "use" here and instead take the default choice of using all good pulses:
 
 ```python
 # mkdocs: render
@@ -422,8 +424,8 @@ def do_multifit(ch: mass2.Channel) -> mass2.Channel:
         multifit = multifit.with_line(line, dlo=dlow.get(line, None), dhi=dhigh.get(line, None))
     return ch.multifit_mass_cal(multifit, STEP_WITH_ROUGH_CAL, "energy_5lagy_best")
 
-data2 = data.map(do_multifit)
-ch = data2.ch0
+data = data.map(do_multifit)
+ch = data.ch0
 plt.clf()
 ax1 = plt.subplot(211)
 use_cal = (pl.col("state_label") == "CAL2")
@@ -456,6 +458,7 @@ Sometimes you run an analysis that you consider "final"; you want to keep the re
 **Approach A: one file per channel** Here we store each channel's dataframe in a separate file. Notice that we want to drop the column representing the raw pulse data, because the output would otherwise be far too large (and redundant). Probably it's fine to drop the subframe count, too, so we do that here.
 
 ```python
+# mkdocs: render
 # For automated tests, we want the output in a temporary directory
 import tempfile, os
 output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
@@ -530,9 +533,17 @@ data_replay = mass2.Channels.from_ljh_folder(
     pulse_folder=pn_pair.pulse_folder,
     noise_folder=pn_pair.noise_folder
 ).with_experiment_state_by_path()
-data_replay = data_replay.load_recipes(trimmed_recipe_file)
-assert(data_replay.ch0.df.equal(data.ch0.df))
+data_replay = data_replay.load_recipes(trimmed_recipe_filename)
 
+# Verify that some expected columns exist in the replay and have identical values
+df1 = data.ch0.df
+df2 = data_replay.ch0.df
+for field in ("pulse_rms", "5lagy", "5lagx", "energy_5lagy_best"):
+    assert(df2[field].equals(df1[field]))
+
+# But two fields remove from the trimmed recipe should NOT exist in the replay:
+for field in ("energy_pulse_rms", "energy_5lagy_dc")
+    assert field not in df2
 ```
 
 ## Further examples
