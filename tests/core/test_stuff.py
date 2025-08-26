@@ -304,7 +304,7 @@ def test_pretrig_mean_jump_fix_step():
     assert step.output == ["ptm_jf"]
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
-        ch2.save_steps(tmpfilename)
+        ch2.save_recipes(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.PretrigMeanJumpFixStep)
@@ -329,7 +329,7 @@ def test_select_step():
     assert set(step.output) == set(["a*5", "a+b"])
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
-        ch2.save_steps(tmpfilename)
+        ch2.save_recipes(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.SelectStep)
@@ -351,7 +351,7 @@ def test_categorize_step():
     assert (df["expected"] == df["category"].cast(str)).all()
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
-        ch2.save_steps(tmpfilename)
+        ch2.save_recipes(tmpfilename)
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)

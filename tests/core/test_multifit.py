@@ -77,7 +77,7 @@ def test_multifit_and_saving_and_loading_steps_in_channel():
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
-        ch.save_steps(filename)
+        ch.save_recipes(filename)
         steps_loaded = mass2.misc.unpickle_object(filename)
     steps_loaded[ch.header.ch_num][-1].dbg_plot(ch.df)
 
@@ -91,12 +91,12 @@ def test_multifit_and_saving_and_loading_steps_in_channels():
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
-        data.save_steps(filename)
-        _ = data.load_steps(filename)  # it would be better to start with a data that doesn't have the output of the steps...
+        data.save_recipes(filename)
+        _ = data.load_recipes(filename)  # it would be better to start with a data that doesn't have the output of the steps...
         # and maybe throw an error for writing over existing columns?
         # fow now, I'm happy this is tested at all
         steps = mass2.misc.unpickle_object(filename)
-    _ = data.with_steps_dict(steps)  # pretty much the blow by blow version of load_steps
+    _ = data.with_steps_dict(steps)  # pretty much the blow by blow version of load_recipes
 
 
 if __name__ == "__main__":
