@@ -443,9 +443,14 @@ Sometimes you run an analysis that you consider "final"; you want to keep the re
 **Approach A: one file per channel** Here we store each channel's dataframe in a separate file. Notice that we want to drop the column representing the raw pulse data, because the output would otherwise be far too large (and redundant). Probably it's fine to drop the subframe count, too, so we do that here.
 
 ```python
+# For automated tests, we want the output in a temporary directory
+import tempfile, os
+output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
+print(f"Test output lives in '{output_dir.name}'")
+
 columns_to_drop = ("pulse", "subframecount")
 for cnum, ch in data.channels.items():
-    filename = f"output_test_chan{cnum}.parquet"
+    filename = os.path.join(output_dir.name, f"output_test_chan{cnum}.parquet")
     df = ch.df.drop(columns_to_drop)
     df.write_parquet(filename)
 ```
@@ -474,7 +479,7 @@ all_df = []
 for cnum, ch in data.channels.items():
     df = ch.df.drop(columns_to_drop).with_columns(chan_number=pl.lit(cnum))
     all_df.append(df)
-filename = f"output_test_allchan.parquet"
+filename = os.path.join(output_dir.name, "output_test_allchan.parquet")
 pl.concat(all_df).write_parquet(filename)
 ```
 
@@ -485,7 +490,8 @@ pl.concat(all_df).write_parquet(filename)
 The system for storing analysis recipes is extremely simple. The following will save the full analysis recipe for each channel in the `data` object.
 
 ```python
-data.save_recipes("full_recipes.pkl")
+recipe_file = os.path.join(output_dir.name, "full_recipes.pkl")
+data.save_recipes(recipe_file)
 ```
 
 Beware that this operation will drop all "debug information" in certain steps in the recipe (generally, any steps that store a lot of data that's used not for _performing_ the step but only for debugging). The benefit is that the recipes file is smaller, and faster to save and load. The cost is that debugging plots cannot be made after the recipes are reloaded. You probably save a recipe because you've already debugged its steps, so this is usually an acceptable tradeoff. If you don't like it, use the `drop_debug=False` argument.
@@ -494,7 +500,8 @@ By default all steps in a recipe are saved, but you might not want or need this.
 
 ```python
 required_fields = {"energy_5lagy_best", "pretrig_mean"}
-data.save_recipes("trimmed_recipes.pkl", required_fields=required_fields)
+recipe_file = os.path.join(output_dir.name, "trimmed_recipes.pkl")
+data.save_recipes(recipe_file, required_fields=required_fields)
 ```
 
 This version will save all the steps that produce the two specified `required_fields`, and all steps that the depend on. The two rough calibration steps, however, will be trimmed away as dead ends. (In this instance, having the pretrigger mean as a required field is superfluous. It's already required in the drift correction step, which is required before the step that takes drift-corrected optimally-filtered pulse height into energy.)
