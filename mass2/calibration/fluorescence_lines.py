@@ -188,7 +188,7 @@ class SpectralLine:
             for component in self.components(x, instrument_gaussian_fwhm):
                 axis.plot(x, component, "--")
         pdf = self.pdf(x, instrument_gaussian_fwhm)
-        axis.plot(x, pdf, "k", lw=2, label=label, color=color)
+        axis.plot(x, pdf, lw=2, label=label, color=color)
         axis.set_xlabel("Energy (eV)")
         axis.set_ylabel(f"Counts per {float(x[1] - x[0]):.2} eV bin")
         axis.set_xlim(x[0], x[-1])

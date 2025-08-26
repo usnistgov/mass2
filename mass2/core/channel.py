@@ -504,6 +504,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
+        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
         assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter_maker = FilterMaker(
@@ -755,7 +756,7 @@ class Channel:
     def as_bad(self, error_type, error_msg, backtrace):
         return BadChannel(self, error_type, error_msg, backtrace)
 
-    def save_steps(self, filename):
+    def save_recipes(self, filename):
         steps = {self.header.ch_num: self.steps[:]}
         misc.pickle_object(steps, filename)
         return steps

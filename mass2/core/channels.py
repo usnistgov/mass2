@@ -305,16 +305,16 @@ class Channels:
         return Channels(ch2s, self.description)
 
     def with_steps_dict(self, steps_dict):
-        def load_steps(channel):
+        def load_recipes(channel):
             try:
                 steps = steps_dict[channel.header.ch_num]
             except KeyError:
                 raise Exception("steps dict did not contain steps for this ch_num")
             return channel.with_steps(steps)
 
-        return self.map(load_steps)
+        return self.map(load_recipes)
 
-    def save_steps(self, filename, required_fields: str | Iterable[str] | None = None, drop_debug=True) -> dict[int, Recipe]:
+    def save_recipes(self, filename, required_fields: str | Iterable[str] | None = None, drop_debug=True) -> dict[int, Recipe]:
         """Pickle a dictionary (one entry per channel) of Recipe objects.
 
         If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),
@@ -344,7 +344,7 @@ class Channels:
         mass2.misc.pickle_object(steps, filename)
         return steps
 
-    def load_steps(self, filename):
+    def load_recipes(self, filename):
         steps = mass2.misc.unpickle_object(filename)
         return self.with_steps_dict(steps)
 

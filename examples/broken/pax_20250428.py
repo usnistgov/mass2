@@ -341,7 +341,7 @@ def _(mo):
 
 @app.cell
 def _(data3):
-    data3.save_steps(data3.get_path_in_output_folder("steps_dict.pkl"))
+    data3.save_recipes(data3.get_path_in_output_folder("steps_dict.pkl"))
     return
 
 
