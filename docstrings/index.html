@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link rel="canonical" href="https://usnistgov.github.io/mass2/docstrings/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
     <title>Docstrings - Mass2</title>
     <link rel="stylesheet" href="../css/theme.css" />
@@ -15,7 +15,7 @@
         // Current page data
         var mkdocs_page_name = "Docstrings";
         var mkdocs_page_input_path = "docstrings.md";
-        var mkdocs_page_url = null;
+        var mkdocs_page_url = "/mass2/docstrings/";
       </script>
     
     <!--[if lt IE 9]>
@@ -45,11 +45,35 @@
                 </li>
               </ul>
               <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../getting_started/">Getting started</a>
+                </li>
+              </ul>
+              <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../demo_plot/">Demo plot</a>
                 </li>
               </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../filtering/">Optimal filtering</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Fluorescence lines</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../fluorescence/">Atomic fluorescence</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../line_fitting/">Line fitting</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../hci_lines_from_asd/">Highly-charge ion lines</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../xray_efficiency_models/">X-ray efficiency models</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Digging deeper</span></p>
               <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">Docstrings</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../LJHfiles/">LJH file format</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Docstrings</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#mass2.core.channel">channel</a>
     </li>
@@ -73,9 +97,11 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#mass2.core.channels.Channels">Channels</a>
         <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.channels.Channels.from_ljh_path_pairs">from_ljh_path_pairs</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#mass2.core.channels.Channels.plot_hists">plot_hists</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.channels.Channels.save_steps">save_steps</a>
+    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.channels.Channels.save_recipes">save_recipes</a>
     </li>
         </ul>
     </li>
@@ -109,25 +135,25 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#mass2.core.analysis_algorithms.unwrap_n">unwrap_n</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.cal_steps">cal_steps</a>
+    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.recipe">recipe</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.cal_steps.CalStep">CalStep</a>
+    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.recipe.ColumnAsNumpyMapStep">ColumnAsNumpyMapStep</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.recipe.Recipe">Recipe</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.cal_steps.CalStep.drop_debug">drop_debug</a>
+    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.recipe.Recipe.calc_from_df">calc_from_df</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.recipe.Recipe.trim_dead_ends">trim_dead_ends</a>
     </li>
         </ul>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.cal_steps.CalSteps">CalSteps</a>
+    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.recipe.RecipeStep">RecipeStep</a>
         <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.cal_steps.CalSteps.calc_from_df">calc_from_df</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.cal_steps.CalSteps.trim_dead_ends">trim_dead_ends</a>
+    <li class="toctree-l3"><a class="reference internal" href="#mass2.core.recipe.RecipeStep.drop_debug">drop_debug</a>
     </li>
         </ul>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.cal_steps.ColumnAsNumpyMapStep">ColumnAsNumpyMapStep</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.cal_steps.SelectStep">SelectStep</a>
+    <li class="toctree-l2"><a class="reference internal" href="#mass2.core.recipe.SelectStep">SelectStep</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#mass2.core.drift_correction">drift_correction</a>
     </li>
@@ -198,35 +224,9 @@
     <li class="toctree-l2"><a class="reference internal" href="#hci-lines">HCI lines</a>
     </li>
     </ul>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../filtering/">Optimal filtering</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../fluorescence/">Fluorescence lines</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../line_fitting/">Line fitting</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../hci_lines_from_asd/">HCI lines</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../xray_efficiency_models/">X-ray efficiency models</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../LJHfiles/">LJH file format</a>
-                </li>
-              </ul>
-              <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../tests/">Testing</a>
-                </li>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../tests/">Testing</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../about/">About</a>
@@ -246,6 +246,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Digging deeper</li>
       <li class="breadcrumb-item active">Docstrings</li>
     <li class="wy-breadcrumbs-aside">
     </li>
@@ -1060,7 +1061,10 @@
 <span class="normal">831</span>
 <span class="normal">832</span>
 <span class="normal">833</span>
-<span class="normal">834</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># noqa: PLR0904</span>
+<span class="normal">834</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># noqa: PLR0904</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Channel</span><span class="p">:</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">header</span><span class="p">:</span> <span class="n">ChannelHeader</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="nb">repr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -1069,9 +1073,13 @@
     <span class="n">noise</span><span class="p">:</span> <span class="n">NoiseChannel</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">good_expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">alwaysTrue</span><span class="p">)</span>
     <span class="n">df_history</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="n">steps</span><span class="p">:</span> <span class="n">CalSteps</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">CalSteps</span><span class="o">.</span><span class="n">new_empty</span><span class="p">)</span>
+    <span class="n">steps</span><span class="p">:</span> <span class="n">Recipe</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">Recipe</span><span class="o">.</span><span class="n">new_empty</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">steps_elapsed_s</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
     <span class="n">transform_raw</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shortname</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">description</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">mo_stepplots</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">desc_ind</span> <span class="o">=</span> <span class="p">{</span><span class="n">step</span><span class="o">.</span><span class="n">description</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">)}</span>
@@ -1159,7 +1167,7 @@
         <span class="c1"># Customize the plot</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
         <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Counts per </span><span class="si">{</span><span class="n">step_size</span><span class="si">:</span><span class="s2">.02f</span><span class="si">}</span><span class="s2"> unit bin"</span><span class="p">)</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Histogram of </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Histogram of </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shortname</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">bin_centers</span><span class="p">,</span> <span class="n">counts</span>
@@ -1375,9 +1383,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_column_map_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""f should take a numpy array and return a numpy array with the same number of elements"""</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">ColumnAsNumpyMapStep</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">input_col</span><span class="p">],</span> <span class="p">[</span><span class="n">output_col</span><span class="p">],</span> <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span>
-        <span class="p">)</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">ColumnAsNumpyMapStep</span><span class="p">([</span><span class="n">input_col</span><span class="p">],</span> <span class="p">[</span><span class="n">output_col</span><span class="p">],</span> <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_step</span><span class="p">(</span><span class="n">step</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_good_expr_pretrig_rms_and_postpeak_deriv</span><span class="p">(</span>
@@ -1457,7 +1463,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_step</span><span class="p">(</span><span class="n">step</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">correct_pretrig_mean_jumps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uncorrected</span><span class="o">=</span><span class="s2">"pretrig_mean"</span><span class="p">,</span> <span class="n">corrected</span><span class="o">=</span><span class="s2">"ptm_jf"</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">4096</span><span class="p">):</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">PretrigMeanJumpFixStep</span><span class="p">(</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">PretrigMeanJumpFixStep</span><span class="p">(</span>
             <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">uncorrected</span><span class="p">],</span>
             <span class="n">output</span><span class="o">=</span><span class="p">[</span><span class="n">corrected</span><span class="p">],</span>
             <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span>
@@ -1474,7 +1480,7 @@
         <span class="n">inputs</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">col_expr_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extract</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">SelectStep</span><span class="p">(</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">SelectStep</span><span class="p">(</span>
             <span class="n">inputs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span>
             <span class="n">output</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">col_expr_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
             <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span>
@@ -1492,7 +1498,7 @@
         <span class="n">inputs</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">category_condition_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extract</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">CategorizeStep</span><span class="p">(</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">CategorizeStep</span><span class="p">(</span>
             <span class="n">inputs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span>
             <span class="n">output</span><span class="o">=</span><span class="p">[</span><span class="n">output_col</span><span class="p">],</span>
             <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span>
@@ -1521,6 +1527,7 @@
             <span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
             <span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">avg_pulse</span> <span class="o">-=</span> <span class="n">avg_pulse</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">n_presamples</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise</span>
         <span class="n">spectrum5lag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise</span><span class="o">.</span><span class="n">spectrum</span><span class="p">(</span><span class="n">trunc_front</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">trunc_back</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">filter_maker</span> <span class="o">=</span> <span class="n">FilterMaker</span><span class="p">(</span>
@@ -1706,7 +1713,7 @@
         <span class="n">calibrated_col</span><span class="p">,</span>
         <span class="n">use_expr</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
-        <span class="n">step</span> <span class="o">=</span> <span class="n">MultiFitQuadraticGainCalStep</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">MultiFitQuadraticGainStep</span><span class="o">.</span><span class="n">learn</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span>
             <span class="n">multifit_spec</span><span class="o">=</span><span class="n">multifit</span><span class="p">,</span>
             <span class="n">previous_cal_step_index</span><span class="o">=</span><span class="n">previous_cal_step_index</span><span class="p">,</span>
@@ -1772,7 +1779,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">as_bad</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="n">backtrace</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">BadChannel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error_type</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="n">backtrace</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">save_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_recipes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
         <span class="n">steps</span> <span class="o">=</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">ch_num</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">[:]}</span>
         <span class="n">misc</span><span class="o">.</span><span class="n">pickle_object</span><span class="p">(</span><span class="n">steps</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">steps</span>
@@ -1867,11 +1874,7 @@
 - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
@@ -1928,7 +1931,11 @@
 <span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
-<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_hists</span><span class="p">(</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_hists</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">col</span><span class="p">,</span>
     <span class="n">bin_edges</span><span class="p">,</span>
@@ -2048,10 +2055,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 </table>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">761</span>
-<span class="normal">762</span>
-<span class="normal">763</span>
-<span class="normal">764</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">764</span>
 <span class="normal">765</span>
 <span class="normal">766</span>
 <span class="normal">767</span>
@@ -2112,7 +2116,10 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">822</span>
 <span class="normal">823</span>
 <span class="normal">824</span>
-<span class="normal">825</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_summaries</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_expr_in</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">downsample</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">log</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">825</span>
+<span class="normal">826</span>
+<span class="normal">827</span>
+<span class="normal">828</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_summaries</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_expr_in</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">downsample</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">log</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Plot a summary of the data set, including time series and histograms of key pulse properties.</span>
 
 <span class="sd">    Parameters</span>
@@ -2189,16 +2196,12 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <p>f should take a numpy array and return a numpy array with the same number of elements</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_column_map_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_column_map_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""f should take a numpy array and return a numpy array with the same number of elements"""</span>
-    <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">ColumnAsNumpyMapStep</span><span class="p">(</span>
-        <span class="p">[</span><span class="n">input_col</span><span class="p">],</span> <span class="p">[</span><span class="n">output_col</span><span class="p">],</span> <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span>
-    <span class="p">)</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">ColumnAsNumpyMapStep</span><span class="p">([</span><span class="n">input_col</span><span class="p">],</span> <span class="p">[</span><span class="n">output_col</span><span class="p">],</span> <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_step</span><span class="p">(</span><span class="n">step</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
 </details>
@@ -2212,9 +2215,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <p>always sets lower limit at 0, don't use for values that can be negative</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">380</span>
 <span class="normal">381</span>
 <span class="normal">382</span>
 <span class="normal">383</span>
@@ -2227,7 +2228,9 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">390</span>
 <span class="normal">391</span>
 <span class="normal">392</span>
-<span class="normal">393</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_good_expr_below_nsigma_outlier_resistant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_nsigma_pairs</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_prev_good_expr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_good_expr_below_nsigma_outlier_resistant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_nsigma_pairs</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_prev_good_expr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    always sets lower limit at 0, don't use for values that can be negative</span>
 <span class="sd">    """</span>
@@ -2255,9 +2258,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <p>always sets lower limit at 0, don't use for values that can be negative</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">397</span>
 <span class="normal">398</span>
 <span class="normal">399</span>
 <span class="normal">400</span>
@@ -2270,7 +2271,9 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">407</span>
 <span class="normal">408</span>
 <span class="normal">409</span>
-<span class="normal">410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_good_expr_nsigma_range_outlier_resistant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_nsigma_pairs</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_prev_good_expr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_good_expr_nsigma_range_outlier_resistant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_nsigma_pairs</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_prev_good_expr</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    always sets lower limit at 0, don't use for values that can be negative</span>
 <span class="sd">    """</span>
@@ -2298,9 +2301,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <p>This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channel.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">452</span>
 <span class="normal">453</span>
 <span class="normal">454</span>
 <span class="normal">455</span>
@@ -2313,7 +2314,9 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">462</span>
 <span class="normal">463</span>
 <span class="normal">464</span>
-<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_select_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_expr_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_select_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_expr_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"Channel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.</span>
 <span class="sd">    """</span>
@@ -2321,7 +2324,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
     <span class="n">inputs</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">col_expr_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
         <span class="n">inputs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extract</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
-    <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">cal_steps</span><span class="o">.</span><span class="n">SelectStep</span><span class="p">(</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">SelectStep</span><span class="p">(</span>
         <span class="n">inputs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span>
         <span class="n">output</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">col_expr_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
         <span class="n">good_expr</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">,</span>
@@ -2353,8 +2356,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <div class="doc doc-contents">
 <details class="quote">
 <summary>Source code in <code>mass2/core/channels.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
-<span class="normal"> 20</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -2696,7 +2698,40 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
-<span class="normal">362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># noqa: PLR0904</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># noqa: PLR0904</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Channels</span><span class="p">:</span>
     <span class="n">channels</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Channel</span><span class="p">]</span>
     <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>
@@ -2857,7 +2892,39 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
         <span class="k">return</span> <span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">==</span> <span class="nb">id</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_ljh_path_pairs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pulse_noise_pairs</span><span class="p">,</span> <span class="n">description</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_ljh_path_pairs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pulse_noise_pairs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">description</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Create a :class:`Channels` instance from pairs of LJH files.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            pulse_noise_pairs (List[Tuple[str, str]]):</span>
+<span class="sd">                A list of `(pulse_path, noise_path)` tuples, where each entry contains</span>
+<span class="sd">                the file path to a pulse LJH file and its corresponding noise LJH file.</span>
+<span class="sd">            description (str):</span>
+<span class="sd">                A human-readable description for the resulting Channels object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Channels:</span>
+<span class="sd">                A Channels object with one :class:`Channel` per `(pulse_path, noise_path)` pair.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            AssertionError:</span>
+<span class="sd">                If two input files correspond to the same channel number.</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            Each channel is created via :meth:`Channel.from_ljh`.</span>
+<span class="sd">            The channel number is taken from the LJH file header and used as the key</span>
+<span class="sd">            in the returned Channels mapping.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; pairs = [</span>
+<span class="sd">            ...     ("datadir/run0000_ch0000.ljh", "datadir/run0001_ch0000.ljh"),</span>
+<span class="sd">            ...     ("datadir/run0000_ch0001.ljh", "datadir/run0001_ch0001.ljh"),</span>
+<span class="sd">            ... ]</span>
+<span class="sd">            &gt;&gt;&gt; channels = Channels.from_ljh_path_pairs(pairs, description="Test run")</span>
+<span class="sd">            &gt;&gt;&gt; list(channels.keys())</span>
+<span class="sd">            [0, 1]</span>
+<span class="sd">        """</span>
         <span class="n">channels</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">pulse_path</span><span class="p">,</span> <span class="n">noise_path</span> <span class="ow">in</span> <span class="n">pulse_noise_pairs</span><span class="p">:</span>
             <span class="n">channel</span> <span class="o">=</span> <span class="n">Channel</span><span class="o">.</span><span class="n">from_ljh</span><span class="p">(</span><span class="n">pulse_path</span><span class="p">,</span> <span class="n">noise_path</span><span class="p">)</span>
@@ -2952,17 +3019,17 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
         <span class="k">return</span> <span class="n">Channels</span><span class="p">(</span><span class="n">ch2s</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_steps_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">steps_dict</span><span class="p">):</span>
-        <span class="k">def</span><span class="w"> </span><span class="nf">load_steps</span><span class="p">(</span><span class="n">channel</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">load_recipes</span><span class="p">(</span><span class="n">channel</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">steps</span> <span class="o">=</span> <span class="n">steps_dict</span><span class="p">[</span><span class="n">channel</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">ch_num</span><span class="p">]</span>
             <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"steps dict did not contain steps for this ch_num"</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">channel</span><span class="o">.</span><span class="n">with_steps</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">load_steps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">load_recipes</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">save_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">CalSteps</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Pickle a dictionary (one entry per channel) of CalSteps objects.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_recipes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Recipe</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Pickle a dictionary (one entry per channel) of Recipe objects.</span>
 
 <span class="sd">        If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),</span>
 <span class="sd">        then set `required_fields` to be a list/tuple/set of DataFrame column names (or a single column name)</span>
@@ -2977,13 +3044,13 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="sd">            Drop all steps that do not lead (directly or indireactly) to producing this field or these fields.</span>
 <span class="sd">            If None, then preserve all steps (default None).</span>
 <span class="sd">        drop_debug: bool</span>
-<span class="sd">            Whether to remove debugging-related data from each `CalStep`, if the subclass supports this (via the</span>
-<span class="sd">            `CalStep.drop_debug() method).</span>
+<span class="sd">            Whether to remove debugging-related data from each `RecipeStep`, if the subclass supports this (via the</span>
+<span class="sd">            `RecipeStep.drop_debug() method).</span>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
 <span class="sd">        dict</span>
-<span class="sd">            Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) CalSteps objects.</span>
+<span class="sd">            Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) Recipe objects.</span>
 <span class="sd">        """</span>
         <span class="n">steps</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">channum</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -2991,7 +3058,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
         <span class="n">mass2</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">pickle_object</span><span class="p">(</span><span class="n">steps</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">steps</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">load_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load_recipes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
         <span class="n">steps</span> <span class="o">=</span> <span class="n">mass2</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">unpickle_object</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_steps_dict</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
 
@@ -3044,6 +3111,124 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 </details>
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="mass2.core.channels.Channels.from_ljh_path_pairs">
+<code class="highlight language-python"><span class="n">from_ljh_path_pairs</span><span class="p">(</span><span class="n">pulse_noise_pairs</span><span class="p">,</span> <span class="n">description</span><span class="p">)</span></code>
+<span class="doc doc-labels">
+<small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+</span>
+</h3>
+<div class="doc doc-contents">
+<p>Create a :class:<code>Channels</code> instance from pairs of LJH files.</p>
+<p>Args:
+    pulse_noise_pairs (List[Tuple[str, str]]):
+        A list of <code>(pulse_path, noise_path)</code> tuples, where each entry contains
+        the file path to a pulse LJH file and its corresponding noise LJH file.
+    description (str):
+        A human-readable description for the resulting Channels object.</p>
+<p>Returns:
+    Channels:
+        A Channels object with one :class:<code>Channel</code> per <code>(pulse_path, noise_path)</code> pair.</p>
+<p>Raises:
+    AssertionError:
+        If two input files correspond to the same channel number.</p>
+<p>Notes:
+    Each channel is created via :meth:<code>Channel.from_ljh</code>.
+    The channel number is taken from the LJH file header and used as the key
+    in the returned Channels mapping.</p>
+<p>Examples:
+    &gt;&gt;&gt; pairs = [
+    ...     ("datadir/run0000_ch0000.ljh", "datadir/run0001_ch0000.ljh"),
+    ...     ("datadir/run0000_ch0001.ljh", "datadir/run0001_ch0001.ljh"),
+    ... ]
+    &gt;&gt;&gt; channels = Channels.from_ljh_path_pairs(pairs, description="Test run")
+    &gt;&gt;&gt; list(channels.keys())
+    [0, 1]</p>
+<details class="quote">
+<summary>Source code in <code>mass2/core/channels.py</code></summary>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">from_ljh_path_pairs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pulse_noise_pairs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">description</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Create a :class:`Channels` instance from pairs of LJH files.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pulse_noise_pairs (List[Tuple[str, str]]):</span>
+<span class="sd">            A list of `(pulse_path, noise_path)` tuples, where each entry contains</span>
+<span class="sd">            the file path to a pulse LJH file and its corresponding noise LJH file.</span>
+<span class="sd">        description (str):</span>
+<span class="sd">            A human-readable description for the resulting Channels object.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Channels:</span>
+<span class="sd">            A Channels object with one :class:`Channel` per `(pulse_path, noise_path)` pair.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        AssertionError:</span>
+<span class="sd">            If two input files correspond to the same channel number.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        Each channel is created via :meth:`Channel.from_ljh`.</span>
+<span class="sd">        The channel number is taken from the LJH file header and used as the key</span>
+<span class="sd">        in the returned Channels mapping.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; pairs = [</span>
+<span class="sd">        ...     ("datadir/run0000_ch0000.ljh", "datadir/run0001_ch0000.ljh"),</span>
+<span class="sd">        ...     ("datadir/run0000_ch0001.ljh", "datadir/run0001_ch0001.ljh"),</span>
+<span class="sd">        ... ]</span>
+<span class="sd">        &gt;&gt;&gt; channels = Channels.from_ljh_path_pairs(pairs, description="Test run")</span>
+<span class="sd">        &gt;&gt;&gt; list(channels.keys())</span>
+<span class="sd">        [0, 1]</span>
+<span class="sd">    """</span>
+    <span class="n">channels</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">pulse_path</span><span class="p">,</span> <span class="n">noise_path</span> <span class="ow">in</span> <span class="n">pulse_noise_pairs</span><span class="p">:</span>
+        <span class="n">channel</span> <span class="o">=</span> <span class="n">Channel</span><span class="o">.</span><span class="n">from_ljh</span><span class="p">(</span><span class="n">pulse_path</span><span class="p">,</span> <span class="n">noise_path</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">channel</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">ch_num</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">channels</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">channels</span><span class="p">[</span><span class="n">channel</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">ch_num</span><span class="p">]</span> <span class="o">=</span> <span class="n">channel</span>
+    <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">channels</span><span class="p">,</span> <span class="n">description</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="mass2.core.channels.Channels.plot_hists">
 <code class="highlight language-python"><span class="n">plot_hists</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">bin_edges</span><span class="p">,</span> <span class="n">group_by_col</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 </h3>
@@ -3056,8 +3241,7 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channels.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 83</span>
-<span class="normal"> 84</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 84</span>
 <span class="normal"> 85</span>
 <span class="normal"> 86</span>
 <span class="normal"> 87</span>
@@ -3098,7 +3282,8 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_hists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">bin_edges</span><span class="p">,</span> <span class="n">group_by_col</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_none</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="normal">125</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_hists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">bin_edges</span><span class="p">,</span> <span class="n">group_by_col</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_expr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_none</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Plots histograms for the given column, grouped by the specified column.</span>
 
@@ -3146,11 +3331,11 @@ If None, choose the smallest value so that no more than 10000 points appear</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h3 class="doc doc-heading" id="mass2.core.channels.Channels.save_steps">
-<code class="highlight language-python"><span class="n">save_steps</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+<h3 class="doc doc-heading" id="mass2.core.channels.Channels.save_recipes">
+<code class="highlight language-python"><span class="n">save_recipes</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 </h3>
 <div class="doc doc-contents">
-<p>Pickle a dictionary (one entry per channel) of CalSteps objects.</p>
+<p>Pickle a dictionary (one entry per channel) of Recipe objects.</p>
 <p>If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),
 then set <code>required_fields</code> to be a list/tuple/set of DataFrame column names (or a single column name)
 whose production from raw data should be possible.</p>
@@ -3188,8 +3373,8 @@ If None, then preserve all steps (default None).</p>
 <b><code>drop_debug</code></b>
               –
               <div class="doc-md-description">
-<p>Whether to remove debugging-related data from each <code>CalStep</code>, if the subclass supports this (via the
-`CalStep.drop_debug() method).</p>
+<p>Whether to remove debugging-related data from each <code>RecipeStep</code>, if the subclass supports this (via the
+`RecipeStep.drop_debug() method).</p>
 </div>
 </li>
 </ul>
@@ -3211,7 +3396,7 @@ If None, then preserve all steps (default None).</p>
 <code><span title="dict">dict</span></code>
               –
               <div class="doc-md-description">
-<p>Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) CalSteps objects.</p>
+<p>Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) Recipe objects.</p>
 </div>
 </li>
 </ul>
@@ -3221,36 +3406,36 @@ If None, then preserve all steps (default None).</p>
 </table>
 <details class="quote">
 <summary>Source code in <code>mass2/core/channels.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">284</span>
-<span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">CalSteps</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Pickle a dictionary (one entry per channel) of CalSteps objects.</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save_recipes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Recipe</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Pickle a dictionary (one entry per channel) of Recipe objects.</span>
 
 <span class="sd">    If you want to save a "recipe", a minimal series of steps required to reproduce the required field(s),</span>
 <span class="sd">    then set `required_fields` to be a list/tuple/set of DataFrame column names (or a single column name)</span>
@@ -3265,13 +3450,13 @@ If None, then preserve all steps (default None).</p>
 <span class="sd">        Drop all steps that do not lead (directly or indireactly) to producing this field or these fields.</span>
 <span class="sd">        If None, then preserve all steps (default None).</span>
 <span class="sd">    drop_debug: bool</span>
-<span class="sd">        Whether to remove debugging-related data from each `CalStep`, if the subclass supports this (via the</span>
-<span class="sd">        `CalStep.drop_debug() method).</span>
+<span class="sd">        Whether to remove debugging-related data from each `RecipeStep`, if the subclass supports this (via the</span>
+<span class="sd">        `RecipeStep.drop_debug() method).</span>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
 <span class="sd">    dict</span>
-<span class="sd">        Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) CalSteps objects.</span>
+<span class="sd">        Dictionary with keys=channel numbers, values=the (possibly trimmed and debug-dropped) Recipe objects.</span>
 <span class="sd">    """</span>
     <span class="n">steps</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">channum</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">channels</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -4748,107 +4933,139 @@ Becker. Sped up 300x by @njit.</p>
 </div>
 </div>
 <div class="doc doc-object doc-module">
-<a id="mass2.core.cal_steps"></a>
+<a id="mass2.core.recipe"></a>
 <div class="doc doc-contents first">
 <div class="doc doc-children">
 <div class="doc doc-object doc-class">
-<h2 class="doc doc-heading" id="mass2.core.cal_steps.CalStep">
-<code>CalStep</code>
+<h2 class="doc doc-heading" id="mass2.core.recipe.ColumnAsNumpyMapStep">
+<code>ColumnAsNumpyMapStep</code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
 </span>
 </h2>
 <div class="doc doc-contents">
+<p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="RecipeStep
+
+
+  
+      dataclass
+   (mass2.core.recipe.RecipeStep)" href="#mass2.core.recipe.RecipeStep">RecipeStep</a></code></p>
+<p>This step is meant for interactive exploration, it takes a column and applies a function to it,
+and makes a new column with the result. It makes it easy to test functions on a column without
+having to write a whole new step class,
+while maintaining the benefit of being able to use the step in a Recipe chain, like replaying steps
+on another channel.</p>
+<p>example usage:</p>
+<blockquote>
+<blockquote>
+<blockquote>
+<p>def my_function(x):
+...     return x * 2
+step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)
+ch2 = ch.with_step(step)</p>
+</blockquote>
+</blockquote>
+</blockquote>
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
-<span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">CalStep</span><span class="p">:</span>
-    <span class="n">inputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-    <span class="n">output</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
-    <span class="n">good_expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span>
-    <span class="n">use_expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ColumnAsNumpyMapStep</span><span class="p">(</span><span class="n">RecipeStep</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    This step is meant for interactive exploration, it takes a column and applies a function to it,</span>
+<span class="sd">    and makes a new column with the result. It makes it easy to test functions on a column without</span>
+<span class="sd">    having to write a whole new step class,</span>
+<span class="sd">    while maintaining the benefit of being able to use the step in a Recipe chain, like replaying steps</span>
+<span class="sd">    on another channel.</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+<span class="sd">    example usage:</span>
+<span class="sd">    &gt;&gt;&gt; def my_function(x):</span>
+<span class="sd">    ...     return x * 2</span>
+<span class="sd">    &gt;&gt;&gt; step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)</span>
+<span class="sd">    &gt;&gt;&gt; ch2 = ch.with_step(step)</span>
+<span class="sd">    """</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> inputs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="si">}</span><span class="s2"> outputs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="si">}</span><span class="s2">"</span>
+    <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"ColumnMapStep expects exactly one input"</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"ColumnMapStep expects exactly one output"</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"f must be a callable, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">calc_from_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-        <span class="c1"># TODO: should this be an abstract method?</span>
-        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">)</span>
+        <span class="n">output_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">output_segments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">df_iter</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">)</span><span class="o">.</span><span class="n">iter_slices</span><span class="p">():</span>
+            <span class="n">series1</span> <span class="o">=</span> <span class="n">df_iter</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="c1"># Have to apply the function differently when series elements are arrays vs scalars</span>
+            <span class="k">if</span> <span class="n">series1</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">base_type</span><span class="p">()</span> <span class="ow">is</span> <span class="n">pl</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
+                <span class="n">output_numpy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">series1</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">output_numpy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">series1</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+            <span class="n">this_output_segment</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">output_col</span><span class="p">,</span> <span class="n">output_numpy</span><span class="p">)</span>
+            <span class="n">output_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">this_output_segment</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">dbg_plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_after</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">:</span>
-        <span class="c1"># this is a no-op, subclasses can override this to plot something</span>
-        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
-        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No plot defined for: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">drop_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalStep"</span><span class="p">:</span>
-        <span class="s2">"Return self, or a copy of it with debug information removed"</span>
-        <span class="k">return</span> <span class="bp">self</span>
+        <span class="n">combined</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">output_segments</span><span class="p">)</span>
+        <span class="c1"># Put into a DataFrame with one column</span>
+        <span class="n">df2</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">output_col</span><span class="p">:</span> <span class="n">combined</span><span class="p">})</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df2</span>
 </code></pre></div></td></tr></table></div>
 </details>
 <div class="doc doc-children">
-<div class="doc doc-object doc-function">
-<h3 class="doc doc-heading" id="mass2.core.cal_steps.CalStep.drop_debug">
-<code class="highlight language-python"><span class="n">drop_debug</span><span class="p">()</span></code>
-</h3>
-<div class="doc doc-contents">
-<p>Return self, or a copy of it with debug information removed</p>
-<details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalStep"</span><span class="p">:</span>
-    <span class="s2">"Return self, or a copy of it with debug information removed"</span>
-    <span class="k">return</span> <span class="bp">self</span>
-</code></pre></div></td></tr></table></div>
-</details>
-</div>
-</div>
 </div>
 </div>
 </div>
 <div class="doc doc-object doc-class">
-<h2 class="doc doc-heading" id="mass2.core.cal_steps.CalSteps">
-<code>CalSteps</code>
+<h2 class="doc doc-heading" id="mass2.core.recipe.Recipe">
+<code>Recipe</code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
 </span>
 </h2>
 <div class="doc doc-contents">
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
@@ -4944,11 +5161,11 @@ Becker. Sped up 300x by @njit.</p>
 <span class="normal">273</span>
 <span class="normal">274</span>
 <span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">CalSteps</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Recipe</span><span class="p">:</span>
     <span class="c1"># leaves many optimizations on the table, but is very simple</span>
     <span class="c1"># 1. we could calculate filt_value_5lag and filt_phase_5lag at the same time</span>
     <span class="c1"># 2. we could calculate intermediate quantities optionally and not materialize all of them</span>
-    <span class="n">steps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CalStep</span><span class="p">]</span>
+    <span class="n">steps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RecipeStep</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">calc_from_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
         <span class="s2">"return a dataframe with all the newly calculated info"</span>
@@ -4957,10 +5174,10 @@ Becker. Sped up 300x by @njit.</p>
         <span class="k">return</span> <span class="n">df</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">new_empty</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalSteps"</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">new_empty</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Recipe"</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">([])</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CalStep</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RecipeStep</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -4968,24 +5185,24 @@ Becker. Sped up 300x by @njit.</p>
 
     <span class="c1"># def copy(self):</span>
     <span class="c1">#     # copy by creating a new list containing all the entires in the old list</span>
-    <span class="c1">#     # a list entry, aka a CalStep, should be immutable</span>
-    <span class="c1">#     return CalSteps(self.steps[:])</span>
+    <span class="c1">#     # a list entry, aka a RecipeStep, should be immutable</span>
+    <span class="c1">#     return Recipe(self.steps[:])</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="n">CalStep</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalSteps"</span><span class="p">:</span>
-        <span class="c1"># return a new CalSteps with the step added, no mutation!</span>
-        <span class="k">return</span> <span class="n">CalSteps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps</span> <span class="o">+</span> <span class="p">[</span><span class="n">step</span><span class="p">])</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="n">RecipeStep</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Recipe"</span><span class="p">:</span>
+        <span class="c1"># return a new Recipe with the step added, no mutation!</span>
+        <span class="k">return</span> <span class="n">Recipe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps</span> <span class="o">+</span> <span class="p">[</span><span class="n">step</span><span class="p">])</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">trim_dead_ends</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalSteps"</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">trim_dead_ends</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Recipe"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Create a new Recipe object with all dead-end steps (and optionally also debug info) removed.</span>
 
-<span class="sd">        The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can</span>
+<span class="sd">        The purpose is to replace the fully useful interactive Recipe with a trimmed-down object that can</span>
 <span class="sd">        repeat the current steps as a "recipe" without having the extra information from which the recipe</span>
 <span class="sd">        was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel</span>
 <span class="sd">        to 30 kB per channel, or a 112x size reduction (with `drop_debug=True`).</span>
 
 <span class="sd">        Dead-end steps are defined as any step that can be omitted without affecting the ability to</span>
 <span class="sd">        compute any of the fields given in `required_fields`. The result of this method is to return</span>
-<span class="sd">        a CalSteps where any step is remove if it does not contribute to computing any of the `required_fields`</span>
+<span class="sd">        a Recipe where any step is remove if it does not contribute to computing any of the `required_fields`</span>
 <span class="sd">        (i.e., if it is a dead end).</span>
 
 <span class="sd">        Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.</span>
@@ -5002,7 +5219,7 @@ Becker. Sped up 300x by @njit.</p>
 
 <span class="sd">        Returns</span>
 <span class="sd">        -------</span>
-<span class="sd">        CalSteps</span>
+<span class="sd">        Recipe</span>
 <span class="sd">            A copy of `self`, except that any steps not required to compute any of `required_fields` are omitted.</span>
 <span class="sd">        """</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">required_fields</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
@@ -5037,18 +5254,18 @@ Becker. Sped up 300x by @njit.</p>
                     <span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">drop_debug</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-        <span class="k">return</span> <span class="n">CalSteps</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Recipe</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
 </details>
 <div class="doc doc-children">
 <div class="doc doc-object doc-function">
-<h3 class="doc doc-heading" id="mass2.core.cal_steps.CalSteps.calc_from_df">
+<h3 class="doc doc-heading" id="mass2.core.recipe.Recipe.calc_from_df">
 <code class="highlight language-python"><span class="n">calc_from_df</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></code>
 </h3>
 <div class="doc doc-contents">
 <p>return a dataframe with all the newly calculated info</p>
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
@@ -5063,18 +5280,18 @@ Becker. Sped up 300x by @njit.</p>
 </div>
 </div>
 <div class="doc doc-object doc-function">
-<h3 class="doc doc-heading" id="mass2.core.cal_steps.CalSteps.trim_dead_ends">
+<h3 class="doc doc-heading" id="mass2.core.recipe.Recipe.trim_dead_ends">
 <code class="highlight language-python"><span class="n">trim_dead_ends</span><span class="p">(</span><span class="n">required_fields</span><span class="p">,</span> <span class="n">drop_debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 </h3>
 <div class="doc doc-contents">
-<p>Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.</p>
-<p>The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can
+<p>Create a new Recipe object with all dead-end steps (and optionally also debug info) removed.</p>
+<p>The purpose is to replace the fully useful interactive Recipe with a trimmed-down object that can
 repeat the current steps as a "recipe" without having the extra information from which the recipe
 was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel
 to 30 kB per channel, or a 112x size reduction (with <code>drop_debug=True</code>).</p>
 <p>Dead-end steps are defined as any step that can be omitted without affecting the ability to
 compute any of the fields given in <code>required_fields</code>. The result of this method is to return
-a CalSteps where any step is remove if it does not contribute to computing any of the <code>required_fields</code>
+a Recipe where any step is remove if it does not contribute to computing any of the <code>required_fields</code>
 (i.e., if it is a dead end).</p>
 <p>Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.</p>
 <table class="field-list">
@@ -5123,12 +5340,12 @@ If None, preserve all steps.</p>
 <td class="field-body">
 <ul class="first simple">
 <li>
-<code><a class="autorefs autorefs-internal" title="CalSteps
+<code><a class="autorefs autorefs-internal" title="Recipe
 
 
   
       dataclass
-   (mass2.core.cal_steps.CalSteps)" href="#mass2.core.cal_steps.CalSteps">CalSteps</a></code>
+   (mass2.core.recipe.Recipe)" href="#mass2.core.recipe.Recipe">Recipe</a></code>
               –
               <div class="doc-md-description">
 <p>A copy of <code>self</code>, except that any steps not required to compute any of <code>required_fields</code> are omitted.</p>
@@ -5140,7 +5357,7 @@ If None, preserve all steps.</p>
 </tbody>
 </table>
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
@@ -5203,17 +5420,17 @@ If None, preserve all steps.</p>
 <span class="normal">272</span>
 <span class="normal">273</span>
 <span class="normal">274</span>
-<span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">trim_dead_ends</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CalSteps"</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Create a new CalSteps object with all dead-end steps (and optionally also debug info) removed.</span>
+<span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">trim_dead_ends</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">required_fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">drop_debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Recipe"</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Create a new Recipe object with all dead-end steps (and optionally also debug info) removed.</span>
 
-<span class="sd">    The purpose is to replace the fully useful interactive CalSteps with a trimmed-down object that can</span>
+<span class="sd">    The purpose is to replace the fully useful interactive Recipe with a trimmed-down object that can</span>
 <span class="sd">    repeat the current steps as a "recipe" without having the extra information from which the recipe</span>
 <span class="sd">    was first created. In one test, this method reduced the pickle file's size from 3.4 MB per channel</span>
 <span class="sd">    to 30 kB per channel, or a 112x size reduction (with `drop_debug=True`).</span>
 
 <span class="sd">    Dead-end steps are defined as any step that can be omitted without affecting the ability to</span>
 <span class="sd">    compute any of the fields given in `required_fields`. The result of this method is to return</span>
-<span class="sd">    a CalSteps where any step is remove if it does not contribute to computing any of the `required_fields`</span>
+<span class="sd">    a Recipe where any step is remove if it does not contribute to computing any of the `required_fields`</span>
 <span class="sd">    (i.e., if it is a dead end).</span>
 
 <span class="sd">    Examples of a dead end are typically steps used to prepare a tentative, intermediate calibration function.</span>
@@ -5230,7 +5447,7 @@ If None, preserve all steps.</p>
 
 <span class="sd">    Returns</span>
 <span class="sd">    -------</span>
-<span class="sd">    CalSteps</span>
+<span class="sd">    Recipe</span>
 <span class="sd">        A copy of `self`, except that any steps not required to compute any of `required_fields` are omitted.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">required_fields</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
@@ -5265,7 +5482,7 @@ If None, preserve all steps.</p>
                 <span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">drop_debug</span><span class="p">())</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-    <span class="k">return</span> <span class="n">CalSteps</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Recipe</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
 </details>
 </div>
@@ -5274,127 +5491,95 @@ If None, preserve all steps.</p>
 </div>
 </div>
 <div class="doc doc-object doc-class">
-<h2 class="doc doc-heading" id="mass2.core.cal_steps.ColumnAsNumpyMapStep">
-<code>ColumnAsNumpyMapStep</code>
+<h2 class="doc doc-heading" id="mass2.core.recipe.RecipeStep">
+<code>RecipeStep</code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
 </span>
 </h2>
 <div class="doc doc-contents">
-<p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="CalStep
-
-
-  
-      dataclass
-   (mass2.core.cal_steps.CalStep)" href="#mass2.core.cal_steps.CalStep">CalStep</a></code></p>
-<p>This step is meant for interactive exploration, it takes a column and applies a function to it,
-and makes a new column with the result. It makes it easy to test functions on a column without
-having to write a whole new step class,
-while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps
-on another channel.</p>
-<p>example usage:</p>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>def my_function(x):
-...     return x * 2
-step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)
-ch2 = ch.with_step(step)</p>
-</blockquote>
-</blockquote>
-</blockquote>
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">ColumnAsNumpyMapStep</span><span class="p">(</span><span class="n">CalStep</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    This step is meant for interactive exploration, it takes a column and applies a function to it,</span>
-<span class="sd">    and makes a new column with the result. It makes it easy to test functions on a column without</span>
-<span class="sd">    having to write a whole new step class,</span>
-<span class="sd">    while maintaining the benefit of being able to use the step in a CalSteps chain, like replaying steps</span>
-<span class="sd">    on another channel.</span>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">RecipeStep</span><span class="p">:</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">output</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">good_expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span>
+    <span class="n">use_expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span>
 
-<span class="sd">    example usage:</span>
-<span class="sd">    &gt;&gt;&gt; def my_function(x):</span>
-<span class="sd">    ...     return x * 2</span>
-<span class="sd">    &gt;&gt;&gt; step = ColumnAsNumpyMapStep(inputs=["my_column"], output=["my_new_column"], f=my_function)</span>
-<span class="sd">    &gt;&gt;&gt; ch2 = ch.with_step(step)</span>
-<span class="sd">    """</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
-    <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"ColumnMapStep expects exactly one input"</span>
-        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"ColumnMapStep expects exactly one output"</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"f must be a callable, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">description</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> inputs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="si">}</span><span class="s2"> outputs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="si">}</span><span class="s2">"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">calc_from_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-        <span class="n">output_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">output_segments</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">df_iter</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">)</span><span class="o">.</span><span class="n">iter_slices</span><span class="p">():</span>
-            <span class="n">series1</span> <span class="o">=</span> <span class="n">df_iter</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
-            <span class="c1"># Have to apply the function differently when series elements are arrays vs scalars</span>
-            <span class="k">if</span> <span class="n">series1</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">base_type</span><span class="p">()</span> <span class="ow">is</span> <span class="n">pl</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
-                <span class="n">output_numpy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">series1</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">output_numpy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">series1</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
-            <span class="n">this_output_segment</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">output_col</span><span class="p">,</span> <span class="n">output_numpy</span><span class="p">)</span>
-            <span class="n">output_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">this_output_segment</span><span class="p">)</span>
+        <span class="c1"># TODO: should this be an abstract method?</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">good_expr</span><span class="p">)</span>
 
-        <span class="n">combined</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">output_segments</span><span class="p">)</span>
-        <span class="c1"># Put into a DataFrame with one column</span>
-        <span class="n">df2</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="n">output_col</span><span class="p">:</span> <span class="n">combined</span><span class="p">})</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">df2</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dbg_plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_after</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">plt</span><span class="o">.</span><span class="n">Axes</span><span class="p">:</span>
+        <span class="c1"># this is a no-op, subclasses can override this to plot something</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No plot defined for: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">plt</span><span class="o">.</span><span class="n">gca</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">drop_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RecipeStep"</span><span class="p">:</span>
+        <span class="s2">"Return self, or a copy of it with debug information removed"</span>
+        <span class="k">return</span> <span class="bp">self</span>
 </code></pre></div></td></tr></table></div>
 </details>
 <div class="doc doc-children">
+<div class="doc doc-object doc-function">
+<h3 class="doc doc-heading" id="mass2.core.recipe.RecipeStep.drop_debug">
+<code class="highlight language-python"><span class="n">drop_debug</span><span class="p">()</span></code>
+</h3>
+<div class="doc doc-contents">
+<p>Return self, or a copy of it with debug information removed</p>
+<details class="quote">
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_debug</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RecipeStep"</span><span class="p">:</span>
+    <span class="s2">"Return self, or a copy of it with debug information removed"</span>
+    <span class="k">return</span> <span class="bp">self</span>
+</code></pre></div></td></tr></table></div>
+</details>
+</div>
+</div>
 </div>
 </div>
 </div>
 <div class="doc doc-object doc-class">
-<h2 class="doc doc-heading" id="mass2.core.cal_steps.SelectStep">
+<h2 class="doc doc-heading" id="mass2.core.recipe.SelectStep">
 <code>SelectStep</code>
 <span class="doc doc-labels">
 <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -5402,15 +5587,15 @@ ch2 = ch.with_step(step)</p>
 </h2>
 <div class="doc doc-contents">
 <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="CalStep
+              Bases: <code><a class="autorefs autorefs-internal" title="RecipeStep
 
 
   
       dataclass
-   (mass2.core.cal_steps.CalStep)" href="#mass2.core.cal_steps.CalStep">CalStep</a></code></p>
+   (mass2.core.recipe.RecipeStep)" href="#mass2.core.recipe.RecipeStep">RecipeStep</a></code></p>
 <p>This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.</p>
 <details class="quote">
-<summary>Source code in <code>mass2/core/cal_steps.py</code></summary>
+<summary>Source code in <code>mass2/core/recipe.py</code></summary>
 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
@@ -5423,7 +5608,7 @@ ch2 = ch.with_step(step)</p>
 <span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">SelectStep</span><span class="p">(</span><span class="n">CalStep</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SelectStep</span><span class="p">(</span><span class="n">RecipeStep</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.</span>
 
@@ -9824,8 +10009,8 @@ R because for records as long as 10,000 samples, the matrix will consist of 10^8
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../demo_plot/" class="btn btn-neutral float-left" title="Demo plot"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../filtering/" class="btn btn-neutral float-right" title="Optimal filtering">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../LJHfiles/" class="btn btn-neutral float-left" title="LJH file format"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../tests/" class="btn btn-neutral float-right" title="Testing">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -9848,10 +10033,10 @@ R because for records as long as 10,000 samples, the matrix will consist of 10^8
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../demo_plot/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../LJHfiles/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../filtering/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../tests/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
