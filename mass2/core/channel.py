@@ -500,6 +500,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
+        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
         assert self.noise
         spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
         filter_maker = FilterMaker(
