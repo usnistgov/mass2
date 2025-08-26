@@ -741,7 +741,7 @@ class RoughCalibrationStep(RecipeStep):
         step = cls(
             [uncalibrated_col],
             [calibrated_col],
-            ch.good_expr.and_(pl.col(uncalibrated_col)<assignment_result.phzerogain()),
+            ch.good_expr.and_(pl.col(uncalibrated_col) < assignment_result.phzerogain()),
             use_expr=use_expr,
             pfresult=pfresult,
             assignment_result=assignment_result,

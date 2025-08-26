@@ -265,7 +265,7 @@ class TrueBqBin:
                 return (int(bay[0]) - 1) * 4 + "ABCD".index(bay[1].upper())
 
             channel_number = bay2int(str(bin_path.parent.stem))
-        desc = str(bin_path.parent.parent.stem)+"_"+str(bin_path.parent.stem)
+        desc = str(bin_path.parent.parent.stem) + "_" + str(bin_path.parent.stem)
         header_np = np.memmap(bin_path, dtype=header_dtype, mode="r", offset=0, shape=1)
         sample_rate_hz = header_np["sample_rate_hz"][0]
         header_df = pl.from_numpy(header_np)
