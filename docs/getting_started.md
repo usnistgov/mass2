@@ -269,7 +269,7 @@ This section concentrate on the first case, analysis of new data for which no es
 
 ### Summarizing pulses
 
-The `Channel.summarize_pulses()` method returns a new `Channel` with a much enhanced dataframe that has nearly a dozen new columns, such as `"pretrig_mean", "pulse_rms", ...]`. To use this method on all the Channels in a `Channels` object, we make use of the handy `Channels.map()` method. It takes a single, callable argument `f` which must accept a `Channel` object and returns a modifie version of it. We also often follow this up by a function that attaches a "good expression" to each channel. Here we'll consider pulses "good" when their pretrigger rms and their postpeak derivatives are no more than 8-sigma off the median. These two steps can be performed with `map()` like this:
+The `Channel.summarize_pulses()` method returns a new `Channel` with a much enhanced dataframe that has nearly a dozen new columns, such as `["pretrig_mean", "pulse_rms", ...]`. To use this method on all the Channels in a `Channels` object, we make use of the handy `Channels.map()` method. It takes a single, callable argument `f` which must accept a `Channel` object and returns a modifie version of it. We also often follow this up by a function that attaches a "good expression" to each channel. Here we'll consider pulses "good" when their pretrigger rms and their postpeak derivatives are no more than 8-sigma off the median. These two steps can be performed with `map()` like this:
 
 ```python
 # mkdocs: render
@@ -283,8 +283,9 @@ data = data.map(summarize_and_cut)
 # Plot a distribution
 ch = data.ch0
 prms = ch.df["pulse_rms"]
-plt.clf()
-plt.hist(prms, 1000, range=np.percentile(prms, [0.5, 99.5]), histtype="step")
+hist_range = range=np.percentile(prms, [0.5, 99.5])
+bin_edges = np.linspace(hist_range[0], hist_range[1], 1000)
+ch.plot_hist("pulse_rms", bin_edges)
 plt.xlabel("Pulse rms (arbs)")
 plt.title(f"The middle 99% of pulse rms values for channel {ch.header.ch_num}")
 ```
@@ -427,14 +428,114 @@ plt.xlim([0, 1000])
 plt.tight_layout()
 ```
 
-## Saving your results, and the `Recipe` system
+## Saving results and the `Recipe` system
+
+Mass2 is designed to make storing results easy, both the the quantities produced in analysis _and_ the steps taken to compute them. This section explains how and explores the saving of steps and of numerical results.
+
+Analysis "steps" have been mentioned before. The big idea is that each channel is associated with a "recipe" containing all the operations and parameters used to create it, starting from the raw pulse records in an LJH file. (LJH files are _never_ modified by Mass.) This recipe consists of one or more steps to be applied in a fixed order. Each step takes for input fields that existed in the channel's dataframe before the step, and it creates one or more new fields that exist in the dataframe afterwards. Importantly, a recipe can be stored to disk, and applied in the future, either to the same data set, or to another.
+
+**Warning:** One catch is that each recipe is specific to one sensor, and they are tracked only by channel number. If the set of active sensors changes after the learning phase, any new sensors will lack a recipe. Worse, if a probe of the µMUX resonator frequencies leads to renumbering of the sensors, then we won't be able to find the right recipe for most (or all) sensors.
+
+### Caching computed data (work in progress)
+
+Sometimes you run an analysis that you consider "final"; you want to keep the results only, and you expect (hope?) never to look at the raw LJH files again. We are still working out a standard system for caching computed data: how to name the files, how to combine them, etc. Here are two approaches that employ Parquet files. One stores a file per channel, and the other stores all data in a single file.
+
+**Approach A: one file per channel** Here we store each channel's dataframe in a separate file. Notice that we want to drop the column representing the raw pulse data, because the output would otherwise be far too large (and redundant). Probably it's fine to drop the subframe count, too, so we do that here.
+
+```python
+columns_to_drop = ("pulse", "subframecount")
+for cnum, ch in data.channels.items():
+    filename = f"output_test_chan{cnum}.parquet"
+    df = ch.df.drop(columns_to_drop)
+    df.write_parquet(filename)
+```
+
+You can pass options to `write_parquet` to control compression and other aspects of the file. If you prefer to write out only a specified subset of the fields in the dataframes, replace the `.drop(columns_to_drop)` in the code above with a `.select(columns_to_keep)` operation. All the methods that act on dataframes are possible:
+
+* `drop` to remove specific columns
+* `select` to keep specific columns
+* `limit` to write only a maximum number of rows
+* `filter` to select rows according to a Polars expression
+* `alias` to rename columns
+* and many others.
+
+TODO: we should work on a way to make it easier to load up these files and start analyzing where you left off. One might match up these files with an LJH file, to permit creation of a new `Channel` object. For now, this sort of data caching is limited to when you just need the data, not the full framework of Mass2. (But keep in mind, the Polars framework is really powerful, and there's a lot you could imagine doing with just the data.)
+
+**Approach B: one file for all channels**
+
+This is similar, except that we use some new Polars tricks:
+
+1. `polars.DataFrame.with_columns()` to append a new column containing this channel's number (we will need it later, because we're about to mix all channels into a new dataframe)
+2. `polars.concat()` to join rows from multiple dataframes
+
+```python
+columns_to_drop = ("pulse", "subframecount")
+all_df = []
+for cnum, ch in data.channels.items():
+    df = ch.df.drop(columns_to_drop).with_columns(chan_number=pl.lit(cnum))
+    all_df.append(df)
+filename = f"output_test_allchan.parquet"
+pl.concat(all_df).write_parquet(filename)
+```
 
 
-
-### Caching computed data
 
 ### Storing analysis recipes
 
-## Re-using a recipe (on the same or new data)
+The system for storing analysis recipes is extremely simple. The following will save the full analysis recipe for each channel in the `data` object.
+
+```python
+data.save_recipes("full_recipes.pkl")
+```
+
+Beware that this operation will drop all "debug information" in certain steps in the recipe (generally, any steps that store a lot of data that's used not for _performing_ the step but only for debugging). The benefit is that the recipes file is smaller, and faster to save and load. The cost is that debugging plots cannot be made after the recipes are reloaded. You probably save a recipe because you've already debugged its steps, so this is usually an acceptable tradeoff. If you don't like it, use the `drop_debug=False` argument.
+
+By default all steps in a recipe are saved, but you might not want or need this. For instance, in the examples given on this page, we computed two "rough" calibrations and a final one. The two rough ones are "dead ends" if you only care about the final energy. When you are saving a recipe for later use on future data sets in a real-time pipeline, you might want to store a minimal recipe--one that omits any steps not needed to reach a few critical fields. Perhaps you have no need to compute anything that doesn't directly lead to the final energy value. If you omit dead ends from the stored recipes, then not only is the file smaller, but the computation required to run the recipes is reduced. You might prefer instead:
+
+```python
+required_fields = {"energy_5lagy_best", "pretrig_mean"}
+data.save_recipes("trimmed_recipes.pkl", required_fields=required_fields)
+```
+
+This version will save all the steps that produce the two specified `required_fields`, and all steps that the depend on. The two rough calibration steps, however, will be trimmed away as dead ends. (In this instance, having the pretrigger mean as a required field is superfluous. It's already required in the drift correction step, which is required before the step that takes drift-corrected optimally-filtered pulse height into energy.)
+
+
+### Re-using a recipe (on the same or new data)
+
+Once a `mass2.Channels` object is created from raw LJH files, an existing recipe can be loaded from a file and executed on the raw data. The result will be that the dataframe for each `Channel` will now contain the derived fields, including `{"energy_5lagy_best", "pretrig_mean"}`, as well as any fields computed along with them, or on the direct path to them.
+
+```python
+pn_pair = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
+data_replay = mass2.Channels.from_ljh_folder(
+    pulse_folder=pn_pair.pulse_folder,
+    noise_folder=pn_pair.noise_folder
+).with_experiment_state_by_path()
+data_replay = data_replay.load_recipes("trimmed_recipes.pkl")
+
+```
 
 ## Further examples
+
+There are more examples of how one can use the Mass2 approach to data analysis in the `examples/` directory, in the form of [Marimo notebooks](https://marimo.io/). Many examples in the top level of that directory have been designed for use on data found in the https://github.com/ggggggggg/pulsedata repository, so they should work for any user of Mass. Other examples rely on data that isn't public, but they can still be useful training materials for ways to use Mass2.
+
+Marimo is similar to Jupyter, but it has some nice advantages. It stores notebooks as pure Python (vs JSON for Jupyter). It uses a reactive execution model with an understanding of the data-flow dependency graph. This fixes a lot of the hidden-state and unexpected behavior that often come with Jupyter's linear-flow (top-to-bottom) execution model. Another really cool Marimo feature (though it's still a bit buggy) is that Matplotlib figure can be rendered and made interactive in the web browser (rather than having to explicitly set x/y limits and re-run a cell)--the result is closer to what you expect from an iPython session.
+
+Marimo is easy to start from the command line. The `marimo` shell command will start a marimo server running, which both serves web pages and runs the underlying Python code. Here are a few examples of how to start marimo:
+
+```bash
+cd ~/where/I/stored/mass2
+
+# Each of the following commands starts a local Marimo webserver,
+# then opens a brower tab pointing to it. They also...
+
+# ...display a chooser to select whatever example you like:
+marimo edit examples
+
+# ...display one specific example notebook, with (editable) code:
+marimo edit examples/bessy_20240727.py
+
+# ...display a notebook's results, but not the code that created it:
+marimo run examples/ebit_juy2024_from_off.py
+```
+
+We strongly suggest exploring a couple of these notebooks as you launch your adventure with Mass2.
