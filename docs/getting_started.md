@@ -477,7 +477,7 @@ This is similar, except that we use some new Polars tricks:
 columns_to_drop = ("pulse", "subframecount")
 all_df = []
 for cnum, ch in data.channels.items():
-    df = ch.df.drop(columns_to_drop).with_columns(chan_number=pl.lit(cnum))
+    df = ch.df.drop(columns_to_drop).with_columns(ch_num=pl.lit(cnum))
     all_df.append(df)
 filename = os.path.join(output_dir.name, "output_test_allchan.parquet")
 pl.concat(all_df).write_parquet(filename)

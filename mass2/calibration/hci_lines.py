@@ -12,11 +12,13 @@ Paul Szypryt
 
 import importlib.resources as pkg_resources
 import numpy as np
+from numpy.typing import ArrayLike
 import pickle
 import gzip
 import scipy.constants as sp_const
 import os
 from . import fluorescence_lines
+from .fluorescence_lines import SpectralLine
 from . import AmplitudeType
 import xraydb
 
@@ -47,7 +49,7 @@ class NIST_ASD:
             with open(pickleFilename, "rb") as handle:
                 self.NIST_ASD_Dict = pickle.load(handle)
 
-    def getAvailableElements(self):
+    def getAvailableElements(self) -> list[str]:
         """Returns a list of all available elements from the ASD pickle file"""
 
         return list(self.NIST_ASD_Dict.keys())
@@ -190,10 +192,18 @@ class NIST_ASD:
 
 
 # Some non-class functions useful for integration with mass
-def add_hci_line(element, spectr_ch, line_identifier, energies, widths, ratios, nominal_peak_energy=None):
-    energies = np.array(energies)
-    widths = np.array(widths)
-    ratios = np.array(ratios)
+def add_hci_line(
+    element: str,
+    spectr_ch: int,
+    line_identifier: str,
+    energies: ArrayLike,
+    widths: ArrayLike,
+    ratios: ArrayLike,
+    nominal_peak_energy: float | None = None,
+) -> SpectralLine:
+    energies = np.asarray(energies)
+    widths = np.asarray(widths)
+    ratios = np.asarray(ratios)
     if nominal_peak_energy is None:
         nominal_peak_energy = np.dot(energies, ratios) / np.sum(ratios)
     linetype = f"{int(spectr_ch)} {line_identifier}"
@@ -214,7 +224,7 @@ def add_hci_line(element, spectr_ch, line_identifier, energies, widths, ratios, 
     return spectrum_class
 
 
-def add_H_like_lines_from_asd(asd, element, maxLevels=None):
+def add_H_like_lines_from_asd(asd: NIST_ASD, element: str, maxLevels: int | None = None) -> list[SpectralLine]:
     spectr_ch = xraydb.atomic_number(element)
     added_lines = []
     if maxLevels is not None:
@@ -231,7 +241,7 @@ def add_H_like_lines_from_asd(asd, element, maxLevels=None):
     return added_lines
 
 
-def add_He_like_lines_from_asd(asd, element, maxLevels=None):
+def add_He_like_lines_from_asd(asd: NIST_ASD, element: str, maxLevels: int | None = None) -> list[SpectralLine]:
     spectr_ch = xraydb.atomic_number(element) - 1
     added_lines = []
     if maxLevels is not None:

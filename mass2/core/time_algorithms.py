@@ -1,10 +1,13 @@
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 import numba
 
 
 @numba.njit
-def python_nearest_arrivals(reference_times, other_times):
+def python_nearest_arrivals(reference_times: ArrayLike, other_times: ArrayLike) -> tuple[NDArray, NDArray]:
     """Identical to nearest_arrivals(...)."""
+    reference_times = np.asarray(reference_times)
+    other_times = np.asarray(other_times)
     nearest_after_index = np.searchsorted(other_times, reference_times)
     last_index = np.searchsorted(nearest_after_index, other_times.size, side="left")
     first_index = np.searchsorted(nearest_after_index, 1)

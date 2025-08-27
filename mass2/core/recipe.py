@@ -15,18 +15,18 @@ class RecipeStep:
     use_expr: pl.Expr
 
     @property
-    def name(self):
-        return type(self)
+    def name(self) -> str:
+        return str(type(self))
 
     @property
-    def description(self):
+    def description(self) -> str:
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         # TODO: should this be an abstract method?
         return df.filter(self.good_expr)
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: dict) -> plt.Axes:
         # this is a no-op, subclasses can override this to plot something
         plt.figure()
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
@@ -47,10 +47,10 @@ class PretrigMeanJumpFixStep(RecipeStep):
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs) -> plt.Axes:
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: dict) -> plt.Axes:
         plt.figure()
-        plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0])
-        plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0])
+        plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0], **kwargs)
+        plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0], **kwargs)
         plt.legend()
         plt.xlabel("timestamp")
         plt.ylabel("pretrig mean")
@@ -107,7 +107,7 @@ class ColumnAsNumpyMapStep(RecipeStep):
 
     f: Callable[[np.ndarray], np.ndarray]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert len(self.inputs) == 1, "ColumnMapStep expects exactly one input"
         assert len(self.output) == 1, "ColumnMapStep expects exactly one output"
         if not callable(self.f):
@@ -136,7 +136,7 @@ class ColumnAsNumpyMapStep(RecipeStep):
 class CategorizeStep(RecipeStep):
     category_condition_dict: dict[str, pl.Expr]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         err_msg = "The first condition must be True, to be used as a fallback"
         first_condition = next(iter(self.category_condition_dict.values()))
         assert first_condition is True or first_condition.meta.eq(pl.lit(True)), err_msg
@@ -144,7 +144,7 @@ class CategorizeStep(RecipeStep):
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         output_col = self.output[0]
 
-        def categorize_df(df, category_condition_dict, output_col):
+        def categorize_df(df: pl.DataFrame, category_condition_dict: dict[str, pl.Expr], output_col: str) -> pl.DataFrame:
             """returns a series showing which category each pulse is in
             pulses will be assigned to the last category for which the condition evaluates to True"""
             dtype = pl.Enum(category_condition_dict.keys())
