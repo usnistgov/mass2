@@ -140,7 +140,7 @@ class ToeplitzSolver:
             h[:K] -= h[K] * gsave[K - 1 :: -1]
         raise ValueError("unreachable")
 
-    def __precompute_symmetric(self):
+    def __precompute_symmetric(self) -> None:
         """Precompute some data so that the solve_symmetric method can be done in
         roughly half the time per solve."""
         n = self.n

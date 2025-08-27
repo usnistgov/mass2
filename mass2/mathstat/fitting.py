@@ -79,7 +79,7 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     return model, abc, X2
 
 
-def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | None = None):
+def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | None = None) -> tuple[NDArray, NDArray, float]:
     """Find the linear least-squares solution for a kinked-linear model.
 
     The model is f(x) = a+b(x-k) for x<k and f(x)=a+c(x-k) for x>=k, where
@@ -136,7 +136,7 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | No
     x = np.asarray(x)
     y = np.asarray(y)
 
-    def penalty(k, x, y):
+    def penalty(k: float, x: NDArray, y: NDArray) -> float:
         _, _, X2 = kink_model(k, x, y)
         return X2
 
