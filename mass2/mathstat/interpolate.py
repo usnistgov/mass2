@@ -498,12 +498,12 @@ class SmoothingSpline:
 
         # Store the linear extrapolation outside the knotted region.
         endpoints = np.array([self.x[0], self.x[-1]]) * self.xscale
-        val = self.__eval(endpoints, 0)
-        slope = self.__eval(endpoints, 1) * self.xscale
+        val = self.__eval(endpoints, 0, allow_extrapolate=False)
+        slope = self.__eval(endpoints, 1, allow_extrapolate=False) * self.xscale
         self.lowline = np.poly1d([slope[0], val[0]])
         self.highline = np.poly1d([slope[1], val[1]])
 
-    def __eval(self, x: ArrayLike, der: int = 0) -> NDArray:
+    def __eval(self, x: ArrayLike, der: int = 0, allow_extrapolate: bool = True) -> NDArray:
         """Return the value of (the `der`th derivative of) the smoothing spline
         at data points `x`."""
         scalar = np.isscalar(x)
@@ -512,14 +512,14 @@ class SmoothingSpline:
         splresult = splev(x, (self.basis.padknots, self.coeff, 3), der=der)
         low = x < self.x[0]
         high = x > self.x[-1]
-        if np.any(low):
+        if np.any(low) and allow_extrapolate:
             if der == 0:
                 splresult[low] = self.lowline(x[low] - self.x[0])
             elif der == 1:
                 splresult[low] = self.lowline.coeffs[0]
             elif der >= 2:
                 splresult[low] = 0.0
-        if np.any(high):
+        if np.any(high) and allow_extrapolate:
             if der == 0:
                 splresult[high] = self.highline(x[high] - self.x[-1])
             elif der == 1:
