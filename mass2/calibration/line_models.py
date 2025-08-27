@@ -2,13 +2,16 @@
 Implements MLEModel, CompositeMLEModel, GenericLineModel
 """
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from collections.abc import Callable
 from numpy.typing import ArrayLike, NDArray
 import lmfit
 import numpy as np
 import pylab as plt
-from .fluorescence_lines import SpectralLine
+
+if TYPE_CHECKING:
+    from .fluorescence_lines import SpectralLine
+
 
 VALIDATE_BIN_SIZE = True
 
@@ -263,7 +266,7 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
 class GenericLineModel(MLEModel):
     def __init__(
         self,
-        spect: SpectralLine,
+        spect: "SpectralLine",
         independent_vars: list[str] = ["bin_centers"],
         prefix: str = "",
         nan_policy: str = "raise",
