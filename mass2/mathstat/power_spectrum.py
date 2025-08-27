@@ -150,7 +150,7 @@ class PowerSpectrum:
             raise ValueError(f"Cannot rebin into more than m={self.m} bins")
         return np.arange(nbins + 1, dtype=float) / (2 * self.dt * nbins)
 
-    def plot(self, axis=None, arb_to_unit_scale_and_label=(1, "arb"), sqrt_psd=True, **plotkwarg):
+    def plot(self, axis: plt.Axes | None = None, arb_to_unit_scale_and_label=(1, "arb"), sqrt_psd=True, **plotkwarg):
         if axis is None:
             plt.figure()
             axis = plt.gca()

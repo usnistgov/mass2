@@ -684,7 +684,7 @@ class RoughCalibrationStep(RecipeStep):
     def drop_debug(self):
         return replace(self, pfresult=None, assignment_result=None)
 
-    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis=None, plotkwarg={}):
+    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis: plt.Axes | None = None, plotkwarg={}):
         series = mass2.misc.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
         axis = mass2.misc.plot_hist_of_series(series, bin_edges)
         axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")

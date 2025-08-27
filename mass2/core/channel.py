@@ -128,7 +128,7 @@ class Channel:
         self,
         col,
         bin_edges,
-        axis=None,
+        axis: plt.Axes | None = None,
         use_good_expr=True,
         use_expr=pl.lit(True),
     ):
@@ -154,7 +154,7 @@ class Channel:
         col,
         bin_edges,
         group_by_col,
-        axis=None,
+        axis: plt.Axes | None = None,
         use_good_expr=True,
         use_expr=pl.lit(True),
         skip_none=True,

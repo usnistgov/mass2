@@ -2,14 +2,26 @@
 Implements MLEModel, CompositeMLEModel, GenericLineModel
 """
 
+from typing import Any
+from collections.abc import Callable
+from numpy.typing import ArrayLike, NDArray
 import lmfit
 import numpy as np
 import pylab as plt
+from .fluorescence_lines import SpectralLine
 
 VALIDATE_BIN_SIZE = True
 
 
-def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tailtau, P_tailshare_hi=0.0, P_tailtau_hi=1):
+def _smear_exponential_tail(
+    cleanspectrum_fn: Callable,
+    x: ArrayLike,
+    P_resolution: float,
+    P_tailfrac: float,
+    P_tailtau: float,
+    P_tailshare_hi: float = 0.0,
+    P_tailtau_hi: float = 1,
+) -> NDArray:
     """Evaluate `cleanspectrum_fn(x)`, but padded and smeared to add a low-E and/or high-E tail.
 
     This is done by convolution, which is computed using DFT methods. The spectrum is padded
@@ -36,6 +48,7 @@ def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tai
     :return: _description_
     :rtype: _type_
     """
+    x = np.asarray(x)
     if P_tailfrac <= 1e-6:
         return cleanspectrum_fn(x)
 
@@ -72,7 +85,7 @@ def _smear_exponential_tail(cleanspectrum_fn, x, P_resolution, P_tailfrac, P_tai
     return smoothspectrum[nlow : nlow + len(x)]
 
 
-def _scale_add_bg(spectrum, P_integral, P_bg=0, P_bgslope=0):
+def _scale_add_bg(spectrum: NDArray, P_integral: float, P_bg: float = 0, P_bgslope: float = 0) -> NDArray:
     """Scale a spectrum and add a sloped background. BG<0 is replaced with BG=0."""
     bg = np.zeros_like(spectrum) + P_bg
     if P_bgslope != 0:
@@ -88,7 +101,7 @@ class MLEModel(lmfit.Model):
     "Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation"
     """
 
-    def _residual(self, params, data, weights, **kwargs):
+    def _residual(self, params: lmfit.Parameters, data: NDArray | None, weights: NDArray | None, **kwargs: Any) -> NDArray:
         """Calculate the chi_MLE^2 value from Joe Fowler's Paper
         doi:10.1007/s10909-014-1098-4 "Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation"
         """
@@ -111,11 +124,11 @@ class MLEModel(lmfit.Model):
         vals[y < data] *= -1
         return vals
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return representation of Model."""
         return f"<{type(self).__name__}: {self.name}>"
 
-    def _reprstring(self, long=False):
+    def _reprstring(self, long: bool = False) -> str:
         out = self._name
         opts = []
         if len(self._prefix) > 0:
@@ -127,19 +140,19 @@ class MLEModel(lmfit.Model):
             out = "{}, {}".format(out, ", ".join(opts))
         return f"{type(self).__name__}({out})"
 
-    def __add__(self, other):
+    def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """+"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
 
-    def __sub__(self, other):
+    def __sub__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """-"""
         return CompositeMLEModel(self, other, lmfit.model.operator.sub)
 
-    def __mul__(self, other):
+    def __mul__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """*"""
         return CompositeMLEModel(self, other, lmfit.model.operator.mul)
 
-    def __truediv__(self, other):
+    def __truediv__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """/"""
         return CompositeMLEModel(self, other, lmfit.model.operator.truediv)
 
@@ -162,7 +175,7 @@ class MLEModel(lmfit.Model):
     #     c.eval = blah
     #     return c
 
-    def fit(self, *args, minimum_bins_per_fwhm=3, **kwargs):
+    def fit(self, *args: Any, minimum_bins_per_fwhm: float | None = 3, **kwargs: Any) -> "LineModelResult":
         """as lmfit.Model.fit except
         1. the default method is "least_squares because it gives error bars more often at 1.5-2.0X speed penalty
         2. supports "leastsq_refit" which uses "leastsq" to fit, but if there are no error bars, refits with
@@ -184,7 +197,7 @@ class MLEModel(lmfit.Model):
         result._validate_bins_per_fwhm(minimum_bins_per_fwhm)
         return result
 
-    def _fit(self, *args, **kwargs):
+    def _fit(self, *args: Any, **kwargs: Any) -> "LineModelResult":
         """internal implementation of fit to add support for "leastsq_refit" method"""
         if kwargs["method"] == "leastsq_refit":
             # First fit with leastsq (the fastest method)
@@ -198,7 +211,7 @@ class MLEModel(lmfit.Model):
             if "params" in kwargs:
                 kwargs["params"] = result0.params
             elif len(args) > 1:
-                args = [result0.params if i == 1 else arg for (i, arg) in enumerate(args)]
+                args = tuple([result0.params if i == 1 else arg for (i, arg) in enumerate(args)])
             result = lmfit.Model.fit(self, *args, **kwargs)
         else:
             result = lmfit.Model.fit(self, *args, **kwargs)
@@ -212,7 +225,7 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
     "Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation"
     """
 
-    def _residual(self, params, data, weights, **kwargs):
+    def _residual(self, params: lmfit.Parameters, data: NDArray | None, weights: NDArray | None, **kwargs: Any) -> NDArray:
         """Calculate the chi_MLE^2 value from Joe Fowler's Paper
         doi:10.1007/s10909-014-1098-4 Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation
         """
@@ -230,19 +243,19 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
     #     """Return representation of Model."""
     #     return "<CompositeMLEModel: %s>" % (self.name)
 
-    def __add__(self, other):
+    def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """+"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
 
-    def __sub__(self, other):
+    def __sub__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """-"""
         return CompositeMLEModel(self, other, lmfit.model.operator.sub)
 
-    def __mul__(self, other):
+    def __mul__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """*"""
         return CompositeMLEModel(self, other, lmfit.model.operator.mul)
 
-    def __truediv__(self, other):
+    def __truediv__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """/"""
         return CompositeMLEModel(self, other, lmfit.model.operator.truediv)
 
@@ -250,14 +263,14 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
 class GenericLineModel(MLEModel):
     def __init__(
         self,
-        spect,
-        independent_vars=["bin_centers"],
-        prefix="",
-        nan_policy="raise",
-        has_linear_background=True,
-        has_tails=False,
-        qemodel=None,
-        **kwargs,
+        spect: SpectralLine,
+        independent_vars: list[str] = ["bin_centers"],
+        prefix: str = "",
+        nan_policy: str = "raise",
+        has_linear_background: bool = True,
+        has_tails: bool = False,
+        qemodel: Callable | None = None,
+        **kwargs: Any,
     ):
         self.spect = spect
         self._has_tails = has_tails
@@ -273,23 +286,23 @@ class GenericLineModel(MLEModel):
         if has_tails:
 
             def modelfunctails(  # noqa: PLR0917
-                bin_centers,
-                fwhm,
-                peak_ph,
-                dph_de,
-                integral,
-                background=0,
-                bg_slope=0,
-                tail_frac=0,
-                tail_tau=8,
-                tail_share_hi=0,
-                tail_tau_hi=8,
-            ):
+                bin_centers: ArrayLike,
+                fwhm: float,
+                peak_ph: float,
+                dph_de: float,
+                integral: float,
+                background: float = 0,
+                bg_slope: float = 0,
+                tail_frac: float = 0,
+                tail_tau: float = 8,
+                tail_share_hi: float = 0,
+                tail_tau_hi: float = 8,
+            ) -> NDArray:
                 bin_centers = np.asarray(bin_centers, dtype=float)
                 bin_width = bin_centers[1] - bin_centers[0]
                 energy = (bin_centers - peak_ph) / dph_de + self.spect.peak_energy
 
-                def cleanspectrum_fn(x):
+                def cleanspectrum_fn(x: ArrayLike) -> NDArray:
                     return self.spect.pdf(x, instrument_gaussian_fwhm=fwhm)
 
                 # tail_tau* is in energy units but has to be converted to the same units as `bin_centers`
@@ -310,7 +323,15 @@ class GenericLineModel(MLEModel):
 
         else:
 
-            def modelfunc(bin_centers, fwhm, peak_ph, dph_de, integral, background=0, bg_slope=0):
+            def modelfunc(
+                bin_centers: ArrayLike,
+                fwhm: float,
+                peak_ph: float,
+                dph_de: float,
+                integral: float,
+                background: float = 0,
+                bg_slope: float = 0,
+            ) -> NDArray:
                 bin_centers = np.asarray(bin_centers, dtype=float)
                 bin_width = bin_centers[1] - bin_centers[0]
                 energy = (bin_centers - peak_ph) / dph_de + self.spect.peak_energy
@@ -327,7 +348,7 @@ class GenericLineModel(MLEModel):
 
         self._set_paramhints_prefix()
 
-    def _set_paramhints_prefix(self):
+    def _set_paramhints_prefix(self) -> None:
         nominal_peak_energy = self.spect.nominal_peak_energy
         self.set_param_hint("fwhm", value=nominal_peak_energy / 1000, min=nominal_peak_energy / 10000, max=nominal_peak_energy)
         self.set_param_hint("peak_ph", value=nominal_peak_energy, min=0)
@@ -342,11 +363,13 @@ class GenericLineModel(MLEModel):
             self.set_param_hint("tail_share_hi", value=0, min=0, max=1, vary=False)
             self.set_param_hint("tail_tau_hi", value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=False)
 
-    def guess(self, data, bin_centers, dph_de, **kwargs):
+    def guess(self, data: ArrayLike, bin_centers: ArrayLike, dph_de: float, **kwargs: dict) -> lmfit.Parameters:
         "Guess values for the peak_ph, integral, and background."
+        data = np.asarray(data)
+        bin_centers = np.asarray(bin_centers)
         order_stat = np.array(data.cumsum(), dtype=float) / data.sum()
 
-        def percentiles(p):
+        def percentiles(p: float) -> NDArray:
             return bin_centers[(order_stat > p).argmax()]
 
         fwhm_arb = 0.7 * (percentiles(0.75) - percentiles(0.25))
@@ -366,7 +389,7 @@ class GenericLineModel(MLEModel):
 class LineModelResult(lmfit.model.ModelResult):
     """like lmfit.model.Model result, but with some convenient plotting functions for line spectra fits"""
 
-    def _compact_fit_report(self):
+    def _compact_fit_report(self) -> str:
         s = ""
         sn = {"background": "bg", "integral": "intgrl", "bg_slope": "bg_slp"}
         for k in sorted(self.params.keys()):
@@ -385,7 +408,9 @@ class LineModelResult(lmfit.model.ModelResult):
         s += f"redchi  {self.redchi:.2g}"
         return s
 
-    def plotm(self, ax=None, title=None, xlabel=None, ylabel=None):
+    def plotm(
+        self, ax: plt.Axes | None = None, title: str | None = None, xlabel: str | None = None, ylabel: str | None = None
+    ) -> None:
         """plot the data, the fit, and annotate the plot with the parameters"""
         title, xlabel, ylabel = self._handle_default_labels(title, xlabel, ylabel)
         if ax is None:
@@ -406,7 +431,9 @@ class LineModelResult(lmfit.model.ModelResult):
         # ax.legend(["data", self._compact_fit_report()],loc='best', frameon=True, framealpha = 0.5)
         ax.legend(loc="upper right")
 
-    def set_label_hints(self, binsize, ds_shortname, attr_str, unit_str, cut_hint, states_hint=""):
+    def set_label_hints(
+        self, binsize: float, ds_shortname: str, attr_str: str, unit_str: str, cut_hint: str, states_hint: str = ""
+    ) -> None:
         self._binsize = binsize
         self._ds_shortname = ds_shortname
         self._attr_str = attr_str
@@ -415,7 +442,7 @@ class LineModelResult(lmfit.model.ModelResult):
         self._states_hint = states_hint
         self._has_label_hints = True
 
-    def _handle_default_labels(self, title, xlabel, ylabel):
+    def _handle_default_labels(self, title: str | None, xlabel: str | None, ylabel: str | None) -> tuple[str, str, str]:
         if hasattr(self, "_has_label_hints"):
             if title is None:
                 title = f"{self._ds_shortname}: {self.model.spect.shortname}"
@@ -428,9 +455,15 @@ class LineModelResult(lmfit.model.ModelResult):
         elif ylabel is None and "bin_centers" in self.userkws:
             binsize = self.userkws["bin_centers"][1] - self.userkws["bin_centers"][0]
             ylabel = f"counts per {binsize:g} unit bin"
+        if title is None:
+            title = ""
+        if xlabel is None:
+            xlabel = ""
+        if ylabel is None:
+            ylabel = ""
         return title, xlabel, ylabel
 
-    def _validate_bins_per_fwhm(self, minimum_bins_per_fwhm):
+    def _validate_bins_per_fwhm(self, minimum_bins_per_fwhm: float) -> None:
         if "bin_centers" not in self.userkws:
             return  # i guess someone used this for a non histogram fit
         if not VALIDATE_BIN_SIZE:

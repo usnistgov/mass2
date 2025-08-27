@@ -250,24 +250,32 @@ class EnergyCalibrationMaker:
         x.append(anchors.max() * np.linspace(1, 2, 101)[1:])
         return np.hstack(x)
 
-    def make_calibration_loglog(self, approximate: bool = False, powerlaw: float = 1.15, extra_info=None) -> EnergyCalibration:
+    def make_calibration_loglog(
+        self, approximate: bool = False, powerlaw: float = 1.15, extra_info: dict[str, Any] | None = None
+    ) -> EnergyCalibration:
         return self.make_calibration(Curvetypes.LOGLOG, approximate=approximate, powerlaw=powerlaw, extra_info=extra_info)
 
-    def make_calibration_gain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_gain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
         return self.make_calibration(Curvetypes.GAIN, approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_invgain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_invgain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
         return self.make_calibration(Curvetypes.INVGAIN, approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_loggain(self, approximate: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_loggain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
         return self.make_calibration(Curvetypes.LOGGAIN, approximate=approximate, extra_info=extra_info)
 
-    def make_calibration_linear(self, approximate: bool = False, addzero: bool = False, extra_info=None) -> EnergyCalibration:
+    def make_calibration_linear(
+        self, approximate: bool = False, addzero: bool = False, extra_info: dict[str, Any] | None = None
+    ) -> EnergyCalibration:
         curvename = Curvetypes.LINEAR_PLUS_ZERO if addzero else Curvetypes.LINEAR
         return self.make_calibration(curvename, approximate=approximate, extra_info=extra_info)
 
     def make_calibration(
-        self, curvename: Curvetypes = Curvetypes.LOGLOG, approximate: bool = False, powerlaw: float = 1.15, extra_info=None
+        self,
+        curvename: Curvetypes = Curvetypes.LOGLOG,
+        approximate: bool = False,
+        powerlaw: float = 1.15,
+        extra_info: dict[str, Any] | None = None,
     ) -> EnergyCalibration:
         if approximate and self.npts < 3:
             raise ValueError(f"approximating curves require 3 or more cal anchor points, have {self.npts}")
