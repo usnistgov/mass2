@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from collections.abc import Callable, Iterable
-from typing import List, Tuple
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -178,7 +177,7 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: List[Tuple[str, str]], description: str):
+    def from_ljh_path_pairs(cls, pulse_noise_pairs: list[tuple[str, str]], description: str):
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
