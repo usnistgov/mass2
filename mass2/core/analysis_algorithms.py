@@ -10,6 +10,9 @@ Created on Jun 9, 2014
 """
 
 import numpy as np
+from numpy.typing import NDArray, ArrayLike
+from typing import Any
+from collections.abc import Callable
 import scipy as sp
 from numba import njit
 
@@ -25,7 +28,7 @@ LOG = logging.getLogger("mass")
 
 
 @njit
-def estimateRiseTime(pulse_data, timebase, nPretrig):
+def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> NDArray:
     """Computes the rise time of timeseries <pulse_data>, where the time steps are <timebase>.
     <pulse_data> can be a 2D array where each row is a different pulse record, in which case
     the return value will be an array last long as the number of rows in <pulse_data>.
@@ -87,7 +90,9 @@ def estimateRiseTime(pulse_data, timebase, nPretrig):
         return -9.9e-6 + np.zeros(npulses, dtype=float)
 
 
-def compute_max_deriv(pulse_data, ignore_leading, spike_reject=True, kernel=None):
+def compute_max_deriv(
+    pulse_data: ArrayLike, ignore_leading: int, spike_reject: bool = True, kernel: ArrayLike | str | None = None
+) -> NDArray:
     """Computes the maximum derivative in timeseries <pulse_data>.
     <pulse_data> can be a 2D array where each row is a different pulse record, in which case
     the return value will be an array last long as the number of rows in <pulse_data>.
@@ -179,11 +184,11 @@ class HistogramSmoother:
     that histogram, we can smooth multiple histograms with the same geometry.
     """
 
-    def __init__(self, smooth_sigma, limits):
+    def __init__(self, smooth_sigma: float, limits: ArrayLike):
         """Give the smoothing Gaussian's width as <smooth_sigma> and the
         [lower,upper] histogram limits as <limits>."""
 
-        self.limits = np.asarray(limits, dtype=float)
+        self.limits = tuple(np.asarray(limits, dtype=float))
         self.smooth_sigma = smooth_sigma
 
         # Choose a reasonable # of bins, at least 1024 and a power of 2
@@ -207,7 +212,7 @@ class HistogramSmoother:
         kernel /= kernel.sum()
         self.kernel_ft = np.fft.rfft(kernel)
 
-    def __call__(self, values):
+    def __call__(self, values: ArrayLike) -> NDArray:
         """Return a smoothed histogram of the data vector <values>"""
         contents, _ = np.histogram(values, self.nbins, self.limits)
         ftc = np.fft.rfft(contents)
@@ -217,7 +222,7 @@ class HistogramSmoother:
 
 
 @njit
-def make_smooth_histogram(values, smooth_sigma, limit, upper_limit=None):
+def make_smooth_histogram(values: ArrayLike, smooth_sigma: float, limit: float, upper_limit: float | None = None) -> NDArray:
     """Convert a vector of arbitrary <values> info a smoothed histogram by
     histogramming it and smoothing.
 
@@ -237,7 +242,7 @@ def make_smooth_histogram(values, smooth_sigma, limit, upper_limit=None):
     return HistogramSmoother(smooth_sigma, [limit, upper_limit])(values)
 
 
-def drift_correct(indicator, uncorrected, limit=None):
+def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None) -> tuple[float, dict]:
     """Compute a drift correction that minimizes the spectral entropy.
 
     Args:
@@ -261,8 +266,10 @@ def drift_correct(indicator, uncorrected, limit=None):
     pretrigger means. (Or replace "pretrigger mean" with whatever quantity you
     passed in as <indicator>.)
     """
+    uncorrected = np.asarray(uncorrected)
+    indicator = np.array(indicator)  # make a copy
     ptm_offset = np.median(indicator)
-    indicator = np.array(indicator) - ptm_offset
+    indicator -= ptm_offset
 
     if limit is None:
         pct99 = np.percentile(uncorrected, 99)
@@ -271,7 +278,7 @@ def drift_correct(indicator, uncorrected, limit=None):
     smoother = HistogramSmoother(0.5, [0, limit])
     assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
-    def entropy(param, indicator, uncorrected, smoother):
+    def entropy(param: NDArray, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
         corrected = uncorrected * (1 + indicator * param)
         hsmooth = smoother(corrected)
         w = hsmooth > 0
@@ -284,7 +291,7 @@ def drift_correct(indicator, uncorrected, limit=None):
 
 
 @njit
-def nearest_arrivals(reference_times, other_times):
+def nearest_arrivals(reference_times: ArrayLike, other_times: ArrayLike) -> tuple[NDArray, NDArray]:
     """Find the external trigger time immediately before and after each pulse timestamp
 
     Args:
@@ -306,6 +313,7 @@ def nearest_arrivals(reference_times, other_times):
     closest greater time contained in other_times or a inf number if there was
     no later time in external_trigger_timestamps.
     """
+    other_times = np.asarray(other_times)
     nearest_after_index = np.searchsorted(other_times, reference_times)
     # because both sets of arrival times should be sorted, there are faster algorithms than searchsorted
     # for example: https://github.com/kwgoodman/bottleneck/issues/47
@@ -327,7 +335,7 @@ def nearest_arrivals(reference_times, other_times):
 
 
 @njit
-def filter_signal_lowpass(sig, fs, fcut):
+def filter_signal_lowpass(sig: NDArray, fs: float, fcut: float) -> NDArray:
     """Tophat lowpass filter using an FFT
 
     Args:
@@ -347,7 +355,7 @@ def filter_signal_lowpass(sig, fs, fcut):
     return sig_filt
 
 
-def correct_flux_jumps_original(vals, mask, flux_quant):
+def correct_flux_jumps_original(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> NDArray:
     """Remove 'flux' jumps' from pretrigger mean.
 
     When using umux readout, if a pulse is recorded that has a very fast rising
@@ -378,8 +386,10 @@ def correct_flux_jumps_original(vals, mask, flux_quant):
     # difference between the largest and smallest values for "good" pulses. If
     # you don't exclude "bad" pulses, this check can be tricked in cases where
     # the pretrigger section contains a (sufficiently large) tail.
+    vals = np.asarray(vals)
+    mask = np.asarray(mask)
     if (np.amax(vals) - np.amin(vals)) >= flux_quant:
-        corrected = vals % (flux_quant)
+        corrected = vals % flux_quant
         if (np.amax(corrected[mask]) - np.amin(corrected[mask])) > 0.75 * flux_quant:
             corrected = (vals + flux_quant / 4) % (flux_quant)
             corrected = corrected - flux_quant / 4 + flux_quant
@@ -389,7 +399,7 @@ def correct_flux_jumps_original(vals, mask, flux_quant):
         return vals
 
 
-def correct_flux_jumps(vals, mask, flux_quant):
+def correct_flux_jumps(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> NDArray:
     """Remove 'flux' jumps' from pretrigger mean.
 
     When using umux readout, if a pulse is recorded that has a very fast rising
@@ -412,7 +422,7 @@ def correct_flux_jumps(vals, mask, flux_quant):
 
 
 @njit
-def unwrap_n(data, period, mask, n=3):
+def unwrap_n(data: NDArray[np.uint16], period: float, mask: ArrayLike, n: int = 3) -> NDArray:
     """Unwrap data that has been restricted to a given period.
 
     The algorithm iterates through each data point and compares
@@ -432,9 +442,10 @@ def unwrap_n(data, period, mask, n=3):
     data : array of data values
     period : the range over which the data loops
     n : how many preceding points to average
-    mask (optional) -- mask indentifying "good" pulses
+    mask: mask indentifying "good" pulses
     """
-    udata = data.copy()
+    mask = np.asarray(mask)
+    udata = np.copy(data)  # make a copy for output
     if n <= 0:
         return udata
 
@@ -461,15 +472,15 @@ def unwrap_n(data, period, mask, n=3):
 
 
 def time_drift_correct(  # noqa: PLR0914
-    time,
-    uncorrected,
-    w,
-    sec_per_degree=2000,
-    pulses_per_degree=2000,
-    max_degrees=20,
-    ndeg=None,
-    limit=None,
-):
+    time: ArrayLike,
+    uncorrected: ArrayLike,
+    w: float,
+    sec_per_degree: float = 2000,
+    pulses_per_degree: int = 2000,
+    max_degrees: int = 20,
+    ndeg: int | None = None,
+    limit: tuple[float, float] | None = None,
+) -> dict[str, Any]:
     """Compute a time-based drift correction that minimizes the spectral entropy.
 
     Args:
@@ -497,17 +508,19 @@ def time_drift_correct(  # noqa: PLR0914
     * Figure out how to span the available time with more than one set of legendre
       polynomials, so that we can have more than 20 d.o.f. eventually, for long runs.
     """
+    time = np.asarray(time)
+    uncorrected = np.asarray(uncorrected)
     if limit is None:
         pct99 = np.percentile(uncorrected, 99)
-        limit = [0, 1.25 * pct99]
+        limit = (0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])
-    time = time[use]
-    uncorrected = uncorrected[use]
+    time = np.asarray(time[use])
+    uncorrected = np.asarray(uncorrected[use])
 
     tmin, tmax = np.min(time), np.max(time)
 
-    def normalize(t):
+    def normalize(t: NDArray) -> NDArray:
         return (t - tmin) / (tmax - tmin) * 2 - 1
 
     info = {
@@ -536,12 +549,12 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("Using %2d degrees for %6d photons (after %d downsample)", ndeg, N, downsample)
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
-    def model1(pi, i, param, basis):
+    def model1(pi: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
         pcopy = np.array(param)
         pcopy[i] = pi
         return 1 + np.dot(basis.T, pcopy)
 
-    def cost1(pi, i, param, y, w, basis):
+    def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
         return laplace_entropy(y * model1(pi, i, param, basis), w=w)
 
     param = np.zeros(ndeg, dtype=float)
@@ -549,7 +562,7 @@ def time_drift_correct(  # noqa: PLR0914
     basis = np.vstack([sp.special.legendre(i + 1)(xnorm) for i in range(ndeg)])
 
     fc = 0
-    model = np.poly1d([0])
+    model: Callable = np.poly1d([0])
     info["coefficients"] = np.zeros(ndeg, dtype=float)
     for i in range(ndeg):
         result, _fval, _iter, funcalls = sp.optimize.brent(
@@ -569,7 +582,7 @@ def time_drift_correct(  # noqa: PLR0914
     if H2 <= 0 or H2 - H1 > 0.0:
         model = np.poly1d([0])
     elif H3 <= 0 or H3 - H2 > 0.00001:
-        model2 = model
+        model = model2
 
     info["entropies"] = (H1, H2, H3)
     info["model"] = model

@@ -1,32 +1,42 @@
 """
 This file is intended to include algorithms that could be generally useful
 for calibration. Mostly they are pulled out of the former
-mass2.calibration.young module.
+mass.calibration.young module.
 """
 
+from collections.abc import Iterable
+from typing import Any, cast
+from numpy.typing import ArrayLike, NDArray
 import itertools
-import operator
 import numpy as np
 
 
-from mass2.calibration.fluorescence_lines import STANDARD_FEATURES
+from .fluorescence_lines import STANDARD_FEATURES, SpectralLine
+from .energy_calibration import EnergyCalibration
+from .line_models import GenericLineModel, LineModelResult
+
 import mass2
 
 
-def line_names_and_energies(line_names):
+def line_names_and_energies(line_names: Iterable[str | float]) -> tuple[list[str], list[float]]:
     """Given a list of line_names, return (names, energies) in eV.
 
     Can also accept energies in eV directly and return (names, energies).
     """
-    if len(line_names) <= 0:
-        return [], []
+    energies: list[float] = []
+    for name_or_energy in line_names:
+        if isinstance(name_or_energy, str):
+            energies.append(STANDARD_FEATURES[name_or_energy])
+        else:
+            energies.append(float(name_or_energy))
+    order: NDArray = np.argsort(energies)
+    names = list(line_names)
+    sorted_names = [str(names[i]) for i in order]
+    energies.sort()
+    return sorted_names, energies
 
-    energies = [STANDARD_FEATURES.get(name_or_energy, name_or_energy) for name_or_energy in line_names]
-    # names = [str(name_or_energy) for name_or_energy in line_names]
-    return zip(*sorted(zip(line_names, energies), key=operator.itemgetter(1)))
 
-
-def find_local_maxima(pulse_heights, gaussian_fwhm):
+def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> tuple[NDArray, NDArray]:
     """Smears each pulse by a gaussian of gaussian_fhwm and finds local maxima,
     returns a list of their locations in pulse_height units (sorted by number of
     pulses in peak) AND their peak values as: (peak_locations, peak_intensities)
@@ -56,7 +66,14 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     return np.array(x[lm]), np.array(y[lm])
 
 
-def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, nextramax=8, maxacc=0.015):
+def find_opt_assignment(
+    peak_positions: ArrayLike,
+    line_names: list[str | float],
+    nextra: int = 2,
+    nincrement: int = 3,
+    nextramax: int = 8,
+    maxacc: float = 0.015,
+) -> tuple[list[str], NDArray, list[int]]:
     """Tries to find an assignment of peaks to line names that is reasonably self consistent and smooth
 
     Args:
@@ -76,6 +93,7 @@ def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, next
 
     n_sel_pp = len(line_names) + nextra  # number of peak_positions to use to line up to line_names
     nmax = len(line_names) + nextramax
+    peak_positions = np.asarray(peak_positions)
 
     while True:
         sel_positions = np.asarray(peak_positions[:n_sel_pp], dtype="float")
@@ -101,20 +119,24 @@ def find_opt_assignment(peak_positions, line_names, nextra=2, nincrement=3, next
             return name_e, energies, list(opt_assign)
 
 
-def build_fit_ranges_ph(line_names, excluded_line_names, approx_ecal, fit_width_ev):
+def build_fit_ranges_ph(
+    line_names: Iterable[str | float], excluded_line_names: Iterable[str | float], approx_ecal: EnergyCalibration, fit_width_ev: float
+) -> tuple[list[float], list[tuple[float, float]], list[float]]:
     """Call build_fit_ranges() to get (lo,hi) for fitranges in energy units,
     then convert to ph using approx_ecal"""
     e_e, fit_lo_hi_energy, slopes_de_dph = build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev)
     fit_lo_hi_ph = []
     for lo, hi in fit_lo_hi_energy:
-        lo_ph = approx_ecal.energy2ph(lo)
-        hi_ph = approx_ecal.energy2ph(hi)
+        lo_ph = cast(float, approx_ecal.energy2ph(lo))
+        hi_ph = cast(float, approx_ecal.energy2ph(hi))
         fit_lo_hi_ph.append((lo_ph, hi_ph))
 
     return e_e, fit_lo_hi_ph, slopes_de_dph
 
 
-def build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev):
+def build_fit_ranges(
+    line_names: Iterable[str | float], excluded_line_names: Iterable[str | float], approx_ecal: EnergyCalibration, fit_width_ev: float
+) -> tuple[list[float], list[tuple[float, float]], list[float]]:
     """Returns a list of (lo,hi) where lo and hi have units of energy of
     ranges to fit in for each energy in line_names.
 
@@ -134,7 +156,7 @@ def build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev)
     slopes_de_dph = []
 
     for e in e_e:
-        slope_de_dph = approx_ecal.energy2dedph(e)
+        slope_de_dph = cast(float, approx_ecal.energy2dedph(e))
         if any(all_e < e):
             nearest_below = all_e[all_e < e][-1]
         else:
@@ -151,27 +173,26 @@ def build_fit_ranges(line_names, excluded_line_names, approx_ecal, fit_width_ev)
     return e_e, fit_lo_hi_energy, slopes_de_dph
 
 
-class FailedFit:
-    def __init__(self, hist, bins):
-        self.hist = hist
-        self.bins = bins
-
-
 class FailedToGetModelException(Exception):
     pass
 
 
-def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False, prefix=""):
-    if isinstance(lineNameOrEnergy, mass2.calibration.GenericLineModel):
+def get_model(
+    lineNameOrEnergy: GenericLineModel | SpectralLine | str | float,
+    has_linear_background: bool = True,
+    has_tails: bool = False,
+    prefix: str = "",
+) -> GenericLineModel:
+    if isinstance(lineNameOrEnergy, GenericLineModel):
         line = lineNameOrEnergy.spect
-    elif isinstance(lineNameOrEnergy, mass2.calibration.SpectralLine):
+    elif isinstance(lineNameOrEnergy, SpectralLine):
         line = lineNameOrEnergy
     elif isinstance(lineNameOrEnergy, str):
         if lineNameOrEnergy in mass2.spectra:
             line = mass2.spectra[lineNameOrEnergy]
         elif lineNameOrEnergy in mass2.STANDARD_FEATURES:
             energy = mass2.STANDARD_FEATURES[lineNameOrEnergy]
-            line = mass2.calibration.SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
+            line = SpectralLine.quick_monochromatic_line(lineNameOrEnergy, energy, 0.001, 0)
         else:
             raise FailedToGetModelException(f"failed to get line from lineNameOrEnergy={lineNameOrEnergy}")
     else:
@@ -182,11 +203,18 @@ def get_model(lineNameOrEnergy, has_linear_background=True, has_tails=False, pre
                 f"lineNameOrEnergy = {lineNameOrEnergy} is not convertable"
                 " to float or a str in mass2.spectra or mass2.STANDARD_FEATURES"
             )
-        line = mass2.calibration.SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
+        line = SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
     return line.model(has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix)
 
 
-def multifit(ph, line_names, fit_lo_hi, binsize_ev, slopes_de_dph, hide_deprecation=False):
+def multifit(
+    ph: ArrayLike,
+    line_names: Iterable[str],
+    fit_lo_hi: list[list[float]],
+    binsize_ev: list[float],
+    slopes_de_dph: list[float],
+    hide_deprecation: bool = False,
+) -> dict[str, Any]:
     """
     Args:
         ph (np.array(dtype=float)): list of pulse heights
@@ -213,7 +241,9 @@ def multifit(ph, line_names, fit_lo_hi, binsize_ev, slopes_de_dph, hide_deprecat
     return {"results": results, "peak_ph": peak_ph, "eres": eres, "line_names": name_e, "energies": e_e}
 
 
-def singlefit(ph, name, lo, hi, binsize_ph, approx_dP_dE):
+def singlefit(
+    ph: ArrayLike, name: GenericLineModel | SpectralLine | str | float, lo: float, hi: float, binsize_ph: float, approx_dP_dE: float
+) -> LineModelResult:
     nbins = (hi - lo) / binsize_ph
     if nbins > 5000:
         raise Exception("too damn many bins, dont like running out of memory")
