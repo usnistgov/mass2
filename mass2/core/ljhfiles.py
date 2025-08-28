@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import ClassVar, Any
-import numpy.typing as npt
+from numpy.typing import NDArray
 import os
 import numpy as np
 import polars as pl
@@ -208,7 +208,7 @@ class LJHFile(ABC):
         )
 
     @property
-    def subframecount(self) -> npt.NDArray:
+    def subframecount(self) -> NDArray:
         """Return a copy of the subframecount memory map.
 
         Old LJH versions don't have this: return zeros, unless overridden by derived class (LJHFile_2_2 will be the only one).
@@ -222,7 +222,7 @@ class LJHFile(ABC):
 
     @property
     @abstractmethod
-    def datatimes_raw(self) -> npt.NDArray:
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -237,7 +237,7 @@ class LJHFile(ABC):
         raise NotImplementedError("illegal: this is an abstract base class")
 
     @property
-    def datatimes_float(self) -> npt.NDArray:
+    def datatimes_float(self) -> NDArray:
         """Compute pulse record times in floating-point (seconds since the 1970 epoch).
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -251,7 +251,7 @@ class LJHFile(ABC):
         """
         return self.datatimes_raw / 1e6
 
-    def read_trace(self, i: int) -> npt.NDArray:
+    def read_trace(self, i: int) -> NDArray:
         """Return a single pulse record from an LJH file.
 
         Parameters
@@ -261,12 +261,12 @@ class LJHFile(ABC):
 
         Returns
         -------
-        npt.ArrayLike
+        ArrayLike
             A view into the pulse record.
         """
         return self._mmap["data"][i]
 
-    def read_trace_with_timing(self, i: int) -> tuple[int, int, npt.NDArray]:
+    def read_trace_with_timing(self, i: int) -> tuple[int, int, NDArray]:
         """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
@@ -343,7 +343,7 @@ class LJHFile(ABC):
 
 class LJHFile_2_2(LJHFile):
     @property
-    def subframecount(self) -> npt.NDArray:
+    def subframecount(self) -> NDArray:
         """Return a copy of the subframecount memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -366,7 +366,7 @@ class LJHFile_2_2(LJHFile):
         return subframecount
 
     @property
-    def datatimes_raw(self) -> npt.NDArray:
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -411,7 +411,7 @@ class LJHFile_2_2(LJHFile):
 
 class LJHFile_2_1(LJHFile):
     @property
-    def datatimes_raw(self) -> npt.NDArray:
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -456,7 +456,7 @@ class LJHFile_2_1(LJHFile):
 
 class LJHFile_2_0(LJHFile):
     @property
-    def datatimes_raw(self) -> npt.NDArray:
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively

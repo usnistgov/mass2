@@ -8,7 +8,7 @@ Tools for fitting and simulating X-ray fluorescence lines.
 from dataclasses import dataclass
 from functools import cached_property
 from collections.abc import Callable
-import numpy.typing as npt
+from numpy.typing import ArrayLike, NDArray
 from enum import Enum
 import pathlib
 import importlib.resources as pkg_resources
@@ -97,9 +97,9 @@ class SpectralLine:
     material: str
     linetype: str
     nominal_peak_energy: float
-    energies: npt.NDArray[np.float64]
-    lorentzian_fwhm: npt.NDArray[np.float64]
-    reference_amplitude: npt.NDArray[np.float64]
+    energies: NDArray[np.float64]
+    lorentzian_fwhm: NDArray[np.float64]
+    reference_amplitude: NDArray[np.float64]
     reference_amplitude_type: AmplitudeType = AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY
     reference_measurement_type: str | None = "unknown"
     intrinsic_sigma: float = 0.0
@@ -119,11 +119,11 @@ class SpectralLine:
         return peak_energy
 
     @property
-    def cumulative_amplitudes(self) -> npt.NDArray:
+    def cumulative_amplitudes(self) -> NDArray:
         return self.lorentzian_integral_intensity.cumsum()
 
     @cached_property
-    def lorentzian_integral_intensity(self) -> npt.NDArray:
+    def lorentzian_integral_intensity(self) -> NDArray:
         if self.reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
             sigma = self.reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
             return np.array([
@@ -136,19 +136,19 @@ class SpectralLine:
             return self.reference_amplitude
 
     @cached_property
-    def normalized_lorentzian_integral_intensity(self) -> npt.NDArray:
+    def normalized_lorentzian_integral_intensity(self) -> NDArray:
         x = self.lorentzian_integral_intensity
         return x / np.sum(x)
 
     @cached_property
-    def lorentz_amplitude(self) -> npt.NDArray:
+    def lorentz_amplitude(self) -> NDArray:
         return self.lorentzian_integral_intensity / self.lorentzian_fwhm
 
-    def __call__(self, x: npt.ArrayLike, instrument_gaussian_fwhm: float) -> npt.NDArray:
+    def __call__(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Make the class callable, returning the same value as the self.pdf method."""
         return self.pdf(x, instrument_gaussian_fwhm)
 
-    def pdf(self, x: npt.ArrayLike, instrument_gaussian_fwhm: float) -> npt.NDArray:
+    def pdf(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Spectrum (units of fraction per eV) as a function of <x>, the energy in eV"""
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
@@ -158,7 +158,7 @@ class SpectralLine:
             # mass2.voigt() is normalized to have unit integrated intensity
         return result
 
-    def components(self, x: npt.ArrayLike, instrument_gaussian_fwhm: float) -> list[npt.NDArray]:
+    def components(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> list[NDArray]:
         """List of spectrum components as a function of <x>, the energy in eV"""
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
@@ -169,7 +169,7 @@ class SpectralLine:
 
     def plot(
         self,
-        x: npt.ArrayLike | None = None,
+        x: ArrayLike | None = None,
         instrument_gaussian_fwhm: float = 0,
         axis: plt.Axes | None = None,
         components: bool = True,
@@ -213,9 +213,7 @@ class SpectralLine:
         axis = self.plot(axis=axis, instrument_gaussian_fwhm=fwhm)
         return axis
 
-    def rvs(
-        self, size: int | tuple[int] | None, instrument_gaussian_fwhm: float, rng: np.random.Generator | None = None
-    ) -> npt.NDArray:
+    def rvs(self, size: int | tuple[int] | None, instrument_gaussian_fwhm: float, rng: np.random.Generator | None = None) -> NDArray:
         """The CDF and PPF (cumulative distribution and percentile point functions) are hard to
         compute.  But it's easy enough to generate the random variates themselves, so we
         override that method."""
@@ -326,9 +324,9 @@ class SpectralLine:
         reference_short: str,
         reference_plot_instrument_gaussian_fwhm: float | None,
         nominal_peak_energy: float,
-        energies: npt.ArrayLike,
-        lorentzian_fwhm: npt.ArrayLike,
-        reference_amplitude: npt.ArrayLike,
+        energies: ArrayLike,
+        lorentzian_fwhm: ArrayLike,
+        reference_amplitude: ArrayLike,
         reference_amplitude_type: AmplitudeType,
         ka12_energy_diff: float | None = None,
         position_uncertainty: float = np.nan,

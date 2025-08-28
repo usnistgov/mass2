@@ -200,7 +200,7 @@ class Channel:
             _, step_size = misc.midpoints_and_step_size(bin_edges)
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
-            counts_dict[group_name] = counts
+            counts_dict[group_name_str] = counts
             plt.step(bin_centers, counts, where="mid", label=group_name_str)
             # Plot the histogram for the current group
             # if group_name == "EBIT":

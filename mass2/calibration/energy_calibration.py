@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pylab as plt
 import h5py
-import numpy.typing as npt
+from numpy.typing import ArrayLike, NDArray
 from typing import Any
 from enum import Enum, auto
 
@@ -46,19 +46,19 @@ class EnergyCalibrationMaker:
         When calibration data arrays have unequal length, or `ph` is not monotone in `energy`.
     """
 
-    ph: npt.NDArray[np.float64]
-    energy: npt.NDArray[np.float64]
-    dph: npt.NDArray[np.float64]
-    de: npt.NDArray[np.float64]
+    ph: NDArray[np.float64]
+    energy: NDArray[np.float64]
+    dph: NDArray[np.float64]
+    de: NDArray[np.float64]
     names: list[str]
 
     @classmethod
     def init(
         cls,
-        ph: npt.ArrayLike | None = None,
-        energy: npt.ArrayLike | None = None,
-        dph: npt.ArrayLike | None = None,
-        de: npt.ArrayLike | None = None,
+        ph: ArrayLike | None = None,
+        energy: ArrayLike | None = None,
+        dph: ArrayLike | None = None,
+        de: ArrayLike | None = None,
         names: list[str] | None = None,
     ) -> EnergyCalibrationMaker:
         if ph is None:
@@ -224,7 +224,7 @@ class EnergyCalibrationMaker:
         return EnergyCalibrationMaker(new_ph, new_energy, new_dph, new_de, new_names)
 
     @staticmethod
-    def heuristic_samplepoints(anchors: npt.ArrayLike) -> np.ndarray:
+    def heuristic_samplepoints(anchors: ArrayLike) -> np.ndarray:
         """Given a set of calibration anchor points, return a few hundred
         sample points, reasonably spaced below, between, and above the anchor points.
 
@@ -283,7 +283,7 @@ class EnergyCalibrationMaker:
             raise ValueError(f"{curvename=}, must be in {Curvetypes}")
 
         # Use a heuristic to repair negative uncertainties.
-        def regularize_uncertainties(x: npt.NDArray[np.float64]) -> np.ndarray:
+        def regularize_uncertainties(x: NDArray[np.float64]) -> np.ndarray:
             if not np.any(x < 0):
                 return x
             target = max(0.0, x.min())
@@ -404,7 +404,7 @@ class EnergyCalibrationMaker:
 
     def drop_one_errors(
         self, curvename: Curvetypes = Curvetypes.LOGLOG, approximate: bool = False, powerlaw: float = 1.15
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         # """For each calibration point, calculate the difference between the 'correct' energy
         # and the energy predicted by creating a calibration without that point and using
         # ph2energy to calculate the predicted energy, return (energies, drop_one_energy_diff)"""
@@ -438,16 +438,16 @@ class EnergyCalibration:
         _description_
     """
 
-    ph: npt.NDArray[np.float64]
-    energy: npt.NDArray[np.float64]
-    dph: npt.NDArray[np.float64]
-    de: npt.NDArray[np.float64]
+    ph: NDArray[np.float64]
+    energy: NDArray[np.float64]
+    dph: NDArray[np.float64]
+    de: NDArray[np.float64]
     names: list[str]
     curvename: Curvetypes
     approximating: bool
-    spline: Callable[..., npt.NDArray[np.float64]]
-    energy2ph: Callable[[npt.ArrayLike], npt.NDArray[np.float64]]
-    ph2uncertainty: Callable[[npt.ArrayLike], npt.NDArray[np.float64]]
+    spline: Callable[..., NDArray[np.float64]]
+    energy2ph: Callable[[ArrayLike], NDArray[np.float64]]
+    ph2uncertainty: Callable[[ArrayLike], NDArray[np.float64]]
     input_transform: Callable
     output_transform: Callable | None = None
     extra_info: dict[str, Any] | None = None
@@ -463,7 +463,7 @@ class EnergyCalibration:
         return len(self.ph)
 
     @staticmethod
-    def _ecal_input_identity(ph: npt.NDArray, der: int = 0) -> npt.NDArray:
+    def _ecal_input_identity(ph: NDArray, der: int = 0) -> NDArray:
         "Use ph as the argument to the spline"
         assert der >= 0
         if der == 0:
@@ -473,7 +473,7 @@ class EnergyCalibration:
         return np.zeros_like(ph)
 
     @staticmethod
-    def _ecal_input_log(ph: npt.NDArray, der: int = 0) -> npt.NDArray:
+    def _ecal_input_log(ph: NDArray, der: int = 0) -> NDArray:
         "Use log(ph) as the argument to the spline"
         assert der >= 0
         if der == 0:
@@ -483,7 +483,7 @@ class EnergyCalibration:
         raise ValueError(f"der={der}, should be one of (0,1)")
 
     @staticmethod
-    def _ecal_output_identity(ph: npt.NDArray, yspline: npt.NDArray, der: int = 0, dery: int = 0) -> npt.NDArray:
+    def _ecal_output_identity(ph: NDArray, yspline: NDArray, der: int = 0, dery: int = 0) -> NDArray:
         "Use the spline result as E itself"
         assert der >= 0 and dery >= 0
         if der > 0:
@@ -496,7 +496,7 @@ class EnergyCalibration:
             return np.zeros_like(ph)
 
     @staticmethod
-    def _ecal_output_log(ph: npt.NDArray, yspline: npt.NDArray, der: int = 0, dery: int = 0) -> npt.NDArray:
+    def _ecal_output_log(ph: NDArray, yspline: NDArray, der: int = 0, dery: int = 0) -> NDArray:
         "Use the spline result as log(E)"
         assert der >= 0 and dery >= 0
         if der == 0:
@@ -506,7 +506,7 @@ class EnergyCalibration:
             return np.zeros_like(ph)
 
     @staticmethod
-    def _ecal_output_gain(ph: npt.NDArray, yspline: npt.NDArray, der: int = 0, dery: int = 0) -> npt.NDArray:
+    def _ecal_output_gain(ph: NDArray, yspline: NDArray, der: int = 0, dery: int = 0) -> NDArray:
         "Use the spline result as gain = ph/E"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -520,7 +520,7 @@ class EnergyCalibration:
         return -ph / yspline**2
 
     @staticmethod
-    def _ecal_output_invgain(ph: npt.NDArray, yspline: npt.NDArray, der: int = 0, dery: int = 0) -> npt.NDArray:
+    def _ecal_output_invgain(ph: NDArray, yspline: NDArray, der: int = 0, dery: int = 0) -> NDArray:
         "Use the spline result as the inverse gain = E/ph"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -534,7 +534,7 @@ class EnergyCalibration:
         return ph
 
     @staticmethod
-    def _ecal_output_loggain(ph: npt.NDArray, yspline: npt.NDArray, der: int = 0, dery: int = 0) -> npt.NDArray:
+    def _ecal_output_loggain(ph: NDArray, yspline: NDArray, der: int = 0, dery: int = 0) -> NDArray:
         "Use the spline result as the log of the gain, or log(ph/E)"
         assert der >= 0 and dery >= 0
         if dery == 0:
@@ -556,16 +556,16 @@ class EnergyCalibration:
         e = self(ph)
         return np.all(np.diff(e) > 0)
 
-    def name2ph(self, name: str) -> npt.NDArray[np.float64]:
+    def name2ph(self, name: str) -> NDArray[np.float64]:
         """Convert a named energy feature to pulse height. `name` need not be a calibration point."""
         energy = STANDARD_FEATURES[name]
         return self.energy2ph(energy)
 
-    def energy2dedph(self, energies: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def energy2dedph(self, energies: ArrayLike) -> NDArray[np.float64]:
         """Calculate the slope at the given energies."""
         return self.ph2dedph(self.energy2ph(energies))
 
-    def energy2uncertainty(self, energies: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def energy2uncertainty(self, energies: ArrayLike) -> NDArray[np.float64]:
         """Cal uncertainty in eV at the given energies."""
         ph = self.energy2ph(energies)
         return self.ph2uncertainty(ph)
@@ -576,7 +576,7 @@ class EnergyCalibration:
             seq.append(f"  energy(ph={pulse_ht:7.2f}) --> {energy:9.2f} eV ({name})")
         return "\n".join(seq)
 
-    def ph2energy(self, ph: npt.ArrayLike, exact: bool = False) -> npt.NDArray[np.float64]:
+    def ph2energy(self, ph: ArrayLike, exact: bool = False) -> NDArray[np.float64]:
         ph = np.asarray(ph)
         x = self.input_transform(ph)
         y = self.spline(x, der=0)
@@ -588,7 +588,7 @@ class EnergyCalibration:
 
     __call__ = ph2energy
 
-    def ph2dedph(self, ph: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def ph2dedph(self, ph: ArrayLike) -> NDArray[np.float64]:
         """Calculate the slope at pulse heights `ph`."""
         ph = np.asarray(ph)
         x = self.input_transform(ph)
@@ -602,7 +602,7 @@ class EnergyCalibration:
             dEdP = dfdP + dfdy * dydx * dgdP
         return dEdP
 
-    def energy2ph_exact(self, E: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def energy2ph_exact(self, E: ArrayLike) -> NDArray[np.float64]:
         # TODO use the spline as a starting point for Brent's method
         return self.energy2ph(E)
 
