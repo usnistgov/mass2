@@ -9,6 +9,10 @@ on:
     branches-ignore:
       - 'refs/heads/pull/**' # Excludes branches that are part of a pull request
       - 'main' # Or any other branch you want to exclude from direct push builds if it's handled by PRs
+    paths-ignore:
+      - 'README.md'
+      - 'VERSIONS.md'
+      - '.gitignore'
   pull_request:
     branches:
       - '*' # Triggers for all PRs targeting any branch (presumably 99% of all PRs will target 'main')
@@ -38,8 +42,7 @@ jobs:
       uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
-        # Cache wasn't working. Need a better understanding before we turn this on:
-        # enable-cache: true
+        enable-cache: true
 
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
