@@ -12,10 +12,12 @@ def _():
     import pylab as plt
     from pathlib import Path
     import polars as pl
+    import tempfile
+    import os
     import mass2.core.mass_add_lines_truebq
     import lmfit
     import pulsedata
-    return mass2, np, pl, plt, pulsedata
+    return mass2, np, os, pl, plt, pulsedata, tempfile
 
 
 @app.cell
@@ -25,7 +27,7 @@ def _(mass2, pl, pulsedata):
         # with just the parquet, we don't know all this other info
         # lets just fill it in with None where we can
         # and see what we can do
-        ch = mass2.Channel(df, 
+        ch = mass2.Channel(df,
                           header = mass2.ChannelHeader(description=filename,
                                                        ch_num=1,
                                                       frametime_s=1e-5,df=None,n_presamples=None, n_samples=None),
@@ -106,7 +108,16 @@ def _(ch20um, mass2, model, np, params):
 
 
 @app.cell
-def _(bin_centers, counts20um, counts20um_blank, counts5um, np, pl):
+def _(
+    bin_centers,
+    counts20um,
+    counts20um_blank,
+    counts5um,
+    np,
+    os,
+    pl,
+    tempfile,
+):
     # Define dtype and create structured array
     dtype = [
         ('bin_centers', float),
@@ -127,14 +138,23 @@ def _(bin_centers, counts20um, counts20um_blank, counts5um, np, pl):
     data['counts5um_noCo'] = counts5um[0].astype(int)
     data['counts5um_withCo'] = counts5um[1].astype(int)
 
-    # Save structured array as .npy
-    np.save('202508truebq_Pu239_5um_20um_20umblank_all_data.npy', data)
+    # Replace with some local directory if you want to check out these files.
+    # But for testing purposes, we want to stash them somewhere temporary:
+    with tempfile.TemporaryDirectory(prefix="trueBq_demo_notebook_") as output_dir:
+        # Uncomment the following line to write somewhere specific, instead of using the temporary dir
+        # output_dir = "."
+        print(f"Writing output CSV and npy files to {output_dir=}")
 
-    # Convert structured array to Polars DataFrame directly
-    df = pl.from_numpy(data)
+        # Save structured array as .npy
+        npy_path = os.path.join(output_dir, '202508truebq_Pu239_5um_20um_20umblank_all_data.npy')
+        np.save(npy_path, data)
 
-    # Save to CSV
-    df.write_csv('202508truebq_Pu239_5um_20um_20umblank_all_data.csv')
+        # Convert structured array to Polars DataFrame directly
+        df = pl.from_numpy(data)
+
+        # Save to CSV
+        csv_path = os.path.join(output_dir, '202508truebq_Pu239_5um_20um_20umblank_all_data.csv')
+        df.write_csv(csv_path)
     return
 
 
