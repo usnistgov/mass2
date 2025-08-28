@@ -535,15 +535,10 @@ data_replay = mass2.Channels.from_ljh_folder(
 ).with_experiment_state_by_path()
 data_replay = data_replay.load_recipes(trimmed_recipe_filename)
 
-# Verify that some expected columns exist in the replay and have identical values
+# Verify that the expected columns exist in the replay and have identical values
 df1 = data.ch0.df
 df2 = data_replay.ch0.df
-for field in ("pulse_rms", "5lagy", "5lagx", "energy_5lagy_best"):
-    assert(df2[field].equals(df1[field]))
-
-# But two fields remove from the trimmed recipe should NOT exist in the replay:
-for field in ("energy_pulse_rms", "energy_5lagy_dc"):
-    assert field not in df2
+assert df2.equals(df1.select(df2.columns))
 ```
 
 ## Further examples
