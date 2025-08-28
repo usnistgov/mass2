@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from collections.abc import Iterable
-from collections.abc import Callable
+from typing import Any
+from collections.abc import Iterable, Callable
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -26,7 +26,7 @@ class RecipeStep:
         # TODO: should this be an abstract method?
         return df.filter(self.good_expr)
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: dict) -> plt.Axes:
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         # this is a no-op, subclasses can override this to plot something
         plt.figure()
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
@@ -47,7 +47,7 @@ class PretrigMeanJumpFixStep(RecipeStep):
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 
-    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: dict) -> plt.Axes:
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         plt.figure()
         plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0], **kwargs)
         plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0], **kwargs)

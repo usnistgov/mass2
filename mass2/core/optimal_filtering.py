@@ -6,7 +6,8 @@ import numpy as np
 import matplotlib.pylab as plt
 from numba import njit
 
-import numpy.typing as npt
+from typing import Any
+from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -55,18 +56,18 @@ class ToeplitzWhitener:
     phi: np.ndarray
 
     @property
-    def p(self):
+    def p(self) -> int:
         return len(self.phi) - 1
 
     @property
-    def q(self):
+    def q(self) -> int:
         return len(self.theta) - 1
 
-    def whiten(self, v: npt.ArrayLike) -> np.ndarray:
+    def whiten(self, v: ArrayLike) -> np.ndarray:
         "Return whitened vector (or matrix of column vectors) Wv"
         return self(v)
 
-    def __call__(self, v: npt.ArrayLike) -> np.ndarray:
+    def __call__(self, v: ArrayLike) -> np.ndarray:
         "Return whitened vector (or matrix of column vectors) Wv"
         v = np.asarray(v)
         if v.ndim > 3:
@@ -98,7 +99,7 @@ class ToeplitzWhitener:
             y[i] /= self.theta[0]
         return y
 
-    def solveW(self, v: npt.ArrayLike) -> np.ndarray:
+    def solveW(self, v: ArrayLike) -> np.ndarray:
         "Return unwhitened vector (or matrix of column vectors) inv(W)*v"
         v = np.asarray(v)
         if v.ndim > 3:
@@ -130,7 +131,7 @@ class ToeplitzWhitener:
             y[i] /= self.phi[0]
         return y
 
-    def solveWT(self, v: npt.ArrayLike) -> np.ndarray:
+    def solveWT(self, v: ArrayLike) -> np.ndarray:
         "Return vector (or matrix of column vectors) inv(W')*v"
         v = np.asarray(v)
         if v.ndim > 3:
@@ -150,7 +151,7 @@ class ToeplitzWhitener:
             y[i] /= self.phi[0]
         return np.correlate(y, self.theta, "full")[self.q :]
 
-    def applyWT(self, v: npt.ArrayLike) -> np.ndarray:
+    def applyWT(self, v: ArrayLike) -> np.ndarray:
         """Return vector (or matrix of column vectors) W'v"""
         v = np.asarray(v)
         if v.ndim > 3:
@@ -186,7 +187,7 @@ class ToeplitzWhitener:
         return np.linalg.solve(MA, AR)
 
 
-def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: float | None, f_3db: float | None):
+def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: float | None, f_3db: float | None) -> None:
     """Band-limit the column-vectors in a model matrix with a hard and/or
     1-pole low-pass filter. Change the input `modelmatrix` in-place.
 
@@ -268,16 +269,16 @@ class Filter(ABC):
 
     @property
     @abstractmethod
-    def is_arrival_time_safe(self):
+    def is_arrival_time_safe(self) -> bool:
         """Is this an arrival-time-safe filter?"""
         return False
 
     @property
     @abstractmethod
-    def _filter_type(self):
+    def _filter_type(self) -> str:
         return "illegal: this is supposed to be an abstract base class"
 
-    def plot(self, axis: plt.Axes | None = None, **kwargs):
+    def plot(self, axis: plt.Axes | None = None, **kwargs: Any) -> None:
         """Make a plot of the filter
 
         Parameters
@@ -295,7 +296,7 @@ class Filter(ABC):
         axis.set_xlabel("Lag Time (s)")
         plt.gcf().tight_layout()
 
-    def report(self, std_energy: float = 5898.8):
+    def report(self, std_energy: float = 5898.8) -> None:
         """Report on estimated V/dV for the filter.
 
         Parameters
@@ -310,7 +311,7 @@ class Filter(ABC):
         print(f"v/\u03b4v: {v_dv: .2f}, variance: {var:.2f} \u03b4E: {fwhm_eV:.2f} eV (FWHM), assuming standard E={std_energy:.2f} eV")
 
     @abstractmethod
-    def filter_records(self, x: npt.ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
         pass
 
 
@@ -326,16 +327,16 @@ class Filter5Lag(Filter):
         An optimal filter, for convolution with data (at 5 lags, obviously)
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert self.convolution_lags == 5
 
     @property
-    def is_arrival_time_safe(self):
+    def is_arrival_time_safe(self) -> bool:
         """Is this an arrival-time-safe filter?"""
         return False
 
     @property
-    def _filter_type(self):
+    def _filter_type(self) -> str:
         return "5lag"
 
     # These parameters fit a parabola to any 5 evenly-spaced points
@@ -351,12 +352,12 @@ class Filter5Lag(Filter):
         / 70.0
     )
 
-    def filter_records(self, x: npt.ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
         """Filter one microcalorimeter record or an array of records.
 
         Parameters
         ----------
-        x : npt.ArrayLike
+        x : ArrayLike
             A 1-d array, a single pulse record, or a 2-d array, where `x[i, :]` is pulse record number `i`.
 
         Returns
@@ -402,25 +403,25 @@ class FilterATS(Filter):
         An optimal filter, for convolution with data (at 5 lags, obviously)
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         assert self.convolution_lags == 1
         assert self.dt_values is not None
 
     @property
-    def is_arrival_time_safe(self):
+    def is_arrival_time_safe(self) -> bool:
         """Is this an arrival-time-safe filter?"""
         return True
 
     @property
-    def _filter_type(self):
+    def _filter_type(self) -> str:
         return "ats"
 
-    def filter_records(self, x: npt.ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
         """Filter one microcalorimeter record or an array of records.
 
         Parameters
         ----------
-        x : npt.ArrayLike
+        x : ArrayLike
             A 1-d array, a single pulse record, or a 2-d array, each row a pulse records.
 
         Returns
@@ -444,7 +445,7 @@ class FilterATS(Filter):
 
 
 @njit
-def _filter_records_ats(x: npt.ArrayLike, values: npt.NDArray, dt_values: npt.NDArray):
+def _filter_records_ats(x: ArrayLike, values: NDArray, dt_values: NDArray) -> tuple[float, float]:
     "A numba-JIT speedup of the core computation"
     conv0 = np.dot(x, values)
     conv1 = np.dot(x, dt_values)
@@ -458,7 +459,7 @@ class FilterMaker:
 
     Parameters
     ---------
-    signal_model : npt.ArrayLike
+    signal_model : ArrayLike
         The average signal shape.  Filters will be rescaled so that the output
         upon putting this signal into the filter equals the *peak value* of this
         filter (that is, peak value relative to the baseline level).
@@ -468,10 +469,10 @@ class FilterMaker:
         its constant averaged value before creating filters.  Also, one filter
         (filt_baseline_pretrig) is designed to infer the baseline using only
         `n_pretrigger` samples at the start of a record.
-    noise_autocorr : Optional[npt.ArrayLike]
+    noise_autocorr : Optional[ArrayLike]
         The autocorrelation function of the noise, where the lag spacing is
         assumed to be the same as the sample period of `avg_signal`.
-    noise_psd : Optional[npt.ArrayLike]
+    noise_psd : Optional[ArrayLike]
         The noise power spectral density.  If not None, then it must be of length (2N+1),
         where N is the length of `avg_signal`, and its values are assumed to cover the
         non-negative frequencies from 0, 1/Delta, 2/Delta,.... up to the Nyquist frequency.
@@ -506,18 +507,18 @@ class FilterMaker:
         An object that can make a variety of optimal filters, assuming a single signal and noise analysis.
     """
 
-    signal_model: npt.NDArray
+    signal_model: NDArray
     n_pretrigger: int
-    noise_autocorr: npt.NDArray | None = None
-    noise_psd: npt.NDArray | None = None
-    dt_model: npt.NDArray | None = None
+    noise_autocorr: NDArray | None = None
+    noise_psd: NDArray | None = None
+    dt_model: NDArray | None = None
     whitener: ToeplitzWhitener | None = None
     sample_time_sec: float = 0.0
     peak: float = 0.0
 
     def compute_constrained_5lag(
         self,
-        constraints: npt.ArrayLike | None = None,
+        constraints: ArrayLike | None = None,
         fmax: float | None = None,
         f_3db: float | None = None,
         cut_pre: int = 0,
@@ -832,7 +833,7 @@ class FilterMaker:
         filt_dt = filt[1]
         filt_baseline = filt[2]
 
-        variance = bracketR(filt_noconst, self.noise_autocorr)
+        variance = bracketR(filt_noconst, noise_autocorr)
         vdv = peak / (np.log(2) * 8 * variance) ** 0.5
         return FilterATS(
             filt_noconst, peak, variance, vdv, filt_dt, filt_baseline, avg_signal, dt_model, 1, fmax, f_3db, cut_pre, cut_post
@@ -918,7 +919,7 @@ class FilterMaker:
         return avg_signal, peak_signal, dt_model
 
     @staticmethod
-    def _normalize_5lag_filter(f: np.ndarray, avg_signal: np.ndarray):
+    def _normalize_5lag_filter(f: np.ndarray, avg_signal: np.ndarray) -> None:
         """Rescale 5-lag filter `f` in-place so that it gives unit response to avg_signal
 
         Parameters
@@ -939,7 +940,7 @@ class FilterMaker:
         f *= 1.0 / fit_peak
 
     @staticmethod
-    def _normalize_filter(f: np.ndarray, avg_signal: np.ndarray):
+    def _normalize_filter(f: np.ndarray, avg_signal: np.ndarray) -> None:
         """Rescale single-lag filter `f` in-place so that it gives unit response to avg_signal
 
         Parameters
@@ -953,7 +954,7 @@ class FilterMaker:
         f *= 1 / np.dot(f, avg_signal)
 
 
-def bracketR(q, noise):
+def bracketR(q: NDArray, noise: NDArray) -> float:
     """Return the dot product (q^T R q) for vector <q> and matrix R constructed from
     the vector <noise> by R_ij = noise_|i-j|.  We don't want to construct the full matrix
     R because for records as long as 10,000 samples, the matrix will consist of 10^8 floats

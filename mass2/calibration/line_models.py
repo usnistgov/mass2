@@ -366,7 +366,7 @@ class GenericLineModel(MLEModel):
             self.set_param_hint("tail_share_hi", value=0, min=0, max=1, vary=False)
             self.set_param_hint("tail_tau_hi", value=nominal_peak_energy / 200, min=0, max=nominal_peak_energy / 10, vary=False)
 
-    def guess(self, data: ArrayLike, bin_centers: ArrayLike, dph_de: float, **kwargs: dict) -> lmfit.Parameters:
+    def guess(self, data: ArrayLike, bin_centers: ArrayLike, dph_de: float, **kwargs: Any) -> lmfit.Parameters:
         "Guess values for the peak_ph, integral, and background."
         data = np.asarray(data)
         bin_centers = np.asarray(bin_centers)
