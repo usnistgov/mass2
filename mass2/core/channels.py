@@ -80,7 +80,7 @@ class Channels:
         )
         return result
 
-    def plot_hist(self, col: str, bin_edges: ArrayLike, use_expr: pl.Expr = pl.lit(True), axis: plt.Axes | None = None):
+    def plot_hist(self, col: str, bin_edges: ArrayLike, use_expr: pl.Expr = pl.lit(True), axis: plt.Axes | None = None) -> None:
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
@@ -93,7 +93,7 @@ class Channels:
         axis: plt.Axes | None = None,
         use_expr: pl.Expr | None = None,
         skip_none: bool = True,
-    ):
+    ) -> None:
         """
         Plots histograms for the given column, grouped by the specified column.
 
@@ -171,8 +171,8 @@ class Channels:
                 new_channels[key] = channel
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
-    def linefit_joblib(self, line: str, col: str, prefer="threads", n_jobs: int = 4) -> LineModelResult:
-        def work(key: int) -> Channel:
+    def linefit_joblib(self, line: str, col: str, prefer: str = "threads", n_jobs: int = 4) -> LineModelResult:
+        def work(key: int) -> LineModelResult:
             channel = self.channels[key]
             return channel.linefit(line, col)
 
@@ -234,7 +234,7 @@ class Channels:
     def from_off_paths(cls, off_paths: Iterable[str | Path], description: str) -> "Channels":
         channels = {}
         for path in off_paths:
-            ch = Channel.from_off(mass2.core.OffFile(path))
+            ch = Channel.from_off(mass2.core.OffFile(str(path)))
             channels[ch.header.ch_num] = ch
         return cls(channels, description)
 
@@ -275,7 +275,7 @@ class Channels:
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir / filename
 
-    def get_experiment_state_df(self, experiment_state_path: str | None = None) -> pl.DataFrame:
+    def get_experiment_state_df(self, experiment_state_path: str | Path | None = None) -> pl.DataFrame:
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
             experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
@@ -390,7 +390,7 @@ class Channels:
         description: str = "from Channels.channels_from_df",
     ) -> "Channels":
         # requres a column named "ch_num" containing the channel number
-        keys_df: dict[tuple[int, ...], pl.DataFrame] = df_in.partition_by(by=["ch_num"], as_dict=True)
+        keys_df: dict[tuple, pl.DataFrame] = df_in.partition_by(by=["ch_num"], as_dict=True)
         dfs: dict[int, pl.DataFrame] = {keys[0]: df for (keys, df) in keys_df.items()}
         channels: dict[int, Channel] = {}
         for ch_num, df in dfs.items():

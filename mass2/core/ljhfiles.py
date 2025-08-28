@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import ClassVar, Any
 import numpy.typing as npt
 import os
@@ -45,7 +46,8 @@ class LJHFile(ABC):
         return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
 
     @classmethod
-    def open(cls, filename: str, max_pulses: int | None = None) -> "LJHFile":
+    def open(cls, filename: str | Path, max_pulses: int | None = None) -> "LJHFile":
+        filename = str(filename)
         header_dict, header_string, header_size = cls.read_header(filename)
         channum = header_dict["Channel"]
         timebase = header_dict["Timebase"]

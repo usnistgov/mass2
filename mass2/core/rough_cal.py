@@ -1,14 +1,16 @@
+from collections.abc import Callable, Iterable
+from typing import Any
+from numpy.typing import NDArray, ArrayLike
 from dataclasses import dataclass, field, replace
 import numpy as np
 import pylab as plt  # type: ignore
 import polars as pl
 from matplotlib.axes._axes import Axes
-from numpy import float32, float64, ndarray
+from numpy import float32, ndarray
 from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult  # type: ignore
 import scipy as sp
-import typing
 import itertools
 
 import mass2
@@ -21,12 +23,12 @@ from mass2.calibration.algorithms import line_names_and_energies
 
 
 def rank_3peak_assignments(
-    ph,
-    e,
-    line_names,
-    max_fractional_energy_error_3rd_assignment=0.1,
-    min_gain_fraction_at_ph_30k=0.25,
-):
+    ph: NDArray,
+    e: NDArray,
+    line_names: Iterable[str],
+    max_fractional_energy_error_3rd_assignment: float = 0.1,
+    min_gain_fraction_at_ph_30k: float = 0.25,
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     # we explore possible line assignments, and down select based on knowledge of gain curve shape
     # gain = ph/e, and we assume gain starts at zero, decreases with pulse height, and
     # that a 2nd order polynomial is a reasonably good approximation
@@ -78,8 +80,8 @@ def rank_3peak_assignments(
 class BestAssignmentPfitGainResult:
     rms_residual: float
     ph_assigned: np.ndarray
-    residual_e: np.ndarray
-    assignment_inds: np.ndarray
+    residual_e: np.ndarray | None
+    assignment_inds: np.ndarray | None
     pfit_gain: np.polynomial.Polynomial
     energy_target: np.ndarray
     names_target: list[str]  # list of strings with names for the energies in energy_target
@@ -88,7 +90,7 @@ class BestAssignmentPfitGainResult:
     def ph_unassigned(self) -> ndarray:
         return np.array(list(set(self.ph_target) - set(self.ph_assigned)))
 
-    def plot(self, ax: Axes | None = None):
+    def plot(self, ax: Axes | None = None) -> None:
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -103,7 +105,7 @@ class BestAssignmentPfitGainResult:
         for name, x, y in zip(self.names_target, self.ph_assigned, gain):
             ax.annotate(str(name), (x, y))
 
-    def phzerogain(self) -> float64:
+    def phzerogain(self) -> float:
         # the pulse height at which the gain is zero
         # for now I'm counting on the roots being ordered, we want the positive root where gain goes zero
         # since our function is invalid outside that range
@@ -114,10 +116,10 @@ class BestAssignmentPfitGainResult:
         else:
             raise ValueError()
 
-    def ph2energy(self, ph: ndarray | float) -> float64 | ndarray:
+    def ph2energy(self, ph: ndarray | float) -> float | ndarray:
         return ph / self.pfit_gain(ph)
 
-    def energy2ph(self, energy):
+    def energy2ph(self, energy: ArrayLike) -> NDArray:
         if self.pfit_gain.degree() == 2:
             return self._energy2ph_deg2(energy)
         elif self.pfit_gain.degree() == 1:
@@ -127,7 +129,7 @@ class BestAssignmentPfitGainResult:
         else:
             raise Exception("degree out of range")
 
-    def _energy2ph_deg2(self, energy):
+    def _energy2ph_deg2(self, energy: ArrayLike) -> NDArray:
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
@@ -135,12 +137,12 @@ class BestAssignmentPfitGainResult:
         # and given that we've selected for well formed calibrations,
         # we know which root we want
         cba = self.pfit_gain.convert().coef
-        c, bb, a = cba * energy
+        c, bb, a = cba * np.asarray(energy)
         b = bb - 1
         ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
         return ph
 
-    def _energy2ph_deg1(self, energy):
+    def _energy2ph_deg1(self, energy: ArrayLike) -> NDArray:
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(b + a*x)
         # so
@@ -152,7 +154,7 @@ class BestAssignmentPfitGainResult:
         ph = y * b / (1 - y * a)
         return ph
 
-    def _energy2ph_deg0(self, energy):
+    def _energy2ph_deg0(self, energy: ArrayLike) -> NDArray:
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(a)
         # so
@@ -162,7 +164,7 @@ class BestAssignmentPfitGainResult:
         ph = y * a
         return ph
 
-    def predicted_energies(self):
+    def predicted_energies(self) -> NDArray | float:
         return self.ph2energy(self.ph_assigned)
 
 
@@ -175,26 +177,26 @@ class SmoothedLocalMaximaResult:
     local_maxima_inds: np.ndarray  # inds into bin_centers
     local_minima_inds: np.ndarray  # inds into bin_centers
 
-    def inds_sorted_by_peak_height(self) -> ndarray:
+    def inds_sorted_by_peak_height(self) -> NDArray:
         return self.local_maxima_inds[np.argsort(-self.peak_height())]
 
-    def inds_sorted_by_prominence(self) -> ndarray:
+    def inds_sorted_by_prominence(self) -> NDArray:
         return self.local_maxima_inds[np.argsort(-self.prominence())]
 
-    def ph_sorted_by_prominence(self) -> ndarray:
+    def ph_sorted_by_prominence(self) -> NDArray:
         return self.bin_centers[self.inds_sorted_by_prominence()]
 
-    def ph_sorted_by_peak_height(self):
+    def ph_sorted_by_peak_height(self) -> NDArray:
         return self.bin_centers[self.inds_sorted_by_peak_height()]
 
-    def peak_height(self) -> ndarray:
+    def peak_height(self) -> NDArray:
         return self.smoothed_counts[self.local_maxima_inds]
 
-    def prominence(self) -> ndarray:
+    def prominence(self) -> NDArray:
         assert len(self.local_minima_inds) == len(self.local_maxima_inds) + 1, (
             "peakfind_local_maxima_of_smoothed_hist must ensure this "
         )
-        prominence = np.zeros_like(self.local_maxima_inds, dtype=float64)
+        prominence = np.zeros_like(self.local_maxima_inds, dtype=float)
         for i in range(len(self.local_maxima_inds)):
             sc_max = self.smoothed_counts[self.local_maxima_inds[i]]
             sc_min_before = self.smoothed_counts[self.local_minima_inds[i]]
@@ -270,13 +272,13 @@ class SmoothedLocalMaximaResult:
         return ax
 
 
-def smooth_hist_with_gauassian_by_fft(hist: ndarray, fwhm_in_bin_number_units: float64) -> ndarray:
+def smooth_hist_with_gauassian_by_fft(hist: ndarray, fwhm_in_bin_number_units: float) -> ndarray:
     kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
     y = np.fft.irfft(np.fft.rfft(hist) * kernel)
     return y
 
 
-def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_number_units: float64) -> ndarray:
+def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_number_units: float) -> ndarray:
     sigma = fwhm_in_bin_number_units / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
     tx = np.fft.rfftfreq(nbins)
@@ -345,7 +347,7 @@ def peakfind_local_maxima_of_smoothed_hist(
     )
 
 
-def find_local_maxima(pulse_heights, gaussian_fwhm):
+def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> Any:
     """Smears each pulse by a gaussian of gaussian_fhwm and finds local maxima,
     returns a list of their locations in pulse_height units (sorted by number of
     pulses in peak) AND their peak values as: (peak_locations, peak_intensities)
@@ -375,12 +377,14 @@ def find_local_maxima(pulse_heights, gaussian_fwhm):
     return np.array(x[lm]), np.array(y[lm]), (hist, bin_centers, y)
 
 
-def rank_assignments(ph, e):
+def rank_assignments(ph: ArrayLike, e: ArrayLike) -> tuple[NDArray, NDArray, NDArray]:
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
-    e = np.array(sorted(list(e)))
-    ph = np.array(sorted(list(ph)))
+    e = np.array(e)
+    ph = np.array(ph)
+    e.sort()
+    ph.sort()
     pha = np.array(list(itertools.combinations(ph, len(e))))
     pha_inds = np.array(list(itertools.combinations(np.arange(len(ph)), len(e))))
     # pha[i,:] is one choice of len(e) values from ph to assign to e
@@ -396,19 +400,21 @@ def rank_assignments(ph, e):
     x_m_x0_over_x1_m_x0 = (x - x0) / (x1 - x0)
     y = y0 + (y1 - y0) * x_m_x0_over_x1_m_x0
     y_expected = e[1:-1]
-    rms_e_residual = mass2.misc.root_mean_squared(y - y_expected, axis=1)
+    rms_e_residual = np.asarray(mass2.misc.root_mean_squared(y - y_expected, axis=1))
     # prefer negative slopes for gain
     # gain_first = ph[0]/e[0]
     # gain_last = ph[-1]/e[-1]
     return rms_e_residual, pha, pha_inds
 
 
-def find_optimal_assignment(ph, e):
+def find_optimal_assignment(ph: ArrayLike, e: ArrayLike) -> tuple[float, NDArray]:
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
 
     # when given 3 or less energies to match, use the largest peaks in peak order
+    ph = np.asarray(ph)
+    e = np.asarray(e)
     assert len(e) >= 1
     if len(e) <= 2:
         return 0, np.array(sorted(ph[: len(e)]))
@@ -418,12 +424,15 @@ def find_optimal_assignment(ph, e):
     return rms_e_residual[ind], pha[ind]
 
 
-def find_optimal_assignment_height_info(ph, e, line_heights_allowed):
+def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_heights_allowed: ArrayLike) -> tuple[float, NDArray]:
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
 
     # when given 3 or less energies to match, use the largest peaks in peak order
+    ph = np.asarray(ph)
+    e = np.asarray(e)
+    line_heights_allowed = np.asarray(line_heights_allowed)
     assert len(e) >= 1
     if len(e) <= 2:
         return 0, np.array(sorted(ph[: len(e)]))
@@ -460,7 +469,9 @@ def find_optimal_assignment_height_info(ph, e, line_heights_allowed):
     return rms_e_residual[best_ind], pha[best_ind, :]
 
 
-def find_optimal_assignment2(ph, e, line_names):
+def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str]) -> BestAssignmentPfitGainResult:
+    ph = np.asarray(ph)
+    e = np.asarray(e)
     rms_e_residual, pha = find_optimal_assignment(ph, e)
     gain = pha / e
     deg = min(len(e) - 1, 2)
@@ -481,8 +492,12 @@ def find_optimal_assignment2(ph, e, line_names):
     return result
 
 
-def find_optimal_assignment2_height_info(ph, e, line_names, line_heights_allowed):
+def find_optimal_assignment2_height_info(
+    ph: ArrayLike, e: ArrayLike, line_names: list[str], line_heights_allowed: ArrayLike
+) -> BestAssignmentPfitGainResult:
     rms_e_residual, pha = find_optimal_assignment_height_info(ph, e, line_heights_allowed)
+    ph = np.asarray(ph)
+    e = np.asarray(e)
     gain = pha / e
     deg = min(len(e) - 1, 2)
     if deg == 0:
@@ -507,7 +522,7 @@ def find_pfit_gain_residual(ph: ndarray, e: ndarray) -> tuple[ndarray, Polynomia
     gain = ph / e
     pfit_gain = np.polynomial.Polynomial.fit(ph, gain, deg=2)
 
-    def ph2energy(ph):
+    def ph2energy(ph: NDArray) -> NDArray:
         return ph / pfit_gain(ph)
 
     predicted_e = ph2energy(ph)
@@ -565,12 +580,12 @@ def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -
 
 
 def drift_correct_entropy(
-    slope: float64,
+    slope: float,
     indicator_zero_mean: ndarray,
     uncorrected: ndarray,
     bin_edges: ndarray,
     fwhm_in_bin_number_units: int,
-) -> float64:
+) -> float:
     corrected = uncorrected * (1 + indicator_zero_mean * slope)
     smoothed_counts, bin_edges, _counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
     w = smoothed_counts > 0
@@ -586,14 +601,16 @@ def minimize_entropy_linear(
     indicator_mean = np.mean(indicator)
     indicator_zero_mean = indicator - indicator_mean
 
-    def entropy_fun(slope):
+    def entropy_fun(slope: float) -> float:
         return drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units)
 
     result = sp.optimize.minimize_scalar(entropy_fun, bracket=[0, 0.1])
     return result, indicator_mean
 
 
-def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_energies, line_names):
+def eval_3peak_assignment_pfit_gain(
+    ph_assigned: NDArray, e_assigned: NDArray, possible_phs: NDArray, line_energies: NDArray, line_names: list[str]
+) -> tuple[float, BestAssignmentPfitGainResult | str]:
     assert len(np.unique(ph_assigned)) == len(ph_assigned), "assignments must be unique"
     assert len(np.unique(e_assigned)) == len(e_assigned), "assignments must be unique"
     assert all(np.diff(ph_assigned) > 0), "assignments must be sorted"
@@ -610,13 +627,13 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
         # well formed calibrations have real roots
         return np.inf, "pfit_gain_3peak must have real roots"
 
-    def ph2energy(ph):
+    def ph2energy(ph: NDArray) -> NDArray:
         gain = pfit_gain_3peak(ph)
         return ph / gain
 
     cba = pfit_gain_3peak.convert().coef
 
-    def energy2ph(energy):
+    def energy2ph(energy: NDArray) -> NDArray:
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
@@ -670,7 +687,7 @@ def eval_3peak_assignment_pfit_gain(ph_assigned, e_assigned, possible_phs, line_
 class RoughCalibrationStep(RecipeStep):
     pfresult: SmoothedLocalMaximaResult | None
     assignment_result: BestAssignmentPfitGainResult | None
-    ph2energy: typing.Callable
+    ph2energy: Callable
     success: bool
 
     def calc_from_df(self, df: DataFrame) -> DataFrame:
@@ -681,43 +698,30 @@ class RoughCalibrationStep(RecipeStep):
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
 
-    def drop_debug(self):
+    def drop_debug(self) -> "RoughCalibrationStep":
         return replace(self, pfresult=None, assignment_result=None)
 
-    def dbg_plot_old(self, df, bin_edges=np.arange(0, 10000, 1), axis: plt.Axes | None = None, plotkwarg={}):
-        series = mass2.misc.good_series(df, col=self.output[0], good_expr=self.good_expr, use_expr=self.use_expr)
-        axis = mass2.misc.plot_hist_of_series(series, bin_edges)
-        axis.plot(self.line_energies, np.zeros(len(self.line_energies)), "o")
-        for line_name, energy in zip(self.line_names, self.line_energies):
-            axis.annotate(line_name, (energy, 0), rotation=90)
-        np.set_printoptions(precision=2)
-        energy_residuals = self.predicted_energies - self.line_energies
-        axis.set_title(f"RoughCalibrationStep dbg_plot\n{energy_residuals=}")
-        return axis
-
-    def dbg_plot(self, df, axs=None):
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> None:
         if self.success:
-            self.dbg_plot_success(df, axs)
+            self.dbg_plot_success(df_after, **kwargs)
         else:
-            self.dbg_plot_failure(df, axs)
+            self.dbg_plot_failure(df_after, **kwargs)
 
-    def dbg_plot_success(self, df: DataFrame, axs: None | ndarray = None):
-        if axs is None:
-            _, axs = plt.subplots(2, 1, figsize=(11, 6))
+    def dbg_plot_success(self, df: DataFrame, **kwargs: Any) -> None:
+        _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.assignment_result:
             self.assignment_result.plot(ax=axs[0])
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
-    def dbg_plot_failure(self, df: DataFrame, axs: None | ndarray = None):
-        if axs is None:
-            _, axs = plt.subplots(2, 1, figsize=(11, 6))
+    def dbg_plot_failure(self, df: DataFrame, **kwargs: None) -> None:
+        _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
-    def energy2ph(self, energy: float64) -> float:
+    def energy2ph(self, energy: ArrayLike) -> NDArray | float:
         if self.assignment_result:
             return self.assignment_result.energy2ph(energy)
         return 0.0
@@ -801,14 +805,15 @@ class RoughCalibrationStep(RecipeStep):
     ) -> "RoughCalibrationStep":
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
-        (line_names, line_energies) = line_names_and_energies(line_names)
+        (line_names_str, line_energies_list) = line_names_and_energies(line_names)
+        line_energies = np.asarray(line_energies_list)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=fwhm_pulse_height_units)
-        possible_phs = pfresult.ph_sorted_by_prominence()[: len(line_names) + n_extra_peaks]
+        possible_phs = pfresult.ph_sorted_by_prominence()[: len(line_names_str) + n_extra_peaks]
         df3peak, _dfe = rank_3peak_assignments(
             possible_phs,
             line_energies,
-            line_names,
+            line_names_str,
             max_fractional_energy_error_3rd_assignment,
             min_gain_fraction_at_ph_30k,
         )
@@ -816,28 +821,36 @@ class RoughCalibrationStep(RecipeStep):
         best_assignment_result = None
         for assignment_row in df3peak.select("e0", "ph0", "e1", "ph1", "e2", "ph2", "e_err_at_ph2").iter_rows():
             e0, ph0, e1, ph1, e2, ph2, _e_err_at_ph2 = assignment_row
+            pharray = np.array([ph0, ph1, ph2])
+            earray = np.array([e0, e1, e2])
             rms_residual, assignment_result = eval_3peak_assignment_pfit_gain(
-                [ph0, ph1, ph2], [e0, e1, e2], possible_phs, line_energies, line_names
+                pharray, earray, possible_phs, line_energies, line_names_str
             )
             if rms_residual < best_rms_residual:
                 best_rms_residual = rms_residual
                 best_assignment_result = assignment_result
                 if rms_residual < acceptable_rms_residual_e:
                     break
-        if best_assignment_result and not np.isinf(best_rms_residual):
+        if (
+            best_assignment_result
+            and isinstance(best_assignment_result, BestAssignmentPfitGainResult)
+            and not np.isinf(best_rms_residual)
+        ):
             success = True
             ph2energy = best_assignment_result.ph2energy
             # df3peak_on_failure = None
         else:
             success = False
 
-            def nanenergy(ph):
-                return ph * np.nana
+            def nanenergy(ph: NDArray | float) -> NDArray | float:
+                return ph * np.nan
 
             ph2energy = nanenergy
             # df3peak_on_failure = df3peak
         # df3peak_on_failure = df3peak
 
+        if isinstance(best_assignment_result, str):
+            best_assignment_result = None
         step = cls(
             [uncalibrated_col],
             [calibrated_col],

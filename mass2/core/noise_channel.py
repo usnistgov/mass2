@@ -1,18 +1,24 @@
+from typing import Any
+from numpy.typing import NDArray
+from pathlib import Path
 from dataclasses import dataclass
 import polars as pl
 import numpy as np
 import mass2
+from .noise_algorithms import NoiseResult
 
 
 @dataclass(frozen=True)
 class NoiseChannel:
-    df: pl.DataFrame | pl.LazyFrame  # DO NOT MUTATE THIS!!!
-    header_df: pl.DataFrame | pl.LazyFrame  # DO NOT MUTATE THIS!!
+    df: pl.DataFrame  # DO NOT MUTATE THIS!!!
+    header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
 
     # @functools.cache
-    def calc_max_excursion(self, trace_col_name="pulse", n_limit=10000, excursion_nsigma=5):
-        def excursion2d(noise_trace):
+    def calc_max_excursion(
+        self, trace_col_name: str = "pulse", n_limit: int = 10000, excursion_nsigma: float = 5
+    ) -> tuple[pl.DataFrame, float]:
+        def excursion2d(noise_trace: NDArray) -> float:
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
         noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
@@ -23,12 +29,12 @@ class NoiseChannel:
 
     def get_records_2d(
         self,
-        trace_col_name="pulse",
-        n_limit=10000,
-        excursion_nsigma=5,
-        trunc_front=0,
-        trunc_back=0,
-    ):
+        trace_col_name: str = "pulse",
+        n_limit: int = 10000,
+        excursion_nsigma: float = 5,
+        trunc_front: int = 0,
+        trunc_back: int = 0,
+    ) -> NDArray:
         """
         Return a 2D NumPy array of cleaned noise traces from the specified column.
 
@@ -69,36 +75,36 @@ class NoiseChannel:
     # @functools.cache
     def spectrum(
         self,
-        trace_col_name="pulse",
-        n_limit=10000,
-        excursion_nsigma=5,
-        trunc_front=0,
-        trunc_back=0,
-        skip_autocorr_if_length_over=10000,
-    ):
+        trace_col_name: str = "pulse",
+        n_limit: int = 10000,
+        excursion_nsigma: float = 5,
+        trunc_front: int = 0,
+        trunc_back: int = 0,
+        skip_autocorr_if_length_over: int = 10000,
+    ) -> NoiseResult:
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
         spectrum = mass2.core.noise_algorithms.calc_noise_result(
             records, continuous=self.is_continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
         )
         return spectrum
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
         return hash(id(self))
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return id(self) == id(other)
 
     @property
-    def is_continuous(self):
+    def is_continuous(self) -> bool:
         if "continuous" in self.header_df:
             return self.header_df["continuous"][0]
         return False
 
     @classmethod
-    def from_ljh(cls, path):
+    def from_ljh(cls, path: str | Path) -> "NoiseChannel":
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         noise_channel = cls(df, header_df, header_df["Timebase"][0])
