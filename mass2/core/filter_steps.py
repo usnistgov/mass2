@@ -1,6 +1,7 @@
 import polars as pl
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+import dataclasses
 from collections.abc import Callable
 from typing import Any
 import pylab as plt
@@ -33,4 +34,4 @@ class Filter5LagStep(RecipeStep):
         return plt.gca()
 
     def drop_debug(self) -> "Filter5LagStep":
-        return replace(self, spectrum=None)
+        return dataclasses.replace(self, spectrum=None)

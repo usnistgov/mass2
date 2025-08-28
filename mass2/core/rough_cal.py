@@ -1,7 +1,8 @@
 from collections.abc import Callable, Iterable
 from typing import Any
 from numpy.typing import NDArray, ArrayLike
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
+import dataclasses
 import numpy as np
 import pylab as plt  # type: ignore
 import polars as pl
@@ -699,7 +700,7 @@ class RoughCalibrationStep(RecipeStep):
         return df2
 
     def drop_debug(self) -> "RoughCalibrationStep":
-        return replace(self, pfresult=None, assignment_result=None)
+        return dataclasses.replace(self, pfresult=None, assignment_result=None)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> None:
         if self.success:

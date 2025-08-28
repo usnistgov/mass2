@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
+import dataclasses
 from typing import TypeVar, Any, TYPE_CHECKING
 from numpy.typing import NDArray, ArrayLike
 from collections.abc import Callable
@@ -96,25 +97,12 @@ class MultiFit:
         return self.with_fitspec(fitspec)
 
     def with_fitspec(self, fitspec: FitSpec) -> "MultiFit":
-        return MultiFit(
-            self.default_fit_width,
-            self.default_bin_size,
-            self.default_use_expr,
-            self.default_params_update,
-            sorted(self.fitspecs + [fitspec], key=lambda x: x.model.spect.peak_energy),
-            # make sure they're always sorted by energy
-            self.results,
-        )
+        # make sure they're always sorted by energy
+        newfitspecs = sorted(self.fitspecs + [fitspec], key=lambda x: x.model.spect.peak_energy)
+        return dataclasses.replace(self, fitspecs=newfitspecs)
 
     def with_results(self, results: list) -> "MultiFit":
-        return MultiFit(
-            self.default_fit_width,
-            self.default_bin_size,
-            self.default_use_expr,
-            self.default_params_update,
-            self.fitspecs,
-            results,
-        )
+        return dataclasses.replace(self, results=results)
 
     def results_params_as_df(self) -> pl.DataFrame:
         assert self.results is not None
@@ -249,7 +237,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
 
     def drop_debug(self) -> "MultiFitQuadraticGainStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None)
 
     def ph2energy(self, ph: ArrayLike) -> NDArray:
         ph = np.asarray(ph)
@@ -315,7 +303,7 @@ class MultiFitMassCalibrationStep(RecipeStep):
 
     def drop_debug(self) -> "MultiFitMassCalibrationStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         assert self.multifit is not None
