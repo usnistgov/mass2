@@ -17,12 +17,17 @@ MASS is the work of physicists from NIST Boulder Labs and the University of Colo
 * Jamie Titus
 * Many collaborators, who have made many bug reports, bug fixes, and feature requests.
 
+## Documentation
+
+* [Mass2 Documentation](https://usnistgov.github.io/mass2/)
+
 ## Introduction
 
 MASS is a software suite designed to analyze pulse records from high-resolution, cryogenic microcalorimeters. We use MASS with pulse records from x-ray and gamma-ray spectrometers, performing a sequence of analysis, or "calibration" steps to extract a high-precision estimate of the energy from each record.
 
 With raw pulse records and MASS, you can:
 
+* Analyze triggered or untriggered pulse records from microcalorimeters to create energy spectra.
 * Analyze data from one or multiple detectors at one time.
 * Analyze data from one or more raw pulse data files per detector.
 * Analyze a fixed dataset taken in the past, or perform "online" analysis of a dataset still being acquired.
