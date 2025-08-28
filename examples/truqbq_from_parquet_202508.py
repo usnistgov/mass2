@@ -44,6 +44,7 @@ def _(mass2, pl, pulsedata):
 def _(ch5um):
     ch = ch5um
     ch.good_df()
+
     return
 
 
@@ -63,6 +64,7 @@ def _(bin_edges, ch20um, mass2, plt):
     plt.yscale("log")
     plt.title("20um foil, few alpha escape, clean Pu239 line")
     mass2.show()
+
     return (counts20um,)
 
 
@@ -131,12 +133,12 @@ def _(
 
     data = np.zeros(len(bin_centers), dtype=dtype)
     data['bin_centers'] = bin_centers
-    data['counts20um_noCo'] = counts20um[0].astype(int)
-    data['counts20um_withCo'] = counts20um[1].astype(int)
-    data['counts20um_blank_noCo'] = counts20um_blank[0].astype(int)
-    data['counts20um_blank_withCo'] = counts20um_blank[1].astype(int)
-    data['counts5um_noCo'] = counts5um[0].astype(int)
-    data['counts5um_withCo'] = counts5um[1].astype(int)
+    data['counts20um_noCo'] = counts20um["0"].astype(int)
+    data['counts20um_withCo'] = counts20um["1"].astype(int)
+    data['counts20um_blank_noCo'] = counts20um_blank["0"].astype(int)
+    data['counts20um_blank_withCo'] = counts20um_blank["1"].astype(int)
+    data['counts5um_noCo'] = counts5um["0"].astype(int)
+    data['counts5um_withCo'] = counts5um["1"].astype(int)
 
     # Replace with some local directory if you want to check out these files.
     # But for testing purposes, we want to stash them somewhere temporary:
