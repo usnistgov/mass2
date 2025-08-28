@@ -18,6 +18,7 @@
 * Add sub-keV fluorescence line shapes learned from HAUSKat 2024 measurements on C, N, O, Fe, Ni, Cu (issue 37).
 * Figured out how to render matplotlib images in documentation with `mkdocs-matplotlib` plugin (issue 47).
 * Reorganized documentation and make a Getting Started page (issues 45+46).
+* Added complete modern type annotations, to run with zero mypy errors (issue 56).
 
 
 ## Mass Version 1 (2010-2025)
