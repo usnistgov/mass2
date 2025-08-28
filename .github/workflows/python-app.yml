@@ -5,11 +5,14 @@ name: Python application
 
 on:
   push:
-    # branches: [ "main" ]
-    # If you don't have a "branches: [...]" entry here, the action runs on any push.
-    # At first, we ran actions only on main pushes, but let's try all branches as of Aug 15, 2025
+    # We will test by default on all pushes, EXCEPT those that become part of a pull request.
+    branches-ignore:
+      - 'refs/heads/pull/**' # Excludes branches that are part of a pull request
+      - 'main' # Or any other branch you want to exclude from direct push builds if it's handled by PRs
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - '*' # Triggers for all PRs targeting any branch (presumably 99% of all PRs will target 'main')
+
 
 permissions:
   contents: write
