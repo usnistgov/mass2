@@ -2,6 +2,8 @@ import polars as pl
 
 from dataclasses import dataclass, replace
 from collections.abc import Callable
+from typing import Any
+import pylab as plt
 from mass2.core.recipe import RecipeStep
 from mass2.core.noise_algorithms import NoiseResult
 from mass2.core.optimal_filtering import Filter, FilterMaker
@@ -26,8 +28,9 @@ class Filter5LagStep(RecipeStep):
         df2 = df2.rename({"peak_x": self.output[0], "peak_y": self.output[1]})
         return df2
 
-    def dbg_plot(self, _):
-        return self.filter.plot()
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        self.filter.plot()
+        return plt.gca()
 
-    def drop_debug(self):
+    def drop_debug(self) -> "Filter5LagStep":
         return replace(self, spectrum=None)
