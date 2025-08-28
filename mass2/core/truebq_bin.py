@@ -1,3 +1,4 @@
+from numpy.typing import NDArray, ArrayLike
 import numpy as np
 import polars as pl
 import pylab as plt
@@ -33,7 +34,9 @@ class TriggerResult:
     trig_inds: np.ndarray
     limit_samples: int
 
-    def plot(self, decimate=10, n_limit=100000, offset_raw=0, x_axis_time_s=False, ax=None):
+    def plot(
+        self, decimate: int = 10, n_limit: int = 100000, offset_raw: int = 0, x_axis_time_s: bool = False, ax: plt.Axes | None = None
+    ) -> None:
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -90,10 +93,10 @@ class TriggerResult:
 
     def get_noise(
         self,
-        n_dead_samples_after_pulse_trigger,
-        n_record_samples,
-        max_noise_triggers=200,
-    ):
+        n_dead_samples_after_pulse_trigger: int,
+        n_record_samples: int,
+        max_noise_triggers: int = 200,
+    ) -> NoiseChannel:
         noise_trigger_inds = get_noise_trigger_inds(
             self.trig_inds,
             n_dead_samples_after_pulse_trigger,
@@ -116,7 +119,9 @@ class TriggerResult:
         )
         return noise
 
-    def to_channel_copy_to_memory(self, noise_n_dead_samples_after_pulse_trigger, npre, npost, invert=False):
+    def to_channel_copy_to_memory(
+        self, noise_n_dead_samples_after_pulse_trigger: int, npre: int, npost: int, invert: bool = False
+    ) -> Channel:
         noise = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
@@ -143,12 +148,12 @@ class TriggerResult:
 
     def to_channel_mmap(
         self,
-        noise_n_dead_samples_after_pulse_trigger,
-        npre,
-        npost,
-        invert=False,
-        verbose=True,
-    ):
+        noise_n_dead_samples_after_pulse_trigger: int,
+        npre: int,
+        npost: int,
+        invert: bool = False,
+        verbose: bool = True,
+    ) -> Channel:
         noise = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
@@ -254,14 +259,14 @@ class TrueBqBin:
     # the bin file is a continuous data aqusition, untriggered
 
     @classmethod
-    def load(cls, bin_path):
+    def load(cls, bin_path: str | Path) -> "TrueBqBin":
         bin_path = Path(bin_path)
         try:
             # for when it's named like dev2_ai6
             channel_number = int(str(bin_path.parent)[-1])
         except ValueError:
             # for when it's named like 2A
-            def bay2int(bay):
+            def bay2int(bay: str) -> int:
                 return (int(bay[0]) - 1) * 4 + "ABCD".index(bay[1].upper())
 
             channel_number = bay2int(str(bin_path.parent.stem))
@@ -280,7 +285,7 @@ class TrueBqBin:
             data,
         )
 
-    def trigger(self, filter_in, threshold, limit_hours=None, verbose=True):
+    def trigger(self, filter_in: NDArray, threshold: float, limit_hours: float | None = None, verbose: bool = True) -> TriggerResult:
         if limit_hours is None:
             limit_samples = len(self.data)
         else:
@@ -376,8 +381,8 @@ def write_truebq_bin_file(
 
 
 @njit
-def fasttrig_filter_trigger(data, filter_in, threshold, verbose):
-    assert threshold > 0, "algorithm assumes we trigger with positiv threshold, change sign of filter_in to accomodate"
+def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float, verbose: bool) -> NDArray:
+    assert threshold > 0, "algorithm assumes we trigger with positive threshold, change sign of filter_in to accomodate"
     filter_len = len(filter_in)
     inds = []
     jmax = len(data) - filter_len - 1
@@ -414,7 +419,7 @@ def fasttrig_filter_trigger(data, filter_in, threshold, verbose):
     return np.array(inds)
 
 
-def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
+def gather_pulses_from_inds_numpy_contiguous(data: NDArray, npre: int, nsamples: int, inds: NDArray) -> NDArray:
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
@@ -424,7 +429,9 @@ def gather_pulses_from_inds_numpy_contiguous(data, npre, nsamples, inds):
     return pulses
 
 
-def gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=".mmapped_pulses.npy"):
+def gather_pulses_from_inds_numpy_contiguous_mmap(
+    data: NDArray, npre: int, nsamples: int, inds: NDArray, filename: str | Path = ".mmapped_pulses.npy"
+) -> NDArray:
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
@@ -473,7 +480,9 @@ def gather_pulses_from_inds_pyarrow_share_memory(data, npre, nsamples, inds):
 """
 
 
-def filter_and_residual_rms(data, chosen_filter, avg_pulse, trig_inds, npre, nsamples, polarity):
+def filter_and_residual_rms(
+    data: NDArray, chosen_filter: NDArray, avg_pulse: NDArray, trig_inds: NDArray, npre: int, nsamples: int, polarity: int
+) -> tuple[NDArray, NDArray, NDArray]:
     filt_value = np.zeros(len(trig_inds))
     residual_rms = np.zeros(len(trig_inds))
     filt_value_template = np.zeros(len(trig_inds))
@@ -492,7 +501,7 @@ def filter_and_residual_rms(data, chosen_filter, avg_pulse, trig_inds, npre, nsa
 
 
 @njit
-def fast_apply_filter(data, filter_in):
+def fast_apply_filter(data: NDArray, filter_in: NDArray) -> NDArray:
     cache = np.zeros(len(filter_in))
     filter = np.zeros(len(filter_in))
     filter[:] = filter_in
@@ -508,11 +517,12 @@ def fast_apply_filter(data, filter_in):
 
 
 def get_noise_trigger_inds(
-    pulse_trigger_inds,
-    n_dead_samples_after_previous_pulse,
-    n_record_samples,
-    max_noise_triggers,
-):
+    pulse_trigger_inds: ArrayLike,
+    n_dead_samples_after_previous_pulse: int,
+    n_record_samples: int,
+    max_noise_triggers: int,
+) -> NDArray:
+    pulse_trigger_inds = np.asarray(pulse_trigger_inds)
     diffs = np.diff(pulse_trigger_inds)
     inds = []
     for i in range(len(diffs)):
@@ -526,7 +536,9 @@ def get_noise_trigger_inds(
     return np.array(inds)
 
 
-def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_samples, bin_path, verbose=True):
+def _fasttrig_filter_trigger_with_cache(
+    data: NDArray, filter_in: NDArray, threshold: float, limit_samples: int, bin_path: str | Path, verbose: bool = True
+) -> NDArray:
     bin_full_path = Path(bin_path).absolute()
     actual_n_samples = min(len(data), limit_samples)
     to_hash_str = str(filter_in) + str(threshold) + str(actual_n_samples) + str(bin_full_path)
@@ -548,7 +560,9 @@ def _fasttrig_filter_trigger_with_cache(data, filter_in, threshold, limit_sample
     return trig_inds
 
 
-def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(data, npre, nsamples, inds, bin_path, verbose=True):
+def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
+    data: NDArray, npre: int, nsamples: int, inds: NDArray, bin_path: Path | str, verbose: bool = True
+) -> NDArray | np.memmap:
     bin_full_path = Path(bin_path).absolute()
     inds = inds[inds > npre]  # ensure all inds inbounds
     inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
@@ -578,9 +592,7 @@ def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(data, npre, nsample
     if cache_hit:
         if verbose:
             print(f"pulse cache hit for {file_path}")
-        pulses = np.memmap(file_path, dtype=np.int16, mode="r", shape=(len(inds), nsamples))
-    else:
-        if verbose:
-            print(f"pulse cache miss for {file_path}")
-        pulses = gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=file_path)
-    return pulses
+        return np.memmap(file_path, dtype=np.int16, mode="r", shape=(len(inds), nsamples))
+    if verbose:
+        print(f"pulse cache miss for {file_path}")
+    return gather_pulses_from_inds_numpy_contiguous_mmap(data, npre, nsamples, inds, filename=file_path)

@@ -1,7 +1,8 @@
 import numpy as np
 from numba import njit
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 import lmfit
+from ..calibration.line_models import LineModelResult
 
 # Define the dtype for the structured array
 result_dtype = np.dtype([
@@ -171,8 +172,10 @@ def summarize_data_numba(  # noqa: PLR0914
     return results
 
 
-def pulse_2exp_with_tail(t, t0, a_tail, tau_tail, a, tau_rise, tau_fall_factor, baseline):
-    tt = t - t0
+def pulse_2exp_with_tail(
+    t: ArrayLike, t0: float, a_tail: float, tau_tail: float, a: float, tau_rise: float, tau_fall_factor: float, baseline: float
+) -> NDArray:
+    tt = np.asarray(t) - t0
     tau_fall = tau_rise * tau_fall_factor
     assert tau_fall_factor >= 1
 
@@ -191,7 +194,8 @@ def pulse_2exp_with_tail(t, t0, a_tail, tau_tail, a, tau_rise, tau_fall_factor, 
     )
 
 
-def fit_pulse_2exp_with_tail(data, npre, dt=1, guess_tau=None):
+def fit_pulse_2exp_with_tail(data: ArrayLike, npre: int, dt: float = 1, guess_tau: float | None = None) -> LineModelResult:
+    data = np.asarray(data)
     if guess_tau is None:
         guess_tau = dt * len(data) / 5
     model = lmfit.Model(pulse_2exp_with_tail)

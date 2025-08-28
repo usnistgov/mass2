@@ -54,6 +54,9 @@ in the callable function itself.  It is allowed to use different windows
 on different data segments, though honestly that would be really weird.
 """
 
+from numpy.typing import ArrayLike, NDArray
+from typing import Any
+from collections.abc import Callable
 import numpy as np
 import pylab as plt
 
@@ -68,18 +71,19 @@ class PowerSpectrum:
 
     Based on Num Rec 3rd Ed section 13.4"""
 
-    def __init__(self, m, dt=1.0):
+    def __init__(self, m: int, dt: float | None = 1.0):
         """Sets up to estimate PSD at m+1 frequencies (counting DC) given
         data segments of length 2m.  Optional dt is the time step Delta"""
         self.m = m
         self.m2 = 2 * m
         self.nsegments = 0
         self.specsum = np.zeros(m + 1, dtype=float)
-        self.dt = dt
         if dt is None:
             self.dt = 1.0
+        else:
+            self.dt = dt
 
-    def copy(self):
+    def copy(self) -> "PowerSpectrum":
         """Return a copy of the object.
 
         Handy when coding and you don't want to recompute everything, but
@@ -88,7 +92,7 @@ class PowerSpectrum:
         c.__dict__.update(self.__dict__)
         return c
 
-    def addDataSegment(self, data, window=None):
+    def addDataSegment(self, data: NDArray, window: Callable | NDArray | None = None) -> None:
         """Process a data segment of length 2m using the window function
         given.  window can be None (square window), a callable taking the
         length and returning a sequence, or a sequence."""
@@ -97,15 +101,16 @@ class PowerSpectrum:
         if np.isnan(data).any():
             raise ValueError("data contains NaN")
         if window is None:
-            wksp = data
-            sum_window = self.m2
+            w = np.ones(self.m2)
+        elif callable(window):
+            w = window(self.m2)
+        elif isinstance(window, np.ndarray):
+            assert len(window) == self.m2
+            w = window
         else:
-            try:
-                w = window(self.m2)
-            except TypeError:
-                w = np.array(window)
-            wksp = w * data
-            sum_window = (w**2).sum()
+            raise TypeError("Window not understood")
+        wksp = w * data
+        sum_window = (w**2).sum()
 
         scale_factor = 2.0 / (sum_window * self.m2)
         if True:  # we want real units
@@ -117,15 +122,16 @@ class PowerSpectrum:
         self.specsum += scale_factor * ps
         self.nsegments += 1
 
-    def addLongData(self, data, window=None):
+    def addLongData(self, data: NDArray, window: Callable | NDArray | None = None) -> None:
         """Process a long vector of data as non-overlapping segments of length 2m."""
+        data = np.asarray(data)
         nt = len(data)
         nk = nt // self.m2
         for k in range(nk):
             noff = k * self.m2
-            PowerSpectrum.addDataSegment(self, data[noff : noff + self.m2], window=window)
+            self.addDataSegment(data[noff : noff + self.m2], window=window)
 
-    def spectrum(self, nbins=None):
+    def spectrum(self, nbins: int | None = None) -> NDArray:
         """If <nbins> is given, the data are averaged into <nbins> bins."""
         if nbins is None:
             return self.specsum / self.nsegments
@@ -138,11 +144,11 @@ class PowerSpectrum:
             result[i] = self.specsum[newbin == i].mean()
         return result / self.nsegments
 
-    def autocorrelation(self):
+    def autocorrelation(self) -> None:
         """Return the autocorrelation (the DFT of this power spectrum)"""
         raise NotImplementedError("The autocorrelation method is not yet implemented.")
 
-    def frequencies(self, nbins=None):
+    def frequencies(self, nbins: int | None = None) -> NDArray:
         """If <nbins> is given, the data are averaged into <nbins> bins."""
         if nbins is None:
             nbins = self.m
@@ -150,7 +156,13 @@ class PowerSpectrum:
             raise ValueError(f"Cannot rebin into more than m={self.m} bins")
         return np.arange(nbins + 1, dtype=float) / (2 * self.dt * nbins)
 
-    def plot(self, axis=None, arb_to_unit_scale_and_label=(1, "arb"), sqrt_psd=True, **plotkwarg):
+    def plot(
+        self,
+        axis: plt.Axes | None = None,
+        arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
+        sqrt_psd: bool = True,
+        **plotkwarg: Any,
+    ) -> None:
         if axis is None:
             plt.figure()
             axis = plt.gca()
@@ -176,11 +188,11 @@ class PowerSpectrumOverlap(PowerSpectrum):
     on the first and last segment).
     """
 
-    def __init__(self, m, dt=1.0):
+    def __init__(self, m: int, dt: float | None = 1.0):
         PowerSpectrum.__init__(self, m, dt=dt)
         self.first = True
 
-    def addDataSegment(self, data, window=None):
+    def addDataSegment(self, data: NDArray, window: Callable | NDArray | None = None) -> None:
         "Process a data segment of length m using window."
         if self.first:
             self.first = False
@@ -190,7 +202,7 @@ class PowerSpectrumOverlap(PowerSpectrum):
             self.fullseg[self.m :] = data
             PowerSpectrum.addDataSegment(self, self.fullseg, window=window)
 
-    def addLongData(self, data, window=None):
+    def addLongData(self, data: NDArray, window: Callable | NDArray | None = None) -> None:
         """Process a long vector of data as overlapping segments of
         length 2m."""
         nt = len(data)
@@ -207,17 +219,17 @@ class PowerSpectrumOverlap(PowerSpectrum):
 # Commonly used window functions
 
 
-def bartlett(n):
+def bartlett(n: int) -> NDArray:
     """A Bartlett window (triangle shape) of length n"""
     return np.bartlett(n)
 
 
-def welch(n):
+def welch(n: int) -> NDArray:
     """A Welch window (parabolic) of length n"""
     return 1 - (2 * np.arange(n, dtype=float) / (n - 1.0) - 1) ** 2
 
 
-def hann(n):
+def hann(n: int) -> NDArray:
     """A Hann window (sine-squared) of length n"""
     # twopi = np.pi*2
     # i = np.arange(n, dtype=float)
@@ -225,13 +237,15 @@ def hann(n):
     return np.hanning(n)
 
 
-def hamming(n):
+def hamming(n: int) -> NDArray:
     """A Hamming window (0.08 + 0.92*sine-squared) of length n"""
     return np.hamming(n)
 
 
 # Convenience functions
-def computeSpectrum(data, segfactor=1, dt=None, window=None):
+def computeSpectrum(
+    data: ArrayLike, segfactor: int = 1, dt: float | None = None, window: Callable | ArrayLike | None = None
+) -> tuple[NDArray, NDArray]:
     """Convenience function to compute the power spectrum of a single data array.
 
     Args:
@@ -249,30 +263,37 @@ def computeSpectrum(data, segfactor=1, dt=None, window=None):
         Either the PSD estimate as an array (non-negative frequencies only),
         *OR* the tuple (frequencies, PSD).  The latter returns when <dt> is not None.
     """
-
+    data = np.asarray(data)
     N = len(data)
     M = N // (2 * segfactor)
-    try:
-        window = window(2 * M)  # precompute
-    except TypeError:
-        window = None
+    window_length = 2 * M
+    if window is None:
+        w = np.ones(window_length, dtype=float)
+    elif callable(window):
+        w = window(window_length)
+    elif isinstance(window, np.ndarray):
+        assert len(window) == window_length
+        w = np.array(window)
+    else:
+        raise TypeError("Window not understood")
+    print(f"Trying {N=}, {M=}")
 
     if segfactor == 1:
         spec = PowerSpectrum(M, dt=dt)
         # Ensure that the datasegment has even length
-        spec.addDataSegment(data[: 2 * (len(data) // 2)], window=window)
+        spec.addDataSegment(data[: 2 * M], window=w)
     else:
         spec = PowerSpectrumOverlap(M, dt=dt)
         for i in range(2 * segfactor - 1):
-            spec.addDataSegment(data[i * M : (i + 1) * M], window=window)
+            spec.addDataSegment(data[i * M : (i + 1) * M], window=w)
 
     if dt is None:
-        return spec.spectrum()
+        return np.zeros(M), spec.spectrum()
     else:
         return spec.frequencies(), spec.spectrum()
 
 
-def demo(N=1024, window=np.hanning):
+def demo(N: int = 1024, window: Callable | ArrayLike | None = np.hanning) -> None:
     data = np.random.default_rng().standard_normal(N)
     plt.clf()
     for i in (2, 4, 8, 1):

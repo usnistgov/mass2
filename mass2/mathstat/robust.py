@@ -399,7 +399,7 @@ def _choose_trial_val(left: NDArray, right: NDArray, x: ArrayLike, n: int) -> tu
 
 
 @njit
-def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int):
+def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int]:
     trial_q_row = 0
     trial_q_col = 0
 

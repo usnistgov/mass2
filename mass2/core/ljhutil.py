@@ -41,7 +41,7 @@ def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[s
     return list(matching_folders)
 
 
-def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False, exclude_ch_nums=[]) -> list[str]:
+def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False, exclude_ch_nums: list[int] = []) -> list[str]:
     """
     Finds all .ljh files in the given folder and its subfolders.
 
@@ -82,7 +82,9 @@ def extract_channel_number(file_path: str) -> int:
         raise ValueError(f"File path does not match expected pattern: {file_path}")
 
 
-def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nums=[]) -> list[tuple[str, str]]:
+def match_files_by_channel(
+    folder1: str, folder2: str, limit: int | None = None, exclude_ch_nums: list[int] = []
+) -> list[tuple[str, str]]:
     """
     Matches .ljh files from two folders by channel number.
 
@@ -119,10 +121,9 @@ def match_files_by_channel(folder1: str, folder2: str, limit=None, exclude_ch_nu
     for channel in sorted(files1_by_channel.keys()):
         if channel in files2_by_channel.keys() and channel not in exclude_ch_nums:
             matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
-    # print(f"in match_files_by_channel found {len(matching_pairs)} channel pairs, {limit=}")
-    matching_pairs_limited = matching_pairs[:limit]
-    # print(f"in match_files_by_channel found {len(matching_pairs)=} after limit of {limit=}")
-    return matching_pairs_limited
+    if limit is not None:
+        matching_pairs = matching_pairs[:limit]
+    return matching_pairs
 
 
 def experiment_state_path_from_ljh_path(
@@ -286,7 +287,7 @@ def main_ljh_truncate() -> None:
             ljh_truncate(in_fname, out_fname, n_pulses=args.npulses, timestamp=args.timestamp)
 
 
-def ljh_merge(out_path: str, filenames: list[str], overwrite: bool):
+def ljh_merge(out_path: str, filenames: list[str], overwrite: bool) -> None:
     if not overwrite and os.path.isfile(out_path):
         raise OSError(f"To overwrite destination {out_path}, use the --force flag")
     shutil.copy(filenames[0], out_path)

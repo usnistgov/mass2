@@ -7,7 +7,8 @@ Tools for fitting and simulating X-ray fluorescence lines.
 
 from dataclasses import dataclass
 from functools import cached_property
-import numpy.typing as npt
+from collections.abc import Callable
+from numpy.typing import ArrayLike, NDArray
 from enum import Enum
 import pathlib
 import importlib.resources as pkg_resources
@@ -17,7 +18,7 @@ import scipy as sp
 import pylab as plt
 import yaml
 
-from . import line_models
+from .line_models import GenericLineModel
 from mass2.calibration.nist_xray_database import NISTXrayDBFile
 from mass2.mathstat.special import voigt
 
@@ -27,7 +28,7 @@ LOG = logging.getLogger("mass")
 
 FWHM_OVER_SIGMA = (8 * np.log(2)) ** 0.5
 
-_rng = np.random.default_rng()
+_rng: np.random.Generator = np.random.default_rng()
 
 
 def LineEnergies() -> dict[str, float]:
@@ -80,9 +81,6 @@ class AmplitudeType(Enum):
     VOIGT_PEAK_HEIGHT = "Peak height of Voigts"
 
 
-spectra: dict[str, "SpectralLine"] = {}
-
-
 @dataclass(frozen=True)
 class SpectralLine:
     """An abstract base class for modeling spectral lines as a sum
@@ -99,19 +97,19 @@ class SpectralLine:
     material: str
     linetype: str
     nominal_peak_energy: float
-    energies: npt.NDArray[np.float64]
-    lorentzian_fwhm: npt.NDArray[np.float64]
-    reference_amplitude: npt.NDArray[np.float64]
+    energies: NDArray[np.float64]
+    lorentzian_fwhm: NDArray[np.float64]
+    reference_amplitude: NDArray[np.float64]
     reference_amplitude_type: AmplitudeType = AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY
-    reference_measurement_type: str = "unknown"
+    reference_measurement_type: str | None = "unknown"
     intrinsic_sigma: float = 0.0
-    reference_plot_instrument_gaussian_fwhm: float = 0.0
+    reference_plot_instrument_gaussian_fwhm: float | None = 0.0
     reference_short: str = "unknown"
     position_uncertainty: float = 0.0
     is_default_material: bool = True
 
     @cached_property
-    def peak_energy(self):
+    def peak_energy(self) -> float:
         try:
             peak_energy = sp.optimize.brent(
                 lambda x: -self.pdf(x, instrument_gaussian_fwhm=0), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
@@ -121,11 +119,11 @@ class SpectralLine:
         return peak_energy
 
     @property
-    def cumulative_amplitudes(self):
+    def cumulative_amplitudes(self) -> NDArray:
         return self.lorentzian_integral_intensity.cumsum()
 
     @cached_property
-    def lorentzian_integral_intensity(self):
+    def lorentzian_integral_intensity(self) -> NDArray:
         if self.reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
             sigma = self.reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
             return np.array([
@@ -138,19 +136,19 @@ class SpectralLine:
             return self.reference_amplitude
 
     @cached_property
-    def normalized_lorentzian_integral_intensity(self):
+    def normalized_lorentzian_integral_intensity(self) -> NDArray:
         x = self.lorentzian_integral_intensity
         return x / np.sum(x)
 
     @cached_property
-    def lorentz_amplitude(self):
+    def lorentz_amplitude(self) -> NDArray:
         return self.lorentzian_integral_intensity / self.lorentzian_fwhm
 
-    def __call__(self, x, instrument_gaussian_fwhm):
+    def __call__(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Make the class callable, returning the same value as the self.pdf method."""
         return self.pdf(x, instrument_gaussian_fwhm)
 
-    def pdf(self, x, instrument_gaussian_fwhm):
+    def pdf(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Spectrum (units of fraction per eV) as a function of <x>, the energy in eV"""
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
@@ -160,7 +158,7 @@ class SpectralLine:
             # mass2.voigt() is normalized to have unit integrated intensity
         return result
 
-    def components(self, x, instrument_gaussian_fwhm):
+    def components(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> list[NDArray]:
         """List of spectrum components as a function of <x>, the energy in eV"""
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
@@ -169,7 +167,16 @@ class SpectralLine:
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
-    def plot(self, x=None, instrument_gaussian_fwhm=0, axis=None, components=True, label=None, setylim=True, color=None):
+    def plot(
+        self,
+        x: ArrayLike | None = None,
+        instrument_gaussian_fwhm: float = 0,
+        axis: plt.Axes | None = None,
+        components: bool = True,
+        label: str | None = None,
+        setylim: bool = True,
+        color: str | None = None,
+    ) -> plt.Axes:
         """Plot the spectrum.
         x - np array of energy in eV to plot at (sensible default)
         axis - axis to plot on (default creates new figure)
@@ -177,10 +184,11 @@ class SpectralLine:
         label - a string to label the plot with (optional)"""
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         if x is None:
-            width = max(2 * gaussian_sigma, 3 * np.amax(self.lorentzian_fwhm))
+            width = max(2 * gaussian_sigma, 3 * float(np.amax(self.lorentzian_fwhm)))
             lo = np.amin(self.energies) - width
             hi = np.amax(self.energies) + width
             x = np.linspace(lo, hi, 500)
+        x = np.asarray(x)
         if axis is None:
             plt.figure()
             axis = plt.gca()
@@ -197,7 +205,7 @@ class SpectralLine:
         axis.set_title(f"{self.shortname} with resolution {instrument_gaussian_fwhm:.2f} eV FWHM")
         return axis
 
-    def plot_like_reference(self, axis=None):
+    def plot_like_reference(self, axis: plt.Axes | None = None) -> plt.Axes:
         if self.reference_plot_instrument_gaussian_fwhm is None:
             fwhm = 0.001
         else:
@@ -205,7 +213,7 @@ class SpectralLine:
         axis = self.plot(axis=axis, instrument_gaussian_fwhm=fwhm)
         return axis
 
-    def rvs(self, size, instrument_gaussian_fwhm, rng=None):
+    def rvs(self, size: int | tuple[int] | None, instrument_gaussian_fwhm: float, rng: np.random.Generator | None = None) -> NDArray:
         """The CDF and PPF (cumulative distribution and percentile point functions) are hard to
         compute.  But it's easy enough to generate the random variates themselves, so we
         override that method."""
@@ -230,47 +238,51 @@ class SpectralLine:
         return results
 
     @property
-    def shortname(self):
+    def shortname(self) -> str:
         if self.is_default_material:
             return f"{self.element}{self.linetype}"
         else:
             return f"{self.element}{self.linetype}_{self.material}"
 
     @property
-    def reference(self):
+    def reference(self) -> str:
         return lineshape_references[self.reference_short]
 
-    def _gaussian_sigma(self, instrument_gaussian_fwhm):
+    def _gaussian_sigma(self, instrument_gaussian_fwhm: float) -> float:
         """combined intrinstic_sigma and insturment_gaussian_fwhm in quadrature and return the result"""
         assert instrument_gaussian_fwhm >= 0
         return ((instrument_gaussian_fwhm / FWHM_OVER_SIGMA) ** 2 + self.intrinsic_sigma**2) ** 0.5
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"SpectralLine: {self.shortname}"
 
-    def model(self, has_linear_background=True, has_tails=False, prefix="", qemodel=None):
+    def model(
+        self, has_linear_background: bool = True, has_tails: bool = False, prefix: str = "", qemodel: Callable | None = None
+    ) -> GenericLineModel:
         """Generate a LineModel instance from a SpectralLine"""
-        model_class = line_models.GenericLineModel
+        model_class = GenericLineModel
         name = f"{self.element}{self.linetype}"
         m = model_class(
             name=name, spect=self, has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix, qemodel=qemodel
         )
         return m
 
-    def fitter(self):
-        fitter_class = line_models.GenericLineModel
+    def fitter(self) -> GenericLineModel:
+        fitter_class = GenericLineModel
         f = fitter_class(self)
         f.name = f"{self.element}{self.linetype}"
         return f
 
-    def minimum_fwhm(self, instrument_gaussian_fwhm):
+    def minimum_fwhm(self, instrument_gaussian_fwhm: float) -> float:
         """for the narrowest lorentzian in the line model, calculate the combined fwhm including
         the lorentzian, intrinstic_sigma, and instrument_gaussian_fwhm"""
         fwhm2 = np.amin(self.lorentzian_fwhm) ** 2 + instrument_gaussian_fwhm**2 + (self.intrinsic_sigma * FWHM_OVER_SIGMA) ** 2
         return np.sqrt(fwhm2)
 
     @classmethod
-    def quick_monochromatic_line(cls, name, energy, lorentzian_fwhm, intrinsic_sigma=0.0):
+    def quick_monochromatic_line(
+        cls, name: str, energy: float, lorentzian_fwhm: float, intrinsic_sigma: float = 0.0
+    ) -> "SpectralLine":
         """
         Create a quick monochromatic line. Intended for use in calibration when we know a line energy, but not a lineshape model.
         Returns and instrance of SpectralLine with most fields having contents like "unknown: quick_line". The line will have
@@ -279,12 +291,10 @@ class SpectralLine:
         energy = float(energy)
         element = name
         material = "unknown: quick_line"
-        energies = np.array([energy])
         if lorentzian_fwhm <= 0 and intrinsic_sigma <= 1e-6:
             intrinsic_sigma = 1e-6
-        lorentzian_fwhm = np.array([lorentzian_fwhm])
         linetype = "Gaussian"
-        reference_short = "unkown: quick_line"
+        reference_short = "unknown: quick_line"
         reference_amplitude = np.array([1.0])
         reference_amplitude_type = AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY
         nominal_peak_energy = energy
@@ -294,8 +304,8 @@ class SpectralLine:
             element=element,
             material=material,
             linetype=linetype,
-            energies=energies,
-            lorentzian_fwhm=lorentzian_fwhm,
+            energies=np.array([energy]),
+            lorentzian_fwhm=np.array([lorentzian_fwhm]),
             intrinsic_sigma=intrinsic_sigma,
             reference_short=reference_short,
             reference_amplitude=reference_amplitude,
@@ -308,23 +318,23 @@ class SpectralLine:
     @classmethod
     def addline(  # noqa: PLR0917
         cls,
-        element,
-        linetype,
-        material,
-        reference_short,
-        reference_plot_instrument_gaussian_fwhm,
-        nominal_peak_energy,
-        energies,
-        lorentzian_fwhm,
-        reference_amplitude,
-        reference_amplitude_type,
-        ka12_energy_diff=None,
-        position_uncertainty=np.nan,
-        intrinsic_sigma=0,
-        reference_measurement_type=None,
-        is_default_material=True,
-        allow_replacement=True,
-    ):
+        element: str,
+        linetype: str,
+        material: str,
+        reference_short: str,
+        reference_plot_instrument_gaussian_fwhm: float | None,
+        nominal_peak_energy: float,
+        energies: ArrayLike,
+        lorentzian_fwhm: ArrayLike,
+        reference_amplitude: ArrayLike,
+        reference_amplitude_type: AmplitudeType,
+        ka12_energy_diff: float | None = None,
+        position_uncertainty: float = np.nan,
+        intrinsic_sigma: float = 0,
+        reference_measurement_type: str | None = None,
+        is_default_material: bool = True,
+        allow_replacement: bool = True,
+    ) -> "SpectralLine":
         # require exactly one method of specifying the amplitude of each component
         assert reference_amplitude_type in {
             AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
@@ -335,7 +345,7 @@ class SpectralLine:
         assert reference_short in lineshape_references
 
         # require kalpha lines to have ka12_energy_diff
-        if linetype.startswith("KAlpha"):
+        if linetype.startswith("KAlpha") and ka12_energy_diff is not None:
             ka12_energy_diff = float(ka12_energy_diff)
         # require reference_plot_instrument_gaussian_fwhm to be a float or None
         assert reference_plot_instrument_gaussian_fwhm is None or isinstance(reference_plot_instrument_gaussian_fwhm, float)
@@ -347,7 +357,7 @@ class SpectralLine:
             nominal_peak_energy=float(nominal_peak_energy),
             energies=np.array(energies),
             lorentzian_fwhm=np.array(lorentzian_fwhm),
-            reference_amplitude=reference_amplitude,
+            reference_amplitude=np.array(reference_amplitude),
             reference_amplitude_type=reference_amplitude_type,
             reference_measurement_type=reference_measurement_type,
             intrinsic_sigma=intrinsic_sigma,
@@ -364,6 +374,9 @@ class SpectralLine:
         spectra[name] = line
         globals()[name] = line
         return line
+
+
+spectra: dict[str, SpectralLine] = {}
 
 
 @dataclass(frozen=True)
@@ -1592,10 +1605,10 @@ addline(
 )
 
 
-def plot_all_spectra(maxplots=10):
+def plot_all_spectra(maxplots: int = 10) -> None:
     """Makes plots showing the line shape and component parts for some lines.
     Intended to replicate plots in the literature giving spectral lineshapes."""
     keys = list(spectra.keys())[:maxplots]
     for name in keys:
-        spectrum = spectra[name]()
+        spectrum = spectra[name]
         spectrum.plot_like_reference()

@@ -465,8 +465,8 @@ output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
 print(f"Test output lives in '{output_dir.name}'")
 
 columns_to_drop = ("pulse", "subframecount")
-for cnum, ch in data.channels.items():
-    filename = os.path.join(output_dir.name, f"output_test_chan{cnum}.parquet")
+for ch_num, ch in data.channels.items():
+    filename = os.path.join(output_dir.name, f"output_test_chan{ch_num}.parquet")
     df = ch.df.drop(columns_to_drop)
     df.write_parquet(filename)
 ```
@@ -492,8 +492,8 @@ This is similar, except that we use some new Polars tricks:
 ```python
 columns_to_drop = ("pulse", "subframecount")
 all_df = []
-for cnum, ch in data.channels.items():
-    df = ch.df.drop(columns_to_drop).with_columns(chan_number=pl.lit(cnum))
+for ch_num, ch in data.channels.items():
+    df = ch.df.drop(columns_to_drop).with_columns(ch_num=pl.lit(ch_num))
     all_df.append(df)
 filename = os.path.join(output_dir.name, "output_test_allchan.parquet")
 pl.concat(all_df).write_parquet(filename)

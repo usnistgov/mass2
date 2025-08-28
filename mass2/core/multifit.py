@@ -1,4 +1,8 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
+import dataclasses
+from typing import TypeVar, Any, TYPE_CHECKING
+from numpy.typing import NDArray, ArrayLike
+from collections.abc import Callable
 import lmfit
 import copy
 import math
@@ -6,14 +10,21 @@ import numpy as np
 import polars as pl
 import pylab as plt
 
-from mass2.calibration.algorithms import get_model
-from mass2.calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
-from mass2.calibration.line_models import GenericLineModel
-from mass2.core.recipe import RecipeStep
+from ..calibration.algorithms import get_model
+from ..calibration.energy_calibration import Curvetypes, EnergyCalibration, EnergyCalibrationMaker
+from ..calibration.fluorescence_lines import SpectralLine
+from ..calibration.line_models import GenericLineModel, LineModelResult
+from .recipe import RecipeStep
+from .misc import alwaysTrue
+
+if TYPE_CHECKING:
+    from .channel import Channel
 import mass2
 
+T = TypeVar("T")
 
-def handle_none(val, default):
+
+def handle_none(val: T | None, default: T) -> T:
     if val is None:
         return copy.copy(default)
     return val
@@ -26,14 +37,14 @@ class FitSpec:
     use_expr: pl.Expr
     params_update: lmfit.parameter.Parameters
 
-    def params(self, bin_centers, counts):
+    def params(self, bin_centers: NDArray, counts: NDArray) -> lmfit.Parameters:
         params = self.model.make_params()
         params = self.model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
         params = params.update(self.params_update)
         return params
 
-    def fit_series_without_use_expr(self, series):
+    def fit_series_without_use_expr(self, series: pl.Series) -> LineModelResult:
         bin_centers, counts = mass2.misc.hist_of_series(series, self.bin_edges)
         params = self.params(bin_centers, counts)
         bin_centers, bin_size = mass2.misc.midpoints_and_step_size(self.bin_edges)
@@ -48,11 +59,11 @@ class FitSpec:
         )
         return result
 
-    def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr):
+    def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr) -> LineModelResult:
         series = mass2.misc.good_series(df, col, good_expr, use_expr=self.use_expr)
         return self.fit_series_without_use_expr(series)
 
-    def fit_ch(self, ch, col: str):
+    def fit_ch(self, ch: "Channel", col: str) -> LineModelResult:
         return self.fit_df(ch.df, col, ch.good_expr)
 
 
@@ -60,12 +71,20 @@ class FitSpec:
 class MultiFit:
     default_fit_width: float = 50
     default_bin_size: float = 0.5
-    default_use_expr: bool = True
+    default_use_expr: pl.Expr = field(default_factory=alwaysTrue)
     default_params_update: dict = field(default_factory=lmfit.Parameters)
     fitspecs: list[FitSpec] = field(default_factory=list)
     results: list | None = None
 
-    def with_line(self, line, dlo=None, dhi=None, bin_size=None, use_expr=None, params_update=None):
+    def with_line(
+        self,
+        line: GenericLineModel | SpectralLine | str | float,
+        dlo: float | None = None,
+        dhi: float | None = None,
+        bin_size: float | None = None,
+        use_expr: pl.Expr | None = None,
+        params_update: lmfit.Parameters | None = None,
+    ) -> "MultiFit":
         model = get_model(line)
         peak_energy = model.spect.peak_energy
         dlo = handle_none(dlo, self.default_fit_width / 2)
@@ -77,31 +96,19 @@ class MultiFit:
         fitspec = FitSpec(model, bin_edges, use_expr, params_update)
         return self.with_fitspec(fitspec)
 
-    def with_fitspec(self, fitspec):
-        return MultiFit(
-            self.default_fit_width,
-            self.default_bin_size,
-            self.default_use_expr,
-            self.default_params_update,
-            sorted(self.fitspecs + [fitspec], key=lambda x: x.model.spect.peak_energy),
-            # make sure they're always sorted by energy
-            self.results,
-        )
+    def with_fitspec(self, fitspec: FitSpec) -> "MultiFit":
+        # make sure they're always sorted by energy
+        newfitspecs = sorted(self.fitspecs + [fitspec], key=lambda x: x.model.spect.peak_energy)
+        return dataclasses.replace(self, fitspecs=newfitspecs)
 
-    def with_results(self, results):
-        return MultiFit(
-            self.default_fit_width,
-            self.default_bin_size,
-            self.default_use_expr,
-            self.default_params_update,
-            self.fitspecs,
-            results,
-        )
+    def with_results(self, results: list) -> "MultiFit":
+        return dataclasses.replace(self, results=results)
 
-    def results_params_as_df(self):
+    def results_params_as_df(self) -> pl.DataFrame:
+        assert self.results is not None
         result = self.results[0]
         param_names = result.params.keys()
-        d = {}
+        d: dict[str, list] = {}
         d["line"] = [fitspec.model.spect.shortname for fitspec in self.fitspecs]
         d["peak_energy_ref"] = [fitspec.model.spect.peak_energy for fitspec in self.fitspecs]
         d["peak_energy_ref_err"] = []
@@ -118,21 +125,21 @@ class MultiFit:
             d[param_name + "_stderr"] = [result.params[param_name].stderr for result in self.results]
         return pl.DataFrame(d)
 
-    def fit_series_without_use_expr(self, series: pl.Series):
+    def fit_series_without_use_expr(self, series: pl.Series) -> "MultiFit":
         results = [fitspec.fit_series_without_use_expr(series) for fitspec in self.fitspecs]
         return self.with_results(results)
 
-    def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr):
+    def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr) -> "MultiFit":
         results = []
         for fitspec in self.fitspecs:
             result = fitspec.fit_df(df, col, good_expr)
             results.append(result)
         return self.with_results(results)
 
-    def fit_ch(self, ch, col: str):
+    def fit_ch(self, ch: "Channel", col: str) -> "MultiFit":
         return self.fit_df(ch.df, col, ch.good_expr)
 
-    def plot_results(self, n_extra_axes=0):
+    def plot_results(self, n_extra_axes: int = 0) -> tuple[plt.Figure, plt.Axes]:
         assert self.results is not None
         n = len(self.results) + n_extra_axes
         cols = min(3, n)
@@ -157,7 +164,8 @@ class MultiFit:
         plt.tight_layout()
         return fig, axes
 
-    def plot_results_and_pfit(self, uncalibrated_name, previous_energy2ph, n_extra_axes=0):
+    def plot_results_and_pfit(self, uncalibrated_name: str, previous_energy2ph: Callable, n_extra_axes: int = 0) -> plt.Axes:
+        assert self.results is not None
         _fig, axes = self.plot_results(n_extra_axes=1 + n_extra_axes)
         ax = axes[len(self.results)]
         multifit_df = self.results_params_as_df()
@@ -177,15 +185,15 @@ class MultiFit:
             ax.annotate(str(name), (x, y))
         return axes
 
-    def to_pfit_gain(self, previous_energy2ph):
+    def to_pfit_gain(self, previous_energy2ph: Callable) -> tuple[np.polynomial.Polynomial, float]:
         multifit_df = self.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
-        peaks_uncalibrated = np.array([previous_energy2ph(e) for e in peaks_in_energy_rough_cal])
+        peaks_uncalibrated = np.array([previous_energy2ph(e) for e in peaks_in_energy_rough_cal]).ravel()
         peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
         gain = peaks_uncalibrated / peaks_in_energy_reference
         pfit_gain = np.polynomial.Polynomial.fit(peaks_uncalibrated, gain, deg=2)
 
-        def ph2energy(ph):
+        def ph2energy(ph: NDArray) -> NDArray:
             gain = pfit_gain(ph)
             return ph / gain
 
@@ -193,7 +201,9 @@ class MultiFit:
         rms_residual_energy = mass2.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
         return pfit_gain, rms_residual_energy
 
-    def to_mass_cal(self, previous_energy2ph, curvetype=Curvetypes.GAIN, approximate=False):
+    def to_mass_cal(
+        self, previous_energy2ph: Callable, curvetype: Curvetypes = Curvetypes.GAIN, approximate: bool = False
+    ) -> EnergyCalibration:
         df = self.results_params_as_df()
         maker = EnergyCalibrationMaker(
             ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]),
@@ -212,7 +222,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
     multifit: MultiFit | None
     rms_residual_energy: float
 
-    def calc_from_df(self, df):
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
         inputs_np = [df[input].to_numpy() for input in self.inputs]
@@ -220,24 +230,28 @@ class MultiFitQuadraticGainStep(RecipeStep):
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
 
-    def dbg_plot(self, df):
-        self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.energy2ph)
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        if self.multifit is not None:
+            self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.energy2ph)
+        return plt.gca()
 
     def drop_debug(self) -> "MultiFitQuadraticGainStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None)
 
-    def ph2energy(self, ph):
+    def ph2energy(self, ph: ArrayLike) -> NDArray:
+        ph = np.asarray(ph)
         gain = self.pfit_gain(ph)
         return ph / gain
 
-    def energy2ph(self, energy):
+    def energy2ph(self, energy: ArrayLike) -> NDArray:
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
         # y*c + (y*b-1)*x + a*x^2 = 0
         # and given that we've selected for well formed calibrations,
         # we know which root we want
+        energy = np.asarray(energy)
         cba = self.pfit_gain.convert().coef
         c, bb, a = cba * energy
         b = bb - 1
@@ -248,13 +262,14 @@ class MultiFitQuadraticGainStep(RecipeStep):
     @classmethod
     def learn(
         cls,
-        ch,
+        ch: "Channel",
         multifit_spec: MultiFit,
-        previous_cal_step_index,
-        calibrated_col,
-        use_expr=pl.lit(True),
-    ):
+        previous_cal_step_index: int,
+        calibrated_col: str,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "MultiFitQuadraticGainStep":
         previous_cal_step = ch.steps[previous_cal_step_index]
+        assert hasattr(previous_cal_step, "energy2ph")
         rough_energy_col = previous_cal_step.output[0]
         uncalibrated_col = previous_cal_step.inputs[0]
 
@@ -278,7 +293,7 @@ class MultiFitMassCalibrationStep(RecipeStep):
     cal: EnergyCalibration
     multifit: MultiFit | None
 
-    def calc_from_df(self, df):
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
         inputs_np = [df[input].to_numpy() for input in self.inputs]
@@ -288,9 +303,10 @@ class MultiFitMassCalibrationStep(RecipeStep):
 
     def drop_debug(self) -> "MultiFitMassCalibrationStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None)
 
-    def dbg_plot(self, df):
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        assert self.multifit is not None
         axes = self.multifit.plot_results_and_pfit(
             uncalibrated_name=self.inputs[0],
             previous_energy2ph=self.energy2ph,
@@ -313,25 +329,29 @@ class MultiFitMassCalibrationStep(RecipeStep):
         for name, x, y in zip(multifit_df["line"], peaks_uncalibrated, gain):
             ax.annotate(str(name), (x, y))
         plt.legend()
+        return ax
 
-    def ph2energy(self, ph):
+    def ph2energy(self, ph: ArrayLike) -> NDArray:
+        ph = np.asarray(ph)
         return self.cal.ph2energy(ph)
 
-    def energy2ph(self, energy):
+    def energy2ph(self, energy: ArrayLike) -> NDArray:
+        energy = np.asarray(energy)
         return self.cal.energy2ph(energy)
 
     @classmethod
     def learn(
         cls,
-        ch,
+        ch: "Channel",
         multifit_spec: MultiFit,
-        previous_cal_step_index,
-        calibrated_col,
-        use_expr=pl.lit(True),
-    ):
+        previous_cal_step_index: int,
+        calibrated_col: str,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "MultiFitMassCalibrationStep":
         """multifit then make a mass calibration object with curve_type=Curvetypes.GAIN and approx=False
         TODO: support more options"""
         previous_cal_step = ch.steps[previous_cal_step_index]
+        assert hasattr(previous_cal_step, "energy2ph")
         rough_energy_col = previous_cal_step.output[0]
         uncalibrated_col = previous_cal_step.inputs[0]
 

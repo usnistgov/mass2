@@ -28,6 +28,7 @@ Joe Fowler, NIST
 Created Feb 2014
 """
 
+from numpy.typing import NDArray, ArrayLike
 import numpy as np
 import scipy as sp
 from scipy.interpolate import splev
@@ -56,7 +57,7 @@ class CubicSpline:
     plt.plot(xa, cs(xa), 'b-')
     """
 
-    def __init__(self, x, y, yprime1=None, yprimeN=None):
+    def __init__(self, x: ArrayLike, y: ArrayLike, yprime1: float | None = None, yprimeN: float | None = None):
         """Create an exact cubic spline representation for the function y(x).
 
         'Exact' means that the spline will strictly pass through the given points.
@@ -69,13 +70,13 @@ class CubicSpline:
         argsort = np.argsort(x)
         self._x = np.array(x, dtype=float)[argsort]
         self._y = np.array(y, dtype=float)[argsort]
-        self._n = len(x)
+        self._n = len(argsort)
         self._y2 = np.zeros(self._n, dtype=float)
         self.yprime1 = yprime1
         self.yprimeN = yprimeN
         self._compute_y2()
 
-    def _compute_y2(self):
+    def _compute_y2(self) -> None:
         self.ystep = self._y[1:] - self._y[:-1]
         self.xstep = self._x[1:] - self._x[:-1]
 
@@ -113,7 +114,7 @@ class CubicSpline:
         if self.yprimeN is None:
             self.yprimeN = self.ystep[-1] / self.xstep[-1] + self.xstep[-1] * (self._y2[-2] / 6.0 + self._y2[-1] / 3.0)
 
-    def __call__(self, x, der=0):
+    def __call__(self, x: ArrayLike | float, der: int = 0) -> NDArray:
         scalar = np.isscalar(x)
         x = np.asarray(x)
         if x.size == 0:
@@ -176,12 +177,11 @@ class CubicSpline:
             result = result[0]
         return result
 
-    @staticmethod
-    def variance(xtest):
+    def variance(self, xtest: ArrayLike) -> NDArray:  # noqa: PLR6301
         return np.zeros_like(xtest)
 
 
-def k_spline(x, y):
+def k_spline(x: NDArray, y: NDArray) -> NDArray:
     """Compute the spline covariance kernel, R&W eq 6.28."""
     v = np.minimum(x, y)
     return v**3 / 3 + v**2 / 2 * np.abs(x - y)
@@ -213,7 +213,7 @@ class GPRSpline(CubicSpline):
     2. The uncertainty in the spline curve is estimated by GPR theory.
     """
 
-    def __init__(self, x, y, dy, dx=None, sigmaf=None):
+    def __init__(self, x: ArrayLike, y: ArrayLike, dy: ArrayLike, dx: ArrayLike | None = None, sigmaf: float | None = None):
         self.x = np.array(x)
         self.y = np.array(y)
         self.dy = np.array(dy)
@@ -226,9 +226,9 @@ class GPRSpline(CubicSpline):
             self.err = np.array(np.abs(dy))
         else:
             self.dx = np.array(dx)
-            roughfit = np.polyfit(x, y, 2)
-            slope = np.poly1d(np.polyder(roughfit, 1))(x)
-            self.err = np.sqrt((dx * slope) ** 2 + dy**2)
+            roughfit = np.polyfit(self.x, self.y, 2)
+            slope = np.poly1d(np.polyder(roughfit, 1))(self.x)
+            self.err = np.sqrt((self.dx * slope) ** 2 + self.dy**2)
         assert self.Nk == len(self.dx)
         assert self.Nk == len(self.err)
 
@@ -260,7 +260,7 @@ class GPRSpline(CubicSpline):
         gbar = fbar + R.T.dot(beta)
         CubicSpline.__init__(self, self.x, gbar)
 
-    def best_sigmaf(self):
+    def best_sigmaf(self) -> float:
         """Return the sigmaf value that maximizes the marginal Bayesian likelihood."""
         guess = np.median(self.err / self.y)
         result = sp.optimize.minimize_scalar(lambda x: -self._marginal_like(x), [guess / 1e4, guess * 1e4])
@@ -269,7 +269,7 @@ class GPRSpline(CubicSpline):
             return np.abs(result.x)
         raise (ValueError("Could not maximimze the marginal likelihood"))
 
-    def _marginal_like(self, sigmaf):
+    def _marginal_like(self, sigmaf: float) -> float:
         H = np.vstack((np.ones_like(self.x), self.x))
         K = np.zeros((self.Nk, self.Nk), dtype=float)
         sf2 = sigmaf**2
@@ -288,12 +288,13 @@ class GPRSpline(CubicSpline):
         yKinvy = Linvy.dot(Linvy)
         return -0.5 * ((self.Nk - 2) * np.log(2 * np.pi) + np.linalg.slogdet(A)[1] + np.linalg.slogdet(Ky)[1] - yCy + yKinvy)
 
-    def variance(self, xtest):
+    def variance(self, xtest: ArrayLike) -> NDArray:
         """Returns the variance for function evaluations at the test points `xtest`.
 
         This equals the diagonal of `self.covariance(xtest)`, but for large test sets,
         this method computes only the diagonal and should therefore be faster."""
         v = []
+        xtest = np.asarray(xtest)
         for x in np.asarray(xtest):
             Ktest = self.sigmaf**2 * k_spline(x, self.x)
             LinvKtest = np.linalg.solve(self.L, Ktest)
@@ -304,7 +305,7 @@ class GPRSpline(CubicSpline):
             return v[0]
         return np.array(v)
 
-    def covariance(self, xtest):
+    def covariance(self, xtest: ArrayLike) -> NDArray:
         """Returns the covariance between function evaluations at the test points `xtest`."""
         if np.isscalar(xtest):
             return self.variance(xtest)
@@ -334,8 +335,9 @@ class NaturalBsplineBasis:
         plt.plot(x, basis(x, id))
     """
 
-    def __init__(self, knots):
+    def __init__(self, knots: ArrayLike):
         """Initialization requires only the list of knots."""
+        knots = np.asarray(knots)
         Nk = len(knots)
         b, e = knots[0], knots[-1]
         padknots = np.hstack([[b, b, b], knots, [e, e, e]])
@@ -359,7 +361,7 @@ class NaturalBsplineBasis:
         self.knots = np.array(knots)
         self.padknots = padknots
 
-    def __call__(self, x, id, der=0):
+    def __call__(self, x: ArrayLike, id: int, der: int = 0) -> NDArray:
         if id < 0 or id >= self.Nk:
             raise ValueError(f"Require 0 <= id < Nk={self.Nk}")
         coef = np.zeros(self.Nk + 2, dtype=float)
@@ -370,19 +372,18 @@ class NaturalBsplineBasis:
             coef[-1] = self.coef_e[self.Nk - id - 1]
         return splev(x, (self.padknots, coef, 3), der=der)
 
-    def values_matrix(self, der=0):
+    def values_matrix(self, der: int = 0) -> NDArray:
         """Return matrix M where M_ij = value at knot i for basis function j.
         If der>0, then return the derivative of that order instead of the value."""
         # Note the array is naturally built by vstack as the Transpose of what we want.
         return np.vstack([self(self.knots, id, der=der) for id in range(self.Nk)]).T
 
-    def expand_coeff(self, beta):
+    def expand_coeff(self, beta: NDArray) -> NDArray:
         """Given coefficients of this length-Nk basis, return the coefficients
         needed by FITPACK, which are of length Nk+2."""
-        c = np.hstack([[0], beta, [0]])
-        c[0] = beta[0] * self.coef_b[0] + beta[1] * self.coef_b[1]
-        c[-1] = beta[-1] * self.coef_e[0] + beta[-2] * self.coef_e[1]
-        return c
+        first = beta[0] * self.coef_b[0] + beta[1] * self.coef_b[1]
+        last = beta[-1] * self.coef_e[0] + beta[-2] * self.coef_e[1]
+        return np.hstack([first, beta, last])
 
 
 class SmoothingSpline:
@@ -399,7 +400,7 @@ class SmoothingSpline:
     Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161
     """
 
-    def __init__(self, x, y, dy, dx=None, maxchisq=None):
+    def __init__(self, x: ArrayLike, y: ArrayLike, dy: ArrayLike, dx: ArrayLike | None = None, maxchisq: float | None = None):
         """Smoothing spline for data {x,y} with errors {dy} on the y values
         and {dx} on the x values (or zero if not given).
 
@@ -414,24 +415,24 @@ class SmoothingSpline:
         (weighted) least squares fit of a line to the data meets the maxchisq
         constraint, then the actual chi-squared will be less than maxchisq.
         """
+        self.x = np.array(x)  # copy
+        self.y = np.array(y)
+        self.dy = np.array(dy)
         if dx is None:
             err = np.array(np.abs(dy))
             dx = np.zeros_like(err)
         else:
-            roughfit = np.polyfit(x, y, 2)
+            roughfit = np.polyfit(self.x, self.y, 2)
             slope = np.poly1d(np.polyder(roughfit, 1))(x)
-            err = np.sqrt((dx * slope) ** 2 + dy * dy)
+            err = np.sqrt((np.asarray(dx) * slope) ** 2 + self.dy**2)
 
-        self.x = np.array(x)
-        self.xscale = (x**2).mean() ** 0.5
+        self.xscale = (self.x**2).mean() ** 0.5
         self.x /= self.xscale
-        self.y = np.array(y)
         self.dx = np.array(dx) / self.xscale
-        self.dy = np.array(dy)
         self.err = err
-        self.Nk = len(x)
+        self.Nk = len(self.x)
         if maxchisq is None:
-            self.maxchisq = self.Nk
+            self.maxchisq = float(self.Nk)
         else:
             self.maxchisq = maxchisq
 
@@ -442,7 +443,7 @@ class SmoothingSpline:
         self.smooth(chisq=self.maxchisq)
 
     @staticmethod
-    def _compute_Omega(knots, N2):
+    def _compute_Omega(knots: NDArray, N2: NDArray) -> NDArray:
         """Given the matrix M2 of second derivates at the knots (that is, M2_ij is
         the value of B_j''(x_i), second derivative of basis function #j at knot i),
         compute the matrix Omega, where Omega_ij is the integral over the entire
@@ -462,7 +463,7 @@ class SmoothingSpline:
                 Omega[j, i] = Omega[i, j]
         return Omega
 
-    def smooth(self, chisq=None):
+    def smooth(self, chisq: float | None = None) -> None:
         """Choose the value of the curve at the knots so as to achieve the
         smallest possible curvature subject to the constraint that the
         sum over all {x,y} pairs S = [(y-f(x))/dy]^2 <= chisq"""
@@ -474,10 +475,10 @@ class SmoothingSpline:
         lhs = np.dot(NTDinv, self.N0)
         rhs = np.dot(self.N0.T, Dinv * self.y)
 
-        def best_params(p):
+        def best_params(p: NDArray) -> NDArray:
             return np.linalg.solve(p * (lhs - self.Omega) + self.Omega, p * rhs)
 
-        def chisq_difference(p, target_chisq):
+        def chisq_difference(p: NDArray, target_chisq: float) -> float:
             # If curvature is too small, the computation can become singular.
             # Avoid this by returning a crazy-high chisquared, as needed.
             try:
@@ -497,27 +498,28 @@ class SmoothingSpline:
 
         # Store the linear extrapolation outside the knotted region.
         endpoints = np.array([self.x[0], self.x[-1]]) * self.xscale
-        val = self.__eval(endpoints, 0)
-        slope = self.__eval(endpoints, 1) * self.xscale
+        val = self.__eval(endpoints, 0, allow_extrapolate=False)
+        slope = self.__eval(endpoints, 1, allow_extrapolate=False) * self.xscale
         self.lowline = np.poly1d([slope[0], val[0]])
         self.highline = np.poly1d([slope[1], val[1]])
 
-    def __eval(self, x, der=0):
+    def __eval(self, x: ArrayLike, der: int = 0, allow_extrapolate: bool = True) -> NDArray:
         """Return the value of (the `der`th derivative of) the smoothing spline
         at data points `x`."""
         scalar = np.isscalar(x)
-        x = np.asarray(x) / self.xscale
+        x = np.asarray(x)
+        x /= self.xscale
         splresult = splev(x, (self.basis.padknots, self.coeff, 3), der=der)
         low = x < self.x[0]
         high = x > self.x[-1]
-        if np.any(low):
+        if np.any(low) and allow_extrapolate:
             if der == 0:
                 splresult[low] = self.lowline(x[low] - self.x[0])
             elif der == 1:
                 splresult[low] = self.lowline.coeffs[0]
             elif der >= 2:
                 splresult[low] = 0.0
-        if np.any(high):
+        if np.any(high) and allow_extrapolate:
             if der == 0:
                 splresult[high] = self.highline(x[high] - self.x[-1])
             elif der == 1:
@@ -530,19 +532,22 @@ class SmoothingSpline:
             splresult = splresult[()]
         return splresult
 
-    def __call__(self, x, der=0):
+    def __call__(self, x: ArrayLike, der: int = 0) -> NDArray:
         """Return the value of (the `der`th derivative of) the smoothing spline
         at data points `x`."""
         return self.__eval(x, der=der)
 
 
 class SmoothingSplineLog:
-    def __init__(self, x, y, dy, dx=None, maxchisq=None):
+    def __init__(self, x: ArrayLike, y: ArrayLike, dy: ArrayLike, dx: ArrayLike | None = None, maxchisq: float | None = None):
+        x = np.asarray(x)
+        y = np.asarray(y)
+        dy = np.asarray(dy)
         if np.any(x <= 0) or np.any(y <= 0):
             raise ValueError("The x and y data must all be positive to use a SmoothingSplineLog")
         if dx is not None:
-            dx /= x
+            dx = np.asarray(dx) / x
         self.linear_model = SmoothingSpline(np.log(x), np.log(y), dy / y, dx, maxchisq=maxchisq)
 
-    def __call__(self, x, der=0):
+    def __call__(self, x: ArrayLike, der: int = 0) -> NDArray:
         return np.exp(self.linear_model(np.log(x), der=der))

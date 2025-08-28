@@ -7,7 +7,7 @@ Created on Nov 7, 2011
 """
 
 import numpy as np
-import numpy.typing as npt
+from numpy.typing import ArrayLike
 
 
 __all__ = ["ToeplitzSolver"]
@@ -41,7 +41,7 @@ class ToeplitzSolver:
     step is approximately as long as the per-solution computations.
     """
 
-    def __init__(self, T: npt.ArrayLike, symmetric: bool = True):
+    def __init__(self, T: ArrayLike, symmetric: bool = True):
         """Initialize a Toeplitz matrix solver.
 
         Parameters
@@ -83,7 +83,7 @@ class ToeplitzSolver:
         if symmetric:
             self.__precompute_symmetric()
 
-    def mult(self, x: npt.ArrayLike) -> np.ndarray:
+    def mult(self, x: ArrayLike) -> np.ndarray:
         """Return y=Tx
 
         Currently supported only for symmetric matrices."""
@@ -99,13 +99,13 @@ class ToeplitzSolver:
             y[i] += np.dot(self.T[1 : 1 + i], x[i - 1 :: -1])
         return y
 
-    def __call__(self, y: npt.ArrayLike) -> np.ndarray:
+    def __call__(self, y: ArrayLike) -> np.ndarray:
         """Return the solution x for Tx=y"""
         if self.symmetric:
             return self.__solve_symmetric(y)
         return self.__solve_asymmetric(y)
 
-    def __solve_asymmetric(self, y: npt.ArrayLike) -> np.ndarray:
+    def __solve_asymmetric(self, y: ArrayLike) -> np.ndarray:
         """Return the solution x when Tx=y for an asymmetric Toeplitz matrix T."""
         n = self.n
         y = np.asarray(y)
@@ -140,7 +140,7 @@ class ToeplitzSolver:
             h[:K] -= h[K] * gsave[K - 1 :: -1]
         raise ValueError("unreachable")
 
-    def __precompute_symmetric(self):
+    def __precompute_symmetric(self) -> None:
         """Precompute some data so that the solve_symmetric method can be done in
         roughly half the time per solve."""
         n = self.n
@@ -164,7 +164,7 @@ class ToeplitzSolver:
             g[:K] -= g[K] * g[K - 1 :: -1]
         raise ValueError("unreachable")
 
-    def __solve_symmetric(self, y: npt.ArrayLike) -> np.ndarray:
+    def __solve_symmetric(self, y: ArrayLike) -> np.ndarray:
         """Return the solution x when Tx=y for a symmetric Toeplitz matrix T."""
         y = np.asarray(y)
         if y.ndim == 2:

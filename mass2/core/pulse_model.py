@@ -1,5 +1,7 @@
+from numpy.typing import NDArray
 import pylab as plt
 import numpy as np
+import h5py
 import mass2
 from mass2.common import tostr
 
@@ -15,21 +17,21 @@ class PulseModel:
 
     def __init__(  # noqa: PLR0917
         self,
-        projectors_so_far,
-        basis_so_far,
-        n_basis,
-        pulses_for_svd,
-        v_dv,
-        pretrig_rms_median,
-        pretrig_rms_sigma,
-        file_name,
-        extra_n_basis_5lag,
-        f_5lag,
-        average_pulse_for_5lag,
-        noise_psd,
-        noise_psd_delta_f,
-        noise_autocorr,
-        _from_hdf5=False,
+        projectors_so_far: NDArray,
+        basis_so_far: NDArray,
+        n_basis: int,
+        pulses_for_svd: NDArray,
+        v_dv: float,
+        pretrig_rms_median: float,
+        pretrig_rms_sigma: float,
+        file_name: str,
+        extra_n_basis_5lag: int,
+        f_5lag: NDArray,
+        average_pulse_for_5lag: NDArray,
+        noise_psd: NDArray,
+        noise_psd_delta_f: NDArray,
+        noise_autocorr: NDArray,
+        _from_hdf5: bool = False,
     ):
         self.pulses_for_svd = pulses_for_svd
         self.n_basis = n_basis
@@ -62,7 +64,7 @@ class PulseModel:
         self.noise_psd_delta_f = noise_psd_delta_f
         self.noise_autocorr = noise_autocorr
 
-    def toHDF5(self, hdf5_group, save_inverted):
+    def toHDF5(self, hdf5_group: h5py.Group, save_inverted: bool) -> None:
         projectors, basis = self.projectors[()], self.basis[()]
         if save_inverted:
             # flip every component except the mean component if data is being inverted
@@ -88,7 +90,7 @@ class PulseModel:
         hdf5_group["svdbasis/noise_autocorr"] = self.noise_autocorr
 
     @classmethod
-    def fromHDF5(cls, hdf5_group):
+    def fromHDF5(cls, hdf5_group: h5py.Group) -> "PulseModel":
         projectors = hdf5_group["svdbasis/projectors"][()]
         n_basis = projectors.shape[0]
         basis = hdf5_group["svdbasis/basis"][()]
@@ -126,7 +128,9 @@ class PulseModel:
         )
 
     @staticmethod
-    def _additional_projectors_tsvd(projectors, basis, n_basis, pulses_for_svd):
+    def _additional_projectors_tsvd(
+        projectors: NDArray, basis: NDArray, n_basis: int, pulses_for_svd: NDArray
+    ) -> tuple[NDArray, NDArray]:
         """
         Given an existing basis with projectors, compute a basis with n_basis elements
         by randomized SVD of the residual elements of the training data in pulses_for_svd.
@@ -161,7 +165,7 @@ class PulseModel:
 
         return projectors, basis
 
-    def labels(self):
+    def labels(self) -> list[str]:
         labels = ["const", "deriv", "pulse"]
         for i in range(self.n_basis - 3):
             if i > self.n_basis - 3 - self.extra_n_basis_5lag:
@@ -170,7 +174,7 @@ class PulseModel:
                 labels += [f"svd{i}"]
         return labels
 
-    def plot(self, fig1=None, fig2=None):
+    def plot(self, fig1: plt.Axes | None = None, fig2: plt.Axes | None = None) -> None:
         # plots information about a pulse model
         # fig1 and fig2 are optional matplotlib.pyplot (plt) figures if you need to embed the plots.
         # you can pass in the reference like fig=plt.figure() call or the figure's number, e.g. fig.number

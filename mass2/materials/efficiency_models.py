@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
-from uncertainties import ufloat
+from uncertainties import ufloat, Variable
 from uncertainties import unumpy as unp
 from .uncertainties_helpers import ensure_uncertain, with_fractional_uncertainty
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 import numpy as np
 import pylab as plt
 
@@ -24,21 +24,21 @@ class FilterStack:
     """Represent a sequence of named materials"""
 
     name: str
-    components: list["Filter"] = field(default_factory=list)
+    components: list["Filter | FilterStack"] = field(default_factory=list)
 
-    def add(self, film):
+    def add(self, film: "Filter | FilterStack") -> None:
         self.components.append(film)
 
     def add_filter(
         self,
-        name,
-        material,
-        area_density_g_per_cm2=None,
-        thickness_nm=None,
-        density_g_per_cm3=None,
-        fill_fraction=ufloat(1, 0),
-        absorber=False,
-    ):
+        name: str,
+        material: str,
+        area_density_g_per_cm2: float | None = None,
+        thickness_nm: float | None = None,
+        density_g_per_cm3: float | None = None,
+        fill_fraction: Variable = ufloat(1, 1e-8),
+        absorber: bool = False,
+    ) -> None:
         self.add(
             Filter.newfilter(
                 name,
@@ -51,7 +51,7 @@ class FilterStack:
             )
         )
 
-    def get_efficiency(self, xray_energies_eV, uncertain=False):
+    def get_efficiency(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
         assert len(self.components) > 0, f"{self.name} has no components of which to calculate efficiency"
         individual_efficiency = np.array([
             iComponent.get_efficiency(xray_energies_eV, uncertain=uncertain) for iComponent in self.components
@@ -62,10 +62,10 @@ class FilterStack:
         else:
             return unp.nominal_values(efficiency)
 
-    def __call__(self, xray_energies_eV, uncertain=False):
+    def __call__(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
         return self.get_efficiency(xray_energies_eV, uncertain=uncertain)
 
-    def plot_efficiency(self, xray_energies_eV, ax=None):
+    def plot_efficiency(self, xray_energies_eV: ArrayLike, ax: plt.Axes | None = None) -> None:
         efficiency = unp.nominal_values(self.get_efficiency(xray_energies_eV))
         if ax is None:
             fig = plt.figure()
@@ -83,7 +83,7 @@ class FilterStack:
 
         ax.legend()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = f"{type(self)}(\n"
         for v in self.components:
             s += f"{v.name}: {v}\n"
@@ -98,10 +98,10 @@ class Filter:
     atomic_number: NDArray
     density_g_per_cm3: NDArray[np.float64]
     thickness_cm: NDArray[np.float64]
-    fill_fraction: ufloat = 1.0
+    fill_fraction: Variable = ufloat(1.0, 1e-8)
     absorber: bool = False
 
-    def get_efficiency(self, xray_energies_eV, uncertain=False):
+    def get_efficiency(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
         optical_depth = np.vstack([
             xraydb.material_mu(m, xray_energies_eV, density=d) * t
             for (m, d, t) in zip(self.material, self.density_g_per_cm3, self.thickness_cm)
@@ -117,7 +117,7 @@ class Filter:
         else:
             return unp.nominal_values(efficiency)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = f"{type(self)}("
         for material, density, thick in zip(self.material, self.density_g_per_cm3, self.thickness_cm):
             area_density = density * thick
@@ -128,14 +128,14 @@ class Filter:
     @classmethod
     def newfilter(
         cls,
-        name,
-        material,
-        area_density_g_per_cm2=None,
-        thickness_nm=None,
-        density_g_per_cm3=None,
-        fill_fraction=ufloat(1, 0),
-        absorber=False,
-    ):
+        name: str,
+        material: ArrayLike,
+        area_density_g_per_cm2: ArrayLike | None = None,
+        thickness_nm: ArrayLike | None = None,
+        density_g_per_cm3: ArrayLike | None = None,
+        fill_fraction: Variable = ufloat(1, 1e-8),
+        absorber: bool = False,
+    ) -> "Filter":
         material = np.array(material, ndmin=1)
         atomic_number = np.array([xraydb.atomic_number(iMaterial) for iMaterial in material], ndmin=1)
         fill_fraction = ensure_uncertain(fill_fraction)
@@ -166,7 +166,13 @@ class Filter:
         return cls(name, material, atomic_number, density_g_per_cm3, thickness_cm, fill_fraction, absorber)
 
 
-def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidized_surfaces=2, oxide_density_g_per_cm3=None):
+def AlFilmWithOxide(
+    name: str,
+    Al_thickness_nm: float,
+    Al_density_g_per_cm3: float | None = None,
+    num_oxidized_surfaces: int = 2,
+    oxide_density_g_per_cm3: ArrayLike | None = None,
+) -> Filter:
     """Create a Filter made of an alumninum film with oxides on one or both surfaces
 
     Args:
@@ -178,7 +184,7 @@ def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidiz
     """
     assert num_oxidized_surfaces in {1, 2}, "only 1 or 2 oxidzed surfaces allowed"
     if Al_density_g_per_cm3 is None:
-        Al_density_g_per_cm3 = xraydb.atomic_density("Al")
+        Al_density_g_per_cm3 = float(xraydb.atomic_density("Al"))
     arbE = 5000.0  # an arbitrary energy (5 keV) is used to get answers from material_mu_components()
     oxide_dict = xraydb.material_mu_components("sapphire", arbE)
     oxide_material = oxide_dict["elements"]
@@ -189,6 +195,8 @@ def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidiz
     oxide_thickness_nm = np.repeat(num_oxidized_surfaces * 3.0, num_oxide_elements)
     if oxide_density_g_per_cm3 is None:
         oxide_density_g_per_cm3 = np.repeat(oxide_dict["density"], num_oxide_elements)
+    else:
+        oxide_density_g_per_cm3 = np.asarray(oxide_density_g_per_cm3)
 
     material = np.hstack(["Al", oxide_material])
     density_g_per_cm3 = np.hstack([Al_density_g_per_cm3, oxide_density_g_per_cm3 * oxide_mass_fractions])
@@ -197,14 +205,14 @@ def AlFilmWithOxide(name, Al_thickness_nm, Al_density_g_per_cm3=None, num_oxidiz
 
 
 def AlFilmWithPolymer(
-    name,
-    Al_thickness_nm,
-    polymer_thickness_nm,
-    Al_density_g_per_cm3=None,
-    num_oxidized_surfaces=1,
-    oxide_density_g_per_cm3=None,
-    polymer_density_g_per_cm3=None,
-):
+    name: str,
+    Al_thickness_nm: float,
+    polymer_thickness_nm: float,
+    Al_density_g_per_cm3: float | None = None,
+    num_oxidized_surfaces: int = 1,
+    oxide_density_g_per_cm3: float | None = None,
+    polymer_density_g_per_cm3: float | None = None,
+) -> Filter:
     """Create a Filter made of an alumninum film with polymer backing
 
     Args:
@@ -224,29 +232,29 @@ def AlFilmWithPolymer(
     oxide_dict = xraydb.material_mu_components("sapphire", arbE)
     oxide_thickness_nm = num_oxidized_surfaces * 3.0  # assume 3 nm per oxidized surface
     oxide_material = oxide_dict["elements"]
-    oxide_mass_fractions = [oxide_dict[x][0] * oxide_dict[x][1] / oxide_dict["mass"] for x in oxide_material]
+    oxide_mass_fractions = np.array([oxide_dict[x][0] * oxide_dict[x][1] / oxide_dict["mass"] for x in oxide_material])
     if oxide_density_g_per_cm3 is None:
         oxide_density_g_per_cm3 = oxide_dict["density"] * np.ones(len(oxide_material))
 
     polymer_dict = xraydb.material_mu_components("kapton", arbE)
     polymer_material = polymer_dict["elements"]
-    polymer_thickness_nm *= np.ones(len(polymer_material))
-    polymer_mass_fractions = [polymer_dict[x][0] * polymer_dict[x][1] / polymer_dict["mass"] for x in polymer_material]
+    polymer_thickness_nm_array = np.ones(len(polymer_material)) * polymer_thickness_nm
+    polymer_mass_fractions = np.array([polymer_dict[x][0] * polymer_dict[x][1] / polymer_dict["mass"] for x in polymer_material])
     if polymer_density_g_per_cm3 is None:
         polymer_density_g_per_cm3 = polymer_dict["density"] * np.ones(len(polymer_material))
 
     material = np.hstack(["Al", oxide_material, polymer_material])
     density_g_per_cm3 = np.hstack([
-        Al_density_g_per_cm3,
+        [Al_density_g_per_cm3],
         oxide_density_g_per_cm3 * oxide_mass_fractions,
         polymer_density_g_per_cm3 * polymer_mass_fractions,
     ])
-    thickness_nm = np.hstack([Al_thickness_nm, oxide_thickness_nm, polymer_thickness_nm])
+    thickness_nm = np.hstack([Al_thickness_nm, oxide_thickness_nm, polymer_thickness_nm_array])
 
     return Filter.newfilter(name=name, material=material, thickness_nm=thickness_nm, density_g_per_cm3=density_g_per_cm3)
 
 
-def LEX_HT(name):
+def LEX_HT(name: str) -> FilterStack:
     """Create an Al film with polymer and stainless steel backing.
 
     Models the LEX-HT vacuum window.
@@ -279,7 +287,7 @@ def LEX_HT(name):
     return stack
 
 
-def get_filter_stacks_dict():
+def get_filter_stacks_dict() -> dict[str, FilterStack]:
     """Create a dictionary with a few examples of FilterStack objects
 
     Returns
@@ -287,7 +295,7 @@ def get_filter_stacks_dict():
     dict
         A dictionary of named FilterStacks
     """
-    fs_dict = {}
+    fs_dict: dict[str, FilterStack] = {}
 
     # EBIT Instrument
     EBIT_filter_stack = FilterStack(name="EBIT 2018")

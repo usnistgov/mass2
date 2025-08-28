@@ -219,7 +219,7 @@ def models(
     has_linear_background: bool = False,
     has_tails: bool = False,
     vary_Hlike_amp_ratio: bool = False,
-    additional_Helike_complex_lines=[],
+    additional_Helike_complex_lines: list = [],
 ) -> dict:
     """Generates some commonly used HCI line models that can be used for energy calibration, etc.
 

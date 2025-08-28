@@ -67,7 +67,7 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     n_data = len(data)
     assert n_lags < n_data
 
-    def padded_length(n):
+    def padded_length(n: int) -> int:
         """Return a sensible number in the range [n, 2n] which is not too
         much larger than n, yet is good for FFTs.
 
@@ -166,7 +166,7 @@ def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
     return np.arange(nbins, dtype=float) / (2 * dt * nbins)
 
 
-def noise_psd_periodogram(data: ndarray, dt: float, window="boxcar", detrend=False) -> "NoiseResult":
+def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "boxcar", detrend: bool = False) -> "NoiseResult":
     f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
@@ -233,8 +233,8 @@ class NoiseResult:
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
         loglog: bool = True,
-        **plotkwarg,
-    ):
+        **plotkwarg: dict,
+    ) -> None:
         if axis is None:
             plt.figure()
             axis = plt.gca()
@@ -260,8 +260,8 @@ class NoiseResult:
         axis: plt.Axes | None = None,
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
-        **plotkwarg,
-    ):
+        **plotkwarg: dict,
+    ) -> None:
         """Plot PSD rebinned into logarithmically spaced frequency bins."""
         if axis is None:
             plt.figure()
@@ -281,16 +281,13 @@ class NoiseResult:
         inds = np.digitize(freq, bin_edges)
 
         # average PSD per bin
-        binned_freqs = []
-        binned_psd = []
+        binned_freqs = np.zeros(n_bins, dtype=float)
+        binned_psd = np.zeros(n_bins, dtype=float)
         for i in range(1, len(bin_edges)):
             mask = inds == i
             if np.any(mask):
-                binned_freqs.append(np.exp(np.mean(np.log(freq[mask]))))  # geometric mean
-                binned_psd.append(np.mean(psd[mask]))
-
-        binned_freqs = np.array(binned_freqs)
-        binned_psd = np.array(binned_psd)
+                binned_freqs[i - 1] = np.exp(np.mean(np.log(freq[mask])))  # geometric mean
+                binned_psd[i - 1] = np.mean(psd[mask])
 
         if sqrt_psd:
             axis.plot(binned_freqs, np.sqrt(binned_psd), **plotkwarg)

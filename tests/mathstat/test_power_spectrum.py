@@ -12,9 +12,9 @@ def test_basic():
     for n in [1000, 2000, 2500, 33333, 10000]:
         for segfactor in [1, 4, 10, 33]:
             data = np.zeros(n)
-            _psd = computeSpectrum(data, segfactor=segfactor, dt=None, window=None)
+            _f, _psd = computeSpectrum(data, segfactor=segfactor, dt=None, window=None)
             _f, _psd = computeSpectrum(data, segfactor=segfactor, dt=1e-6, window=None)
-            _psd = computeSpectrum(data, segfactor=segfactor, dt=None, window=None)
+            _f, _psd = computeSpectrum(data, segfactor=segfactor, dt=None, window=None)
             _f, _psd = computeSpectrum(data, segfactor=segfactor, dt=1e-6, window=None)
 
 

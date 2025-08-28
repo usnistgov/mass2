@@ -101,3 +101,4 @@ exclude = [
     "mass2/core/mass2main.py",
     "mass2/core/mass2notebook.py"
     ]
+disallow_untyped_defs = true

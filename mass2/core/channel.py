@@ -1,22 +1,29 @@
+from dataclasses import dataclass, field
+import dataclasses
+from typing import Any
+from numpy.typing import ArrayLike, NDArray
+from collections.abc import Callable, Iterable
 import os
 import lmfit
-from dataclasses import dataclass, field
 import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from collections.abc import Callable
 import numpy as np
 import time
+from pathlib import Path
 
 from .noise_channel import NoiseChannel
-from .recipe import Recipe, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .misc import alwaysTrue
+from .offfiles import OffFile
 from . import misc
+from ..calibration.line_models import GenericLineModel, LineModelResult
+from ..calibration.fluorescence_lines import SpectralLine
 import mass2
 
 
@@ -30,7 +37,7 @@ class ChannelHeader:
     df: pl.DataFrame = field(repr=False)
 
     @classmethod
-    def from_ljh_header_df(cls, df):
+    def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
         return cls(
             description=os.path.split(df["Filename"][0])[-1],
             ch_num=df["Channel"][0],
@@ -55,10 +62,10 @@ class Channel:
     transform_raw: Callable | None = None
 
     @property
-    def shortname(self):
+    def shortname(self) -> str:
         return self.header.description
 
-    def mo_stepplots(self):
+    def mo_stepplots(self) -> mo.ui.dropdown:
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
@@ -72,30 +79,30 @@ class Channel:
             label=f"choose step for ch {self.header.ch_num}",
         )
 
-        def show():
+        def show() -> mo.Html:
             return self._mo_stepplots_explicit(mo_ui)
 
-        def step_ind():
+        def step_ind() -> Any:
             return mo_ui.value
 
         mo_ui.show = show
         mo_ui.step_ind = step_ind
         return mo_ui
 
-    def _mo_stepplots_explicit(self, mo_ui):
-        step_ind = mo_ui.step_ind()
+    def _mo_stepplots_explicit(self, mo_ui: mo.ui.dropdown) -> mo.Html:
+        step_ind = mo_ui.value
         self.step_plot(step_ind)
         fig = plt.gcf()
         return mo.vstack([mo_ui, misc.show(fig)])
 
-    def get_step(self, index):
+    def get_step(self, index: int) -> tuple[RecipeStep, int]:
         if index < 0:
             # normalize the index to a positive index
             index = len(self.steps) + index
         step = self.steps[index]
         return step, index
 
-    def step_plot(self, step_ind, **kwargs):
+    def step_plot(self, step_ind: int, **kwargs: Any) -> plt.Axes:
         step, step_ind = self.get_step(step_ind)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
@@ -105,11 +112,11 @@ class Channel:
 
     def hist(
         self,
-        col,
-        bin_edges,
-        use_good_expr=True,
-        use_expr=pl.lit(True),
-    ):
+        col: str,
+        bin_edges: ArrayLike,
+        use_good_expr: bool = True,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> tuple[NDArray, NDArray]:
         if use_good_expr and self.good_expr is not True:
             # True doesn't implement .and_, haven't found a exper literal equivalent that does
             # so we special case True
@@ -126,12 +133,12 @@ class Channel:
 
     def plot_hist(
         self,
-        col,
-        bin_edges,
-        axis=None,
-        use_good_expr=True,
-        use_expr=pl.lit(True),
-    ):
+        col: str,
+        bin_edges: ArrayLike,
+        axis: plt.Axes | None = None,
+        use_good_expr: bool = True,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> tuple[NDArray, NDArray]:
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
@@ -151,14 +158,14 @@ class Channel:
 
     def plot_hists(
         self,
-        col,
-        bin_edges,
-        group_by_col,
-        axis=None,
-        use_good_expr=True,
-        use_expr=pl.lit(True),
-        skip_none=True,
-    ):
+        col: str,
+        bin_edges: ArrayLike,
+        group_by_col: str,
+        axis: plt.Axes | None = None,
+        use_good_expr: bool = True,
+        use_expr: pl.Expr = pl.lit(True),
+        skip_none: bool = True,
+    ) -> tuple[NDArray, dict[str, NDArray]]:
         """
         Plots histograms for the given column, grouped by the specified column.
 
@@ -184,7 +191,7 @@ class Channel:
         df_small = (self.df.lazy().filter(filter_expr).select(col, group_by_col)).collect().sort(group_by_col, descending=False)
 
         # Plot a histogram for each group
-        counts_dict = {}
+        counts_dict: dict[str, NDArray] = {}
         for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
@@ -192,13 +199,14 @@ class Channel:
             values = group_data[col]
             _, step_size = misc.midpoints_and_step_size(bin_edges)
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
-            counts_dict[group_name] = counts
-            plt.step(bin_centers, counts, where="mid", label=str(group_name))
+            group_name_str = str(group_name)
+            counts_dict[group_name_str] = counts
+            plt.step(bin_centers, counts, where="mid", label=group_name_str)
             # Plot the histogram for the current group
             # if group_name == "EBIT":
-            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=str(group_name))
+            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=group_name_str)
             # else:
-            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=str(group_name))
+            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=group_name_str)
             # bin_centers, counts = misc.hist_of_series(values, bin_edges)
             # plt.plot(bin_centers, counts, label=group_name)
         # Customize the plot
@@ -214,19 +222,22 @@ class Channel:
 
     def plot_scatter(
         self,
-        x_col,
-        y_col,
-        color_col=None,
-        use_expr=pl.lit(True),
-        use_good_expr=pl.lit(True),
-        skip_none=True,
-        ax=None,
-    ):
+        x_col: str,
+        y_col: str,
+        color_col: str | None = None,
+        use_expr: pl.Expr = pl.lit(True),
+        use_good_expr: bool = True,
+        skip_none: bool = True,
+        ax: plt.Axes | None = None,
+    ) -> None:
         if ax is None:
             plt.figure()
             ax = plt.gca()
         plt.sca(ax)  # set current axis so I can use plt api
-        filter_expr = self.good_expr.and_(use_expr)
+        if use_good_expr:
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr = self.good_expr
         df_small = self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
@@ -247,17 +258,17 @@ class Channel:
             plt.legend(title=color_col)
         plt.tight_layout()
 
-    def good_series(self, col, use_expr=pl.lit(True)):
+    def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
 
     def rough_cal_combinatoric(
         self,
-        line_names,
-        uncalibrated_col,
-        calibrated_col,
-        ph_smoothing_fwhm,
-        n_extra=3,
-        use_expr=pl.lit(True),
+        line_names: list[str],
+        uncalibrated_col: str,
+        calibrated_col: str,
+        ph_smoothing_fwhm: float,
+        n_extra: int = 3,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         step = mass2.core.RoughCalibrationStep.learn_combinatoric(
             self,
@@ -272,13 +283,13 @@ class Channel:
 
     def rough_cal_combinatoric_height_info(
         self,
-        line_names,
-        line_heights_allowed,
-        uncalibrated_col,
-        calibrated_col,
-        ph_smoothing_fwhm,
-        n_extra=3,
-        use_expr=pl.lit(True),
+        line_names: list[str],
+        line_heights_allowed: list[list[int]],
+        uncalibrated_col: str,
+        calibrated_col: str,
+        ph_smoothing_fwhm: float,
+        n_extra: int = 3,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         step = mass2.core.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
@@ -318,16 +329,13 @@ class Channel:
         )
         return self.with_step(step)
 
-    def with_step(self, step) -> "Channel":
+    def with_step(self, step: RecipeStep) -> "Channel":
         t_start = time.time()
         df2 = step.calc_from_df(self.df)
         elapsed_s = time.time() - t_start
-        ch2 = Channel(
+        ch2 = dataclasses.replace(
+            self,
             df=df2,
-            header=self.header,
-            npulses=self.npulses,
-            subframediv=self.subframediv,
-            noise=self.noise,
             good_expr=step.good_expr,
             df_history=self.df_history + [self.df],
             steps=self.steps.with_step(step),
@@ -335,28 +343,18 @@ class Channel:
         )
         return ch2
 
-    def with_steps(self, steps) -> "Channel":
+    def with_steps(self, steps: Recipe) -> "Channel":
         ch2 = self
         for step in steps:
             ch2 = ch2.with_step(step)
         return ch2
 
-    def with_good_expr(self, good_expr, replace=False) -> "Channel":
+    def with_good_expr(self, good_expr: pl.Expr, replace: bool = False) -> "Channel":
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
         if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
             good_expr = good_expr.and_(self.good_expr)
-        return Channel(
-            df=self.df,
-            header=self.header,
-            npulses=self.npulses,
-            subframediv=self.subframediv,
-            noise=self.noise,
-            good_expr=good_expr,
-            df_history=self.df_history,
-            steps=self.steps,
-            steps_elapsed_s=self.steps_elapsed_s,
-        )
+        return dataclasses.replace(self, good_expr=good_expr)
 
     def with_column_map_step(self, input_col: str, output_col: str, f: Callable) -> "Channel":
         """f should take a numpy array and return a numpy array with the same number of elements"""
@@ -364,7 +362,7 @@ class Channel:
         return self.with_step(step)
 
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
-        self, n_sigma_pretrig_rms=20, n_sigma_postpeak_deriv=20, replace=False
+        self, n_sigma_pretrig_rms: float = 20, n_sigma_postpeak_deriv: float = 20, replace: bool = False
     ) -> "Channel":
         max_postpeak_deriv = misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
@@ -373,11 +371,13 @@ class Channel:
         good_expr = (pl.col("postpeak_deriv") < max_postpeak_deriv).and_(pl.col("pretrig_rms") < max_pretrig_rms)
         return self.with_good_expr(good_expr, replace)
 
-    def with_range_around_median(self, col, range_up, range_down):
+    def with_range_around_median(self, col: str, range_up: float, range_down: float) -> "Channel":
         med = np.median(self.df[col].to_numpy())
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
-    def with_good_expr_below_nsigma_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
+    def with_good_expr_below_nsigma_outlier_resistant(
+        self, col_nsigma_pairs: Iterable[tuple[str, float]], replace: bool = False, use_prev_good_expr: bool = True
+    ) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -394,7 +394,9 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    def with_good_expr_nsigma_range_outlier_resistant(self, col_nsigma_pairs, replace=False, use_prev_good_expr=True) -> "Channel":
+    def with_good_expr_nsigma_range_outlier_resistant(
+        self, col_nsigma_pairs: Iterable[tuple[str, float]], replace: bool = False, use_prev_good_expr: bool = True
+    ) -> "Channel":
         """
         always sets lower limit at 0, don't use for values that can be negative
         """
@@ -412,13 +414,13 @@ class Channel:
         return self.with_good_expr(good_expr, replace)
 
     @functools.cache
-    def typical_peak_ind(self, col="pulse"):
+    def typical_peak_ind(self, col: str = "pulse") -> int:
         raw = self.df.limit(100)[col].to_numpy()
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
 
-    def summarize_pulses(self, col="pulse", pretrigger_ignore_samples=0, peak_index=None) -> "Channel":
+    def summarize_pulses(self, col: str = "pulse", pretrigger_ignore_samples: int = 0, peak_index: int | None = None) -> "Channel":
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
         out_names = mass2.core.pulse_algorithms.result_dtype.names
@@ -439,7 +441,9 @@ class Channel:
         )
         return self.with_step(step)
 
-    def correct_pretrig_mean_jumps(self, uncorrected="pretrig_mean", corrected="ptm_jf", period=4096):
+    def correct_pretrig_mean_jumps(
+        self, uncorrected: str = "pretrig_mean", corrected: str = "ptm_jf", period: int = 4096
+    ) -> "Channel":
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
@@ -466,7 +470,7 @@ class Channel:
         )
         return self.with_step(step)
 
-    def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col="category") -> "Channel":
+    def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col: str = "category") -> "Channel":
         # ensure the first condition is True, to be used as a fallback
         first_expr = next(iter(category_condition_dict.values()))
         if not first_expr.meta.eq(pl.lit(True)):
@@ -486,12 +490,12 @@ class Channel:
 
     def filter5lag(
         self,
-        pulse_col="pulse",
-        peak_y_col="5lagy",
-        peak_x_col="5lagx",
-        f_3db=25e3,
-        use_expr=pl.lit(True),
-        time_constant_s_of_exp_to_be_orthogonal_to=None,
+        pulse_col: str = "pulse",
+        peak_y_col: str = "5lagy",
+        peak_x_col: str = "5lagx",
+        f_3db: float = 25e3,
+        use_expr: pl.Expr = pl.lit(True),
+        time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
     ) -> "Channel":
         avg_pulse = (
             self.df.lazy()
@@ -530,28 +534,28 @@ class Channel:
         )
         return self.with_step(step)
 
-    def good_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+    def good_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
         good_df = self.df.lazy().filter(self.good_expr)
         if use_expr is not True:
             good_df = good_df.filter(use_expr)
         return good_df.select(cols).collect()
 
-    def bad_df(self, cols=pl.all(), use_expr: bool | pl.Expr = True):
+    def bad_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
         bad_df = self.df.lazy().filter(self.good_expr.not_())
         if use_expr is not True:
             bad_df = bad_df.filter(use_expr)
         return bad_df.select(cols).collect()
 
-    def good_serieses(self, cols, use_expr: bool | pl.Expr):
+    def good_serieses(self, cols: list[str], use_expr: pl.Expr = pl.lit(True)) -> list[pl.Series]:
         df2 = self.good_df(cols, use_expr)
         return [df2[col] for col in cols]
 
     def driftcorrect(
         self,
-        indicator_col="pretrig_mean",
-        uncorrected_col="5lagy",
-        corrected_col=None,
-        use_expr=pl.lit(True),
+        indicator_col: str = "pretrig_mean",
+        uncorrected_col: str = "5lagy",
+        corrected_col: str | None = None,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
@@ -566,16 +570,16 @@ class Channel:
 
     def linefit(  # noqa: PLR0917
         self,
-        line,
-        col,
-        use_expr=pl.lit(True),
-        has_linear_background=False,
-        has_tails=False,
-        dlo=50,
-        dhi=50,
-        binsize=0.5,
-        params_update=lmfit.Parameters(),
-    ):
+        line: GenericLineModel | SpectralLine | str | float,
+        col: str,
+        use_expr: pl.Expr = pl.lit(True),
+        has_linear_background: bool = False,
+        has_tails: bool = False,
+        dlo: float = 50,
+        dhi: float = 50,
+        binsize: float = 0.5,
+        params_update: lmfit.Parameters = lmfit.Parameters(),
+    ) -> LineModelResult:
         model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
@@ -597,7 +601,7 @@ class Channel:
         )
         return result
 
-    def step_summary(self):
+    def step_summary(self) -> list[tuple[str, float]]:
         return [(type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)]
 
     def __hash__(self) -> int:
@@ -606,7 +610,7 @@ class Channel:
         # and we may get nonsense results
         return hash(id(self))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
@@ -614,7 +618,13 @@ class Channel:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh(cls, path, noise_path=None, keep_posix_usec=False, transform_raw: Callable | None = None) -> "Channel":
+    def from_ljh(
+        cls,
+        path: str | Path,
+        noise_path: str | Path | None = None,
+        keep_posix_usec: bool = False,
+        transform_raw: Callable | None = None,
+    ) -> "Channel":
         if not noise_path:
             noise_channel = None
         else:
@@ -628,8 +638,9 @@ class Channel:
         return channel
 
     @classmethod
-    def from_off(cls, off) -> "Channel":
-        df = pl.from_numpy(off._mmap)
+    def from_off(cls, off: OffFile) -> "Channel":
+        assert off._mmap is not None
+        df = pl.from_numpy(np.asarray(off._mmap))
         df = (
             df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
@@ -648,7 +659,7 @@ class Channel:
         channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
-    def with_experiment_state_df(self, df_es, force_timestamp_monotonic=False) -> "Channel":
+    def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
@@ -666,29 +677,22 @@ class Channel:
         )
         return self.with_replacement_df(df2)
 
-    def with_replacement_df(self, df2) -> "Channel":
-        return Channel(
+    def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
+        return dataclasses.replace(
+            self,
             df=df2,
-            header=self.header,
-            npulses=self.npulses,
-            subframediv=self.subframediv,
-            noise=self.noise,
-            good_expr=self.good_expr,
-            df_history=self.df_history,
-            steps=self.steps,
-            transform_raw=self.transform_raw,
         )
 
-    def with_columns(self, df2) -> "Channel":
+    def with_columns(self, df2: pl.DataFrame) -> "Channel":
         df3 = self.df.with_columns(df2)
         return self.with_replacement_df(df3)
 
     def multifit_quadratic_gain_cal(
         self,
         multifit: MultiFit,
-        previous_cal_step_index,
-        calibrated_col,
-        use_expr=pl.lit(True),
+        previous_cal_step_index: int,
+        calibrated_col: str,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         step = MultiFitQuadraticGainStep.learn(
             self,
@@ -702,9 +706,9 @@ class Channel:
     def multifit_mass_cal(
         self,
         multifit: MultiFit,
-        previous_cal_step_index,
-        calibrated_col,
-        use_expr=pl.lit(True),
+        previous_cal_step_index: int,
+        calibrated_col: str,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         step = MultiFitMassCalibrationStep.learn(
             self,
@@ -733,12 +737,12 @@ class Channel:
 
     def phase_correct_mass_specific_lines(
         self,
-        indicator_col,
-        uncorrected_col,
-        line_names,
-        previous_cal_step_index,
-        corrected_col=None,
-        use_expr=pl.lit(True),
+        indicator_col: str,
+        uncorrected_col: str,
+        line_names: Iterable[str | float],
+        previous_cal_step_index: int,
+        corrected_col: str | None = None,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
@@ -753,11 +757,11 @@ class Channel:
         )
         return self.with_step(step)
 
-    def as_bad(self, error_type, error_msg, backtrace):
+    def as_bad(self, error_type: type | None, error_msg: str, backtrace: str | None) -> "BadChannel":
         return BadChannel(self, error_type, error_msg, backtrace)
 
-    def save_recipes(self, filename):
-        steps = {self.header.ch_num: self.steps[:]}
+    def save_recipes(self, filename: str) -> dict[int, Recipe]:
+        steps = {self.header.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
@@ -827,7 +831,7 @@ class Channel:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")
 
-    def fit_pulse(self, index=0, col="pulse", verbose=True):
+    def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         pulse = self.df[col][index].to_numpy()
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
         if verbose:
@@ -840,6 +844,6 @@ class Channel:
 @dataclass(frozen=True)
 class BadChannel:
     ch: Channel
-    error_type: type
+    error_type: type | None
     error_msg: str
-    backtrace: str
+    backtrace: str | None

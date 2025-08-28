@@ -110,7 +110,7 @@ def test_complete():
     factory = EnergyCalibrationMaker(ph_opt, energies_opt, z, z, line_names)
     approxcal = factory.make_calibration(approximate=False)
 
-    _energies, fit_lo_hi, slopes_de_dph = build_fit_ranges_ph(energies_opt, [], approxcal, 100)
+    _, fit_lo_hi, slopes_de_dph = build_fit_ranges_ph(energies_opt, tuple(), approxcal, 100)
     binsize_ev = 1.0
     results = multifit(ph, line_names, fit_lo_hi, np.ones_like(slopes_de_dph) * binsize_ev, slopes_de_dph, hide_deprecation=True)
     assert results is not None

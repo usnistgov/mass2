@@ -5,11 +5,18 @@ name: Python application
 
 on:
   push:
-    # branches: [ "main" ]
-    # If you don't have a "branches: [...]" entry here, the action runs on any push.
-    # At first, we ran actions only on main pushes, but let's try all branches as of Aug 15, 2025
+    # We will test by default on all pushes, EXCEPT those that become part of a pull request.
+    branches-ignore:
+      - 'refs/heads/pull/**' # Excludes branches that are part of a pull request
+      - 'main' # Or any other branch you want to exclude from direct push builds if it's handled by PRs
+    paths-ignore:
+      - 'README.md'
+      - 'VERSIONS.md'
+      - '.gitignore'
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - '*' # Triggers for all PRs targeting any branch (presumably 99% of all PRs will target 'main')
+
 
 permissions:
   contents: write
@@ -25,7 +32,8 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.13"]
-        # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989), or 3.10 specifically will be read as 3.1
+        # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989),
+        # or else 3.10 specifically will be read as 3.1
 
     steps:
     - uses: actions/checkout@v4
@@ -34,14 +42,13 @@ jobs:
       uses: astral-sh/setup-uv@v5
       with:
         python-version: ${{ matrix.python-version }}
-        # Cache wasn't working. Need a better understanding before we turn this on:
-        # enable-cache: true
+        enable-cache: true
 
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
 
     - name: Run ruff formatter (only on most recent Python version)
-      if: ${{ matrix.python-version == 3.13 }}
+      if: ${{ matrix.python-version == '3.13' }}
       uses: astral-sh/ruff-action@v3
       with:
         args: "format"
@@ -57,14 +64,9 @@ jobs:
     - name: Test with pytest
       run: pytest
 
-    # TODO: make doctests work again
-    # - name: Run doctests (only on most recent Python version)
-    #   if: ${{ matrix.python-version == 3.13 }}
-    #   run: |
-    #     uv sync --all-extras --group docs
-    #     cd doc
-    #     uv run make clean
-    #     uv run make doctest
+    - name: Run mypy to check type annotations
+      if: ${{ matrix.python-version == '3.13' }}
+      run: mypy mass2
 
 # TO DO: generate docs automatically and deploy them.
 #

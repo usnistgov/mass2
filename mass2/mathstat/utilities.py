@@ -10,10 +10,11 @@ Joe Fowler, NIST
 Started March 24, 2011
 """
 
+from typing import Any
+from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import pylab as plt
 from collections import namedtuple
-from numpy.typing import ArrayLike, NDArray
 
 __all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "find_svd_randomly", "find_range_randomly"]
 
@@ -22,7 +23,7 @@ __all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "find_svd
 rng = np.random.default_rng()
 
 
-def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwargs) -> None:
+def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwargs: Any) -> None:
     """Plot data in stepped-histogram format.
 
     Args:
@@ -56,7 +57,7 @@ def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwa
 
 
 def plot_stepped_hist_poisson_errors(
-    axis: plt.Axes, counts: ArrayLike, bin_ctrs: ArrayLike, scale: float = 1.0, offset: float = 0.0, **kwargs
+    axis: plt.Axes, counts: ArrayLike, bin_ctrs: ArrayLike, scale: float = 1.0, offset: float = 0.0, **kwargs: Any
 ) -> None:
     """Use plot_as_stepped_hist to plot a histogram, where also
     an error band is plotted, assuming data are Poisson-distributed.

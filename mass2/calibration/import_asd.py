@@ -7,6 +7,7 @@ February 2020
 Paul Szypryt
 """
 
+from typing import Any
 import re
 import ast
 import numpy as np
@@ -14,21 +15,23 @@ import pickle
 import argparse
 
 
-def write_asd_pickle(inputFilename, outputFilename):
+def write_asd_pickle(inputFilename: str, outputFilename: str) -> None:
     createTableString = "CREATE TABLE"
     valueSearchString = r"\`([^\`]*)\`"
     tableName = ""
-    fieldNamesDict = {}
-    energyLevelsDict = {}
+    fieldNamesDict: dict[str, Any] = {}
+    energyLevelsDict: dict[str, dict[int, dict[str, list[float]]]] = {}
     with open(inputFilename, "r", encoding="utf-8") as ASD_file:
         for line in ASD_file:
             # Create dictionary of field names for various tables
             if line.startswith(createTableString):
-                tableName = re.search(valueSearchString, line).groups()[0]
-                fieldNamesDict[tableName] = []
+                match = re.search(valueSearchString, line)
+                if match is not None:
+                    fieldNamesDict[match.groups()[0]] = []
             elif tableName and line.strip().startswith("`"):
-                fieldName = re.search(valueSearchString, line).groups()[0]
-                fieldNamesDict[tableName].append(fieldName)
+                match = re.search(valueSearchString, line)
+                if match is not None:
+                    fieldNamesDict[tableName].append(match.groups()[0])
             # Parse Levels portion
             elif line.startswith("INSERT INTO `ASD_Levels` VALUES"):
                 partitionedLine = line.partition(" VALUES ")[-1].strip()
@@ -39,9 +42,9 @@ def write_asd_pickle(inputFilename, outputFilename):
                 parseLine(energyLevelsDict, fieldNamesDict, formattedLine)
 
     # Sort levels within an element/charge state by energy
-    outputDict = {}
-    for iElement, element in energyLevelsDict.values():
-        for iCharge, chargestate in element.values():
+    outputDict: dict[str, dict[int, dict[str, list[float]]]] = {}
+    for iElement, element in energyLevelsDict.items():
+        for iCharge, chargestate in element.items():
             energyOrder = np.argsort(np.array(list(chargestate.values()))[:, 0])
             orderedKeys = np.array(list(chargestate.keys()))[energyOrder]
             orderedValues = np.array(list(chargestate.values()))[energyOrder]
@@ -51,12 +54,15 @@ def write_asd_pickle(inputFilename, outputFilename):
                 if iCharge not in outputDict[iElement].keys():
                     outputDict[iElement][iCharge] = {}
                 outputDict[iElement][iCharge][str(iKey)] = orderedValues[i].tolist()
+
     # Write dict to pickle file
     with open(outputFilename, "wb") as handle:
         pickle.dump(outputDict, handle, protocol=2)
 
 
-def parseLine(energyLevelsDict, fieldNamesDict, formattedLine):
+def parseLine(
+    energyLevelsDict: dict[str, dict[int, dict[str, list[float]]]], fieldNamesDict: dict[str, Any], formattedLine: str
+) -> None:
     lineAsArray = np.array(ast.literal_eval(formattedLine))
     for iEntry in lineAsArray:
         element = iEntry[fieldNamesDict["ASD_Levels"].index("element")]

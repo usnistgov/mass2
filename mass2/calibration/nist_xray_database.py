@@ -21,7 +21,7 @@ February 2014
 """
 
 import os
-import urllib
+import urllib.request
 import pylab as plt
 
 ELEMENTS = (
@@ -136,7 +136,7 @@ ATOMIC_NUMBERS = dict((ELEMENTS[i], i) for i in range(len(ELEMENTS)))
 class NISTXrayDBFile:
     DEFAULT_FILENAMES = "nist_xray_data.dat", "low_z_xray_data.dat"
 
-    def __init__(self, *filenames):
+    def __init__(self, *filenames: str):
         """Initialize the database from 1 or more <filenames>, which point to
         files downloaded using NISTXrayDBRetrieve. If the list is empty (the
         default), then the file named by self.DEFAULT_FILENAME will be used."""
@@ -146,7 +146,7 @@ class NISTXrayDBFile:
 
         if not filenames:
             path = os.path.split(__file__)[0]
-            filenames = [os.path.join(path, df) for df in self.DEFAULT_FILENAMES]
+            filenames = tuple([os.path.join(path, df) for df in self.DEFAULT_FILENAMES])
 
         self.loaded_filenames = []
         for filename in filenames:
@@ -187,7 +187,7 @@ class NISTXrayDBFile:
         "LG1": "L2N4",
     }
 
-    def get_lines_by_type(self, linetype):
+    def get_lines_by_type(self, linetype: str) -> tuple["NISTXrayLine"]:
         """Return a tuple containing all lines of a certain type, e.g., "KL3".
         See self.LINE_NICKNAMES for some known line "nicknames"."""
         linetype = linetype.upper()
@@ -205,7 +205,7 @@ class NISTXrayDBFile:
                 lines.append(self.lines[linename])
         return tuple(lines)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> "NISTXrayLine":
         element, line = key.split()[:2]
         element = element.capitalize()
         line = line.upper()
@@ -232,7 +232,13 @@ class NISTXrayLine:
         "ref": (81, 91),
     }
 
-    def __init__(self, textline, column_defs=None):
+    def __init__(self, textline: str, column_defs: dict[str, tuple[int, int]] | None = None):
+        self.element = ""
+        self.transition = ""
+        self.peak = 0.0
+        self.peak_unc = 0.0
+        self.blend = ""
+        self.ref = ""
         if column_defs is None:
             column_defs = self.DEFAULT_COLUMN_DEFS
         for name, colrange in column_defs.items():
@@ -244,14 +250,14 @@ class NISTXrayLine:
         self.name = f"{self.element} {self.transition}"
         self.raw = textline.rstrip()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.element} {self.transition} line: {self.peak:.3f} +- {self.peak_unc:.3f} eV"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.raw
 
 
-def plot_line_uncertainties():
+def plot_line_uncertainties() -> None:
     db = NISTXrayDBFile()
     transitions = ("KL3", "KL2", "KM3", "KM5", "L3M5", "L3M4", "L2M4", "L3N5", "L2N4", "L1M3", "L3N7", "L3M1")
     titles = {
@@ -294,7 +300,7 @@ def plot_line_uncertainties():
         plt.text(line.peak, line.peak_unc, line.name)
 
 
-def plot_line_energies():
+def plot_line_energies() -> None:
     db = NISTXrayDBFile()
     plt.clf()
     cm = plt.cm.nipy_spectral
@@ -337,7 +343,7 @@ def plot_line_energies():
 ###############################################################
 
 
-def _NISTXrayDBRetrieve(line_names, savefile, min_E=150, max_E=25000):
+def _NISTXrayDBRetrieve(line_names: list[str], savefile: str, min_E: float = 150, max_E: float = 25000) -> None:
     """Use this for updating the database file. You should not
     ever (?) need to do this, but who knows?"""
     form = "http://physics.nist.gov/cgi-bin/XrayTrans/search.pl?"
@@ -347,14 +353,14 @@ def _NISTXrayDBRetrieve(line_names, savefile, min_E=150, max_E=25000):
     get = f"{form}{joined_args}&{joined_lines}"
     print(f"Grabbing {get}")
 
-    page = urllib.urlopen(get)
+    page = urllib.request.urlopen(get)
     fp = open(savefile, "w", encoding="utf-8")
     fp.writelines(page)
     fp.close()
 
 
-def _RetrieveAllLines(savefile, max_E=30000):
+def _RetrieveAllLines(savefile: str, max_E: float = 30000) -> None:
     """Use this for updating the database file. You should not
     ever (?) need to do this, but who knows?"""
-    lines = ("KL2", "KL3", "KM5", "KM3", "KM2", "L3M5", "L3M4", "L3M1", "L2M4", "L2N4", "L3N5", "L1M3", "L3N7")
+    lines = ["KL2", "KL3", "KM5", "KM3", "KM2", "L3M5", "L3M4", "L3M1", "L2M4", "L2N4", "L3N5", "L1M3", "L3N7"]
     _NISTXrayDBRetrieve(lines, savefile, max_E=max_E)

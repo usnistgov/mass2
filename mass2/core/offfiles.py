@@ -1,6 +1,9 @@
+from typing import Any
+from numpy.typing import NDArray
 import json
-import numpy as np
+import io
 import os
+import numpy as np
 from base64 import decodebytes
 
 
@@ -14,7 +17,7 @@ Supported off versions:
 """
 
 
-def recordDtype(offVersion, nBasis, descriptive_coefs_names=True):
+def recordDtype(offVersion: str, nBasis: int, descriptive_coefs_names: bool = True) -> np.dtype:
     """return a np.dtype matching the record datatype for the given offVersion and nBasis
     descriptive_coefs_names - determines how the modeled pulse coefficients are name, you usually want True
     For True, the names will be `derivLike`, `pulseLike`, and if nBasis>3, also `extraCoefs`
@@ -22,7 +25,7 @@ def recordDtype(offVersion, nBasis, descriptive_coefs_names=True):
     methods that want access to all coefs simultaneously easier"""
     if offVersion in {"0.1.0", "0.2.0"}:
         # start of the dtype is identical for all cases
-        dt_list = [
+        dt_list: list[tuple[str, type] | tuple[str, type, int]] = [
             ("recordSamples", np.int32),
             ("recordPreSamples", np.int32),
             ("framecount", np.int64),
@@ -52,11 +55,11 @@ def recordDtype(offVersion, nBasis, descriptive_coefs_names=True):
     return np.dtype(dt_list)
 
 
-def readJsonString(f):
+def readJsonString(f: io.BufferedReader) -> str:
     """look in file f for a line "}\\n" and return all contents up to that point
     for an OFF file this can be parsed by json.dumps
     and all remaining data is records"""
-    lines = []
+    lines: list[str] = []
     while True:
         line = f.readline().decode("utf-8")
         lines += line
@@ -104,18 +107,18 @@ class OffFile:
                 self.subframediv = None
 
         self.validateHeader()
-        self._mmap = None
-        self.projectors = None
-        self.basis = None
+        self._mmap: np.memmap | None = None
+        self.projectors: NDArray | None = None
+        self.basis: NDArray | None = None
         self._decodeModelInfo()  # calculates afterHeaderPos used by _updateMmap
         self._updateMmap()
 
-    def close(self):
+    def close(self) -> None:
         del self._mmap
         del self.projectors
         del self.basis
 
-    def validateHeader(self):
+    def validateHeader(self) -> None:
         with open(self.filename, "rb") as f:
             f.seek(self.headerStringLength - 2)
             if not f.readline().decode("utf-8") == "}\n":
@@ -123,7 +126,7 @@ class OffFile:
         if self.header["FileFormat"] != "OFF":
             raise Exception("FileFormatVersion is {}, want OFF".format(self.header["FileFormatVersion"]))
 
-    def _updateMmap(self, _nRecords=None):
+    def _updateMmap(self, _nRecords: int | None = None) -> None:
         """
         _nRecords is for testing only, mmap exaclty _nRecords records
         """
@@ -136,17 +139,20 @@ class OffFile:
         self._mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.afterHeaderPos, shape=(self.nRecords,))
         self.shape = self._mmap.shape
 
-    def __getitem__(self, *args, **kwargs):
+    def __getitem__(self, *args: Any, **kwargs: Any) -> Any:
         # make indexing into the off the same as indexing into the memory mapped array
+        assert self._mmap is not None
         return self._mmap.__getitem__(*args, **kwargs)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        assert self._mmap is not None
         return len(self._mmap)
 
-    def __sizeof__(self):
+    def __sizeof__(self) -> int:
+        assert self._mmap is not None
         return self._mmap.__sizeof__()
 
-    def _decodeModelInfo(self):
+    def _decodeModelInfo(self) -> None:
         if (
             "RowMajorFloat64ValuesBase64" in self.header["ModelInfo"]["Projectors"]
             and "RowMajorFloat64ValuesBase64" in self.header["ModelInfo"]["Basis"]
@@ -156,7 +162,7 @@ class OffFile:
         else:
             self._decodeModelInfoMmap()
 
-    def _decodeModelInfoBase64(self):
+    def _decodeModelInfoBase64(self) -> None:
         projectorsData = decodebytes(self.header["ModelInfo"]["Projectors"]["RowMajorFloat64ValuesBase64"].encode())
         projectorsRows = int(self.header["ModelInfo"]["Projectors"]["Rows"])
         projectorsCols = int(self.header["ModelInfo"]["Projectors"]["Cols"])
@@ -175,7 +181,7 @@ class OffFile:
             )
         self.afterHeaderPos = self.headerStringLength
 
-    def _decodeModelInfoMmap(self):
+    def _decodeModelInfoMmap(self) -> None:
         projectorsRows = int(self.header["ModelInfo"]["Projectors"]["Rows"])
         projectorsCols = int(self.header["ModelInfo"]["Projectors"]["Cols"])
         basisRows = int(self.header["ModelInfo"]["Basis"]["Rows"])
@@ -194,16 +200,16 @@ class OffFile:
                 f"NumberOfBases {self.header['NumberOfBases']}"
             )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<OFF file> {}, {} records, {} length basis\n".format(self.filename, self.nRecords, self.header["NumberOfBases"])
 
-    def sampleTimes(self, i):
+    def sampleTimes(self, i: int) -> NDArray:
         """return a vector of sample times for record i, approriate for plotting"""
         recordSamples = self[i]["recordSamples"]
         recordPreSamples = self[i]["recordPreSamples"]
         return np.arange(-recordPreSamples, recordSamples - recordPreSamples) * self.framePeriodSeconds
 
-    def modeledPulse(self, i):
+    def modeledPulse(self, i: int) -> NDArray:
         """return a vector of the modeled pulse samples, the best available value of the actual raw samples"""
         # projectors has size (n,z) where it is (rows,cols)
         # basis has size (z,n)
@@ -215,15 +221,18 @@ class OffFile:
 
         # .view(self._dtype_non_descriptive) should be a copy-free way of changing
         # the dtype so we can access the coefs all together
+        assert self.basis is not None
         allVals = np.matmul(self.basis, self._mmap_with_coefs[i]["coefs"])
-        return allVals
+        return np.asarray(allVals)
 
-    def recordXY(self, i):
+    def recordXY(self, i: int) -> tuple[NDArray, NDArray]:
         return self.sampleTimes(i), self.modeledPulse(i)
 
     @property
-    def _mmap_with_coefs(self):
+    def _mmap_with_coefs(self) -> NDArray:
+        assert self._mmap is not None
         return self._mmap.view(self._dtype_non_descriptive)
 
-    def view(self, *args):
+    def view(self, *args: Any) -> NDArray:
+        assert self._mmap is not None
         return self._mmap.view(*args)

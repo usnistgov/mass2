@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import ClassVar, Any
-import numpy.typing as npt
+from numpy.typing import NDArray
 import os
 import numpy as np
 import polars as pl
@@ -41,11 +42,12 @@ class LJHFile(ABC):
 
     OVERLONG_HEADER: ClassVar[int] = 100
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
 
     @classmethod
-    def open(cls, filename: str, max_pulses: int | None = None) -> "LJHFile":
+    def open(cls, filename: str | Path, max_pulses: int | None = None) -> "LJHFile":
+        filename = str(filename)
         header_dict, header_string, header_size = cls.read_header(filename)
         channum = header_dict["Channel"]
         timebase = header_dict["Timebase"]
@@ -206,7 +208,7 @@ class LJHFile(ABC):
         )
 
     @property
-    def subframecount(self):
+    def subframecount(self) -> NDArray:
         """Return a copy of the subframecount memory map.
 
         Old LJH versions don't have this: return zeros, unless overridden by derived class (LJHFile_2_2 will be the only one).
@@ -220,7 +222,7 @@ class LJHFile(ABC):
 
     @property
     @abstractmethod
-    def datatimes_raw(self):
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -235,7 +237,7 @@ class LJHFile(ABC):
         raise NotImplementedError("illegal: this is an abstract base class")
 
     @property
-    def datatimes_float(self):
+    def datatimes_float(self) -> NDArray:
         """Compute pulse record times in floating-point (seconds since the 1970 epoch).
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -249,7 +251,7 @@ class LJHFile(ABC):
         """
         return self.datatimes_raw / 1e6
 
-    def read_trace(self, i: int) -> npt.NDArray:
+    def read_trace(self, i: int) -> NDArray:
         """Return a single pulse record from an LJH file.
 
         Parameters
@@ -259,12 +261,12 @@ class LJHFile(ABC):
 
         Returns
         -------
-        npt.ArrayLike
+        ArrayLike
             A view into the pulse record.
         """
         return self._mmap["data"][i]
 
-    def read_trace_with_timing(self, i: int) -> tuple[int, int, npt.NDArray]:
+    def read_trace_with_timing(self, i: int) -> tuple[int, int, NDArray]:
         """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
@@ -341,7 +343,7 @@ class LJHFile(ABC):
 
 class LJHFile_2_2(LJHFile):
     @property
-    def subframecount(self):
+    def subframecount(self) -> NDArray:
         """Return a copy of the subframecount memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -364,7 +366,7 @@ class LJHFile_2_2(LJHFile):
         return subframecount
 
     @property
-    def datatimes_raw(self):
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -377,7 +379,7 @@ class LJHFile_2_2(LJHFile):
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
         usec = np.zeros(self.npulses, dtype=np.int64)
-        assert "posix_usec" in self.dtype.names
+        assert self.dtype.names is not None and "posix_usec" in self.dtype.names
         mmap = self._mmap["posix_usec"]
 
         MAXSEGMENT = 4096
@@ -409,7 +411,7 @@ class LJHFile_2_2(LJHFile):
 
 class LJHFile_2_1(LJHFile):
     @property
-    def datatimes_raw(self):
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively
@@ -435,7 +437,7 @@ class LJHFile_2_1(LJHFile):
         usec = usec * scale + offset
 
         # Add the 4 µs units found in LJH version 2.1
-        assert "internal_us" in self.dtype.names
+        assert self.dtype.names is not None and "internal_us" in self.dtype.names
         first = 0
         mmap = self._mmap["internal_us"]
         while first < self.npulses:
@@ -454,7 +456,7 @@ class LJHFile_2_1(LJHFile):
 
 class LJHFile_2_0(LJHFile):
     @property
-    def datatimes_raw(self):
+    def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
 
         In mass issue #337, we found that computing on the entire memory map at once was prohibitively

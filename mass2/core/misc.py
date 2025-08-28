@@ -1,3 +1,5 @@
+from numpy.typing import ArrayLike, NDArray
+from typing import Any
 import numpy as np
 import pylab as plt
 import polars as pl
@@ -6,35 +8,34 @@ import sys
 import pathlib
 import dill
 import marimo as mo
-from typing import Any
 
 
-def show(fig=None):
+def show(fig: plt.Figure | None = None) -> mo.Html:
     if fig is None:
         fig = plt.gcf()
     return mo.mpl.interactive(fig)
 
 
-def pickle_object(obj, filename):
+def pickle_object(obj: Any, filename: str) -> None:
     with open(filename, "wb") as file:
         dill.dump(obj, file)
 
 
-def unpickle_object(filename):
+def unpickle_object(filename: str) -> Any:
     with open(filename, "rb") as file:
         obj = dill.load(file)
         return obj
 
 
-def smallest_positive_real(arr):
-    def is_positive_real(x):
+def smallest_positive_real(arr: ArrayLike) -> float:
+    def is_positive_real(x: Any) -> bool:
         return x > 0 and np.isreal(x)
 
-    positive_real_numbers = np.array(list(filter(is_positive_real, arr)))
+    positive_real_numbers = np.array(list(filter(is_positive_real, np.asarray(arr))))
     return np.min(positive_real_numbers)
 
 
-def good_series(df, col, good_expr, use_expr: bool | pl.Expr):
+def good_series(df: pl.DataFrame, col: str, good_expr: pl.Expr, use_expr: bool | pl.Expr) -> pl.Series:
     # this uses lazy before filting to hopefully allow polars to only access the data needed to filter
     # and the data needed to output what we want
     good_df = df.lazy().filter(good_expr)
@@ -43,56 +44,62 @@ def good_series(df, col, good_expr, use_expr: bool | pl.Expr):
     return good_df.select(pl.col(col)).collect().to_series()
 
 
-def median_absolute_deviation(x):
-    return np.median(np.abs(x - np.median(x)))
+def median_absolute_deviation(x: ArrayLike) -> float:
+    x = np.asarray(x)
+    return float(np.median(np.abs(x - np.median(x))))
 
 
-def sigma_mad(x):
+def sigma_mad(x: ArrayLike) -> float:
     return median_absolute_deviation(x) * 1.4826
 
 
-def outlier_resistant_nsigma_above_mid(x, nsigma=5):
+def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
+    x = np.asarray(x)
     mid = np.median(x)
     mad = np.median(np.abs(x - mid))
     sigma_mad = mad * 1.4826
     return mid + nsigma * sigma_mad
 
 
-def outlier_resistant_nsigma_range_from_mid(x, nsigma=5):
+def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
+    x = np.asarray(x)
     mid = np.median(x)
     mad = np.median(np.abs(x - mid))
     sigma_mad = mad * 1.4826
     return mid - nsigma * sigma_mad, mid + nsigma * sigma_mad
 
 
-def midpoints_and_step_size(x):
+def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
     """
     return midpoints, step_size"""
+    x = np.asarray(x)
     d = np.diff(x)
-    step_size = d[0]
+    step_size = float(d[0])
     assert np.allclose(d, step_size, atol=1e-9), f"{d=}"
     return x[:-1] + step_size, step_size
 
 
-def hist_of_series(series, bin_edges):
-    bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    counts = series.rename("count").hist(bin_edges, include_category=False, include_breakpoint=False)
+def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, NDArray]:
+    bin_edges = np.asarray(bin_edges)
+    bin_centers, _ = midpoints_and_step_size(bin_edges)
+    counts = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
     return bin_centers, counts.to_numpy().T[0]
 
 
-def plot_hist_of_series(series, bin_edges, axis=None, **plotkwarg):
+def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes | None = None, **plotkwarg: dict) -> plt.Axes:
     if axis is None:
         plt.figure()
         axis = plt.gca()
+    bin_edges = np.asarray(bin_edges)
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    hist = series.rename("count").hist(bin_edges, include_category=False, include_breakpoint=False)
+    hist = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
     return axis
 
 
-def plot_a_vs_b_series(a, b, axis=None, **plotkwarg):
+def plot_a_vs_b_series(a: pl.Series, b: pl.Series, axis: plt.Axes | None = None, **plotkwarg: dict) -> None:
     if axis is None:
         plt.figure()
         axis = plt.gca()
@@ -101,10 +108,10 @@ def plot_a_vs_b_series(a, b, axis=None, **plotkwarg):
     axis.set_ylabel(b.name)
 
 
-def launch_examples():
+def launch_examples() -> None:
     examples_folder = pathlib.Path(__file__).parent.parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
-    examples_folder_relative = examples_folder.relative_to(pathlib.Path.cwd())
+    examples_folder_relative = str(examples_folder.relative_to(pathlib.Path.cwd()))
     # Prepare the command
     command = ["marimo", "edit", examples_folder_relative] + sys.argv[1:]
 
@@ -129,8 +136,8 @@ def launch_examples():
         sys.exit(process.returncode)
 
 
-def root_mean_squared(x, axis=None):
-    return np.sqrt(np.mean(x**2, axis))
+def root_mean_squared(x: ArrayLike, axis: int | tuple[int] | None = None) -> float:
+    return np.sqrt(np.mean(np.asarray(x) ** 2, axis))
 
 
 def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) -> dict[int, Any]:
@@ -146,7 +153,7 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
     return merged_dict
 
 
-def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state"):
+def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state") -> pl.DataFrame:
     if concat_state_col in df1.columns:
         # Continue incrementing from the last known concat_state
         max_state = df1[concat_state_col][-1]
