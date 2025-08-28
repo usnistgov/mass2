@@ -733,7 +733,7 @@ class RoughCalibrationStep(RecipeStep):
         line_names: list[str],
         uncalibrated_col: str,
         calibrated_col: str,
-        ph_smoothing_fwhm: int,
+        ph_smoothing_fwhm: float,
         n_extra: int,
         use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":
@@ -762,7 +762,7 @@ class RoughCalibrationStep(RecipeStep):
         line_heights_allowed: list[list[int]],
         uncalibrated_col: str,
         calibrated_col: str,
-        ph_smoothing_fwhm: int,
+        ph_smoothing_fwhm: float,
         n_extra: int,
         use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":

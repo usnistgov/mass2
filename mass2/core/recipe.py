@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Any
-from collections.abc import Iterable, Callable
+from typing import Any, overload
+from collections.abc import Iterable, Callable, Sequence
 import polars as pl
 import numpy as np
 import pylab as plt
@@ -179,11 +179,12 @@ class SelectStep(RecipeStep):
 
 
 @dataclass(frozen=True)
-class Recipe:
-    # leaves many optimizations on the table, but is very simple
+class Recipe(Sequence[RecipeStep]):
+    steps: list[RecipeStep]
+
+    # TODO: leaves many optimizations on the table, but is very simple
     # 1. we could calculate filt_value_5lag and filt_phase_5lag at the same time
     # 2. we could calculate intermediate quantities optionally and not materialize all of them
-    steps: list[RecipeStep]
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
@@ -195,16 +196,17 @@ class Recipe:
     def new_empty(cls) -> "Recipe":
         return cls([])
 
-    def __getitem__(self, key: int) -> RecipeStep:
+    @overload
+    def __getitem__(self, key: int) -> RecipeStep: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> Sequence[RecipeStep]: ...
+
+    def __getitem__(self, key: int | slice) -> RecipeStep | Sequence[RecipeStep]:
         return self.steps[key]
 
     def __len__(self) -> int:
         return len(self.steps)
-
-    # def copy(self):
-    #     # copy by creating a new list containing all the entires in the old list
-    #     # a list entry, aka a RecipeStep, should be immutable
-    #     return Recipe(self.steps[:])
 
     def with_step(self, step: RecipeStep) -> "Recipe":
         # return a new Recipe with the step added, no mutation!

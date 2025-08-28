@@ -60,7 +60,7 @@ class DriftCorrectStep(RecipeStep):
 
     @classmethod
     def learn(
-        cls, ch: "Channel", indicator_col: str, uncorrected_col: str, corrected_col: str, use_expr: pl.Expr
+        cls, ch: "Channel", indicator_col: str, uncorrected_col: str, corrected_col: str | None, use_expr: pl.Expr
     ) -> "DriftCorrectStep":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_dc"
