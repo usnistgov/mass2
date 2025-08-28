@@ -1,6 +1,8 @@
 import numpy as np
 import scipy as sp
 import scipy.signal
+from numpy.typing import NDArray, ArrayLike
+import h5py
 
 import mass2
 from mass2.mathstat.interpolate import CubicSpline
@@ -13,7 +15,14 @@ LOG = logging.getLogger("mass")
 class PhaseCorrector:
     version = 1
 
-    def __init__(self, phase_uniformifier_x, phase_uniformifier_y, corrections, indicatorName, uncorrectedName):
+    def __init__(
+        self,
+        phase_uniformifier_x: ArrayLike,
+        phase_uniformifier_y: ArrayLike,
+        corrections: list[CubicSpline],
+        indicatorName: str,
+        uncorrectedName: str,
+    ):
         self.corrections = corrections
         self.phase_uniformifier_x = np.array(phase_uniformifier_x)
         self.phase_uniformifier_y = np.array(phase_uniformifier_y)
@@ -21,11 +30,11 @@ class PhaseCorrector:
         self.uncorrectedName = tostr(uncorrectedName)
         self.phase_uniformifier = CubicSpline(self.phase_uniformifier_x, self.phase_uniformifier_y)
 
-    def toHDF5(self, hdf5_group, name="phase_correction", overwrite=False):
+    def toHDF5(self, hdf5_group: h5py.Group, name: str = "phase_correction", overwrite: bool = False) -> None:
         """Write to the given HDF5 group for later recovery from disk (by fromHDF5 class method)."""
         group = hdf5_group.require_group(name)
 
-        def h5group_update(name, vector):
+        def h5group_update(name: str, vector: ArrayLike) -> None:
             if name in group:
                 if overwrite:
                     del group[name]
@@ -42,20 +51,21 @@ class PhaseCorrector:
             h5group_update(f"correction_{i}_x", correction._x)
             h5group_update(f"correction_{i}_y", correction._y)
 
-    def correct(self, phase, ph):
+    def correct(self, phase: ArrayLike, ph: ArrayLike) -> NDArray:
+        ph = np.asarray(ph)
         # attempt to force phases to fall between X and X
-        phase_uniformified = phase - self.phase_uniformifier(ph)
+        phase_uniformified = np.asarray(phase) - self.phase_uniformifier(ph)
         # Compute a correction for each pulse for each correction-line energy
         # For the actual correction, don't let |ph| > 0.6 sample
         phase_clipped = np.clip(phase_uniformified, -0.6, 0.6)
         pheight_corrected = _phase_corrected_filtvals(phase_clipped, ph, self.corrections)
         return pheight_corrected
 
-    def __call__(self, phase_indicator, ph):
+    def __call__(self, phase_indicator: ArrayLike, ph: ArrayLike) -> NDArray:
         return self.correct(phase_indicator, ph)
 
     @classmethod
-    def fromHDF5(cls, hdf5_group, name="phase_correction"):
+    def fromHDF5(cls, hdf5_group: h5py.Group, name: str = "phase_correction") -> "PhaseCorrector":
         x = hdf5_group[f"{name}/phase_uniformifier_x"][()]
         y = hdf5_group[f"{name}/phase_uniformifier_y"][()]
         uncorrectedName = tostr(hdf5_group[f"{name}/uncorrected_name"][()])
@@ -71,7 +81,7 @@ class PhaseCorrector:
         assert version == cls.version
         return cls(x, y, corrections, indicatorName, uncorrectedName)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         s = f"""PhaseCorrector with
         splines at this many levels: {len(self.corrections)}
         phase_uniformifier_x: {self.phase_uniformifier_x}
@@ -81,12 +91,22 @@ class PhaseCorrector:
         return s
 
 
-def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=None, indicatorName="", uncorrectedName=""):
+def phase_correct(
+    phase: ArrayLike,
+    pheight: ArrayLike,
+    ph_peaks: ArrayLike | None = None,
+    method2017: bool = True,
+    kernel_width: float | None = None,
+    indicatorName: str = "",
+    uncorrectedName: str = "",
+) -> PhaseCorrector:
+    phase = np.asarray(phase)
+    pheight = np.asarray(pheight)
     if ph_peaks is None:
         ph_peaks = _find_peaks_heuristic(pheight)
+    ph_peaks = np.asarray(ph_peaks)
     if len(ph_peaks) <= 0:
         raise ValueError("Could not phase_correct because no peaks found")
-    ph_peaks = np.asarray(ph_peaks)
     ph_peaks.sort()
 
     # Compute a correction function at each line in ph_peaks
@@ -100,12 +120,11 @@ def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=N
         )
         corrections.append(nextcorr)
         median_phase.append(mphase)
-    median_phase = np.array(median_phase)
 
     NC = len(corrections)
     if NC > 3:
         phase_uniformifier_x = ph_peaks
-        phase_uniformifier_y = median_phase
+        phase_uniformifier_y = np.array(median_phase)
     else:
         # Too few peaks to spline, so just bin and take the median per bin, then
         # interpolated (approximating) spline through/near these points.
@@ -140,14 +159,14 @@ def phase_correct(phase, pheight, ph_peaks=None, method2017=True, kernel_width=N
 
 
 def _phasecorr_find_alignment(  # noqa: PLR0914
-    phase_indicator,
-    pulse_heights,
-    peak,
-    delta_ph,
-    method2017=False,
-    nf=10,
-    kernel_width=2.0,
-):
+    phase_indicator: NDArray,
+    pulse_heights: NDArray,
+    peak: float,
+    delta_ph: float,
+    method2017: bool = False,
+    nf: int = 10,
+    kernel_width: float = 2.0,
+) -> tuple[CubicSpline, float]:
     """Find the way to align (flatten) `pulse_heights` as a function of `phase_indicator`
     working only within the range [peak-delta_ph, peak+delta_ph].
 
@@ -180,7 +199,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
         for i in range(NBINS):
             knots[i] = np.median(x[bins == i])
 
-            def target(shift):
+            def target(shift: float) -> float:
                 yadj = y.copy()
                 yadj[bins == i] += shift
                 return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)
@@ -198,7 +217,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
         yknot2 = np.zeros(NBINS, dtype=float)
         for i in range(NBINS):
 
-            def target(shift):
+            def target(shift: float) -> float:
                 yadj = ycorr.copy()
                 yadj[bins == i] += shift
                 return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)
@@ -228,7 +247,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
     hists = np.zeros((nf, NBINS), dtype=float)
     for i, P in enumerate(Pctrs):
         use = Pbin == i
-        c, b = np.histogram(pulse_heights[use], NBINS, phrange)
+        c, b = np.histogram(pulse_heights[use], NBINS, range=tuple(phrange))
         hists[i] = c
     bctr = 0.5 * (b[1] - b[0]) + b[:-1]
 
@@ -256,7 +275,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
     return curve, median_phase
 
 
-def _phase_corrected_filtvals(phase, uncorrected, corrections):
+def _phase_corrected_filtvals(phase: NDArray, uncorrected: NDArray, corrections: list[CubicSpline]) -> NDArray:
     """Apply phase correction to `uncorrected`.
 
     Returns:
@@ -289,7 +308,7 @@ def _phase_corrected_filtvals(phase, uncorrected, corrections):
     return corrected
 
 
-def _find_peaks_heuristic(phnorm):
+def _find_peaks_heuristic(phnorm: ArrayLike) -> NDArray:
     """A heuristic method to identify the peaks in a spectrum.
 
     This can be used to design the arrival-time-bias correction. Of course,
@@ -304,10 +323,11 @@ def _find_peaks_heuristic(phnorm):
     Returns:
         ndarray of the various peaks found in the input vector.
     """
+    phnorm = np.asarray(phnorm)
     median_scale = np.median(phnorm)
 
     # First make histogram with bins = 0.2% of median PH
-    hist, bins = np.histogram(phnorm, 1000, [0, 2 * median_scale])
+    hist, bins = np.histogram(phnorm, 1000, range=(0, 2 * median_scale))
     binctr = bins[1:] - 0.5 * (bins[1] - bins[0])
 
     # Scipy continuous wavelet transform
