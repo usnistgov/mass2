@@ -54,6 +54,7 @@ def phase_correct_mass_specific_lines(
     use_expr: pl.Expr,
 ) -> PhaseCorrectMassStep:
     previous_step, previous_step_index = ch.get_step(previous_step_index)
+    assert hasattr(previous_step, "energy2ph")
     (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)
     line_positions = [previous_step.energy2ph(line_energy) for line_energy in line_energies]
     [indicator, uncorrected] = ch.good_serieses([indicator_col, uncorrected_col], use_expr=use_expr)

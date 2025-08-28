@@ -1,22 +1,24 @@
+from dataclasses import dataclass, field
+from typing import Any
+from collections.abc import Callable, Iterable
 import os
 import lmfit
-from dataclasses import dataclass, field
 import polars as pl
 import pylab as plt
 import marimo as mo
 import functools
-from collections.abc import Callable
 import numpy as np
 import time
 
 from .noise_channel import NoiseChannel
-from .recipe import Recipe, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
 from .filter_steps import Filter5LagStep
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .misc import alwaysTrue
 from . import misc
+from ..calibration.line_models import LineModelResult
 import mass2
 
 
@@ -30,7 +32,7 @@ class ChannelHeader:
     df: pl.DataFrame = field(repr=False)
 
     @classmethod
-    def from_ljh_header_df(cls, df):
+    def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
         return cls(
             description=os.path.split(df["Filename"][0])[-1],
             ch_num=df["Channel"][0],
@@ -55,10 +57,10 @@ class Channel:
     transform_raw: Callable | None = None
 
     @property
-    def shortname(self):
+    def shortname(self) -> str:
         return self.header.description
 
-    def mo_stepplots(self):
+    def mo_stepplots(self) -> mo.ui.dropdown:
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
@@ -72,7 +74,7 @@ class Channel:
             label=f"choose step for ch {self.header.ch_num}",
         )
 
-        def show():
+        def show() -> mo.Html:
             return self._mo_stepplots_explicit(mo_ui)
 
         def step_ind():
@@ -88,14 +90,14 @@ class Channel:
         fig = plt.gcf()
         return mo.vstack([mo_ui, misc.show(fig)])
 
-    def get_step(self, index):
+    def get_step(self, index: int) -> tuple[RecipeStep, int]:
         if index < 0:
             # normalize the index to a positive index
             index = len(self.steps) + index
         step = self.steps[index]
         return step, index
 
-    def step_plot(self, step_ind, **kwargs):
+    def step_plot(self, step_ind: int, **kwargs: Any) -> plt.Axes:
         step, step_ind = self.get_step(step_ind)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
@@ -702,9 +704,9 @@ class Channel:
     def multifit_mass_cal(
         self,
         multifit: MultiFit,
-        previous_cal_step_index,
-        calibrated_col,
-        use_expr=pl.lit(True),
+        previous_cal_step_index: int,
+        calibrated_col: str,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         step = MultiFitMassCalibrationStep.learn(
             self,
@@ -733,12 +735,12 @@ class Channel:
 
     def phase_correct_mass_specific_lines(
         self,
-        indicator_col,
-        uncorrected_col,
-        line_names,
-        previous_cal_step_index,
-        corrected_col=None,
-        use_expr=pl.lit(True),
+        indicator_col: str,
+        uncorrected_col: str,
+        line_names: Iterable[str | float],
+        previous_cal_step_index: int,
+        corrected_col: str | None = None,
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
@@ -753,11 +755,11 @@ class Channel:
         )
         return self.with_step(step)
 
-    def as_bad(self, error_type, error_msg, backtrace):
+    def as_bad(self, error_type: type | None, error_msg: str, backtrace: str | None) -> "BadChannel":
         return BadChannel(self, error_type, error_msg, backtrace)
 
-    def save_recipes(self, filename):
-        steps = {self.header.ch_num: self.steps[:]}
+    def save_recipes(self, filename: str) -> dict[int, Recipe]:
+        steps = {self.header.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
@@ -827,7 +829,7 @@ class Channel:
                 plt.ylim(ymin=contents.min())
         print(f"Plotting {len(y)} out of {self.npulses} data points")
 
-    def fit_pulse(self, index=0, col="pulse", verbose=True):
+    def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         pulse = self.df[col][index].to_numpy()
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
         if verbose:
@@ -840,6 +842,6 @@ class Channel:
 @dataclass(frozen=True)
 class BadChannel:
     ch: Channel
-    error_type: type
+    error_type: type | None
     error_msg: str
-    backtrace: str
+    backtrace: str | None
