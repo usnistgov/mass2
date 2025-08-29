@@ -590,7 +590,10 @@ class FilterMaker:
         if cut_pre > 0 or cut_post > 0:
             filt_noconst = np.hstack([np.zeros(cut_pre), filt_noconst, np.zeros(cut_post)])
 
-        vdv = peak / (8 * np.log(2) * variance) ** 0.5
+        if variance <= 0:
+            vdv = np.inf
+        else:
+            vdv = peak / (8 * np.log(2) * variance) ** 0.5
         return Filter5Lag(
             filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
         )
