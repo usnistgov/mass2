@@ -261,6 +261,62 @@ class Channel:
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
 
+    @property
+    def last_avg_pulse(self) -> NDArray | None:
+        """Return the average pulse stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's signal model, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter_maker.signal_model
+        return None
+
+    @property
+    def last_filter(self) -> NDArray | None:
+        """Return the average pulse stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's signal model, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter.values
+        return None
+
+    @property
+    def last_noise_psd(self) -> tuple[NDArray, NDArray] | None:
+        """Return the noise PSD stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        tuple[NDArray, NDArray] | None
+            The last filtering step's (frequencies, noise spectrum), or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep) and step.spectrum is not None:
+                return step.spectrum.frequencies, step.spectrum.psd
+        return None
+
+    @property
+    def last_noise_autocorrelation(self) -> NDArray | None:
+        """Return the noise autocorrelation stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's noise autocorrelation, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep) and step.spectrum is not None:
+                return step.spectrum.autocorr_vec
+        return None
+
     def rough_cal_combinatoric(
         self,
         line_names: list[str],

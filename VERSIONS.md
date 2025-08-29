@@ -19,6 +19,7 @@
 * Figured out how to render matplotlib images in documentation with `mkdocs-matplotlib` plugin (issue 47).
 * Reorganized documentation and make a Getting Started page (issues 45+46).
 * Added complete modern type annotations, to run with zero mypy errors (issue 56).
+* Add convenience functions to return and plot key facts from a Channel's Recipe (issue 59).
 
 
 ## Mass Version 1 (2010-2025)
