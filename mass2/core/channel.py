@@ -17,7 +17,7 @@ from .noise_channel import NoiseChannel
 from .recipe import Recipe, RecipeStep, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
-from .filter_steps import Filter5LagStep
+from .filter_steps import OptimalFilterStep
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .misc import alwaysTrue
 from .offfiles import OffFile
@@ -522,7 +522,7 @@ class Channel:
             filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
-        step = Filter5LagStep(
+        step = OptimalFilterStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,

@@ -11,7 +11,7 @@ from mass2.core.optimal_filtering import Filter, FilterMaker
 
 
 @dataclass(frozen=True)
-class Filter5LagStep(RecipeStep):
+class OptimalFilterStep(RecipeStep):
     filter: Filter
     spectrum: NoiseResult | None
     filter_maker: "FilterMaker"
@@ -33,5 +33,5 @@ class Filter5LagStep(RecipeStep):
         self.filter.plot()
         return plt.gca()
 
-    def drop_debug(self) -> "Filter5LagStep":
+    def drop_debug(self) -> "OptimalFilterStep":
         return dataclasses.replace(self, spectrum=None)

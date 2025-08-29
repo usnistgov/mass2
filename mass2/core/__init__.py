@@ -26,7 +26,7 @@ from .multifit import (
     MultiFitMassCalibrationStep,
 )
 from . import filter_steps
-from .filter_steps import Filter5LagStep
+from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
 from .drift_correction import drift_correct, DriftCorrectStep
 from . import rough_cal

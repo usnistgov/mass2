@@ -1,4 +1,5 @@
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+import dataclasses
 from pathlib import Path
 from typing import ClassVar, Any
 from numpy.typing import NDArray
@@ -199,7 +200,7 @@ class LJHFile(ABC):
             offset=self.header_size,
             shape=(npulses,),
         )
-        return replace(
+        return dataclasses.replace(
             self,
             npulses=npulses,
             _mmap=mmap,

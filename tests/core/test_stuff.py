@@ -137,8 +137,8 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     df = pl.DataFrame({"pulse": pulse_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     ch = ch.filter5lag()
-    step: mass2.core.Filter5LagStep = ch.steps[-1]
-    assert isinstance(step, mass2.core.Filter5LagStep)
+    step: mass2.core.OptimalFilterStep = ch.steps[-1]
+    assert isinstance(step, mass2.core.OptimalFilterStep)
     filter: mass2.core.Filter = step.filter
     assert filter.predicted_v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
     # test that the mass normaliztion in place
