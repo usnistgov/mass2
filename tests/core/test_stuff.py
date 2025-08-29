@@ -148,6 +148,10 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     assert Maxsignal / (2.355 * np.std(ch.df["5lagy"].to_numpy())) == pytest.approx(mass_filter.predicted_v_over_dv, rel=5e-2)
     assert filter._filter_type == "5lag"
 
+    assert isinstance(ch.last_avg_pulse, np.ndarray)
+    assert isinstance(ch.last_noise_autocorrelation, np.ndarray)
+    assert isinstance(ch.last_noise_psd[1], np.ndarray)
+
 
 def test_noise_autocorr():
     rng = np.random.default_rng()
