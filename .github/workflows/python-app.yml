@@ -41,8 +41,20 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
+        version: "0.8.14"
         python-version: ${{ matrix.python-version }}
         enable-cache: true
+        cache-dependency-glob: |
+          **/uv.lock
+          **/pyproject.toml
+
+    - name: Report if the cache was restored
+      if: steps.setup-uv.outputs.cache-hit == 'true'
+      run: echo "Cache was restored"
+
+    - name: Report if the cache was NOT restored
+      if: steps.setup-uv.outputs.cache-hit != 'true'
+      run: echo "Cache was restored"
 
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
