@@ -17,7 +17,7 @@ from collections.abc import Callable
 import dataclasses
 from dataclasses import dataclass
 
-from mass2.mathstat.interpolate import CubicSpline, GPRSpline
+from ..mathstat.interpolate import CubicSpline, GPRSpline
 from .fluorescence_lines import STANDARD_FEATURES
 
 
@@ -414,7 +414,7 @@ class EnergyCalibrationMaker:
             dropped_energy = self.energy[i]
             drop_one_maker = self._remove_cal_point_idx(i)
             drop_one_cal = drop_one_maker.make_calibration(curvename=curvename, approximate=approximate, powerlaw=powerlaw)
-            predicted_energy = drop_one_cal.ph2energy(dropped_pulseheight)
+            predicted_energy = drop_one_cal.ph2energy(dropped_pulseheight).item(0)
             drop_one_energy_diff[i] = predicted_energy - dropped_energy
         return self.energy, drop_one_energy_diff
 
