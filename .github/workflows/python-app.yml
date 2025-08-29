@@ -42,6 +42,7 @@ jobs:
       uses: astral-sh/setup-uv@v6
       with:
         version: "0.8.14"
+        activate-environment: true
         python-version: ${{ matrix.python-version }}
         enable-cache: true
         cache-dependency-glob: |
@@ -54,7 +55,7 @@ jobs:
 
     - name: Report if the cache was NOT restored
       if: steps.setup-uv.outputs.cache-hit != 'true'
-      run: echo "Cache was restored"
+      run: echo "Cache was NOT restored"
 
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
