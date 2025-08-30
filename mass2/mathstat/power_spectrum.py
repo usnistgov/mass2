@@ -276,7 +276,6 @@ def computeSpectrum(
         w = np.array(window)
     else:
         raise TypeError("Window not understood")
-    print(f"Trying {N=}, {M=}")
 
     if segfactor == 1:
         spec = PowerSpectrum(M, dt=dt)
