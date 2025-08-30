@@ -241,12 +241,13 @@ class Channels:
     @classmethod
     def from_ljh_folder(
         cls,
-        pulse_folder: str,
-        noise_folder: str | None = None,
+        pulse_folder: str | Path,
+        noise_folder: str | Path | None = None,
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
     ) -> "Channels":
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
+        pulse_folder = str(pulse_folder)
         if exclude_ch_nums is None:
             exclude_ch_nums = []
         if noise_folder is None:
@@ -256,6 +257,7 @@ class Channels:
             pairs = [(path, "") for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
+            noise_folder = str(noise_folder)
             pairs = ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
