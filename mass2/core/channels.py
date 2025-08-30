@@ -248,15 +248,15 @@ class Channels:
         for key, channel in self.channels.items():
             try:
                 new_channels[key] = f(channel)
-            except KeyboardInterrupt:
-                raise
+            except KeyboardInterrupt as kint:
+                raise kint
             except Exception as ex:
                 error_type: type = type(ex)
                 error_message: str = str(ex)
                 backtrace: str = traceback.format_exc()
                 if allow_throw:
                     raise
-                print(f"{key=} {channel=} failed this step")
+                print(f"{key=} {channel=} failed the step {f}")
                 print(f"{error_type=}")
                 print(f"{error_message=}")
                 new_bad_channels[key] = channel.as_bad(error_type, error_message, backtrace)
