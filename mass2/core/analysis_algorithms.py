@@ -201,8 +201,8 @@ class HistogramSmoother:
         # Clamp nbins_guess to at least min_nbins
         clamped_nbins = np.clip(nbins_guess, min_nbins, max_nbins)
         nbins_forced_to_power_of_2 = int(2 ** np.ceil(np.log2(clamped_nbins)))
-        if nbins_forced_to_power_of_2 == max_nbins:
-            print(f"Warning: HistogramSmoother (for drift correct) Limiting histogram bins to {max_nbins} (requested {nbins_guess})")
+        # if nbins_forced_to_power_of_2 == max_nbins:
+        #     print(f"Warning: HistogramSmoother (for drift correct) Limiting histogram bins to {max_nbins} (requested {nbins_guess})")
         self.nbins = nbins_forced_to_power_of_2
         self.stepsize = dlimits / self.nbins
 
