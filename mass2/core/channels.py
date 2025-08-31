@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import dataclasses
 from collections.abc import Callable, Iterable
 from numpy.typing import ArrayLike
 from typing import Any
@@ -31,6 +32,26 @@ class Channels:
     def ch0(self) -> Channel:
         assert len(self.channels) > 0, "channels must be non-empty"
         return next(iter(self.channels.values()))
+
+    def with_more_channels(self, more: "Channels") -> "Channels":
+        """Return a Channels object with additional Channels in it.
+        New channels with the same number will overrule existing ones.
+
+        Parameters
+        ----------
+        more : Channels
+            Another Channels object, to be added
+
+        Returns
+        -------
+        Channels
+            The replacement
+        """
+        channels = self.channels.copy()
+        channels.update(more.channels)
+        bad = self.bad_channels.copy()
+        bad.update(more.bad_channels)
+        return dataclasses.replace(self, channels=channels, bad_channels=bad)
 
     @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
@@ -190,7 +211,7 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: list[tuple[str, str]], description: str) -> "Channels":
+    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
