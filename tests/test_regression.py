@@ -6,10 +6,12 @@ import pulsedata
 
 def load_data():
     pairs = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
-    n = pairs.noise_folder
-    p = pairs.pulse_folder / ".." / "0001"
-    data = mass2.Channels.from_ljh_folder(p, n)
-    return data
+    shorter_pulse_files = pairs.pulse_folder / ".." / "0001"
+    data1 = mass2.Channels.from_ljh_folder(shorter_pulse_files, pairs.noise_folder)
+
+    pairs = pulsedata.pulse_noise_ljh_pairs["regression"]
+    data2 = mass2.Channels.from_ljh_folder(pairs.pulse_folder, pairs.noise_folder)
+    return data1.with_more_channels(data2)
 
 
 def all_steps(ch: mass2.Channel) -> mass2.Channel:
@@ -29,10 +31,9 @@ def test_analysis_regression():
     expected_df = pl.read_parquet("tests/regression_test_data.parquet")
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
-        found = ch.df.drop("pulse", "timestamp", "subframecount")
-        print(expect)
-        print(found)
+        found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
         assert np.allclose(expect, found)
+        print(f"Verified {ch_num=} with {len(ch.df)} pulses, file: {ch.header.df['Filename'][0]}")
 
 
 ###########################################################################
@@ -48,7 +49,7 @@ def store_analysis_regression():
     data = data.map(all_steps)
     frames = []
     for ch_num, ch in data.channels.items():
-        df = ch.df.drop("pulse", "timestamp", "subframecount").with_columns(ch_num=pl.lit(ch_num))
+        df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False).with_columns(ch_num=pl.lit(ch_num))
         frames.append(df)
     df = pl.concat(frames)
     df.write_parquet("regression_test_data.parquet")
