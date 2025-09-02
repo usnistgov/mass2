@@ -103,3 +103,15 @@ exclude = [
     "mass2/core/mass2notebook.py"
     ]
 disallow_untyped_defs = true
+
+[tool.interrogate]
+exclude = [
+    "mass2/_version.py", "setup.py", "mass2/data/notebook_starter_template.py",
+    "tests", "examples", "site", "build", "*/make_logo.py"
+    ]
+ignore_nested = true
+ignore_init_method = true
+ignore_decorators = ["property", "cached_property", "indexed_property"]
+ignore_names = ["__str__", "__repr__", "__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"]
+docstring-convention = "numpy"
+verbose = 1
