@@ -1,6 +1,9 @@
+"""
+Classes and functions to correct for arrival-time bias in optimal filtering.
+"""
+
 import numpy as np
 import scipy as sp
-import scipy.signal
 from numpy.typing import NDArray, ArrayLike
 import h5py
 
@@ -13,6 +16,8 @@ LOG = logging.getLogger("mass")
 
 
 class PhaseCorrector:
+    """A class to correct for arrival-time bias in optimal filtering."""
+
     version = 1
 
     def __init__(
@@ -35,6 +40,7 @@ class PhaseCorrector:
         group = hdf5_group.require_group(name)
 
         def h5group_update(name: str, vector: ArrayLike) -> None:
+            "Overwrite or create a dataset in the given group."
             if name in group:
                 if overwrite:
                     del group[name]
@@ -52,6 +58,7 @@ class PhaseCorrector:
             h5group_update(f"correction_{i}_y", correction._y)
 
     def correct(self, phase: ArrayLike, ph: ArrayLike) -> NDArray:
+        """Apply the phase correction to the given data `ph`."""
         ph = np.asarray(ph)
         # attempt to force phases to fall between X and X
         phase_uniformified = np.asarray(phase) - self.phase_uniformifier(ph)
@@ -62,10 +69,12 @@ class PhaseCorrector:
         return pheight_corrected
 
     def __call__(self, phase_indicator: ArrayLike, ph: ArrayLike) -> NDArray:
+        "Equivalent to self.correct()"
         return self.correct(phase_indicator, ph)
 
     @classmethod
     def fromHDF5(cls, hdf5_group: h5py.Group, name: str = "phase_correction") -> "PhaseCorrector":
+        """Recover a PhaseCorrector object from the given HDF5 group."""
         x = hdf5_group[f"{name}/phase_uniformifier_x"][()]
         y = hdf5_group[f"{name}/phase_uniformifier_y"][()]
         uncorrectedName = tostr(hdf5_group[f"{name}/uncorrected_name"][()])
@@ -82,6 +91,7 @@ class PhaseCorrector:
         return cls(x, y, corrections, indicatorName, uncorrectedName)
 
     def __repr__(self) -> str:
+        """String representation of this object."""
         s = f"""PhaseCorrector with
         splines at this many levels: {len(self.corrections)}
         phase_uniformifier_x: {self.phase_uniformifier_x}
@@ -100,6 +110,7 @@ def phase_correct(
     indicatorName: str = "",
     uncorrectedName: str = "",
 ) -> PhaseCorrector:
+    """Create a PhaseCorrector object to correct for arrival-time bias in optimal filtering."""
     phase = np.asarray(phase)
     pheight = np.asarray(pheight)
     if ph_peaks is None:
@@ -200,6 +211,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
             knots[i] = np.median(x[bins == i])
 
             def target(shift: float) -> float:
+                """Cost function to minimize: the entropy of the adjusted pulse heights."""
                 yadj = y.copy()
                 yadj[bins == i] += shift
                 return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)
@@ -218,6 +230,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
         for i in range(NBINS):
 
             def target(shift: float) -> float:
+                """Cost function to minimize: the entropy of the adjusted pulse heights."""
                 yadj = ycorr.copy()
                 yadj[bins == i] += shift
                 return mass2.mathstat.entropy.laplace_entropy(yadj, kernel_width)

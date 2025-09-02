@@ -60,12 +60,18 @@ class CubicSpline:
     def __init__(self, x: ArrayLike, y: ArrayLike, yprime1: float | None = None, yprimeN: float | None = None):
         """Create an exact cubic spline representation for the function y(x).
 
-        'Exact' means that the spline will strictly pass through the given points.
-
-        The user can give specific values for the slope at either boundary through
-        <yprime1> and <yprimeN>, or can use the default value of None. The
-        slope of None means to use 'natural boundary conditions' by fixing the
-        second derivative to zero at that boundary.
+        Parameters
+        ----------
+        x : ArrayLike
+            Indepdendent variable values. Will be sorted if not increasing.
+        y : ArrayLike
+            Dependent variable values.
+        yprime1 : float | None, optional
+            First derivative at the lower-x boundary, by default None
+        yprimeN : float | None, optional
+            First derivative at the upper-x boundary, by default None.
+            slope of None means to use 'natural boundary conditions' by fixing the
+            second derivative to zero at that boundary.
         """
         argsort = np.argsort(x)
         self._x = np.array(x, dtype=float)[argsort]
@@ -77,6 +83,7 @@ class CubicSpline:
         self._compute_y2()
 
     def _compute_y2(self) -> None:
+        """Compute the second derivatives at the knots."""
         self.ystep = self._y[1:] - self._y[:-1]
         self.xstep = self._x[1:] - self._x[:-1]
 
@@ -115,6 +122,20 @@ class CubicSpline:
             self.yprimeN = self.ystep[-1] / self.xstep[-1] + self.xstep[-1] * (self._y2[-2] / 6.0 + self._y2[-1] / 3.0)
 
     def __call__(self, x: ArrayLike | float, der: int = 0) -> NDArray:
+        """Return the value of the cubic spline (or its derivative) at x.
+
+        Parameters
+        ----------
+        x : ArrayLike | float
+            Independent variable value(s) at which to evaluate the spline.
+        der : int, optional
+            Derivative order, by default 0
+
+        Returns
+        -------
+        NDArray
+            Spline result
+        """
         scalar = np.isscalar(x)
         x = np.asarray(x)
         if x.size == 0:
@@ -178,6 +199,7 @@ class CubicSpline:
         return result
 
     def variance(self, xtest: ArrayLike) -> NDArray:  # noqa: PLR6301
+        """Return a dummy estimate of the variance at points `xtest`."""
         return np.zeros_like(xtest)
 
 
@@ -214,6 +236,21 @@ class GPRSpline(CubicSpline):
     """
 
     def __init__(self, x: ArrayLike, y: ArrayLike, dy: ArrayLike, dx: ArrayLike | None = None, sigmaf: float | None = None):
+        """Set up the Gaussian Process Regression spline.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Indepdendent variable values. Will be sorted if not increasing.
+        y : ArrayLike
+            Dependent variable values.
+        dy : ArrayLike
+            Uncertainties in y values.
+        dx : ArrayLike | None, optional
+            Uncertainties in x values, by default None
+        sigmaf : float | None, optional
+            Allowed function variance, or None to maximize the data likelihood, by default None
+        """
         self.x = np.array(x)
         self.y = np.array(y)
         self.dy = np.array(dy)
@@ -270,6 +307,18 @@ class GPRSpline(CubicSpline):
         raise (ValueError("Could not maximimze the marginal likelihood"))
 
     def _marginal_like(self, sigmaf: float) -> float:
+        """Compute the marginal likelihood of the data given sigmaf.
+
+        Parameters
+        ----------
+        sigmaf : float
+            The square root of the function variance
+
+        Returns
+        -------
+        float
+            The marginal likelihood (up to an additive constant)
+        """
         H = np.vstack((np.ones_like(self.x), self.x))
         K = np.zeros((self.Nk, self.Nk), dtype=float)
         sf2 = sigmaf**2
@@ -362,6 +411,27 @@ class NaturalBsplineBasis:
         self.padknots = padknots
 
     def __call__(self, x: ArrayLike, id: int, der: int = 0) -> NDArray:
+        """Compute the Basis-spline at the points `x` for basis function `id`, or its derivative of degree `der`.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Independent variable values at which to evaluate the basis function.
+        id : int
+            Which basis function to evaluate, 0 <= id < Nk
+        der : int, optional
+            Derivative degree, by default 0
+
+        Returns
+        -------
+        NDArray
+            Basis function values (or derivative values) at `x`.
+
+        Raises
+        ------
+        ValueError
+            If `id` is not in the range 0 <= id < Nk
+        """
         if id < 0 or id >= self.Nk:
             raise ValueError(f"Require 0 <= id < Nk={self.Nk}")
         coef = np.zeros(self.Nk + 2, dtype=float)
@@ -476,9 +546,12 @@ class SmoothingSpline:
         rhs = np.dot(self.N0.T, Dinv * self.y)
 
         def best_params(p: NDArray) -> NDArray:
+            """Return the best-fit parameters for a given curvature penalty p."""
             return np.linalg.solve(p * (lhs - self.Omega) + self.Omega, p * rhs)
 
         def chisq_difference(p: NDArray, target_chisq: float) -> float:
+            """Return the difference between the chi-squared for curvature penalty p
+            and the target chi-squared."""
             # If curvature is too small, the computation can become singular.
             # Avoid this by returning a crazy-high chisquared, as needed.
             try:
@@ -539,7 +612,29 @@ class SmoothingSpline:
 
 
 class SmoothingSplineLog:
+    """A smoothing spline in log-log space."""
+
     def __init__(self, x: ArrayLike, y: ArrayLike, dy: ArrayLike, dx: ArrayLike | None = None, maxchisq: float | None = None):
+        """Set up a smoothing spline in log-log space.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Independent variable values. Must be positive and will be sorted if not increasing.
+        y : ArrayLike
+            Dependent variable values. Must be positive.
+        dy : ArrayLike
+            Uncertainties in y values.
+        dx : ArrayLike | None, optional
+            Uncertainties in x values, by default None
+        maxchisq : float | None, optional
+            Maximum allowed chi^2 value, by default None
+
+        Raises
+        ------
+        ValueError
+            If any x or y values are not positive.
+        """
         x = np.asarray(x)
         y = np.asarray(y)
         dy = np.asarray(dy)
@@ -550,4 +645,18 @@ class SmoothingSplineLog:
         self.linear_model = SmoothingSpline(np.log(x), np.log(y), dy / y, dx, maxchisq=maxchisq)
 
     def __call__(self, x: ArrayLike, der: int = 0) -> NDArray:
+        """Compute the log-log smoothing spline or its derivative at the points `x`.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            Independent variable values at which to evaluate the spline.
+        der : int, optional
+            Derivative degree, by default 0
+
+        Returns
+        -------
+        NDArray
+            Smoothing spline values (or derivative values) at `x`.
+        """
         return np.exp(self.linear_model(np.log(x), der=der))

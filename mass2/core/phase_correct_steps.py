@@ -1,3 +1,7 @@
+"""
+Phase correction step, Mass-style.
+"""
+
 import polars as pl
 import pylab as plt
 from dataclasses import dataclass
@@ -11,12 +15,15 @@ from .phase_correct import PhaseCorrector
 
 @dataclass(frozen=True)
 class PhaseCorrectMassStep(RecipeStep):
+    """Perform a Mass-style phase correction step."""
+
     line_names: list[str]
     line_energies: list[float]
     previous_step_index: int
     phase_corrector: PhaseCorrector
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the phase-corrected pulse height and return a new DataFrame."""
         # since we only need to load two columns I'm assuming we can fit them in memory and just
         # loading them whole
         # if it becomes an issues, use iter_slices or
@@ -31,6 +38,7 @@ class PhaseCorrectMassStep(RecipeStep):
         return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        """Make a diagnostic plot of the phase correction."""
         indicator_col, uncorrected_col = self.inputs
         df_small = df_after.lazy().filter(self.good_expr).filter(self.use_expr).select(self.inputs + self.output).collect()
         mass2.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
@@ -53,6 +61,7 @@ def phase_correct_mass_specific_lines(
     line_names: Iterable[str | float],
     use_expr: pl.Expr,
 ) -> PhaseCorrectMassStep:
+    """Perform a Mass-style phase correction step using specific lines."""
     previous_step, previous_step_index = ch.get_step(previous_step_index)
     assert hasattr(previous_step, "energy2ph")
     (line_names, line_energies) = mass2.calibration.algorithms.line_names_and_energies(line_names)

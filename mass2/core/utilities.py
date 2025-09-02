@@ -16,6 +16,8 @@ import logging
 
 
 class InlineUpdater:
+    """A class to print progress updates to the terminal."""
+
     def __init__(self, baseString: str):
         self.fracDone = 0.0
         self.minElapseTimeForCalc = 1.0
@@ -24,6 +26,7 @@ class InlineUpdater:
         self.logger = logging.getLogger("mass")
 
     def update(self, fracDone: float) -> None:
+        """Update the progress to the given fraction done."""
         if self.logger.getEffectiveLevel() >= logging.WARNING:
             return
         self.fracDone = fracDone
@@ -34,6 +37,7 @@ class InlineUpdater:
 
     @property
     def timeRemaining(self) -> float:
+        """Estimate of time remaining in seconds, or -1 if not enough information yet."""
         if self.elapsedTimeSec > self.minElapseTimeForCalc and self.fracDone > 0:
             fracRemaining = 1 - self.fracDone
             rate = self.fracDone / self.elapsedTimeSec
@@ -46,6 +50,7 @@ class InlineUpdater:
 
     @property
     def timeRemainingStr(self) -> str:
+        """String version of time-remaining estimate."""
         timeRemaining = self.timeRemaining
         if timeRemaining == -1:
             return "?"
@@ -54,22 +59,32 @@ class InlineUpdater:
 
     @property
     def elapsedTimeSec(self) -> float:
+        """Elapsed time in seconds since the creation of this object."""
         return time.time() - self.startTime
 
     @property
     def elapsedTimeStr(self) -> str:
+        """String version of elapsed time."""
         return "%.1f min" % (self.elapsedTimeSec / 60.0)
 
 
 class NullUpdater:
+    """A do-nothing updater class with the same API as InlineUpdater."""
+
     def update(self, f: float) -> None:
+        """Do nothing."""
         pass
 
 
 def show_progress(name: str) -> Callable:
+    """A decorator to show progress updates for another function."""
+
     def decorator(func: Callable) -> Callable:
+        """A decorator to show progress updates for another function."""
+
         @functools.wraps(func)
         def work(self: Any, *args: Any, **kwargs: Any) -> None:
+            """Update the progress of the wrapped function."""
             try:
                 if "sphinx" in sys.modules:  # supress output during doctests
                     print_updater = NullUpdater()

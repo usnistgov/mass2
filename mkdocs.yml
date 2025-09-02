@@ -13,7 +13,8 @@ nav:
   - X-ray efficiency models: xray_efficiency_models.md
   - Digging deeper:
     - LJH file format: LJHfiles.md
-    - Docstrings: docstrings.md
+    - Core docstrings: docstrings.md
+    - Other docstrings: docstrings2.md
     - Testing: tests.md
   - About: about.md
 

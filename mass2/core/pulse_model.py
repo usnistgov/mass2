@@ -1,3 +1,7 @@
+"""
+Pulse model object, to hold a low-dimensional linear basis able to express all normal pulses,
+"""
+
 from numpy.typing import NDArray
 import pylab as plt
 import numpy as np
@@ -65,6 +69,7 @@ class PulseModel:
         self.noise_autocorr = noise_autocorr
 
     def toHDF5(self, hdf5_group: h5py.Group, save_inverted: bool) -> None:
+        """Save the pulse model to an HDF5 group."""
         projectors, basis = self.projectors[()], self.basis[()]
         if save_inverted:
             # flip every component except the mean component if data is being inverted
@@ -91,6 +96,7 @@ class PulseModel:
 
     @classmethod
     def fromHDF5(cls, hdf5_group: h5py.Group) -> "PulseModel":
+        """Restore a pulse model from an HDF5 group."""
         projectors = hdf5_group["svdbasis/projectors"][()]
         n_basis = projectors.shape[0]
         basis = hdf5_group["svdbasis/basis"][()]
@@ -166,6 +172,7 @@ class PulseModel:
         return projectors, basis
 
     def labels(self) -> list[str]:
+        """Return a list of labels for the basis elements."""
         labels = ["const", "deriv", "pulse"]
         for i in range(self.n_basis - 3):
             if i > self.n_basis - 3 - self.extra_n_basis_5lag:
@@ -175,6 +182,7 @@ class PulseModel:
         return labels
 
     def plot(self, fig1: plt.Axes | None = None, fig2: plt.Axes | None = None) -> None:
+        """Plot a pulse model"""
         # plots information about a pulse model
         # fig1 and fig2 are optional matplotlib.pyplot (plt) figures if you need to embed the plots.
         # you can pass in the reference like fig=plt.figure() call or the figure's number, e.g. fig.number
@@ -230,6 +238,3 @@ class PulseModel:
         plt.plot(mp[:, 0], label="modeled pulse index 0")
         plt.legend()
         plt.title("modeled pulse vs true pulse")
-
-
-# how well are the the 5lag filters represented

@@ -31,21 +31,33 @@ DTYPE = np.float64
 
 
 def laplace_entropy(x_in: ArrayLike, w: float = 1.0, approx_mode: str = "size") -> float:
-    r"""Compute the entropy of data set `x` where the
-    kernel is the Laplace kernel k(x) \propto exp(-abs(x-x0)/w).
+    """Compute the entropy of data set `x` where the kernel is the Laplace kernel,
+    $k(x) \\propto$ exp(-abs(x-x0)/w).
 
-    Args:
-        x_in (array): The vector of data of which we want the entropy.
-        w (double): The width (exponential scale length) of the Laplace distribution
-            to be used in kernel-density estimation.
-        approx_mode (string): How to balance execution speed and accuracy
-            (default "size").
+    Parameters
+    ----------
+    x_in : ArrayLike
+        The vector of data of which we want the entropy.
+    w : float, optional
+        The width (exponential scale length) of the Laplace distribution
+            to be used in kernel-density estimation, by default 1.0
+    approx_mode : str, optional
+        How to balance execution speed and accuracy, by default "size"
+        The `approx_mode` can be one of:
+        ``exact``  The exact integral is computed (can take ~0.25 sec per 10^6 values).
+        ``approx`` The integral is approximated by histogramming the data, smoothing
+                that, and using Simpson's rule on the PDF samples that result.
+        ``size``   Uses "approx" if len(x)>200000, or "exact" otherwise.
 
-    The `approx_mode` can be one of:
-    ``exact``  The exact integral is computed (can take ~0.25 sec per 10^6 values).
-    ``approx`` The integral is approximated by histogramming the data, smoothing
-               that, and using Simpson's rule on the PDF samples that result.
-    ``size``   Uses "approx" if len(x)>200000, or "exact" otherwise.
+    Returns
+    -------
+    float
+        The Laplace-kernel entropy.
+
+    Raises
+    ------
+    ValueError
+        If the input array `x` has no values, or `w` is not positive.
     """
     x_in = np.asarray(x_in)
     N = len(x_in)
@@ -68,6 +80,21 @@ def laplace_entropy(x_in: ArrayLike, w: float = 1.0, approx_mode: str = "size") 
 
 @njit
 def laplace_entropy_array(x: ArrayLike, w: float = 1.0) -> float:
+    """Compute the entropy of data set `x` where the kernel is the Laplace kernel,
+    $k(x) \\propto$ exp(-abs(x-x0)/w).
+
+    Parameters
+    ----------
+    x_in : ArrayLike
+        The vector of data of which we want the entropy.
+    w : float, optional
+        The width (exponential scale length) of the Laplace distribution
+            to be used in kernel-density estimation, by default 1.0
+    Returns
+    -------
+    float
+        The exact Laplace-kernel entropy, regardless of the input array size.
+    """
     x = np.asarray(x)
     N = len(x)
     c = np.zeros(N, dtype=DTYPE)
@@ -96,8 +123,21 @@ def laplace_entropy_array(x: ArrayLike, w: float = 1.0) -> float:
 
 
 def laplace_entropy_approx(x: ArrayLike, w: float = 1.0) -> float:
-    """Approximate the entropy with a binned histogram and the Laplace-distribution
-    kernel-density estimator of the probability distribtion."""
+    """Approximage the entropy of data set `x` with a binned histogram and the Laplace-distribution
+    kernel-density estimator of the probability distribtion.
+
+    Parameters
+    ----------
+    x_in : ArrayLike
+        The vector of data of which we want the entropy.
+    w : float, optional
+        The width (exponential scale length) of the Laplace distribution
+            to be used in kernel-density estimation, by default 1.0
+    Returns
+    -------
+    float
+        The approximate Laplace-kernel entropy.
+    """
     EXTEND_DATA = 5 * w
     BINS_PER_W = 20
     KERNEL_WIDTH_IN_WS = 15.0
@@ -126,13 +166,29 @@ def laplace_entropy_approx(x: ArrayLike, w: float = 1.0) -> float:
 
 
 def _merge_orderedlists(x1_in: ArrayLike, x2_in: ArrayLike) -> tuple[NDArray, NDArray]:
-    """Given two lists that are assumed to be sorted (in ascending order),
-    return `(x, wasfirst)` where `x` is an array that contains all the values
+    """Merge two lists that are assumed to be sorted (in ascending order).
+    Behavior is undefined if either `x1` or `x2` is not sorted.
+
+    Parameters
+    ----------
+    x1_in : ArrayLike
+        One sorted input list
+    x2_in : ArrayLike
+        The other sorted input list
+
+    Returns
+    -------
+    tuple[NDArray, NDArray]
+        `(x, wasfirst)`, where `x` is an array that contains all the values
     from `x1` and `x2` in sorted order, and where `wasfirst` is a boolean array
     whose values are True if and only if the corresponding value of `x` was
     found in the `x1` input.
 
-    Behavior is undefined if either `x1` or `x2` is not sorted.
+
+    Raises
+    ------
+    ValueError
+        If both lists are empty
     """
 
     x1 = np.asarray(x1_in, dtype=DTYPE)
@@ -154,6 +210,21 @@ def _merge_orderedlists(x1_in: ArrayLike, x2_in: ArrayLike) -> tuple[NDArray, ND
 
 @njit
 def _merge_orderedlists_arrays(out: NDArray, wasfirst: NDArray, x1: ArrayLike, x2: ArrayLike) -> None:
+    """Merge two lists that are assumed to be sorted (in ascending order).
+    Behavior is undefined if either `x1` or `x2` is not sorted.
+
+    Parameters
+    ----------
+    out : NDArray
+        The merged list
+    wasfirst : NDArray
+        boolean array whose values are True if and only if the corresponding value of `x` was
+        found in the `x1` input.
+    x1 : ArrayLike
+        One sorted input list
+    x2 : ArrayLike
+        The other sorted input list
+    """
     x1 = np.asarray(x1)
     x2 = np.asarray(x2)
     N1 = len(x1)
@@ -244,6 +315,32 @@ def laplace_cross_entropy(x: ArrayLike, y: ArrayLike, w: float = 1.0, approx_mod
 
 
 def laplace_cross_entropy_arrays(x: ArrayLike, y: ArrayLike) -> float:  # noqa: PLR0914
+    """Compute the cross-entropy H(P, Q) between two empirical distributions P and Q,
+    where P is estimated from data `x` using a Laplace kernel, and Q is estimated
+    from data `y` using a piecewise-constant (top-hat) kernel.
+
+    This function assumes both `x` and `y` are sorted and scaled by the kernel width.
+    The cross-entropy is computed exactly by integrating over all points where the
+    estimated densities change due to the presence of data points in `x` or `y`.
+
+    Parameters
+    ----------
+    x : ArrayLike
+        Sorted array of data points for the P distribution, scaled by kernel width.
+    y : ArrayLike
+        Sorted array of data points for the Q distribution, scaled by kernel width.
+
+    Returns
+    -------
+    float
+        The exact cross-entropy H(P, Q) between the two distributions.
+
+    Notes
+    -----
+    - The Laplace kernel is defined as k(x) ∝ exp(-abs(x-x0)/w).
+    - The Q distribution uses a top-hat kernel with a nonzero floor to avoid divergences.
+    - This function is intended for internal use; see `laplace_cross_entropy` for the public API.
+    """
     # List of all places where q(u) increases or decreases because of a y-point.
     Qstepwidth = 2 * np.sqrt(6)
     ynodes, qstep_is_up = _merge_orderedlists(y - 0.5 * Qstepwidth, y + 0.5 * Qstepwidth)
@@ -314,8 +411,33 @@ def laplace_cross_entropy_arrays(x: ArrayLike, y: ArrayLike) -> float:  # noqa: 
 
 
 def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> float:
-    """Approximate the cross-entropy with a binned histogram and the
-    Laplace-distribution kernel-density estimator of the probability distribtion.
+    """
+    Approximate the cross-entropy H(P, Q) between two empirical distributions P and Q,
+    where P is estimated from data `x` and Q from data `y` using Laplace kernel-density
+    estimation and binned histograms.
+
+    This method uses histograms and convolution with a Laplace kernel to estimate the
+    probability distributions, then computes the cross-entropy using numerical integration.
+
+    Parameters
+    ----------
+    x : ArrayLike
+        Data points for the P distribution.
+    y : ArrayLike
+        Data points for the Q distribution.
+    w : float, optional
+        The width (exponential scale length) of the Laplace kernel, by default 1.0.
+
+    Returns
+    -------
+    float
+        The approximate cross-entropy H(P, Q) between the two distributions.
+
+    Notes
+    -----
+    - This is an approximate method, suitable for large data sets.
+    - The Laplace kernel is defined as k(x) ∝ exp(-abs(x-x0)/w).
+    - Uses Simpson's rule for numerical integration.
     """
     EXTEND_DATA = 5 * w
     BINS_PER_W = 20

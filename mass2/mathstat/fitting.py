@@ -137,6 +137,7 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | No
     y = np.asarray(y)
 
     def penalty(k: float, x: NDArray, y: NDArray) -> float:
+        "Extract only the cost function from kink_model()"
         _, _, X2 = kink_model(k, x, y)
         return X2
 

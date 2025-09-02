@@ -201,6 +201,30 @@ def add_hci_line(
     ratios: ArrayLike,
     nominal_peak_energy: float | None = None,
 ) -> SpectralLine:
+    """Add a single HCI line to the fluorescence_lines database
+
+    Parameters
+    ----------
+    element : str
+        The element whose line is being added, e.g. 'Ne'
+    spectr_ch : int
+        The charge state of the ion whose line is being added, e.g. 9 for H-like Ne
+    line_identifier : str
+        The line identifier, e.g. '1s2S1/2 - 2p2P3/2'
+    energies : ArrayLike
+        The energies of the components of the line, in eV
+    widths : ArrayLike
+        The Lorentzian FWHM widths of the components of the line, in eV
+    ratios : ArrayLike
+        The relative intensities of the components of the line
+    nominal_peak_energy : float | None, optional
+        The nominal spectral peak in eV, by default None
+
+    Returns
+    -------
+    SpectralLine
+        The newly added SpectralLine object
+    """
     energies = np.asarray(energies)
     widths = np.asarray(widths)
     ratios = np.asarray(ratios)
@@ -225,6 +249,7 @@ def add_hci_line(
 
 
 def add_H_like_lines_from_asd(asd: NIST_ASD, element: str, maxLevels: int | None = None) -> list[SpectralLine]:
+    """Add all known H-like lines for a given element from the ASD database"""
     spectr_ch = xraydb.atomic_number(element)
     added_lines = []
     if maxLevels is not None:
@@ -242,6 +267,7 @@ def add_H_like_lines_from_asd(asd: NIST_ASD, element: str, maxLevels: int | None
 
 
 def add_He_like_lines_from_asd(asd: NIST_ASD, element: str, maxLevels: int | None = None) -> list[SpectralLine]:
+    """Add all known He-like lines for a given element from the ASD database"""
     spectr_ch = xraydb.atomic_number(element) - 1
     added_lines = []
     if maxLevels is not None:

@@ -1,3 +1,7 @@
+"""
+Models for X-ray filter and detector efficiency.
+"""
+
 from dataclasses import dataclass, field
 from uncertainties import ufloat, Variable
 from uncertainties import unumpy as unp
@@ -27,6 +31,7 @@ class FilterStack:
     components: list["Filter | FilterStack"] = field(default_factory=list)
 
     def add(self, film: "Filter | FilterStack") -> None:
+        """Add a Filter or FilterStack to this FilterStack."""
         self.components.append(film)
 
     def add_filter(
@@ -39,6 +44,7 @@ class FilterStack:
         fill_fraction: Variable = ufloat(1, 1e-8),
         absorber: bool = False,
     ) -> None:
+        """Create and add a Filter layer to this FilterStack."""
         self.add(
             Filter.newfilter(
                 name,
@@ -52,6 +58,7 @@ class FilterStack:
         )
 
     def get_efficiency(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
+        """Return the overall efficiency of this FilterStack at the given x-ray energies."""
         assert len(self.components) > 0, f"{self.name} has no components of which to calculate efficiency"
         individual_efficiency = np.array([
             iComponent.get_efficiency(xray_energies_eV, uncertain=uncertain) for iComponent in self.components
@@ -63,9 +70,11 @@ class FilterStack:
             return unp.nominal_values(efficiency)
 
     def __call__(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
+        """Equivalent to get_efficiency."""
         return self.get_efficiency(xray_energies_eV, uncertain=uncertain)
 
     def plot_efficiency(self, xray_energies_eV: ArrayLike, ax: plt.Axes | None = None) -> None:
+        """Plot the efficiency of this FilterStack and its components."""
         efficiency = unp.nominal_values(self.get_efficiency(xray_energies_eV))
         if ax is None:
             fig = plt.figure()
@@ -84,6 +93,7 @@ class FilterStack:
         ax.legend()
 
     def __repr__(self) -> str:
+        """Return a string representation of the FilterStack object."""
         s = f"{type(self)}(\n"
         for v in self.components:
             s += f"{v.name}: {v}\n"
@@ -93,6 +103,8 @@ class FilterStack:
 
 @dataclass(frozen=True)
 class Filter:
+    """Represent a single material layer in a FilterStack"""
+
     name: str
     material: NDArray
     atomic_number: NDArray
@@ -102,6 +114,7 @@ class Filter:
     absorber: bool = False
 
     def get_efficiency(self, xray_energies_eV: ArrayLike, uncertain: bool = False) -> NDArray:
+        """Return the efficiency of this Filter at the given x-ray energies."""
         optical_depth = np.vstack([
             xraydb.material_mu(m, xray_energies_eV, density=d) * t
             for (m, d, t) in zip(self.material, self.density_g_per_cm3, self.thickness_cm)
@@ -118,6 +131,7 @@ class Filter:
             return unp.nominal_values(efficiency)
 
     def __repr__(self) -> str:
+        """Return a string representation of the Filter object."""
         s = f"{type(self)}("
         for material, density, thick in zip(self.material, self.density_g_per_cm3, self.thickness_cm):
             area_density = density * thick
@@ -136,6 +150,7 @@ class Filter:
         fill_fraction: Variable = ufloat(1, 1e-8),
         absorber: bool = False,
     ) -> "Filter":
+        """Create a Filter from the given parameters, filling in defaults as needed."""
         material = np.array(material, ndmin=1)
         atomic_number = np.array([xraydb.atomic_number(iMaterial) for iMaterial in material], ndmin=1)
         fill_fraction = ensure_uncertain(fill_fraction)

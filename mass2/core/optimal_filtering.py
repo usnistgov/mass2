@@ -57,10 +57,12 @@ class ToeplitzWhitener:
 
     @property
     def p(self) -> int:
+        """Return the autoregressive order"""
         return len(self.phi) - 1
 
     @property
     def q(self) -> int:
+        """Return the moving-average order"""
         return len(self.theta) - 1
 
     def whiten(self, v: ArrayLike) -> np.ndarray:
@@ -276,6 +278,7 @@ class Filter(ABC):
     @property
     @abstractmethod
     def _filter_type(self) -> str:
+        """The name for this filter type"""
         return "illegal: this is supposed to be an abstract base class"
 
     def plot(self, axis: plt.Axes | None = None, **kwargs: Any) -> None:
@@ -312,6 +315,7 @@ class Filter(ABC):
 
     @abstractmethod
     def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Filter one microcalorimeter record or an array of records."""
         pass
 
 
@@ -328,6 +332,7 @@ class Filter5Lag(Filter):
     """
 
     def __post_init__(self) -> None:
+        """Post-init checks that this filter, indeed, is a 5-lag one"""
         assert self.convolution_lags == 5
 
     @property
@@ -337,6 +342,7 @@ class Filter5Lag(Filter):
 
     @property
     def _filter_type(self) -> str:
+        """Name for this filter type"""
         return "5lag"
 
     # These parameters fit a parabola to any 5 evenly-spaced points
@@ -404,6 +410,7 @@ class FilterATS(Filter):
     """
 
     def __post_init__(self) -> None:
+        """Post-init checks that this filter aexpects one lag, and has a dt_values array"""
         assert self.convolution_lags == 1
         assert self.dt_values is not None
 
@@ -414,6 +421,7 @@ class FilterATS(Filter):
 
     @property
     def _filter_type(self) -> str:
+        """Return the name for this filter type"""
         return "ats"
 
     def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
