@@ -51,7 +51,8 @@ class Channels:
         channels.update(more.channels)
         bad = self.bad_channels.copy()
         bad.update(more.bad_channels)
-        return dataclasses.replace(self, channels=channels, bad_channels=bad)
+        descr = self.description + more.description + "\nWarning! created by with_more_channels()"
+        return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
 
     @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:

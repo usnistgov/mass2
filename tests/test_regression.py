@@ -33,7 +33,6 @@ def test_analysis_regression():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
         assert np.allclose(expect, found)
-        print(f"Verified {ch_num=} with {len(ch.df)} pulses, file: {ch.header.df['Filename'][0]}")
 
 
 ###########################################################################
