@@ -395,13 +395,14 @@ class Channels:
         return steps
 
     def load_recipes(self, filename: str) -> "Channels":
-        """Return a copy of this Channels object with Recipe objects loaded from the given pickle file."""
+        """Return a copy of this Channels object with Recipe objects loaded from the given pickle file
+        and applied to each Channel."""
         steps = mass2.misc.unpickle_object(filename)
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self) -> pathlib.Path:
-        """Return the parent folder of the LJH files used to create this Channels object.
-        If there's more than one directory, the self.ch0 channel's directory is used."""
+        """Return the parent folder of the LJH files used to create this Channels object. Specifically, the
+        `self.ch0` channel's directory is used (normally the answer would be the same for all channels)."""
         parent_folder_path = pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
         print(f"{parent_folder_path=}")
         return parent_folder_path

@@ -92,7 +92,8 @@ class DriftCorrectStep(RecipeStep):
 
 @dataclass
 class DriftCorrection:
-    """A linear correction for gain drift that correlates with pretrigger mean."""
+    """A linear correction used to attempt remove any correlation between pretrigger mean and pulse height;
+    will work with other quantities instead."""
 
     offset: float
     slope: float

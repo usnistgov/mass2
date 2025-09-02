@@ -1,5 +1,6 @@
 """
-Add Am241Q and Am243Q lines to the known spectral shapes, if not already present
+Add Am241Q and Am243Q lines to the known spectral shapes, if not already present.
+You _must_ import this file if you want these line shapes; it is not imported automatically.
 """
 
 import numpy as np

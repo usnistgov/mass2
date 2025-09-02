@@ -220,7 +220,7 @@ class MultiFit:
         pfit_gain = np.polynomial.Polynomial.fit(peaks_uncalibrated, gain, deg=2)
 
         def ph2energy(ph: NDArray) -> NDArray:
-            "The gain calibration curve: ph -> energy"
+            "Given an array `ph` of pulse heights, return the corresponding energies as an array."
             gain = pfit_gain(ph)
             return ph / gain
 

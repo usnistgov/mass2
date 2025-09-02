@@ -22,7 +22,8 @@ def show(fig: plt.Figure | None = None) -> mo.Html:
 
 
 def pickle_object(obj: Any, filename: str) -> None:
-    """Pickle the given object to the given filename using dill."""
+    """Pickle the given object to the given filename using dill.
+    Mass2 Recipe objects are compatible with `dill` but _not_ with the standard `pickle` module."""
     with open(filename, "wb") as file:
         dill.dump(obj, file)
 
@@ -62,19 +63,20 @@ def median_absolute_deviation(x: ArrayLike) -> float:
 
 
 def sigma_mad(x: ArrayLike) -> float:
-    """Return the nomrlized median absolute deviation of the input, rescaled to give the rms if distribution is Gaussian."""
+    """Return the nomrlized median absolute deviation of the input, rescaled to give the standard deviation
+    if distribution is Gaussian. This method is more robust to outliers than calculating the standard deviation directly."""
     return median_absolute_deviation(x) * 1.4826
 
 
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
-    """Return the value that is nsigma MADs above the median of the input."""
+    """RReturn the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
     mid = np.median(x)
     return mid + nsigma * sigma_mad(x)
 
 
 def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
-    """Return the values that are nsigma MADs below and above the median of the input."""
+    """Return the values that are `nsigma` median absolute deviations (MADs) below and above the median of the input"""
     x = np.asarray(x)
     mid = np.median(x)
     smad = sigma_mad(x)
@@ -152,7 +154,8 @@ def launch_examples() -> None:
 
 
 def root_mean_squared(x: ArrayLike, axis: int | tuple[int] | None = None) -> float:
-    """Return the root mean square of the input along the given axis or axes."""
+    """Return the root mean square of the input along the given axis or axes.
+    Does _not_ subtract the mean first."""
     return np.sqrt(np.mean(np.asarray(x) ** 2, axis))
 
 
@@ -171,7 +174,8 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
 
 
 def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state") -> pl.DataFrame:
-    """Concatenate two DataFrames vertically, adding a column to indicate which DataFrame each row came from."""
+    """Concatenate two DataFrames vertically, adding a column `concat_state` (or named according to `concat_state_col`)
+    to indicate which DataFrame each row came from."""
     if concat_state_col in df1.columns:
         # Continue incrementing from the last known concat_state
         max_state = df1[concat_state_col][-1]
