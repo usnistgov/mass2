@@ -12,3 +12,9 @@ repos:
     - id: ruff
       args: [--fix, --exit-non-zero-on-fix] # Optional: automatically fix issues and fail if fixes are applied
     - id: ruff-format # Optional: add if you want to use Ruff's formatter
+- repo: https://github.com/econchick/interrogate
+  rev: 1.7.0
+  hooks:
+    - id: interrogate
+      args: [--fail-under=90, --ignore-init-file, --ignore-private, --ignore-magic-methods]
+      pass_filenames: false
