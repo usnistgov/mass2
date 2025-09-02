@@ -16,6 +16,15 @@ import argparse
 
 
 def write_asd_pickle(inputFilename: str, outputFilename: str) -> None:
+    """Write the levels from a NIST Atomic Spectra Database SQL dump to a pickle file
+
+    Parameters
+    ----------
+    inputFilename : str
+        The ASD's sql dump file name
+    outputFilename : str
+        The pickle file name to write the output dictionary to
+    """
     createTableString = "CREATE TABLE"
     valueSearchString = r"\`([^\`]*)\`"
     tableName = ""
@@ -63,6 +72,17 @@ def write_asd_pickle(inputFilename: str, outputFilename: str) -> None:
 def parseLine(
     energyLevelsDict: dict[str, dict[int, dict[str, list[float]]]], fieldNamesDict: dict[str, Any], formattedLine: str
 ) -> None:
+    """Parse a line from the ASD sql dump and add it to the energyLevelsDict
+
+    Parameters
+    ----------
+    energyLevelsDict : dict[str, dict[int, dict[str, list[float]]]]
+        _description_
+    fieldNamesDict : dict[str, Any]
+        _description_
+    formattedLine : str
+        _description_
+    """
     lineAsArray = np.array(ast.literal_eval(formattedLine))
     for iEntry in lineAsArray:
         element = iEntry[fieldNamesDict["ASD_Levels"].index("element")]

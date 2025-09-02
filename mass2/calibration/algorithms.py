@@ -174,6 +174,8 @@ def build_fit_ranges(
 
 
 class FailedToGetModelException(Exception):
+    """Exception raised when get_model() fails to find a model for a line"""
+
     pass
 
 
@@ -183,6 +185,29 @@ def get_model(
     has_tails: bool = False,
     prefix: str = "",
 ) -> GenericLineModel:
+    """Get a GenericLineModel for a line, given either a line name or energy in eV
+
+    Parameters
+    ----------
+    lineNameOrEnergy : GenericLineModel | SpectralLine | str | float
+        A line name, or energy, or a SpectralLine, or a GenericLineModel
+    has_linear_background : bool, optional
+        Whether to allow a background slope, by default True
+    has_tails : bool, optional
+        Whether to allow exponential tails, by default False
+    prefix : str, optional
+        Line nae prefix, by default ""
+
+    Returns
+    -------
+    GenericLineModel
+        An appropriate line model
+
+    Raises
+    ------
+    FailedToGetModelException
+        When a matching line cannot be found
+    """
     if isinstance(lineNameOrEnergy, GenericLineModel):
         line = lineNameOrEnergy.spect
     elif isinstance(lineNameOrEnergy, SpectralLine):
@@ -244,9 +269,36 @@ def multifit(
 def singlefit(
     ph: ArrayLike, name: GenericLineModel | SpectralLine | str | float, lo: float, hi: float, binsize_ph: float, approx_dP_dE: float
 ) -> LineModelResult:
+    """Performs a fit to a single line in pulse height units
+
+    Parameters
+    ----------
+    ph : ArrayLike
+        Measured pulse heights
+    name : GenericLineModel | SpectralLine | str | float
+        Spectral line to fit, either as a name, energy in eV, SpectralLine, or GenericLineModel
+    lo : float
+        minimum pulse height to include in fit
+    hi : float
+        maximum pulse height to include in fit
+    binsize_ph : float
+        bin size in pulse height units
+    approx_dP_dE : float
+        Estimate of the dph/dE at the line energy, used to constrain the fit
+
+    Returns
+    -------
+    LineModelResult
+        The best-fit result
+
+    Raises
+    ------
+    ValueError
+        When too many bins would be used in the fit
+    """
     nbins = (hi - lo) / binsize_ph
     if nbins > 5000:
-        raise Exception("too damn many bins, dont like running out of memory")
+        raise ValueError("too damn many bins, dont like running out of memory")
     counts, bin_edges = np.histogram(ph, np.arange(lo, hi, binsize_ph))
     e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
     model = get_model(name)
