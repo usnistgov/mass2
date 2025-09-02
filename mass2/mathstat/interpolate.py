@@ -199,6 +199,7 @@ class CubicSpline:
         return result
 
     def variance(self, xtest: ArrayLike) -> NDArray:  # noqa: PLR6301
+        """Return a dummy estimate of the variance at points `xtest`."""
         return np.zeros_like(xtest)
 
 
@@ -545,9 +546,12 @@ class SmoothingSpline:
         rhs = np.dot(self.N0.T, Dinv * self.y)
 
         def best_params(p: NDArray) -> NDArray:
+            """Return the best-fit parameters for a given curvature penalty p."""
             return np.linalg.solve(p * (lhs - self.Omega) + self.Omega, p * rhs)
 
         def chisq_difference(p: NDArray, target_chisq: float) -> float:
+            """Return the difference between the chi-squared for curvature penalty p
+            and the target chi-squared."""
             # If curvature is too small, the computation can become singular.
             # Avoid this by returning a crazy-high chisquared, as needed.
             try:

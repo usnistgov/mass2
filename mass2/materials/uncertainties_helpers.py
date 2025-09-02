@@ -1,3 +1,7 @@
+"""
+Helpers for dealing with `uncertainties` scalars and arrays.
+"""
+
 import uncertainties
 from uncertainties import unumpy as unp
 import numpy as np

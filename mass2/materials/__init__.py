@@ -1,3 +1,7 @@
+"""
+Material models for efficiency calculations.
+"""
+
 # ruff: noqa: F401, F403
 
 from . import efficiency_models
