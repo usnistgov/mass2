@@ -1,3 +1,7 @@
+"""
+Algorithms to analyze noise data.
+"""
+
 import numpy as np
 import scipy as sp
 import pylab as plt  # type: ignore
@@ -144,29 +148,8 @@ def calc_autocorrelation_times(n: int, dt: float) -> NDArray:
     return np.arange(n) * dt
 
 
-def psd_2d(Nt: ndarray, dt: float) -> ndarray:
-    # Nt is size (n,m) with m records of length n
-    (n, _m) = Nt.shape
-    df = 1 / n / dt  # the frequency bin spacing of the rfft
-    # take the absolute value of the rfft of each record, then average all records
-    Nabs = np.mean(np.abs(np.fft.rfft(Nt, axis=0)), axis=1)
-    # PSD = 2*Nabs^2/n/df
-    # the 2 accounts for the power that would be in the negative frequency bins, due to use of rfft
-    # n comes from parseval's theorm
-    # df normalizes binsize since rfft doesn't know the bin size
-    psd = 2 * Nabs**2 / n / df
-    # Handle the DC component and Nyquist frequency differently (no factor of 2)
-    psd[0] /= 2  # DC component
-    if n % 2 == 0:  # If even number of samples
-        psd[-1] /= 2  # Nyquist frequency
-    return psd
-
-
-def calc_psd_frequencies(nbins: int, dt: float) -> ndarray:
-    return np.arange(nbins, dtype=float) / (2 * dt * nbins)
-
-
 def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "boxcar", detrend: bool = False) -> "NoiseResult":
+    """Compute the noise power spectral density using scipy's periodogram function and the autocorrelation."""
     f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
@@ -216,13 +199,13 @@ def calc_noise_result(
             use skip_autocorr_if_length_over argument to override this"""
         )
         autocorr_vec = None
-    # nbins = len(psd_mass)
-    # frequencies = calc_psd_frequencies(nbins, dt)
     return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
 
 
 @dataclass
 class NoiseResult:
+    """A dataclass to hold the results of noise analysis, both power-spectral density and (optionally) autocorrelation."""
+
     psd: np.ndarray
     autocorr_vec: np.ndarray | None
     frequencies: np.ndarray
@@ -235,6 +218,7 @@ class NoiseResult:
         loglog: bool = True,
         **plotkwarg: dict,
     ) -> None:
+        """Plot the power spectral density."""
         if axis is None:
             plt.figure()
             axis = plt.gca()

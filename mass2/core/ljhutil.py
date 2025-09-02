@@ -1,3 +1,7 @@
+"""
+Utility functions for handling and finding LJH files, and opening them as Channel or Channels objects.
+"""
+
 import argparse
 import glob
 import os
@@ -12,8 +16,6 @@ from packaging.version import Version
 from .ljhfiles import LJHFile
 
 __all__ = ["find_ljh_files", "ljh_truncate"]
-
-# functions for finding ljh files and opening them as Channels
 
 
 def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[str]:
@@ -129,6 +131,7 @@ def match_files_by_channel(
 def experiment_state_path_from_ljh_path(
     ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
+    """Find the experiment_state.txt file in the directory of the given ljh file."""
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
     new_file_name = f"{base_name}_experiment_state.txt"
@@ -138,6 +141,7 @@ def experiment_state_path_from_ljh_path(
 def external_trigger_bin_path_from_ljh_path(
     ljh_path: str | pathlib.Path,
 ) -> pathlib.Path:
+    """Find the external_trigger.bin file in the directory of the given ljh file."""
     ljh_path = pathlib.Path(ljh_path)  # Convert to Path if it's a string
     base_name = ljh_path.name.split("_chan")[0]
     new_file_name = f"{base_name}_external_trigger.bin"
@@ -185,6 +189,7 @@ def filename_glob_expand(pattern: str) -> list[str]:
 
 
 def helper_write_pulse(dest: BinaryIO, src: LJHFile, i: int) -> None:
+    """Write a single pulse from one LJHFile to another open file."""
     subframecount, timestamp_usec, trace = src.read_trace_with_timing(i)
     prefix = struct.pack("<Q", int(subframecount))
     dest.write(prefix)
@@ -288,6 +293,7 @@ def main_ljh_truncate() -> None:
 
 
 def ljh_merge(out_path: str, filenames: list[str], overwrite: bool) -> None:
+    """Merge a set of LJH files to a single output file."""
     if not overwrite and os.path.isfile(out_path):
         raise OSError(f"To overwrite destination {out_path}, use the --force flag")
     shutil.copy(filenames[0], out_path)

@@ -1,3 +1,7 @@
+"""
+Hold a class to represent a channel with noise data only, and to analyze its noise characteristics.
+"""
+
 from typing import Any
 from numpy.typing import NDArray
 from pathlib import Path
@@ -10,6 +14,8 @@ from .noise_algorithms import NoiseResult
 
 @dataclass(frozen=True)
 class NoiseChannel:
+    """A class to represent a channel with noise data only, and to analyze its noise characteristics."""
+
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
@@ -18,7 +24,10 @@ class NoiseChannel:
     def calc_max_excursion(
         self, trace_col_name: str = "pulse", n_limit: int = 10000, excursion_nsigma: float = 5
     ) -> tuple[pl.DataFrame, float]:
+        """Compute the maximum excursion from the median for each noise record, and store in dataframe."""
+
         def excursion2d(noise_trace: NDArray) -> float:
+            """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
         noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
@@ -82,6 +91,7 @@ class NoiseChannel:
         trunc_back: int = 0,
         skip_autocorr_if_length_over: int = 10000,
     ) -> NoiseResult:
+        """Compute and return the noise result from the noise traces."""
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
         spectrum = mass2.core.noise_algorithms.calc_noise_result(
             records, continuous=self.is_continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
@@ -89,22 +99,26 @@ class NoiseChannel:
         return spectrum
 
     def __hash__(self) -> int:
+        """A hash function based on the object's id."""
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: Any) -> bool:
+        """Equality based on object identity."""
         return id(self) == id(other)
 
     @property
     def is_continuous(self) -> bool:
+        "Whether this channel is continuous data (True) or triggered records with arbitrary gaps (False)."
         if "continuous" in self.header_df:
             return self.header_df["continuous"][0]
         return False
 
     @classmethod
     def from_ljh(cls, path: str | Path) -> "NoiseChannel":
+        """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         noise_channel = cls(df, header_df, header_df["Timebase"][0])

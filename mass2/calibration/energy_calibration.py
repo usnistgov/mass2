@@ -316,6 +316,7 @@ class EnergyCalibrationMaker:
 
         # Use a heuristic to repair negative uncertainties.
         def regularize_uncertainties(x: NDArray[np.float64]) -> np.ndarray:
+            """Replace negative uncertainties with the minimum non-negative uncertainty, or zero."""
             if not np.any(x < 0):
                 return x
             target = max(0.0, x.min())

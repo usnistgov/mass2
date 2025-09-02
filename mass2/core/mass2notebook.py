@@ -1,3 +1,7 @@
+"""
+Create a starter Marimo notebook for mass2 analysis, based on a template.
+"""
+
 import argparse
 import subprocess
 import os
@@ -8,6 +12,7 @@ TEMPLATE_NAME = "notebook_starter_template.py"
 
 
 def create_notebook(data_dir: str, notebook_name: str) -> None:
+    """Create a notebook file from a template, finding data from the data directory."""
     if os.path.exists(notebook_name):
         raise OSError(f"output notebook {notebook_name} exists")
     template_path = pkg_resources.files("mass2").joinpath("data", TEMPLATE_NAME)
@@ -19,6 +24,7 @@ def create_notebook(data_dir: str, notebook_name: str) -> None:
 
 
 def main():
+    """Parse command-line arguments and create a Marimo notebook."""
     parser = argparse.ArgumentParser(
         description="Start a mass2 notebook session by loading a set of LJH files",
     )

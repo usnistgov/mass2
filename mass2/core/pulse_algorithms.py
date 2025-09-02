@@ -1,3 +1,7 @@
+"""
+Pulse summarizing algorithms.
+"""
+
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray, ArrayLike
@@ -175,6 +179,7 @@ def summarize_data_numba(  # noqa: PLR0914
 def pulse_2exp_with_tail(
     t: ArrayLike, t0: float, a_tail: float, tau_tail: float, a: float, tau_rise: float, tau_fall_factor: float, baseline: float
 ) -> NDArray:
+    """Create a pulse shape from two exponentials plus an exponential tail."""
     tt = np.asarray(t) - t0
     tau_fall = tau_rise * tau_fall_factor
     assert tau_fall_factor >= 1
@@ -195,6 +200,7 @@ def pulse_2exp_with_tail(
 
 
 def fit_pulse_2exp_with_tail(data: ArrayLike, npre: int, dt: float = 1, guess_tau: float | None = None) -> LineModelResult:
+    """Fit a pulse shape to data using two exponentials plus an exponential tail."""
     data = np.asarray(data)
     if guess_tau is None:
         guess_tau = dt * len(data) / 5

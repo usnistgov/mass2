@@ -1,3 +1,7 @@
+"""
+Add Am241Q and Am243Q lines to the known spectral shapes, if not already present
+"""
+
 import numpy as np
 from mass2.calibration.fluorescence_lines import addline, spectra, AmplitudeType
 

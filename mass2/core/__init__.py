@@ -1,3 +1,6 @@
+"""mass2.core: Core Mass2 functionality, including file I/O,
+microcalorimeter channel bookkeeping, recipes, fitting, filtering, and more."""
+
 # ruff: noqa: F403, F401
 
 # Don't import the _contents_ of these at the top level
