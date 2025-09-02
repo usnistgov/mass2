@@ -1,3 +1,7 @@
+"""
+Tools for working with continuous data, as taken by the True Bequerel project.
+"""
+
 from numpy.typing import NDArray, ArrayLike
 import numpy as np
 import polars as pl
@@ -28,6 +32,8 @@ header_dtype = np.dtype([
 
 @dataclass(frozen=True)
 class TriggerResult:
+    """A trigger result from applying a triggering filter and threshold to a TrueBqBin data source."""
+
     data_source: "TrueBqBin"
     filter_in: np.ndarray
     threshold: float
@@ -37,6 +43,7 @@ class TriggerResult:
     def plot(
         self, decimate: int = 10, n_limit: int = 100000, offset_raw: int = 0, x_axis_time_s: bool = False, ax: plt.Axes | None = None
     ) -> None:
+        """Make a diagnostic plot of the trigger result."""
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -97,6 +104,7 @@ class TriggerResult:
         n_record_samples: int,
         max_noise_triggers: int = 200,
     ) -> NoiseChannel:
+        """Synthesize a NoiseChannel from the data source by finding time periods without pulse triggers."""
         noise_trigger_inds = get_noise_trigger_inds(
             self.trig_inds,
             n_dead_samples_after_pulse_trigger,
@@ -122,6 +130,7 @@ class TriggerResult:
     def to_channel_copy_to_memory(
         self, noise_n_dead_samples_after_pulse_trigger: int, npre: int, npost: int, invert: bool = False
     ) -> Channel:
+        """Create a Channel object by copying pulse data into memory."""
         noise = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
@@ -154,6 +163,7 @@ class TriggerResult:
         invert: bool = False,
         verbose: bool = True,
     ) -> Channel:
+        """Create a Channel object by memory-mapping pulse data from disk."""
         noise = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
@@ -249,6 +259,8 @@ class TriggerResult:
 
 @dataclass(frozen=True)
 class TrueBqBin:
+    """Represents a binary data file from the True Bequerel project."""
+
     bin_path: Path
     description: str
     channel_number: int
@@ -260,6 +272,7 @@ class TrueBqBin:
 
     @classmethod
     def load(cls, bin_path: str | Path) -> "TrueBqBin":
+        """Create a TrueBqBin object by memory-mapping the given binary file."""
         bin_path = Path(bin_path)
         try:
             # for when it's named like dev2_ai6
@@ -267,6 +280,7 @@ class TrueBqBin:
         except ValueError:
             # for when it's named like 2A
             def bay2int(bay: str) -> int:
+                """Convert a bay name like '2A' to a channel number like 4."""
                 return (int(bay[0]) - 1) * 4 + "ABCD".index(bay[1].upper())
 
             channel_number = bay2int(str(bin_path.parent.stem))
@@ -286,6 +300,7 @@ class TrueBqBin:
         )
 
     def trigger(self, filter_in: NDArray, threshold: float, limit_hours: float | None = None, verbose: bool = True) -> TriggerResult:
+        """Compute trigger indices by applying the given filter and threshold to the data."""
         if limit_hours is None:
             limit_samples = len(self.data)
         else:
@@ -382,6 +397,7 @@ def write_truebq_bin_file(
 
 @njit
 def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float, verbose: bool) -> NDArray:
+    """Apply a filter to the data and return trigger indices where the filter output crosses the threshold."""
     assert threshold > 0, "algorithm assumes we trigger with positive threshold, change sign of filter_in to accomodate"
     filter_len = len(filter_in)
     inds = []
@@ -420,6 +436,7 @@ def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float,
 
 
 def gather_pulses_from_inds_numpy_contiguous(data: NDArray, npre: int, nsamples: int, inds: NDArray) -> NDArray:
+    """Gather pulses from data at the given trigger indices, returning a contiguous numpy array."""
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
@@ -432,6 +449,7 @@ def gather_pulses_from_inds_numpy_contiguous(data: NDArray, npre: int, nsamples:
 def gather_pulses_from_inds_numpy_contiguous_mmap(
     data: NDArray, npre: int, nsamples: int, inds: NDArray, filename: str | Path = ".mmapped_pulses.npy"
 ) -> NDArray:
+    """Gather pulses from data at the given trigger indices, returning a memory-mapped numpy array."""
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
@@ -483,6 +501,7 @@ def gather_pulses_from_inds_pyarrow_share_memory(data, npre, nsamples, inds):
 def filter_and_residual_rms(
     data: NDArray, chosen_filter: NDArray, avg_pulse: NDArray, trig_inds: NDArray, npre: int, nsamples: int, polarity: int
 ) -> tuple[NDArray, NDArray, NDArray]:
+    """Apply a filter to pulses extracted from data at the given trigger indices, returning filter values and residual RMS."""
     filt_value = np.zeros(len(trig_inds))
     residual_rms = np.zeros(len(trig_inds))
     filt_value_template = np.zeros(len(trig_inds))
@@ -502,6 +521,7 @@ def filter_and_residual_rms(
 
 @njit
 def fast_apply_filter(data: NDArray, filter_in: NDArray) -> NDArray:
+    """Apply a filter to the data, returning the filter output."""
     cache = np.zeros(len(filter_in))
     filter = np.zeros(len(filter_in))
     filter[:] = filter_in
@@ -522,6 +542,7 @@ def get_noise_trigger_inds(
     n_record_samples: int,
     max_noise_triggers: int,
 ) -> NDArray:
+    """Get trigger indices for noise periods, avoiding pulses."""
     pulse_trigger_inds = np.asarray(pulse_trigger_inds)
     diffs = np.diff(pulse_trigger_inds)
     inds = []
@@ -539,6 +560,7 @@ def get_noise_trigger_inds(
 def _fasttrig_filter_trigger_with_cache(
     data: NDArray, filter_in: NDArray, threshold: float, limit_samples: int, bin_path: str | Path, verbose: bool = True
 ) -> NDArray:
+    """Apply a filter to the data and return trigger indices where the filter output crosses the threshold, using a cache."""
     bin_full_path = Path(bin_path).absolute()
     actual_n_samples = min(len(data), limit_samples)
     to_hash_str = str(filter_in) + str(threshold) + str(actual_n_samples) + str(bin_full_path)
@@ -563,6 +585,7 @@ def _fasttrig_filter_trigger_with_cache(
 def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
     data: NDArray, npre: int, nsamples: int, inds: NDArray, bin_path: Path | str, verbose: bool = True
 ) -> NDArray | np.memmap:
+    """Gather pulses from data at the given trigger indices, returning a memory-mapped numpy array, using a cache."""
     bin_full_path = Path(bin_path).absolute()
     inds = inds[inds > npre]  # ensure all inds inbounds
     inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds

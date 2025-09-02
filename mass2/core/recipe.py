@@ -1,3 +1,7 @@
+"""
+Define RecipeStep and Recipe classes for processing pulse data in a sequence of steps.
+"""
+
 from dataclasses import dataclass
 from typing import Any, overload
 from collections.abc import Iterable, Callable, Sequence
@@ -9,6 +13,14 @@ from . import pulse_algorithms
 
 @dataclass(frozen=True)
 class RecipeStep:
+    """Represent one step in a data processing recipe.
+
+    A step has inputs, outputs, and a calculation method. It also has a good_expr and use_expr that
+    can be used to filter the data before processing.
+
+    This is an abstract base class, subclasses should implement calc_from_df and dbg_plot.
+    """
+
     inputs: list[str]
     output: list[str]
     good_expr: pl.Expr
@@ -16,17 +28,21 @@ class RecipeStep:
 
     @property
     def name(self) -> str:
+        """The name of this step, usually the class name."""
         return str(type(self))
 
     @property
     def description(self) -> str:
+        """A short description of this step, including its inputs and outputs."""
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the outputs from the inputs in the given DataFrame, returning a new DataFrame."""
         # TODO: should this be an abstract method?
         return df.filter(self.good_expr)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        """Generate a diagnostic plot of the results after this step."""
         # this is a no-op, subclasses can override this to plot something
         plt.figure()
         plt.text(0.0, 0.5, f"No plot defined for: {self.description}")
@@ -39,15 +55,19 @@ class RecipeStep:
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(RecipeStep):
+    """A step to fix jumps in the pretrigger mean by unwrapping the phase angle, a periodic quantity."""
+
     period: float
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the jump-corrected pretrigger mean and return a new DataFrame."""
         ptm1 = df[self.inputs[0]].to_numpy()
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        """Make a diagnostic plot of the pretrigger mean before and after the jump fix."""
         plt.figure()
         plt.plot(df_after["timestamp"], df_after[self.inputs[0]], ".", label=self.inputs[0], **kwargs)
         plt.plot(df_after["timestamp"], df_after[self.output[0]], ".", label=self.output[0], **kwargs)
@@ -60,6 +80,8 @@ class PretrigMeanJumpFixStep(RecipeStep):
 
 @dataclass(frozen=True)
 class SummarizeStep(RecipeStep):
+    """Summarize raw pulse data into summary statistics using numba-accelerated code."""
+
     frametime_s: float
     peak_index: int
     pulse_col: str
@@ -68,6 +90,7 @@ class SummarizeStep(RecipeStep):
     transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the summary statistics and return a new DataFrame."""
         summaries = []
         for df_iter in df.select(self.inputs).iter_slices():
             raw = df_iter[self.pulse_col].to_numpy()
@@ -108,12 +131,14 @@ class ColumnAsNumpyMapStep(RecipeStep):
     f: Callable[[np.ndarray], np.ndarray]
 
     def __post_init__(self) -> None:
+        """Check that inputs and outputs are valid (single column each) and that `f` is a callable object."""
         assert len(self.inputs) == 1, "ColumnMapStep expects exactly one input"
         assert len(self.output) == 1, "ColumnMapStep expects exactly one output"
         if not callable(self.f):
             raise ValueError(f"f must be a callable, got {self.f}")
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the new column by applying `f` to the input column, returning a new DataFrame."""
         output_col = self.output[0]
         output_segments = []
         for df_iter in df.select(self.inputs).iter_slices():
@@ -134,14 +159,19 @@ class ColumnAsNumpyMapStep(RecipeStep):
 
 @dataclass(frozen=True)
 class CategorizeStep(RecipeStep):
+    """A step to categorize pulses into discrete categories based on conditions given in a dictionary mapping
+    category names to polars expressions. The first condition must be True, to be used as a fallback."""
+
     category_condition_dict: dict[str, pl.Expr]
 
     def __post_init__(self) -> None:
+        """Verify that the first condition is always True."""
         err_msg = "The first condition must be True, to be used as a fallback"
         first_condition = next(iter(self.category_condition_dict.values()))
         assert first_condition is True or first_condition.meta.eq(pl.lit(True)), err_msg
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Calculate the category for each pulse and return a new DataFrame with a column for the category names."""
         output_col = self.output[0]
 
         def categorize_df(df: pl.DataFrame, category_condition_dict: dict[str, pl.Expr], output_col: str) -> pl.DataFrame:
@@ -168,18 +198,20 @@ class CategorizeStep(RecipeStep):
 class SelectStep(RecipeStep):
     """
     This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
-
     """
 
     col_expr_dict: dict[str, pl.Expr]
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Select the given columns and return a new DataFrame."""
         df2 = df.select(**self.col_expr_dict).with_columns(df)
         return df2
 
 
 @dataclass(frozen=True)
 class Recipe(Sequence[RecipeStep]):
+    """A sequence of RecipeStep objects to be applied in order to a DataFrame."""
+
     steps: list[RecipeStep]
 
     # TODO: leaves many optimizations on the table, but is very simple
@@ -194,21 +226,29 @@ class Recipe(Sequence[RecipeStep]):
 
     @classmethod
     def new_empty(cls) -> "Recipe":
+        """Create a new empty Recipe."""
         return cls([])
 
     @overload
-    def __getitem__(self, key: int) -> RecipeStep: ...
+    def __getitem__(self, key: int) -> RecipeStep:
+        """Return the step at a given index."""
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> Sequence[RecipeStep]: ...
+    def __getitem__(self, key: slice) -> Sequence[RecipeStep]:
+        """Return the steps at a given slice of indices."""
+        ...
 
     def __getitem__(self, key: int | slice) -> RecipeStep | Sequence[RecipeStep]:
+        """Return the step at the given index, or the steps at a slice of steps."""
         return self.steps[key]
 
     def __len__(self) -> int:
+        """Return the number of steps in the recipe."""
         return len(self.steps)
 
     def with_step(self, step: RecipeStep) -> "Recipe":
+        """Create a new Recipe with the given step added to the end."""
         # return a new Recipe with the step added, no mutation!
         return Recipe(self.steps + [step])
 

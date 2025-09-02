@@ -1,3 +1,9 @@
+"""
+mass2main
+
+A script to start an iPython session with all LJH files in the current directory pre-loaded
+"""
+
 from IPython import start_ipython
 import argparse
 import os
@@ -7,18 +13,15 @@ import pylab as plt
 import polars as pl
 import mass2
 
-"""mass2main
-
-    A script to start an iPython session with all LJH files in the current directory pre-loaded
-"""
-
 
 def load_ljh(directory: str, limit: int | None, exclude_ch_nums: int | None) -> mass2.core.Channels:
+    """Load LJH files from the given directory, excluding any channels in exclude_ch_nums and including no more than `limit`."""
     data = mass2.core.Channels.from_ljh_folder(directory, limit=limit, exclude_ch_nums=exclude_ch_nums)
     return data
 
 
 def main():
+    """Parse command-line arguments, load LJH files, and start an iPython session."""
     parser = argparse.ArgumentParser(
         description="Start a mass2 ipython session by loading a set of LJH files",
         # epilog="Channels will be excluded if in both the excluded and included lists."

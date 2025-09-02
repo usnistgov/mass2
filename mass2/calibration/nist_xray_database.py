@@ -1,8 +1,7 @@
 """
 nist_xray_database
 
-Download the NIST x-ray line database from the website, and parse the
-downloaded data into useable form.
+Download the NIST x-ray line database from the website, and parse the downloaded data into useable form.
 
 For loading a file (locally, from disk) and plotting some information:
 * NISTXrayDBFile
@@ -13,7 +12,7 @@ For updating the data files:
 * GetAllLines
 
 Basic usage (assuming you put the x-ray files in
-${MASS_HOME}/mass/calibration/nist_xray_data.dat):
+${MASS_HOME}/mass2/calibration/nist_xray_data.dat):
 
 
 J. Fowler, NIST
@@ -134,6 +133,8 @@ ATOMIC_NUMBERS = dict((ELEMENTS[i], i) for i in range(len(ELEMENTS)))
 
 
 class NISTXrayDBFile:
+    """A NIST X-ray database file, loaded from disk."""
+
     DEFAULT_FILENAMES = "nist_xray_data.dat", "low_z_xray_data.dat"
 
     def __init__(self, *filenames: str):
@@ -206,6 +207,23 @@ class NISTXrayDBFile:
         return tuple(lines)
 
     def __getitem__(self, key: str) -> "NISTXrayLine":
+        """Get a line by its full name, e.g., "Fe KL3", or by a nickname, e.g., "Fe Kalpha1".
+
+        Parameters
+        ----------
+        key : str
+            The line name or nickname
+
+        Returns
+        -------
+        NISTXrayLine
+            The matching NISTXrayLine object
+
+        Raises
+        ------
+        KeyError
+            If not found
+        """
         element, line = key.split()[:2]
         element = element.capitalize()
         line = line.upper()
@@ -223,6 +241,8 @@ class NISTXrayDBFile:
 
 
 class NISTXrayLine:
+    """A single line from the NIST X-ray database."""
+
     DEFAULT_COLUMN_DEFS = {
         "element": (1, 4),
         "transition": (10, 16),
@@ -233,6 +253,15 @@ class NISTXrayLine:
     }
 
     def __init__(self, textline: str, column_defs: dict[str, tuple[int, int]] | None = None):
+        """Initialize a NISTXrayLine from a line of text found in the NIST x-ray database file.
+
+        Parameters
+        ----------
+        textline : str
+            The text line from the database file
+        column_defs : dict[str, tuple[int, int]] | None, optional
+            The column boundaries of the relevant data, by default None
+        """
         self.element = ""
         self.transition = ""
         self.peak = 0.0
@@ -251,13 +280,16 @@ class NISTXrayLine:
         self.raw = textline.rstrip()
 
     def __str__(self) -> str:
+        """The user-friendly string representation of the line"""
         return f"{self.element} {self.transition} line: {self.peak:.3f} +- {self.peak_unc:.3f} eV"
 
     def __repr__(self) -> str:
+        "The code representation of the line"
         return self.raw
 
 
 def plot_line_uncertainties() -> None:
+    """Plot the uncertainties of some common families of lines from the NIST X-ray database."""
     db = NISTXrayDBFile()
     transitions = ("KL3", "KL2", "KM3", "KM5", "L3M5", "L3M4", "L2M4", "L3N5", "L2N4", "L1M3", "L3N7", "L3M1")
     titles = {
@@ -301,6 +333,7 @@ def plot_line_uncertainties() -> None:
 
 
 def plot_line_energies() -> None:
+    """Plot the energies of some common families of lines from the NIST X-ray database."""
     db = NISTXrayDBFile()
     plt.clf()
     cm = plt.cm.nipy_spectral

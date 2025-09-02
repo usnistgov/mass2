@@ -33,23 +33,32 @@ def _smear_exponential_tail(
     P_tailfrac and P_tailshare_hi are unitless.
     The scale lengths tailtau are in the same units as x, NOT in bins.
 
-    :param cleanspectrum_fn: the spectral function to be evaluated
-    :type cleanspectrum_fn: func
-    :param x: independent variable of the spectrum function (typically in energy units)
-    :type x: ndarray
-    :param P_resolution: resolution (FWHM)
-    :type P_resolution: float
-    :param P_tailfrac: fraction of events in either tail
-    :type P_tailfrac: float
-    :param P_tailtau: exponential scale length for the low-E tail
-    :type P_tailtau: float
-    :param P_tailshare_hi: fraction of tail events that are in the high-E tail, defaults to 0.0
-    :type P_tailshare_hi: float, optional
-    :param P_tailtau_hi: exponential scale length for the high-E tail, defaults to 1
-    :type P_tailtau_hi: int, optional
-    :raises ValueError: _description_
-    :return: _description_
-    :rtype: _type_
+    Parameters
+    ----------
+    cleanspectrum_fn : Callable
+        the spectral function to be evaluated
+    x : ArrayLike
+        independent variable of the spectrum function (typically in energy units)
+    P_resolution : float
+        instrument resolution (FWHM)
+    P_tailfrac : float
+        fraction of events in either tail
+    P_tailtau : float
+        exponential scale length for the low-E tail
+    P_tailshare_hi : float, optional
+        fraction of tail events that are in the high-E tail, by default 0.0
+    P_tailtau_hi : float, optional
+        exponential scale length for the high-E tail, by default 1
+
+    Returns
+    -------
+    NDArray
+        The evaluated spectrum with tails added
+
+    Raises
+    ------
+    ValueError
+        If the length of the padded array is too long (>100000)
     """
     x = np.asarray(x)
     if P_tailfrac <= 1e-6:
@@ -132,6 +141,7 @@ class MLEModel(lmfit.Model):
         return f"<{type(self).__name__}: {self.name}>"
 
     def _reprstring(self, long: bool = False) -> str:
+        """Return a longer string representation of Model, with its options."""
         out = self._name
         opts = []
         if len(self._prefix) > 0:
@@ -144,39 +154,20 @@ class MLEModel(lmfit.Model):
         return f"{type(self).__name__}({out})"
 
     def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """+"""
+        """Sum of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
 
     def __sub__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """-"""
+        """Difference of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.sub)
 
     def __mul__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """*"""
+        """Product of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.mul)
 
     def __truediv__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """/"""
+        """Ratio of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.truediv)
-
-    # def exponentialTail(self):
-    #     """Return a new CompositeModel that convolves this object with a 2-sided exponential tail kernel."""
-    #     def kernelfunc(bin_centers, frac_lo, length_lo, frac_hi, length_hi):
-    #         pass
-    #
-    #     kmodel = MLEModel(kernelfunc)
-    #     kmodel.set_param_hint('frac_lo', value=0.1, min=0, max=1, vary=False)
-    #     kmodel.set_param_hint('frac_hi', value=0.0, min=0, max=1, vary=False)
-    #     kmodel.set_param_hint('length_lo', value=1.0, min=0, vary=False)
-    #     kmodel.set_param_hint('length_hi', value=1.0, min=0, vary=False)
-    #
-    #     dummy_op = lmfit.model.operator.add  # won't actually use this, b/c overriding c.eval method.
-    #     c = CompositeMLEModel(self, kmodel, dummy_op)
-    #
-    #     def blah():
-    #         pass
-    #     c.eval = blah
-    #     return c
 
     def fit(self, *args: Any, minimum_bins_per_fwhm: float | None = 3, **kwargs: Any) -> "LineModelResult":
         """as lmfit.Model.fit except
@@ -242,28 +233,26 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
         vals[y < data] *= -1
         return vals
 
-    # def __repr__(self):
-    #     """Return representation of Model."""
-    #     return "<CompositeMLEModel: %s>" % (self.name)
-
     def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """+"""
+        """Sum of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
 
     def __sub__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """-"""
+        """Difference of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.sub)
 
     def __mul__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """*"""
+        """Product of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.mul)
 
     def __truediv__(self, other: lmfit.Model) -> "CompositeMLEModel":
-        """/"""
+        """Ratio of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.truediv)
 
 
 class GenericLineModel(MLEModel):
+    """A generic line model for fitting spectral lines."""
+
     def __init__(
         self,
         spect: "SpectralLine",
@@ -275,6 +264,35 @@ class GenericLineModel(MLEModel):
         qemodel: Callable | None = None,
         **kwargs: Any,
     ):
+        """Initialize a GenericLineModel
+
+        Parameters
+        ----------
+        spect : SpectralLine
+            The line or feature to be modeled
+        independent_vars : list[str], optional
+            List of independent variable names, by default ["bin_centers"]
+        prefix : str, optional
+            Model, by default ""
+        nan_policy : str, optional
+            How to handle NaN results in the computed spectrum, by default "raise"
+        has_linear_background : bool, optional
+            Whether the background model can have a nonzero slope, by default True
+        has_tails : bool, optional
+            Whether exponential tails are included in the model, by default False
+        qemodel : Callable | None, optional
+            A model for the quantum efficiency (which changes the expected line shape), by default None
+
+        Returns
+        -------
+        GenericLineModel
+            The initialized model
+
+        Raises
+        ------
+        ValueError
+            If the spectral model produces negative or NaN values
+        """
         self.spect = spect
         self._has_tails = has_tails
         self._has_linear_background = has_linear_background
@@ -352,6 +370,7 @@ class GenericLineModel(MLEModel):
         self._set_paramhints_prefix()
 
     def _set_paramhints_prefix(self) -> None:
+        """Set parameter hints with reasonable initial values and bounds."""
         nominal_peak_energy = self.spect.nominal_peak_energy
         self.set_param_hint("fwhm", value=nominal_peak_energy / 1000, min=nominal_peak_energy / 10000, max=nominal_peak_energy)
         self.set_param_hint("peak_ph", value=nominal_peak_energy, min=0)
@@ -373,6 +392,7 @@ class GenericLineModel(MLEModel):
         order_stat = np.array(data.cumsum(), dtype=float) / data.sum()
 
         def percentiles(p: float) -> NDArray:
+            """Find the p-th percentile of the data using histograms."""
             return bin_centers[(order_stat > p).argmax()]
 
         fwhm_arb = 0.7 * (percentiles(0.75) - percentiles(0.25))
@@ -393,6 +413,7 @@ class LineModelResult(lmfit.model.ModelResult):
     """like lmfit.model.Model result, but with some convenient plotting functions for line spectra fits"""
 
     def _compact_fit_report(self) -> str:
+        """A compact fit report suitable for annotating a plot"""
         s = ""
         sn = {"background": "bg", "integral": "intgrl", "bg_slope": "bg_slp"}
         for k in sorted(self.params.keys()):
@@ -437,6 +458,7 @@ class LineModelResult(lmfit.model.ModelResult):
     def set_label_hints(
         self, binsize: float, ds_shortname: str, attr_str: str, unit_str: str, cut_hint: str, states_hint: str = ""
     ) -> None:
+        """Set hints for axis labels and title for plotm()."""
         self._binsize = binsize
         self._ds_shortname = ds_shortname
         self._attr_str = attr_str
@@ -446,6 +468,7 @@ class LineModelResult(lmfit.model.ModelResult):
         self._has_label_hints = True
 
     def _handle_default_labels(self, title: str | None, xlabel: str | None, ylabel: str | None) -> tuple[str, str, str]:
+        """Handle default labels for plotm()."""
         if hasattr(self, "_has_label_hints"):
             if title is None:
                 title = f"{self._ds_shortname}: {self.model.spect.shortname}"
@@ -467,6 +490,7 @@ class LineModelResult(lmfit.model.ModelResult):
         return title, xlabel, ylabel
 
     def _validate_bins_per_fwhm(self, minimum_bins_per_fwhm: float) -> None:
+        """Validate that the bin size is small enough compared to the fitted FWHM to prevent approximation problems."""
         if "bin_centers" not in self.userkws:
             return  # i guess someone used this for a non histogram fit
         if not VALIDATE_BIN_SIZE:

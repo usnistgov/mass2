@@ -1,5 +1,9 @@
-from dataclasses import dataclass
+"""
+Classes and functions for reading and handling LJH files.
+"""
+
 import dataclasses
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Any
 from numpy.typing import NDArray
@@ -44,10 +48,12 @@ class LJHFile(ABC):
     OVERLONG_HEADER: ClassVar[int] = 100
 
     def __repr__(self) -> str:
+        """A string that can be evaluated to re-open this LJH file."""
         return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
 
     @classmethod
     def open(cls, filename: str | Path, max_pulses: int | None = None) -> "LJHFile":
+        """Open an LJH file, parsing its header information and returning an LJHFile object."""
         filename = str(filename)
         header_dict, header_string, header_size = cls.read_header(filename)
         channum = header_dict["Channel"]
@@ -343,6 +349,8 @@ class LJHFile(ABC):
 
 
 class LJHFile_2_2(LJHFile):
+    """LJH files version 2.2 and later, which have subframecount and posix_usec fields."""
+
     @property
     def subframecount(self) -> NDArray:
         """Return a copy of the subframecount memory map.
@@ -411,6 +419,8 @@ class LJHFile_2_2(LJHFile):
 
 
 class LJHFile_2_1(LJHFile):
+    """LJH files version 2.1, which have internal_us and internal_ms fields, but no subframecount."""
+
     @property
     def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
@@ -451,11 +461,14 @@ class LJHFile_2_1(LJHFile):
     def to_polars(
         self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
         df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
         return df.select(pl.exclude("subframecount")), df_header
 
 
 class LJHFile_2_0(LJHFile):
+    """LJH files version 2.0, which have internal_ms fields only, but no subframecount and no µs information."""
+
     @property
     def datatimes_raw(self) -> NDArray:
         """Return a copy of the raw timestamp (posix usec) memory map.
@@ -487,5 +500,6 @@ class LJHFile_2_0(LJHFile):
     def to_polars(
         self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
         df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
         return df.select(pl.exclude("subframecount")), df_header

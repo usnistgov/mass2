@@ -1,3 +1,7 @@
+"""
+Data structures and methods for handling a single microcalorimeter channel's pulse data and metadata.
+"""
+
 from dataclasses import dataclass, field
 import dataclasses
 from typing import Any
@@ -29,6 +33,8 @@ import mass2
 
 @dataclass(frozen=True)
 class ChannelHeader:
+    """Metadata about a Channel, of the sort read from file header."""
+
     description: str  # filename or date/run number, etc
     ch_num: int
     frametime_s: float
@@ -38,6 +44,7 @@ class ChannelHeader:
 
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
+        """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
         return cls(
             description=os.path.split(df["Filename"][0])[-1],
             ch_num=df["Channel"][0],
@@ -50,6 +57,8 @@ class ChannelHeader:
 
 @dataclass(frozen=True)  # noqa: PLR0904
 class Channel:
+    """A single microcalorimeter channel's pulse data and associated metadata."""
+
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
@@ -63,9 +72,11 @@ class Channel:
 
     @property
     def shortname(self) -> str:
+        """A short name for this channel, suitable for plot titles."""
         return self.header.description
 
     def mo_stepplots(self) -> mo.ui.dropdown:
+        """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
         first_non_summarize_step = self.steps[0]
         for step in self.steps:
@@ -80,9 +91,11 @@ class Channel:
         )
 
         def show() -> mo.Html:
+            """Show the selected step plot."""
             return self._mo_stepplots_explicit(mo_ui)
 
         def step_ind() -> Any:
+            """Get the selected step index from the dropdown item, if any."""
             return mo_ui.value
 
         mo_ui.show = show
@@ -90,19 +103,22 @@ class Channel:
         return mo_ui
 
     def _mo_stepplots_explicit(self, mo_ui: mo.ui.dropdown) -> mo.Html:
+        """Marimo UI element to choose and display step plots."""
         step_ind = mo_ui.value
         self.step_plot(step_ind)
         fig = plt.gcf()
         return mo.vstack([mo_ui, misc.show(fig)])
 
     def get_step(self, index: int) -> tuple[RecipeStep, int]:
+        """Get the step at the given index, supporting negative indices."""
+        # normalize the index to a positive index
         if index < 0:
-            # normalize the index to a positive index
             index = len(self.steps) + index
         step = self.steps[index]
         return step, index
 
     def step_plot(self, step_ind: int, **kwargs: Any) -> plt.Axes:
+        """Make a debug plot for the given step index, supporting negative indices."""
         step, step_ind = self.get_step(step_ind)
         if step_ind + 1 == len(self.df_history):
             df_after = self.df
@@ -117,6 +133,7 @@ class Channel:
         use_good_expr: bool = True,
         use_expr: pl.Expr = pl.lit(True),
     ) -> tuple[NDArray, NDArray]:
+        """Compute a histogram of the given column, optionally filtering by good_expr and use_expr."""
         if use_good_expr and self.good_expr is not True:
             # True doesn't implement .and_, haven't found a exper literal equivalent that does
             # so we special case True
@@ -139,6 +156,7 @@ class Channel:
         use_good_expr: bool = True,
         use_expr: pl.Expr = pl.lit(True),
     ) -> tuple[NDArray, NDArray]:
+        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr."""
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
@@ -230,6 +248,7 @@ class Channel:
         skip_none: bool = True,
         ax: plt.Axes | None = None,
     ) -> None:
+        """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`."""
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -259,6 +278,7 @@ class Channel:
         plt.tight_layout()
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
+        """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
         return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
 
     @property
@@ -326,6 +346,7 @@ class Channel:
         n_extra: int = 3,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Learn a rough calibration by trying all combinatorically possible peak assignments."""
         step = mass2.core.RoughCalibrationStep.learn_combinatoric(
             self,
             line_names,
@@ -347,6 +368,8 @@ class Channel:
         n_extra: int = 3,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Learn a rough calibration by trying all combinatorically possible peak assignments,
+        using known relative peak heights to limit the possibilities."""
         step = mass2.core.RoughCalibrationStep.learn_combinatoric_height_info(
             self,
             line_names,
@@ -371,6 +394,9 @@ class Channel:
         n_extra_peaks: int = 10,
         acceptable_rms_residual_e: float = 10,
     ) -> "Channel":
+        """Learn a rough calibration by trying to assign the 3 brightest peaks,
+        then fitting a line to those and looking for other peaks that fit that line.
+        """
         step = mass2.core.RoughCalibrationStep.learn_3peak(
             self,
             line_names,
@@ -386,6 +412,7 @@ class Channel:
         return self.with_step(step)
 
     def with_step(self, step: RecipeStep) -> "Channel":
+        """Return a new Channel with the given step applied to generate new columns in the dataframe."""
         t_start = time.time()
         df2 = step.calc_from_df(self.df)
         elapsed_s = time.time() - t_start
@@ -400,12 +427,15 @@ class Channel:
         return ch2
 
     def with_steps(self, steps: Recipe) -> "Channel":
+        """Return a new Channel with the given steps applied to generate new columns in the dataframe."""
         ch2 = self
         for step in steps:
             ch2 = ch2.with_step(step)
         return ch2
 
     def with_good_expr(self, good_expr: pl.Expr, replace: bool = False) -> "Channel":
+        """Return a new Channel with the given good_expr, combined with the existing good_expr by "and",
+        of by replacing it entirely if `replace` is True."""
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
         if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
@@ -420,6 +450,7 @@ class Channel:
     def with_good_expr_pretrig_rms_and_postpeak_deriv(
         self, n_sigma_pretrig_rms: float = 20, n_sigma_postpeak_deriv: float = 20, replace: bool = False
     ) -> "Channel":
+        """Set good_expr to exclude pulses with pretrigger RMS or postpeak derivative above outlier-resistant thresholds."""
         max_postpeak_deriv = misc.outlier_resistant_nsigma_above_mid(
             self.df["postpeak_deriv"].to_numpy(), nsigma=n_sigma_postpeak_deriv
         )
@@ -428,14 +459,15 @@ class Channel:
         return self.with_good_expr(good_expr, replace)
 
     def with_range_around_median(self, col: str, range_up: float, range_down: float) -> "Channel":
+        """Set good_expr to exclude pulses with `col` outside the given range around its median."""
         med = np.median(self.df[col].to_numpy())
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
     def with_good_expr_below_nsigma_outlier_resistant(
         self, col_nsigma_pairs: Iterable[tuple[str, float]], replace: bool = False, use_prev_good_expr: bool = True
     ) -> "Channel":
-        """
-        always sets lower limit at 0, don't use for values that can be negative
+        """Set good_expr to exclude pulses with any of the given columns above outlier-resistant thresholds.
+        Always sets lower limit at 0, so don't use for values that can be negative
         """
         if use_prev_good_expr:
             df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
@@ -453,8 +485,8 @@ class Channel:
     def with_good_expr_nsigma_range_outlier_resistant(
         self, col_nsigma_pairs: Iterable[tuple[str, float]], replace: bool = False, use_prev_good_expr: bool = True
     ) -> "Channel":
-        """
-        always sets lower limit at 0, don't use for values that can be negative
+        """Set good_expr to exclude pulses with any of the given columns above outlier-resistant thresholds.
+        Always sets lower limit at 0, so don't use for values that can be negative
         """
         if use_prev_good_expr:
             df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
@@ -471,12 +503,14 @@ class Channel:
 
     @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
+        """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
         raw = self.df.limit(100)[col].to_numpy()
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
 
     def summarize_pulses(self, col: str = "pulse", pretrigger_ignore_samples: int = 0, peak_index: int | None = None) -> "Channel":
+        """Summarize the pulses, adding columns for pulse height, pretrigger mean, etc."""
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
         out_names = mass2.core.pulse_algorithms.result_dtype.names
@@ -500,6 +534,7 @@ class Channel:
     def correct_pretrig_mean_jumps(
         self, uncorrected: str = "pretrig_mean", corrected: str = "ptm_jf", period: int = 4096
     ) -> "Channel":
+        """Correct pretrigger mean jumps in the raw pulse data, writing to a new column."""
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
             inputs=[uncorrected],
             output=[corrected],
@@ -511,7 +546,7 @@ class Channel:
 
     def with_select_step(self, col_expr_dict: dict[str, pl.Expr]) -> "Channel":
         """
-        This step is meant for interactive exploration, it's basically like the df.select() method, but it's saved as a step.
+        This step is meant for interactive exploration; it's basically like the df.select() method, but it's saved as a step.
         """
         extract = mass2.misc.extract_column_names_from_polars_expr
         inputs: set[str] = set()
@@ -527,6 +562,7 @@ class Channel:
         return self.with_step(step)
 
     def with_categorize_step(self, category_condition_dict: dict[str, pl.Expr], output_col: str = "category") -> "Channel":
+        """Add a recipe step that categorizes pulses based on the given conditions."""
         # ensure the first condition is True, to be used as a fallback
         first_expr = next(iter(category_condition_dict.values()))
         if not first_expr.meta.eq(pl.lit(True)):
@@ -553,6 +589,28 @@ class Channel:
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
     ) -> "Channel":
+        """Compute a 5-lag optimal filter and apply it.
+
+        Parameters
+        ----------
+        pulse_col : str, optional
+            Which column contains raw data, by default "pulse"
+        peak_y_col : str, optional
+            Column to contain the optimal filter results, by default "5lagy"
+        peak_x_col : str, optional
+            Column to contain the 5-lag filter's estimate of arrival-time/phase, by default "5lagx"
+        f_3db : float, optional
+            A low-pass filter 3 dB point to apply to the computed filter, by default 25e3
+        use_expr : pl.Expr, optional
+            An expression to select pulses for averaging, by default pl.lit(True)
+        time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
+            Optionally an exponential decay time to make the filter insensitive to, by default None
+
+        Returns
+        -------
+        Channel
+            This channel with a Filter5LagStep added to the recipe.
+        """
         avg_pulse = (
             self.df.lazy()
             .filter(self.good_expr)
@@ -591,18 +649,21 @@ class Channel:
         return self.with_step(step)
 
     def good_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
+        """Return a Polars DataFrame of the given columns, filtered by good_expr and use_expr."""
         good_df = self.df.lazy().filter(self.good_expr)
         if use_expr is not True:
             good_df = good_df.filter(use_expr)
         return good_df.select(cols).collect()
 
     def bad_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
+        """Return a Polars DataFrame of the given columns, filtered by the inverse of good_expr, and use_expr."""
         bad_df = self.df.lazy().filter(self.good_expr.not_())
         if use_expr is not True:
             bad_df = bad_df.filter(use_expr)
         return bad_df.select(cols).collect()
 
     def good_serieses(self, cols: list[str], use_expr: pl.Expr = pl.lit(True)) -> list[pl.Series]:
+        """Return a list of Polars Series of the given columns, filtered by good_expr and use_expr."""
         df2 = self.good_df(cols, use_expr)
         return [df2[col] for col in cols]
 
@@ -613,6 +674,7 @@ class Channel:
         corrected_col: str | None = None,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Correct for gain drift correlated with the given indicator column."""
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
         step = DriftCorrectStep.learn(
@@ -636,6 +698,7 @@ class Channel:
         binsize: float = 0.5,
         params_update: lmfit.Parameters = lmfit.Parameters(),
     ) -> LineModelResult:
+        """Fit a spectral line to the  binned data from the given column, optionally filtering by use_expr."""
         model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
@@ -658,15 +721,18 @@ class Channel:
         return result
 
     def step_summary(self) -> list[tuple[str, float]]:
+        """Return a list of (step type name, elapsed time in seconds) for each step in the recipe."""
         return [(type(a).__name__, b) for (a, b) in zip(self.steps, self.steps_elapsed_s)]
 
     def __hash__(self) -> int:
+        """Return a hash based on the object's id."""
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: object) -> bool:
+        """Return True if the other object is the same object (by id)."""
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
@@ -681,6 +747,7 @@ class Channel:
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
     ) -> "Channel":
+        """Load a Channel from an LJH file, optionally with a NoiseChannel from a corresponding noise LJH file."""
         if not noise_path:
             noise_channel = None
         else:
@@ -695,6 +762,7 @@ class Channel:
 
     @classmethod
     def from_off(cls, off: OffFile) -> "Channel":
+        """Load a Channel from an OFF file."""
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
@@ -716,6 +784,7 @@ class Channel:
         return channel
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
+        """Add experiment states from an existing dataframe"""
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
@@ -726,6 +795,7 @@ class Channel:
         return self.with_replacement_df(df2)
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+        """Add external trigger times from an existing dataframe"""
         df2 = (
             self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
             .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
@@ -734,12 +804,14 @@ class Channel:
         return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
+        """Replace the dataframe with a new one, keeping all other attributes the same."""
         return dataclasses.replace(
             self,
             df=df2,
         )
 
     def with_columns(self, df2: pl.DataFrame) -> "Channel":
+        """Append columns from df2 to the existing dataframe, keeping all other attributes the same."""
         df3 = self.df.with_columns(df2)
         return self.with_replacement_df(df3)
 
@@ -750,6 +822,7 @@ class Channel:
         calibrated_col: str,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Fit multiple spectral lines, to create a quadratic gain calibration."""
         step = MultiFitQuadraticGainStep.learn(
             self,
             multifit_spec=multifit,
@@ -766,6 +839,7 @@ class Channel:
         calibrated_col: str,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Fit multiple spectral lines, to create a Mass1-style gain calibration."""
         step = MultiFitMassCalibrationStep.learn(
             self,
             multifit_spec=multifit,
@@ -776,6 +850,8 @@ class Channel:
         return self.with_step(step)
 
     def concat_df(self, df: pl.DataFrame) -> "Channel":
+        """Concat the given dataframe to the existing dataframe, keeping all other attributes the same.
+        If the new frame `df` has a history and/or steps, those will be lost"""
         ch2 = Channel(
             mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
             self.header,
@@ -788,6 +864,8 @@ class Channel:
         return ch2
 
     def concat_ch(self, ch: "Channel") -> "Channel":
+        """Concat the given channel's dataframe to the existing dataframe, keeping all other attributes the same.
+        If the new channel `ch` has a history and/or steps, those will be lost"""
         ch2 = self.concat_df(ch.df)
         return ch2
 
@@ -800,6 +878,7 @@ class Channel:
         corrected_col: str | None = None,
         use_expr: pl.Expr = pl.lit(True),
     ) -> "Channel":
+        """Apply phase correction to the given uncorrected column, where specific lines are used to judge the correction."""
         if corrected_col is None:
             corrected_col = uncorrected_col + "_pc"
         step = mass2.core.phase_correct_steps.phase_correct_mass_specific_lines(
@@ -814,9 +893,11 @@ class Channel:
         return self.with_step(step)
 
     def as_bad(self, error_type: type | None, error_msg: str, backtrace: str | None) -> "BadChannel":
+        """Return a BadChannel object, which wraps this Channel and includes error information."""
         return BadChannel(self, error_type, error_msg, backtrace)
 
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
+        """Save the recipe steps to a pickle file, keyed by channel number."""
         steps = {self.header.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
@@ -826,12 +907,12 @@ class Channel:
 
         Parameters
         ----------
-        use_expr_in : pl.Expr | None, optional
+        use_expr_in: pl.Expr | None, optional
             A polars expression to determine valid pulses, by default None. If None, use `self.good_expr`
-        downsample : int | None, optional
+        downsample: int | None, optional
             Plot only every one of `downsample` pulses in the scatter plots, by default None.
             If None, choose the smallest value so that no more than 10000 points appear
-        log : bool, optional
+        log: bool, optional
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
@@ -888,6 +969,7 @@ class Channel:
         print(f"Plotting {len(y)} out of {self.npulses} data points")
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
+        """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         pulse = self.df[col][index].to_numpy()
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
         if verbose:
@@ -899,6 +981,8 @@ class Channel:
 
 @dataclass(frozen=True)
 class BadChannel:
+    """A wrapper around Channel that includes error information."""
+
     ch: Channel
     error_type: type | None
     error_msg: str

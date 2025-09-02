@@ -1,3 +1,7 @@
+"""
+Miscellaneous utility functions used in mass2 for plotting, pickling, statistics, and DataFrame manipulation.
+"""
+
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
 import numpy as np
@@ -11,24 +15,31 @@ import marimo as mo
 
 
 def show(fig: plt.Figure | None = None) -> mo.Html:
+    """Create a Marimo interactive view of the given Matplotlib figure (or the current figure if None)."""
     if fig is None:
         fig = plt.gcf()
     return mo.mpl.interactive(fig)
 
 
 def pickle_object(obj: Any, filename: str) -> None:
+    """Pickle the given object to the given filename using dill.
+    Mass2 Recipe objects are compatible with `dill` but _not_ with the standard `pickle` module."""
     with open(filename, "wb") as file:
         dill.dump(obj, file)
 
 
 def unpickle_object(filename: str) -> Any:
+    """Unpickle an object from the given filename using dill."""
     with open(filename, "rb") as file:
         obj = dill.load(file)
         return obj
 
 
 def smallest_positive_real(arr: ArrayLike) -> float:
+    """Return the smallest positive real number in the given array-like object."""
+
     def is_positive_real(x: Any) -> bool:
+        "Is `x` a positive real number?"
         return x > 0 and np.isreal(x)
 
     positive_real_numbers = np.array(list(filter(is_positive_real, np.asarray(arr))))
@@ -36,8 +47,9 @@ def smallest_positive_real(arr: ArrayLike) -> float:
 
 
 def good_series(df: pl.DataFrame, col: str, good_expr: pl.Expr, use_expr: bool | pl.Expr) -> pl.Series:
-    # this uses lazy before filting to hopefully allow polars to only access the data needed to filter
-    # and the data needed to output what we want
+    """Return a Series from the given DataFrame column, filtered by the given good_expr and use_expr."""
+    # This uses lazy before filtering. We hope this will allow polars to only access the data needed to filter
+    # and the data needed to output what we want.
     good_df = df.lazy().filter(good_expr)
     if use_expr is not True:
         good_df = good_df.filter(use_expr)
@@ -45,33 +57,34 @@ def good_series(df: pl.DataFrame, col: str, good_expr: pl.Expr, use_expr: bool |
 
 
 def median_absolute_deviation(x: ArrayLike) -> float:
+    """Return the median absolute deviation of the input, unnormalized."""
     x = np.asarray(x)
     return float(np.median(np.abs(x - np.median(x))))
 
 
 def sigma_mad(x: ArrayLike) -> float:
+    """Return the nomrlized median absolute deviation of the input, rescaled to give the standard deviation
+    if distribution is Gaussian. This method is more robust to outliers than calculating the standard deviation directly."""
     return median_absolute_deviation(x) * 1.4826
 
 
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
+    """RReturn the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
     mid = np.median(x)
-    mad = np.median(np.abs(x - mid))
-    sigma_mad = mad * 1.4826
-    return mid + nsigma * sigma_mad
+    return mid + nsigma * sigma_mad(x)
 
 
 def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
+    """Return the values that are `nsigma` median absolute deviations (MADs) below and above the median of the input"""
     x = np.asarray(x)
     mid = np.median(x)
-    mad = np.median(np.abs(x - mid))
-    sigma_mad = mad * 1.4826
-    return mid - nsigma * sigma_mad, mid + nsigma * sigma_mad
+    smad = sigma_mad(x)
+    return mid - nsigma * smad, mid + nsigma * smad
 
 
 def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
-    """
-    return midpoints, step_size"""
+    """return midpoints, step_size for bin edges x"""
     x = np.asarray(x)
     d = np.diff(x)
     step_size = float(d[0])
@@ -80,6 +93,7 @@ def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
 
 
 def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, NDArray]:
+    """Return the bin centers and counts of a histogram of the given Series using the given bin edges."""
     bin_edges = np.asarray(bin_edges)
     bin_centers, _ = midpoints_and_step_size(bin_edges)
     counts = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
@@ -87,6 +101,7 @@ def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, ND
 
 
 def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes | None = None, **plotkwarg: dict) -> plt.Axes:
+    """Plot a histogram of the given Series using the given bin edges on the given axis (or a new one if None)."""
     if axis is None:
         plt.figure()
         axis = plt.gca()
@@ -100,6 +115,7 @@ def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes 
 
 
 def plot_a_vs_b_series(a: pl.Series, b: pl.Series, axis: plt.Axes | None = None, **plotkwarg: dict) -> None:
+    """Plot the two given Series as a scatterplot on the given axis (or a new one if None)."""
     if axis is None:
         plt.figure()
         axis = plt.gca()
@@ -109,6 +125,7 @@ def plot_a_vs_b_series(a: pl.Series, b: pl.Series, axis: plt.Axes | None = None,
 
 
 def launch_examples() -> None:
+    """Launch marimo edit in the examples folder."""
     examples_folder = pathlib.Path(__file__).parent.parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
     examples_folder_relative = str(examples_folder.relative_to(pathlib.Path.cwd()))
@@ -137,10 +154,13 @@ def launch_examples() -> None:
 
 
 def root_mean_squared(x: ArrayLike, axis: int | tuple[int] | None = None) -> float:
+    """Return the root mean square of the input along the given axis or axes.
+    Does _not_ subtract the mean first."""
     return np.sqrt(np.mean(np.asarray(x) ** 2, axis))
 
 
 def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) -> dict[int, Any]:
+    """Merge two dictionaries and return a new dictionary with items ordered by key."""
     # Combine both dictionaries' items (key, value) into a list of tuples
     combined_items = list(dict1.items()) + list(dict2.items())
 
@@ -154,6 +174,8 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
 
 
 def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state") -> pl.DataFrame:
+    """Concatenate two DataFrames vertically, adding a column `concat_state` (or named according to `concat_state_col`)
+    to indicate which DataFrame each row came from."""
     if concat_state_col in df1.columns:
         # Continue incrementing from the last known concat_state
         max_state = df1[concat_state_col][-1]
@@ -168,9 +190,7 @@ def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_st
 
 
 def extract_column_names_from_polars_expr(expr: pl.Expr) -> list[str]:
-    """
-    Recursively extract all column names from a Polars expression.
-    """
+    """Recursively extract all column names from a Polars expression."""
     names = set()
     if hasattr(expr, "meta"):
         meta = expr.meta

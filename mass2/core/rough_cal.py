@@ -1,3 +1,7 @@
+"""
+Tools for rough calibration of pulse heights to energies
+"""
+
 from collections.abc import Callable, Iterable
 from typing import Any
 from numpy.typing import NDArray, ArrayLike
@@ -30,6 +34,7 @@ def rank_3peak_assignments(
     max_fractional_energy_error_3rd_assignment: float = 0.1,
     min_gain_fraction_at_ph_30k: float = 0.25,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Explore and rank possible assignments of pulse heights to energies when there are 3 or more lines."""
     # we explore possible line assignments, and down select based on knowledge of gain curve shape
     # gain = ph/e, and we assume gain starts at zero, decreases with pulse height, and
     # that a 2nd order polynomial is a reasonably good approximation
@@ -79,6 +84,8 @@ def rank_3peak_assignments(
 
 @dataclass(frozen=True)
 class BestAssignmentPfitGainResult:
+    """Result of finding the best assignment of pulse heights to energies and fitting a polynomial gain curve."""
+
     rms_residual: float
     ph_assigned: np.ndarray
     residual_e: np.ndarray | None
@@ -89,9 +96,11 @@ class BestAssignmentPfitGainResult:
     ph_target: np.ndarray  # longer than energy target by 0-3
 
     def ph_unassigned(self) -> ndarray:
+        """Which pulse heights were not assigned to any energy."""
         return np.array(list(set(self.ph_target) - set(self.ph_assigned)))
 
     def plot(self, ax: Axes | None = None) -> None:
+        """Make a diagnostic plot of the gain fit."""
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -107,6 +116,8 @@ class BestAssignmentPfitGainResult:
             ax.annotate(str(name), (x, y))
 
     def phzerogain(self) -> float:
+        """Find the pulse height where the gain goes to zero.
+        Quadratic fits should have two roots, we want the positive one; if they are complex, choose the real part."""
         # the pulse height at which the gain is zero
         # for now I'm counting on the roots being ordered, we want the positive root where gain goes zero
         # since our function is invalid outside that range
@@ -118,9 +129,11 @@ class BestAssignmentPfitGainResult:
             raise ValueError()
 
     def ph2energy(self, ph: ndarray | float) -> float | ndarray:
+        """Convert pulse height to energy using the fitted gain curve."""
         return ph / self.pfit_gain(ph)
 
     def energy2ph(self, energy: ArrayLike) -> NDArray:
+        """Invert the gain curve to convert energy to pulse height."""
         if self.pfit_gain.degree() == 2:
             return self._energy2ph_deg2(energy)
         elif self.pfit_gain.degree() == 1:
@@ -131,6 +144,7 @@ class BestAssignmentPfitGainResult:
             raise Exception("degree out of range")
 
     def _energy2ph_deg2(self, energy: ArrayLike) -> NDArray:
+        """Invert a 2nd degree polynomial gain curve to convert energy to pulse height."""
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
@@ -144,6 +158,7 @@ class BestAssignmentPfitGainResult:
         return ph
 
     def _energy2ph_deg1(self, energy: ArrayLike) -> NDArray:
+        """Invert a 1st degree polynomial gain curve to convert energy to pulse height."""
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(b + a*x)
         # so
@@ -156,6 +171,7 @@ class BestAssignmentPfitGainResult:
         return ph
 
     def _energy2ph_deg0(self, energy: ArrayLike) -> NDArray:
+        """Invert a 0th degree polynomial gain curve to convert energy to pulse height."""
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(a)
         # so
@@ -166,11 +182,14 @@ class BestAssignmentPfitGainResult:
         return ph
 
     def predicted_energies(self) -> NDArray | float:
+        """Convert the assigned pulse heights to energies using the fitted gain curve."""
         return self.ph2energy(self.ph_assigned)
 
 
 @dataclass(frozen=True)
 class SmoothedLocalMaximaResult:
+    """A set of local maxima found in a smoothed histogram of pulse heights."""
+
     fwhm_pulse_height_units: float
     bin_centers: np.ndarray
     counts: np.ndarray
@@ -179,21 +198,27 @@ class SmoothedLocalMaximaResult:
     local_minima_inds: np.ndarray  # inds into bin_centers
 
     def inds_sorted_by_peak_height(self) -> NDArray:
+        """Indices of local maxima sorted by peak height, highest first."""
         return self.local_maxima_inds[np.argsort(-self.peak_height())]
 
     def inds_sorted_by_prominence(self) -> NDArray:
+        """Indices of local maxima sorted by prominence, most prominent first."""
         return self.local_maxima_inds[np.argsort(-self.prominence())]
 
     def ph_sorted_by_prominence(self) -> NDArray:
+        """Pulse heights of local maxima sorted by prominence, most prominent first."""
         return self.bin_centers[self.inds_sorted_by_prominence()]
 
     def ph_sorted_by_peak_height(self) -> NDArray:
+        """Pulse heights of local maxima sorted by peak height, highest first."""
         return self.bin_centers[self.inds_sorted_by_peak_height()]
 
     def peak_height(self) -> NDArray:
+        """Peak heights of local maxima."""
         return self.smoothed_counts[self.local_maxima_inds]
 
     def prominence(self) -> NDArray:
+        """Prominence of local maxima, in aems order as `local_maxima_inds`."""
         assert len(self.local_minima_inds) == len(self.local_maxima_inds) + 1, (
             "peakfind_local_maxima_of_smoothed_hist must ensure this "
         )
@@ -213,6 +238,7 @@ class SmoothedLocalMaximaResult:
         plot_counts: bool = False,
         ax: Axes | None = None,
     ) -> Axes:
+        """Make a diagnostic plot of the smoothed histogram and local maxima."""
         if ax is None:
             plt.figure()
             ax = plt.gca()
@@ -274,12 +300,14 @@ class SmoothedLocalMaximaResult:
 
 
 def smooth_hist_with_gauassian_by_fft(hist: ndarray, fwhm_in_bin_number_units: float) -> ndarray:
+    """Smooth a histogram by convolution with a Gaussian, using FFTs."""
     kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
     y = np.fft.irfft(np.fft.rfft(hist) * kernel)
     return y
 
 
 def smooth_hist_with_gauassian_by_fft_compute_kernel(nbins: int, fwhm_in_bin_number_units: float) -> ndarray:
+    """Compute the DFT of a Gaussian kernel for smoothing a histogram."""
     sigma = fwhm_in_bin_number_units / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
     tx = np.fft.rfftfreq(nbins)
@@ -292,6 +320,7 @@ def hist_smoothed(
     fwhm_pulse_height_units: float,
     bin_edges: ndarray | None = None,
 ) -> tuple[ndarray, ndarray, ndarray]:
+    """Compute a histogram of pulse heights and smooth it with a Gaussian of given FWHM."""
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
@@ -310,6 +339,7 @@ def hist_smoothed(
 
 
 def local_maxima(y: ndarray) -> tuple[ndarray, ndarray]:
+    "Find local maxima and minima, as 1D arrays."
     local_maxima_inds = []
     local_minima_inds = []
     increasing = False
@@ -329,6 +359,8 @@ def peakfind_local_maxima_of_smoothed_hist(
     fwhm_pulse_height_units: float,
     bin_edges: ndarray | None = None,
 ) -> SmoothedLocalMaximaResult:
+    """Find local maxima in a smoothed histogram of pulse heights."""
+    pulse_heights = pulse_heights.astype(np.float64)
     assert len(pulse_heights > 10), "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, _step_size = mass2.misc.midpoints_and_step_size(bin_edges)
@@ -379,6 +411,7 @@ def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> Any:
 
 
 def rank_assignments(ph: ArrayLike, e: ArrayLike) -> tuple[NDArray, NDArray, NDArray]:
+    """Rank possible assignments of pulse heights to energies by how locally linear their implied gain curves are."""
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
@@ -409,6 +442,7 @@ def rank_assignments(ph: ArrayLike, e: ArrayLike) -> tuple[NDArray, NDArray, NDA
 
 
 def find_optimal_assignment(ph: ArrayLike, e: ArrayLike) -> tuple[float, NDArray]:
+    """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test."""
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
@@ -426,6 +460,8 @@ def find_optimal_assignment(ph: ArrayLike, e: ArrayLike) -> tuple[float, NDArray
 
 
 def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_heights_allowed: ArrayLike) -> tuple[float, NDArray]:
+    """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
+    while respecting constraints on which pulse heights can be assigned to which energies."""
     # ph is a list of peak heights longer than e
     # e is a list of known peak energies
     # we want to find the set of peak heights from ph that are closest to being locally linear with the energies in e
@@ -471,6 +507,8 @@ def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_height
 
 
 def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str]) -> BestAssignmentPfitGainResult:
+    """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
+    and fit a polynomial gain curve to the result."""
     ph = np.asarray(ph)
     e = np.asarray(e)
     rms_e_residual, pha = find_optimal_assignment(ph, e)
@@ -496,6 +534,9 @@ def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str])
 def find_optimal_assignment2_height_info(
     ph: ArrayLike, e: ArrayLike, line_names: list[str], line_heights_allowed: ArrayLike
 ) -> BestAssignmentPfitGainResult:
+    """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
+    while respecting constraints on which pulse heights can be assigned to which energies,
+    and fit a polynomial gain curve to the result."""
     rms_e_residual, pha = find_optimal_assignment_height_info(ph, e, line_heights_allowed)
     ph = np.asarray(ph)
     e = np.asarray(e)
@@ -519,11 +560,14 @@ def find_optimal_assignment2_height_info(
 
 
 def find_pfit_gain_residual(ph: ndarray, e: ndarray) -> tuple[ndarray, Polynomial]:
+    """Find a 2nd degree polynomial fit to the gain curve defined by ph/e,
+    and return the residuals in energy when using that gain curve to convert ph to energy."""
     assert len(ph) == len(e)
     gain = ph / e
     pfit_gain = np.polynomial.Polynomial.fit(ph, gain, deg=2)
 
     def ph2energy(ph: NDArray) -> NDArray:
+        """Convert pulse height to energy using the fitted gain curve."""
         return ph / pfit_gain(ph)
 
     predicted_e = ph2energy(ph)
@@ -532,6 +576,10 @@ def find_pfit_gain_residual(ph: ndarray, e: ndarray) -> tuple[ndarray, Polynomia
 
 
 def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, names: list[str]) -> BestAssignmentPfitGainResult:
+    """Try all possible assignments of pulse heights to energies,
+    and return the one with the lowest RMS residual in energy after fitting a 2nd degree polynomial gain curve.
+    Return as a BestAssignmentPfitGainResult object.
+    """
     (
         best_rms_residual,
         best_ph_assigned,
@@ -552,6 +600,9 @@ def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, 
 
 
 def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -> tuple[float, ndarray, ndarray, ndarray, Polynomial]:
+    """Try all possible assignments of pulse heights to energies,
+    and return the one with the lowest RMS residual in energy after fitting a 2nd degree polynomial gain curve.
+    """
     assert len(ph) >= len(e)
     ph = np.sort(ph)
     assignments_inds = itertools.combinations(np.arange(len(ph)), len(e))
@@ -587,6 +638,7 @@ def drift_correct_entropy(
     bin_edges: ndarray,
     fwhm_in_bin_number_units: int,
 ) -> float:
+    """Calculate the entropy of a histogram of drift-corrected pulse heights."""
     corrected = uncorrected * (1 + indicator_zero_mean * slope)
     smoothed_counts, bin_edges, _counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
     w = smoothed_counts > 0
@@ -599,10 +651,13 @@ def minimize_entropy_linear(
     bin_edges: ndarray,
     fwhm_in_bin_number_units: int,
 ) -> tuple[OptimizeResult, float32]:
+    """Minimize the entropy of a histogram of drift-corrected pulse heights
+    by varying the slope of a linear correction based on the given indicator."""
     indicator_mean = np.mean(indicator)
     indicator_zero_mean = indicator - indicator_mean
 
     def entropy_fun(slope: float) -> float:
+        """Return the entropy of a histogram of drift-corrected pulse heights, the optimization target."""
         return drift_correct_entropy(slope, indicator_zero_mean, uncorrected, bin_edges, fwhm_in_bin_number_units)
 
     result = sp.optimize.minimize_scalar(entropy_fun, bracket=[0, 0.1])
@@ -612,6 +667,9 @@ def minimize_entropy_linear(
 def eval_3peak_assignment_pfit_gain(
     ph_assigned: NDArray, e_assigned: NDArray, possible_phs: NDArray, line_energies: NDArray, line_names: list[str]
 ) -> tuple[float, BestAssignmentPfitGainResult | str]:
+    """Evaluate a proposed assignment of 3 pulse heights to 3 energies by fitting a 2nd degree polynomial gain curve,
+    and returning the RMS residual in energy after applying that gain curve to all possible pulse heights.
+    If the proposed assignment does not lead to a well formed gain curve, return infinity and a string describing the problem."""
     assert len(np.unique(ph_assigned)) == len(ph_assigned), "assignments must be unique"
     assert len(np.unique(e_assigned)) == len(e_assigned), "assignments must be unique"
     assert all(np.diff(ph_assigned) > 0), "assignments must be sorted"
@@ -629,12 +687,14 @@ def eval_3peak_assignment_pfit_gain(
         return np.inf, "pfit_gain_3peak must have real roots"
 
     def ph2energy(ph: NDArray) -> NDArray:
+        "Convert pulse height to energy using the fitted gain curve."
         gain = pfit_gain_3peak(ph)
         return ph / gain
 
     cba = pfit_gain_3peak.convert().coef
 
     def energy2ph(energy: NDArray) -> NDArray:
+        "Invert the gain curve to convert energy to pulse height."
         # ph2energy is equivalent to this with y=energy, x=ph
         # y = x/(c + b*x + a*x^2)
         # so
@@ -686,12 +746,15 @@ def eval_3peak_assignment_pfit_gain(
 
 @dataclass(frozen=True)
 class RoughCalibrationStep(RecipeStep):
+    """A step to perform a rough calibration of pulse heights to energies."""
+
     pfresult: SmoothedLocalMaximaResult | None
     assignment_result: BestAssignmentPfitGainResult | None
     ph2energy: Callable
     success: bool
 
     def calc_from_df(self, df: DataFrame) -> DataFrame:
+        """Apply the rough calibration to a dataframe."""
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
         inputs_np = [df[input].to_numpy() for input in self.inputs]
@@ -700,15 +763,18 @@ class RoughCalibrationStep(RecipeStep):
         return df2
 
     def drop_debug(self) -> "RoughCalibrationStep":
+        """Return a copy of this step with debug information removed."""
         return dataclasses.replace(self, pfresult=None, assignment_result=None)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> None:
+        """Create diagnostic plots of the rough calibration step."""
         if self.success:
             self.dbg_plot_success(df_after, **kwargs)
         else:
             self.dbg_plot_failure(df_after, **kwargs)
 
     def dbg_plot_success(self, df: DataFrame, **kwargs: Any) -> None:
+        """Create diagnostic plots of the rough calibration step, if it succeeded."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.assignment_result:
             self.assignment_result.plot(ax=axs[0])
@@ -717,12 +783,14 @@ class RoughCalibrationStep(RecipeStep):
         plt.tight_layout()
 
     def dbg_plot_failure(self, df: DataFrame, **kwargs: None) -> None:
+        """Create diagnostic plots of the rough calibration step, if it failed."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
         plt.tight_layout()
 
     def energy2ph(self, energy: ArrayLike) -> NDArray | float:
+        """Convert energy to pulse height using the fitted gain curve."""
         if self.assignment_result:
             return self.assignment_result.energy2ph(energy)
         return 0.0
@@ -738,6 +806,8 @@ class RoughCalibrationStep(RecipeStep):
         n_extra: int,
         use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":
+        """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
+        and assigning them to known energies in a way that minimizes the RMS error in a local linearity test."""
         (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
@@ -767,6 +837,9 @@ class RoughCalibrationStep(RecipeStep):
         n_extra: int,
         use_expr: pl.Expr = field(default_factory=alwaysTrue),
     ) -> "RoughCalibrationStep":
+        """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
+        and assigning them to known energies in a way that minimizes the RMS error in a local linearity test,
+        while respecting constraints on which pulse heights can be assigned to which energies."""
         (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"
@@ -804,6 +877,11 @@ class RoughCalibrationStep(RecipeStep):
         n_extra_peaks: int = 10,
         acceptable_rms_residual_e: float = 10,
     ) -> "RoughCalibrationStep":
+        """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
+        and assigning 3 of them to known energies in a way that minimizes the RMS error in a local linearity test,
+        and then evaluating that assignment by fitting a 2nd degree polynomial gain curve to all possible pulse heights
+        and returning the RMS error in energy after applying that gain curve to all possible pulse heights.
+        If no good assignment is found, the step will be marked as unsuccessful."""
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
         (line_names_str, line_energies_list) = line_names_and_energies(line_names)
@@ -844,6 +922,7 @@ class RoughCalibrationStep(RecipeStep):
             success = False
 
             def nanenergy(ph: NDArray | float) -> NDArray | float:
+                "Return NaN for all pulse heights, indicating failure to calibrate."
                 return ph * np.nan
 
             ph2energy = nanenergy

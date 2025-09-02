@@ -1,4 +1,9 @@
+"""
+Data structures and methods for handling a group of microcalorimeter channels.
+"""
+
 from dataclasses import dataclass, field
+import dataclasses
 from collections.abc import Callable, Iterable
 from numpy.typing import ArrayLike
 from typing import Any
@@ -24,20 +29,45 @@ from . import ljhutil
 
 @dataclass(frozen=True)  # noqa: PLR0904
 class Channels:
+    """A collection of microcalorimeter channels, with methods to operate in parallel on all channels."""
+
     channels: dict[int, Channel]
     description: str
     bad_channels: dict[int, BadChannel] = field(default_factory=dict)
 
     @property
     def ch0(self) -> Channel:
+        """Return a representative Channel object for convenient exploration (the one with the lowest channel number)."""
         assert len(self.channels) > 0, "channels must be non-empty"
         return next(iter(self.channels.values()))
 
+    def with_more_channels(self, more: "Channels") -> "Channels":
+        """Return a Channels object with additional Channels in it.
+        New channels with the same number will overrule existing ones.
+
+        Parameters
+        ----------
+        more : Channels
+            Another Channels object, to be added
+
+        Returns
+        -------
+        Channels
+            The replacement
+        """
+        channels = self.channels.copy()
+        channels.update(more.channels)
+        bad = self.bad_channels.copy()
+        bad.update(more.bad_channels)
+        descr = self.description + more.description + "\nWarning! created by with_more_channels()"
+        return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
+
     @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
+        """Return a DataFrame containing good pulses from each channel. Excludes the given columns (default "pulse")."""
         # return a dataframe containing good pulses from each channel,
         # exluding "pulse" by default
-        # and including columns "key" (to be removed?) and "ch_num"
+        # and including column "ch_num"
         # the more common call should be to wrap this in a convenient plotter
         dfs = []
         for ch_num, channel in self.channels.items():
@@ -60,6 +90,7 @@ class Channels:
         binsize: float = 0.5,
         params_update: lmfit.Parameters = lmfit.Parameters(),
     ) -> LineModelResult:
+        """Perform a fit to one spectral line in the coadded histogram of the given column."""
         model = mass2.calibration.algorithms.get_model(line, has_linear_background=has_linear_background, has_tails=has_tails)
         pe = model.spect.peak_energy
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
@@ -82,6 +113,7 @@ class Channels:
         return result
 
     def plot_hist(self, col: str, bin_edges: ArrayLike, use_expr: pl.Expr = pl.lit(True), axis: plt.Axes | None = None) -> None:
+        """Plot a histogram for the given column across all channels."""
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
         ax.set_title(f"{len(self.channels)} channels, {self.description}")
@@ -243,6 +275,7 @@ class Channels:
         plt.title("Noise autocorrelation")
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
+        """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
         new_channels = {}
         new_bad_channels = {}
         for key, channel in self.channels.items():
@@ -265,6 +298,7 @@ class Channels:
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
     def set_bad(self, ch_num: int, msg: str, require_ch_num_exists: bool = True) -> "Channels":
+        """Return a copy of this Channels object with the given channel number marked as bad."""
         new_channels = {}
         new_bad_channels = {}
         if require_ch_num_exists:
@@ -277,7 +311,10 @@ class Channels:
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
     def linefit_joblib(self, line: str, col: str, prefer: str = "threads", n_jobs: int = 4) -> LineModelResult:
+        """No one but Galen understands this function."""
+
         def work(key: int) -> LineModelResult:
+            """A unit of parallel work: fit line to one channel."""
             channel = self.channels[key]
             return channel.linefit(line, col)
 
@@ -286,16 +323,18 @@ class Channels:
         return results
 
     def __hash__(self) -> int:
+        """Hash based on the object's id (identity)."""
         # needed to make functools.cache work
         # if self or self.anything is mutated, assumptions will be broken
         # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: Any) -> bool:
+        """Equality test based on object identity."""
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: list[tuple[str, str]], description: str) -> "Channels":
+    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
@@ -337,6 +376,7 @@ class Channels:
 
     @classmethod
     def from_off_paths(cls, off_paths: Iterable[str | Path], description: str) -> "Channels":
+        """Create an instance from a sequence of OFF-file paths"""
         channels = {}
         for path in off_paths:
             ch = Channel.from_off(mass2.core.OffFile(str(path)))
@@ -346,12 +386,14 @@ class Channels:
     @classmethod
     def from_ljh_folder(
         cls,
-        pulse_folder: str,
-        noise_folder: str | None = None,
+        pulse_folder: str | Path,
+        noise_folder: str | Path | None = None,
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
     ) -> "Channels":
+        """Create an instance from a directory of LJH files."""
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
+        pulse_folder = str(pulse_folder)
         if exclude_ch_nums is None:
             exclude_ch_nums = []
         if noise_folder is None:
@@ -361,6 +403,7 @@ class Channels:
             pairs = [(path, "") for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
+            noise_folder = str(noise_folder)
             pairs = ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
@@ -370,17 +413,21 @@ class Channels:
         return data
 
     def get_an_ljh_path(self) -> Path:
+        """Return the path to a representative one of the LJH files used to create this Channels object."""
         return pathlib.Path(self.ch0.header.df["Filename"][0])
 
     def get_path_in_output_folder(self, filename: str | Path) -> Path:
+        """Return a path in an output folder named like the run number, sibling to the LJH folder."""
         ljh_path = self.get_an_ljh_path()
         base_name, _ = ljh_path.name.split("_chan")
         date, run_num = base_name.split("_run")  # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = ljh_path.parent.parent / f"{run_num}moss_output"
+        output_dir = ljh_path.parent.parent / f"{run_num}mass2_output"
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir / filename
 
     def get_experiment_state_df(self, experiment_state_path: str | Path | None = None) -> pl.DataFrame:
+        """Return a DataFrame containing experiment state information,
+        loading from the given path or (if None) inferring it from an LJH file."""
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
             experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
@@ -393,10 +440,14 @@ class Channels:
         return df_es
 
     def with_experiment_state_by_path(self, experiment_state_path: str | None = None) -> "Channels":
+        """Return a copy of this Channels object with experiment state information added,
+        loaded from the given path."""
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
     def with_external_trigger_by_path(self, path: str | None = None) -> "Channels":
+        """Return a copy of this Channels object with external trigger information added, loaded
+        from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented)."""
         if path is None:
             raise NotImplementedError("cannot infer external trigger path yet")
         with open(path, "rb") as _f:
@@ -408,12 +459,18 @@ class Channels:
         return self.with_external_trigger_df(df_ext)
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channels":
+        """Return a copy of this Channels object with external trigger information added to each Channel,
+        found from the given DataFrame."""
+
         def with_etrig_df(channel: Channel) -> Channel:
+            """Return a copy of one Channel object with external trigger information added to it"""
             return channel.with_external_trigger_df(df_ext)
 
         return self.map(with_etrig_df)
 
     def with_experiment_state_df(self, df_es: pl.DataFrame) -> "Channels":
+        """Return a copy of this Channels object with experiment state information added to each Channel,
+        found from the given DataFrame."""
         # this is not as performant as making use_exprs for states
         # and using .set_sorted on the timestamp column
         ch2s = {}
@@ -422,7 +479,10 @@ class Channels:
         return Channels(ch2s, self.description)
 
     def with_steps_dict(self, steps_dict: dict[int, Recipe]) -> "Channels":
+        """Return a copy of this Channels object with the given Recipe objects added to each Channel."""
+
         def load_recipes(channel: Channel) -> Channel:
+            """Return a copy of one Channel object with Recipe steps added to it"""
             try:
                 steps = steps_dict[channel.header.ch_num]
             except KeyError:
@@ -464,15 +524,21 @@ class Channels:
         return steps
 
     def load_recipes(self, filename: str) -> "Channels":
+        """Return a copy of this Channels object with Recipe objects loaded from the given pickle file
+        and applied to each Channel."""
         steps = mass2.misc.unpickle_object(filename)
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self) -> pathlib.Path:
+        """Return the parent folder of the LJH files used to create this Channels object. Specifically, the
+        `self.ch0` channel's directory is used (normally the answer would be the same for all channels)."""
         parent_folder_path = pathlib.Path(self.ch0.header.df["Filename"][0]).parent.parent
         print(f"{parent_folder_path=}")
         return parent_folder_path
 
     def concat_data(self, other_data: "Channels") -> "Channels":
+        """Return a new Channels object with data from this and the other Channels object concatenated together.
+        Only channels that exist in both objects are included in the result."""
         # sorting here to show intention, but I think set is sorted by insertion order as
         # an implementation detail so this may not do anything
         ch_nums = sorted(list(set(self.channels.keys()).intersection(other_data.channels.keys())))
@@ -494,6 +560,7 @@ class Channels:
         n_samples: int,
         description: str = "from Channels.channels_from_df",
     ) -> "Channels":
+        """Create a Channels object from a single DataFrame that holds data from multiple channels."""
         # requres a column named "ch_num" containing the channel number
         keys_df: dict[tuple, pl.DataFrame] = df_in.partition_by(by=["ch_num"], as_dict=True)
         dfs: dict[int, pl.DataFrame] = {keys[0]: df for (keys, df) in keys_df.items()}

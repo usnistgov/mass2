@@ -400,6 +400,22 @@ def _choose_trial_val(left: NDArray, right: NDArray, x: ArrayLike, n: int) -> tu
 
 @njit
 def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int]:
+    """Subroutine to compute the Q statistic.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Sorted data set
+    n : int
+        Number of data values
+    target_k : int
+        We want to find the target_k'th smallest distance |xi-xj| for i<j
+
+    Returns
+    -------
+    tuple[float, int]
+        (Qstatistic, number of distances tried)
+    """
     trial_q_row = 0
     trial_q_col = 0
 

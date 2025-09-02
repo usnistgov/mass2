@@ -110,6 +110,7 @@ class SpectralLine:
 
     @cached_property
     def peak_energy(self) -> float:
+        """Find the peak energy of the line shape assuming ideal instrument resolution."""
         try:
             peak_energy = sp.optimize.brent(
                 lambda x: -self.pdf(x, instrument_gaussian_fwhm=0), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
@@ -120,10 +121,12 @@ class SpectralLine:
 
     @property
     def cumulative_amplitudes(self) -> NDArray:
+        """Cumulative sum of the Lorentzian integral intensities."""
         return self.lorentzian_integral_intensity.cumsum()
 
     @cached_property
     def lorentzian_integral_intensity(self) -> NDArray:
+        """Return (and cache) computed integrated intensities of the Lorentzian components."""
         if self.reference_amplitude_type == AmplitudeType.VOIGT_PEAK_HEIGHT:
             sigma = self.reference_plot_instrument_gaussian_fwhm / FWHM_OVER_SIGMA
             return np.array([
@@ -137,11 +140,13 @@ class SpectralLine:
 
     @cached_property
     def normalized_lorentzian_integral_intensity(self) -> NDArray:
+        """Return (and cache) computed integrated intensities of the Lorentzian components, normalized so sum=1."""
         x = self.lorentzian_integral_intensity
         return x / np.sum(x)
 
     @cached_property
     def lorentz_amplitude(self) -> NDArray:
+        """Return (and cache) computed Lorentzian peak heights of the components."""
         return self.lorentzian_integral_intensity / self.lorentzian_fwhm
 
     def __call__(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
@@ -206,6 +211,7 @@ class SpectralLine:
         return axis
 
     def plot_like_reference(self, axis: plt.Axes | None = None) -> plt.Axes:
+        """Plot the spectrum to match the instrument resolution used in the reference data publication, if known."""
         if self.reference_plot_instrument_gaussian_fwhm is None:
             fwhm = 0.001
         else:
@@ -239,6 +245,7 @@ class SpectralLine:
 
     @property
     def shortname(self) -> str:
+        """A short name for the line, suitable for use as a dictionary key."""
         if self.is_default_material:
             return f"{self.element}{self.linetype}"
         else:
@@ -246,6 +253,7 @@ class SpectralLine:
 
     @property
     def reference(self) -> str:
+        """The full comment and/or citation for the reference data."""
         return lineshape_references[self.reference_short]
 
     def _gaussian_sigma(self, instrument_gaussian_fwhm: float) -> float:
@@ -254,6 +262,7 @@ class SpectralLine:
         return ((instrument_gaussian_fwhm / FWHM_OVER_SIGMA) ** 2 + self.intrinsic_sigma**2) ** 0.5
 
     def __repr__(self) -> str:
+        """String representation of the SpectralLine."""
         return f"SpectralLine: {self.shortname}"
 
     def model(
@@ -268,6 +277,7 @@ class SpectralLine:
         return m
 
     def fitter(self) -> GenericLineModel:
+        """Generate a GenericLineModel instance for fitting this SpectralLine."""
         fitter_class = GenericLineModel
         f = fitter_class(self)
         f.name = f"{self.element}{self.linetype}"
@@ -335,6 +345,7 @@ class SpectralLine:
         is_default_material: bool = True,
         allow_replacement: bool = True,
     ) -> "SpectralLine":
+        """Add a new SpectralLine to the `mass2.fluorescence_lines.spectra` dictionary, and as a variable in this module."""
         # require exactly one method of specifying the amplitude of each component
         assert reference_amplitude_type in {
             AmplitudeType.LORENTZIAN_PEAK_HEIGHT,
@@ -391,6 +402,18 @@ class LineshapeReference:
 
     @classmethod
     def load(cls, filename: pathlib.Path | str | None = None) -> dict:
+        """Load the reference comments from a YAML file. If filename is None, load the default file in mass2/data.
+
+        Parameters
+        ----------
+        filename : pathlib.Path | str | None, optional
+            The file to read containing reference comments, by default None
+
+        Returns
+        -------
+        dict
+            A dictionary of LineshapeReference objects, keyed by their tag.
+        """
         references = {"unknown": LineshapeReference("unknown", "unknown", "")}
         if filename is None:
             filename = str(pkg_resources.files("mass2") / "data" / "fluorescence_line_references.yaml")
@@ -402,6 +425,7 @@ class LineshapeReference:
         return references
 
     def __str__(self) -> str:
+        """The citation string for this reference."""
         lines = [f'lineshape_references["{self.tag}"]:']
         lines.append(self.description.rstrip("\n"))
         if len(self.url) > 1:

@@ -22,6 +22,8 @@ from .fluorescence_lines import STANDARD_FEATURES
 
 
 class Curvetypes(Enum):
+    """Enumerate the types of calibration curves supported by Mass2."""
+
     LINEAR = auto()
     LINEAR_PLUS_ZERO = auto()
     LOGLOG = auto()
@@ -61,6 +63,7 @@ class EnergyCalibrationMaker:
         de: ArrayLike | None = None,
         names: list[str] | None = None,
     ) -> EnergyCalibrationMaker:
+        """Create an EnergyCalibrationMaker, filling in any missing requirements with empty arrays."""
         if ph is None:
             ph = np.array([], dtype=float)
         else:
@@ -109,6 +112,7 @@ class EnergyCalibrationMaker:
 
     @property
     def npts(self) -> int:
+        """The number of calibration anchor points."""
         return len(self.ph)
 
     def _remove_cal_point_idx(self, idx: int) -> EnergyCalibrationMaker:
@@ -253,20 +257,25 @@ class EnergyCalibrationMaker:
     def make_calibration_loglog(
         self, approximate: bool = False, powerlaw: float = 1.15, extra_info: dict[str, Any] | None = None
     ) -> EnergyCalibration:
+        """Create a calibration curve that is a spline in log(energy) vs log(pulse height)."""
         return self.make_calibration(Curvetypes.LOGLOG, approximate=approximate, powerlaw=powerlaw, extra_info=extra_info)
 
     def make_calibration_gain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
+        """Create a calibration curve that is a spline in (pulse height/energy) vs pulse height."""
         return self.make_calibration(Curvetypes.GAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_invgain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
+        """Create a calibration curve that is a spline in (energy/pulse height) vs pulse height."""
         return self.make_calibration(Curvetypes.INVGAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_loggain(self, approximate: bool = False, extra_info: dict[str, Any] | None = None) -> EnergyCalibration:
+        """Create a calibration curve that is a spline in log(pulse height/energy) vs pulse height."""
         return self.make_calibration(Curvetypes.LOGGAIN, approximate=approximate, extra_info=extra_info)
 
     def make_calibration_linear(
         self, approximate: bool = False, addzero: bool = False, extra_info: dict[str, Any] | None = None
     ) -> EnergyCalibration:
+        """Create a calibration curve that is a spline in energy vs pulse height. If `addzero` include a (0,0) anchor point."""
         curvename = Curvetypes.LINEAR_PLUS_ZERO if addzero else Curvetypes.LINEAR
         return self.make_calibration(curvename, approximate=approximate, extra_info=extra_info)
 
@@ -277,6 +286,29 @@ class EnergyCalibrationMaker:
         powerlaw: float = 1.15,
         extra_info: dict[str, Any] | None = None,
     ) -> EnergyCalibration:
+        """Create an energy calibration curve of the specified type.
+
+        Parameters
+        ----------
+        curvename : Curvetypes, optional
+            Which curve type to use, by default Curvetypes.LOGLOG
+        approximate : bool, optional
+            Whether to approximate the anchor point data given the uncertainties, by default False
+        powerlaw : float, optional
+            An approximate powerlaw guess used by LOGLOG curves, by default 1.15
+        extra_info : dict[str, Any] | None, optional
+            Extra text to store in the result, by default None
+
+        Returns
+        -------
+        EnergyCalibration
+            The calibration object.
+
+        Raises
+        ------
+        ValueError
+            If there are too few anchor points for an approximating curve, or if `curvename` is not in `Curvetypes`.
+        """
         if approximate and self.npts < 3:
             raise ValueError(f"approximating curves require 3 or more cal anchor points, have {self.npts}")
         if curvename not in Curvetypes:
@@ -284,6 +316,7 @@ class EnergyCalibrationMaker:
 
         # Use a heuristic to repair negative uncertainties.
         def regularize_uncertainties(x: NDArray[np.float64]) -> np.ndarray:
+            """Replace negative uncertainties with the minimum non-negative uncertainty, or zero."""
             if not np.any(x < 0):
                 return x
             target = max(0.0, x.min())
@@ -405,6 +438,25 @@ class EnergyCalibrationMaker:
     def drop_one_errors(
         self, curvename: Curvetypes = Curvetypes.LOGLOG, approximate: bool = False, powerlaw: float = 1.15
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """For each calibration point, calculate the difference between the 'correct' energy
+        and the energy predicted by creating a calibration without that point and using
+        ph2energy to calculate the predicted energy
+
+        Parameters
+        ----------
+        curvename : Curvetypes, optional
+            Calibration curve type to employ, by default Curvetypes.LOGLOG
+        approximate : bool, optional
+            Whether to approximate the anchor point data given the uncertainties, by default False
+        powerlaw : float, optional
+            An approximate powerlaw guess used by LOGLOG curves, by default 1.15
+
+        Returns
+        -------
+        tuple[NDArray[np.float64], NDArray[np.float64]]
+            An array of the anchor point energies, and an array of the differences between the predicted
+            and actual energies for each anchor point.
+        """
         # """For each calibration point, calculate the difference between the 'correct' energy
         # and the energy predicted by creating a calibration without that point and using
         # ph2energy to calculate the predicted energy, return (energies, drop_one_energy_diff)"""
@@ -435,7 +487,7 @@ class EnergyCalibration:
     Raises
     ------
     ValueError
-        _description_
+        If there is not at least one anchor point.
     """
 
     ph: NDArray[np.float64]
@@ -453,13 +505,16 @@ class EnergyCalibration:
     extra_info: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
+        """Fail for inputs of length zero."""
         assert self.npts > 0
 
     def copy(self, **changes: Any) -> EnergyCalibration:
+        """Make a copy of this object, optionally changing some attributes."""
         return dataclasses.replace(self, **changes)
 
     @property
     def npts(self) -> int:
+        """Return the number of calibration anchor points."""
         return len(self.ph)
 
     @staticmethod
@@ -571,12 +626,25 @@ class EnergyCalibration:
         return self.ph2uncertainty(ph)
 
     def __str__(self) -> str:
+        """A full description of the calibration."""
         seq = [f"EnergyCalibration({self.curvename})"]
         for name, pulse_ht, energy in zip(self.names, self.ph, self.energy):
             seq.append(f"  energy(ph={pulse_ht:7.2f}) --> {energy:9.2f} eV ({name})")
         return "\n".join(seq)
 
-    def ph2energy(self, ph: ArrayLike, exact: bool = False) -> NDArray[np.float64]:
+    def ph2energy(self, ph: ArrayLike) -> NDArray[np.float64]:
+        """Apply the calibration, converting pulse heights `ph` to energies.
+
+        Parameters
+        ----------
+        ph : ArrayLike
+            The pulse heights to convert to energies.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Energies in eV.
+        """
         ph = np.asarray(ph)
         x = self.input_transform(ph)
         y = self.spline(x, der=0)
@@ -589,7 +657,7 @@ class EnergyCalibration:
     __call__ = ph2energy
 
     def ph2dedph(self, ph: ArrayLike) -> NDArray[np.float64]:
-        """Calculate the slope at pulse heights `ph`."""
+        """Calculate the calibration curve's slope at pulse heights `ph`."""
         ph = np.asarray(ph)
         x = self.input_transform(ph)
         dgdP = self.input_transform(ph, der=1)
@@ -603,10 +671,24 @@ class EnergyCalibration:
         return dEdP
 
     def energy2ph_exact(self, E: ArrayLike) -> NDArray[np.float64]:
+        """An exact inversion of the calibration curve, converting energies `E` to pulse heights.
+        This is still in TO DO status, as it simply uses the spline in the forward direction.
+
+        Parameters
+        ----------
+        E : ArrayLike
+            Energies in eV to be converted back to pulse heihgts
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Pulse heights corresponding to the given energies.
+        """
         # TODO use the spline as a starting point for Brent's method
         return self.energy2ph(E)
 
     def save_to_hdf5(self, hdf5_group: h5py.Group, name: str) -> None:
+        """Save this calibration to an HDF5 group in a new subordinate group with the given name."""
         if name in hdf5_group:
             del hdf5_group[name]
 
@@ -621,6 +703,7 @@ class EnergyCalibration:
 
     @staticmethod
     def load_from_hdf5(hdf5_group: h5py.Group, name: str) -> EnergyCalibration:
+        """Load a calibration from an HDF5 group with the given name."""
         cal_group = hdf5_group[name]
 
         # Fix a behavior of h5py for writing in py2, reading in py3.
@@ -636,14 +719,17 @@ class EnergyCalibration:
         return maker.make_calibration(curvetype, approximate=approximate)
 
     def plotgain(self, **kwargs: Any) -> None:
+        """Plot the calibration curve as gain (PH/eV) vs pulse height."""
         kwargs["plottype"] = "gain"
         self.plot(**kwargs)
 
     def plotinvgain(self, **kwargs: Any) -> None:
+        """Plot the calibration curve as inverse gain (eV/PH) vs pulse height."""
         kwargs["plottype"] = "invgain"
         self.plot(**kwargs)
 
     def plotloggain(self, **kwargs: Any) -> None:
+        """Plot the calibration curve as log-gain log(PH/eV) vs pulse height."""
         kwargs["plottype"] = "loggain"
         self.plot(**kwargs)
 
@@ -661,6 +747,7 @@ class EnergyCalibration:
         min_energy: float | None = None,
         max_energy: float | None = None,
     ) -> None:
+        """Plot the calibration curve, with options."""
         # Plot smooth curve
         minph, maxph = self.ph.min() * 0.9, self.ph.max() * 1.1
         if min_energy is not None:

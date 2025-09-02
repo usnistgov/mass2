@@ -1,12 +1,3 @@
-from typing import Any
-from numpy.typing import NDArray
-import json
-import io
-import os
-import numpy as np
-from base64 import decodebytes
-
-
 """
 Code copied from Mass version 1. Not up to date with latest style. Sorry.
 
@@ -15,6 +6,14 @@ Supported off versions:
 0.2.0 has projectors and basis after json as binary
 0.3.0 adds pretrigDelta field
 """
+
+from typing import Any
+from numpy.typing import NDArray
+import json
+import io
+import os
+import numpy as np
+from base64 import decodebytes
 
 
 def recordDtype(offVersion: str, nBasis: int, descriptive_coefs_names: bool = True) -> np.dtype:
@@ -114,11 +113,13 @@ class OffFile:
         self._updateMmap()
 
     def close(self) -> None:
+        """Close the memory map and projectors and basis memmaps"""
         del self._mmap
         del self.projectors
         del self.basis
 
     def validateHeader(self) -> None:
+        "Check that the header looks like we expect, with a valid version code"
         with open(self.filename, "rb") as f:
             f.seek(self.headerStringLength - 2)
             if not f.readline().decode("utf-8") == "}\n":
@@ -127,8 +128,8 @@ class OffFile:
             raise Exception("FileFormatVersion is {}, want OFF".format(self.header["FileFormatVersion"]))
 
     def _updateMmap(self, _nRecords: int | None = None) -> None:
-        """
-        _nRecords is for testing only, mmap exaclty _nRecords records
+        """Memory map an OFF file's data.
+        `_nRecords` maps only a subset--designed for testing only
         """
         fileSize = os.path.getsize(self.filename)
         recordSize = fileSize - self.afterHeaderPos
@@ -140,19 +141,23 @@ class OffFile:
         self.shape = self._mmap.shape
 
     def __getitem__(self, *args: Any, **kwargs: Any) -> Any:
-        # make indexing into the off the same as indexing into the memory mapped array
+        "Make indexing into the off the same as indexing into the memory mapped array"
         assert self._mmap is not None
         return self._mmap.__getitem__(*args, **kwargs)
 
     def __len__(self) -> int:
+        """Number of records in the OFF file"""
         assert self._mmap is not None
         return len(self._mmap)
 
     def __sizeof__(self) -> int:
+        """Size of the memory mapped array in bytes"""
         assert self._mmap is not None
         return self._mmap.__sizeof__()
 
     def _decodeModelInfo(self) -> None:
+        """Decode the model info (projectors and basis) from the OFF file, either from base64 in json
+        or a later proprietary, binary format"""
         if (
             "RowMajorFloat64ValuesBase64" in self.header["ModelInfo"]["Projectors"]
             and "RowMajorFloat64ValuesBase64" in self.header["ModelInfo"]["Basis"]
@@ -163,6 +168,7 @@ class OffFile:
             self._decodeModelInfoMmap()
 
     def _decodeModelInfoBase64(self) -> None:
+        """Decode the model info (projectors and basis) from the OFF file, from base64 in json."""
         projectorsData = decodebytes(self.header["ModelInfo"]["Projectors"]["RowMajorFloat64ValuesBase64"].encode())
         projectorsRows = int(self.header["ModelInfo"]["Projectors"]["Rows"])
         projectorsCols = int(self.header["ModelInfo"]["Projectors"]["Cols"])
@@ -182,6 +188,7 @@ class OffFile:
         self.afterHeaderPos = self.headerStringLength
 
     def _decodeModelInfoMmap(self) -> None:
+        """Decode the model info (projectors and basis) from the OFF file, from binary."""
         projectorsRows = int(self.header["ModelInfo"]["Projectors"]["Rows"])
         projectorsCols = int(self.header["ModelInfo"]["Projectors"]["Cols"])
         basisRows = int(self.header["ModelInfo"]["Basis"]["Rows"])
@@ -201,6 +208,7 @@ class OffFile:
             )
 
     def __repr__(self) -> str:
+        """Return a string representation of the OffFile object."""
         return "<OFF file> {}, {} records, {} length basis\n".format(self.filename, self.nRecords, self.header["NumberOfBases"])
 
     def sampleTimes(self, i: int) -> NDArray:
@@ -226,13 +234,16 @@ class OffFile:
         return np.asarray(allVals)
 
     def recordXY(self, i: int) -> tuple[NDArray, NDArray]:
+        """return (x,y) for record i, where x is time and y is modeled pulse"""
         return self.sampleTimes(i), self.modeledPulse(i)
 
     @property
     def _mmap_with_coefs(self) -> NDArray:
+        """Return a view of the memmap with the coefs all together in one field"""
         assert self._mmap is not None
         return self._mmap.view(self._dtype_non_descriptive)
 
     def view(self, *args: Any) -> NDArray:
+        """Return a view of the memmap with the given args"""
         assert self._mmap is not None
         return self._mmap.view(*args)

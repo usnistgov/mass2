@@ -279,6 +279,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
     def entropy(param: NDArray, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
+        """Return the entropy of the drift-corrected values"""
         corrected = uncorrected * (1 + indicator * param)
         hsmooth = smoother(corrected)
         w = hsmooth > 0
@@ -521,6 +522,7 @@ def time_drift_correct(  # noqa: PLR0914
     tmin, tmax = np.min(time), np.max(time)
 
     def normalize(t: NDArray) -> NDArray:
+        """Rescale time to the range [-1,1]"""
         return (t - tmin) / (tmax - tmin) * 2 - 1
 
     info = {
@@ -550,11 +552,13 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
     def model1(pi: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
+        "The model function, with one parameter pi varied, others fixed."
         pcopy = np.array(param)
         pcopy[i] = pi
         return 1 + np.dot(basis.T, pcopy)
 
     def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
+        "The cost function (spectral entropy), with one parameter pi varied, others fixed."
         return laplace_entropy(y * model1(pi, i, param, basis), w=w)
 
     param = np.zeros(ndeg, dtype=float)
