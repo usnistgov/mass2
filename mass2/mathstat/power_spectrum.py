@@ -163,6 +163,17 @@ class PowerSpectrum:
         sqrt_psd: bool = True,
         **plotkwarg: Any,
     ) -> None:
+        """Plot the power spectrum (or its square root) on a log-log plot.
+
+        Parameters
+        ----------
+        axis : plt.Axes | None, optional
+            Axes to plot on, or if None create a new figure, by default None
+        arb_to_unit_scale_and_label : tuple[int, str], optional
+            rescale the sqrt(PSD) by this amoutn and label it such, by default (1, "arb")
+        sqrt_psd : bool, optional
+            Whether to take the square root of the PSD, by default True
+        """
         if axis is None:
             plt.figure()
             axis = plt.gca()
@@ -189,6 +200,15 @@ class PowerSpectrumOverlap(PowerSpectrum):
     """
 
     def __init__(self, m: int, dt: float | None = 1.0):
+        """Sets up an object to accumulate a power spectrum estimate.
+
+        Parameters
+        ----------
+        m : int
+            Create a PSD estimate with m+1 frequency bins (counting DC)
+        dt : float | None, optional
+            Time sample period in seconds, by default 1.0
+        """
         PowerSpectrum.__init__(self, m, dt=dt)
         self.first = True
 
@@ -294,6 +314,15 @@ def computeSpectrum(
 
 
 def demo(N: int = 1024, window: Callable | ArrayLike | None = np.hanning) -> None:
+    """Plot a demonstration power spectrum with different segmentations.
+
+    Parameters
+    ----------
+    N : int, optional
+        Length of the white-noise random data vector, by default 1024
+    window : Callable | ArrayLike | None, optional
+        Window function to apply, by default np.hanning
+    """
     data = np.random.default_rng().standard_normal(N)
     plt.clf()
     for i in (2, 4, 8, 1):

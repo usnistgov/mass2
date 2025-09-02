@@ -54,6 +54,7 @@ dev = [
     "flake8",
     "pre-commit",
     "tox",
+    "interrogate",
 ]
 
 [project.urls]
