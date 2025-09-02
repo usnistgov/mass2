@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import dataclasses
 from collections.abc import Callable, Iterable
 from numpy.typing import ArrayLike
 from typing import Any
@@ -31,6 +32,27 @@ class Channels:
     def ch0(self) -> Channel:
         assert len(self.channels) > 0, "channels must be non-empty"
         return next(iter(self.channels.values()))
+
+    def with_more_channels(self, more: "Channels") -> "Channels":
+        """Return a Channels object with additional Channels in it.
+        New channels with the same number will overrule existing ones.
+
+        Parameters
+        ----------
+        more : Channels
+            Another Channels object, to be added
+
+        Returns
+        -------
+        Channels
+            The replacement
+        """
+        channels = self.channels.copy()
+        channels.update(more.channels)
+        bad = self.bad_channels.copy()
+        bad.update(more.bad_channels)
+        descr = self.description + more.description + "\nWarning! created by with_more_channels()"
+        return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
 
     @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
@@ -190,7 +212,7 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: list[tuple[str, str]], description: str) -> "Channels":
+    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
@@ -241,12 +263,13 @@ class Channels:
     @classmethod
     def from_ljh_folder(
         cls,
-        pulse_folder: str,
-        noise_folder: str | None = None,
+        pulse_folder: str | Path,
+        noise_folder: str | Path | None = None,
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
     ) -> "Channels":
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
+        pulse_folder = str(pulse_folder)
         if exclude_ch_nums is None:
             exclude_ch_nums = []
         if noise_folder is None:
@@ -256,6 +279,7 @@ class Channels:
             pairs = [(path, "") for path in paths]
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
+            noise_folder = str(noise_folder)
             pairs = ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
