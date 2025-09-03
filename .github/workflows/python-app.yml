@@ -45,6 +45,8 @@ jobs:
         activate-environment: true
         python-version: ${{ matrix.python-version }}
         enable-cache: true
+        ignore-nothing-to-cache: true
+        prune-cache: false
         cache-dependency-glob: |
           **/uv.lock
           **/pyproject.toml
