@@ -73,10 +73,14 @@
               <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../LJHfiles/">LJH file format</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../docstrings/">Docstrings</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../docstrings/">Core docstrings</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../docstrings2/">Other docstrings</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Testing</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#documentation">Documentation</a>
+    </li>
     </ul>
                   </li>
               </ul>
@@ -110,13 +114,15 @@
               
                 <h1 id="unit-testing">Unit testing</h1>
 <p>If you want to run the unit tests for <code>mass2</code> go to your <code>mass2</code> directory and do <code>pytest .</code></p>
-<p>If you want to add tests to <code>mass2</code>, you do <em>not</em> need to use the old <code>unittest</code> framework. Simpler, more modern tests in the <code>pytest</code> style are allowed (and preferred). Put any new tests in a file somewhere inside <code>tests</code> with a name like <code>test_myfeature.py</code>, it must match the pattern <code>test_*.py</code> to be found by pytest.</p>
+<p>If you want to add tests to <code>mass2</code>, just use simple, modern tests in the <code>pytest</code>. Put any new tests in a file somewhere inside <code>tests</code> with a name like <code>test_myfeature.py</code>, it must match the pattern <code>test_*.py</code> to be found by pytest. Use assertions, <code>numpy.allclose</code>, and similar tools to test that outcomes match expectations.</p>
 <p>On each commit to develop, the tests will be run automatically by GitHub Actions. See <a href="https://github.com/usnistgov/mass2/actions">results of recent tests</a>.</p>
+<h2 id="documentation">Documentation</h2>
+<p>We could use a lot of help with documentation. As of September 2, 2025, we used GitHub's AI chatbot to generate all 450+ missing doc strings. We think most of them look pretty reasonable, and many are excellent. But few use the desired numpy style for docstrings. Please consider upgrading any docstrings that touch on your work as you develop Mass2.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../docstrings/" class="btn btn-neutral float-left" title="Docstrings"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../docstrings2/" class="btn btn-neutral float-left" title="Other docstrings"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../about/" class="btn btn-neutral float-right" title="About">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -140,7 +146,7 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../docstrings/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../docstrings2/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../about/" style="color: #fcfcfc">Next &raquo;</a></span>
