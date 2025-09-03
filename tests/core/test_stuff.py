@@ -19,8 +19,8 @@ def test_ljh_to_polars():
 def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16)):
     rng = np.random.default_rng(seed)
     n = len(signal)
-    noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 10 + 5000, dtype=np.int16)
-    pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
+    noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 20 + 5000, dtype=np.int16)
+    pulse_traces = np.outer(rng.uniform(0.8, 1.2, size=npulses), signal).astype(np.int16)
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
@@ -33,7 +33,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16)):
         n_samples=n,
         df=header_df,
     )
-    df = pl.DataFrame({"pulse": pulse_traces})
+    df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     return ch
 
@@ -342,7 +342,7 @@ def test_select_step():
 def test_filtering_steps():
     "Make sure we can compute and apply both 5-lag and ATS-type optimal filters."
     t = np.arange(-25, 25)
-    signal = 2000 * (np.exp(-t / 8) - np.exp(t / 1))
+    signal = 10000 * (np.exp(-t / 12.0) - np.exp(-t / 3.0))
     signal[t < 0] = 0
     ch = dummy_channel(npulses=100, signal=signal)
     ch = ch.filter5lag(f_3db=20000)
