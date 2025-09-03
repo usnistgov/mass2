@@ -339,6 +339,19 @@ def test_select_step():
         assert isinstance(steps2[0][0], mass2.core.recipe.SelectStep)
 
 
+def test_filtering_steps():
+    "Make sure we can compute and apply both 5-lag and ATS-type optimal filters."
+    t = np.arange(-25, 25)
+    signal = 2000 * (np.exp(-t / 8) - np.exp(t / 1))
+    signal[t < 0] = 0
+    ch = dummy_channel(npulses=100, signal=signal)
+    ch = ch.filter5lag(f_3db=20000)
+    ch = ch.summarize_pulses()
+    ch = ch.filterATS(f_3db=20000)
+    for field in ("5lagy", "5lagx", "ats_x", "ats_y"):
+        assert not (np.allclose(ch.df[field].to_numpy().mean(), 0))
+
+
 def test_categorize_step():
     ch = dummy_channel(npulses=10)
     ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
