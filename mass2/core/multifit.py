@@ -194,12 +194,12 @@ class MultiFit:
         ax = axes[len(self.results)]
         multifit_df = self.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
-        peaks_uncalibrated = np.array([previous_energy2ph(e) for e in peaks_in_energy_rough_cal])
+        peaks_uncalibrated = previous_energy2ph(peaks_in_energy_rough_cal)
         peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
         pfit_gain, rms_residual_energy = self.to_pfit_gain(previous_energy2ph)
         plt.sca(ax)
-        x = np.linspace(0, np.amax(peaks_uncalibrated))
-        plt.plot(x, pfit_gain(x), label="fit")
+        x = np.linspace(0, np.amax(peaks_uncalibrated), 100)
+        plt.plot(x, pfit_gain(x), "k", label="fit")
         gain = peaks_uncalibrated / peaks_in_energy_reference
         plt.plot(peaks_uncalibrated, gain, "o")
         plt.xlabel(uncalibrated_name)
@@ -349,26 +349,8 @@ class MultiFitMassCalibrationStep(RecipeStep):
         axes = self.multifit.plot_results_and_pfit(
             uncalibrated_name=self.inputs[0],
             previous_energy2ph=self.energy2ph,
-            n_extra_axes=1,
         )
-        ax = axes[-1]
-        multifit_df = self.multifit.results_params_as_df()
-        peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
-        peaks_uncalibrated = np.array([self.energy2ph(e) for e in peaks_in_energy_rough_cal])
-        peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
-        plt.sca(ax)
-        x = np.linspace(1, np.amax(peaks_uncalibrated))
-        gain_from_cal = x / self.cal(x)
-        plt.plot(x, gain_from_cal, label="mass cal")
-        gain = peaks_uncalibrated / peaks_in_energy_reference
-        plt.plot(peaks_uncalibrated, gain, "o")
-        plt.xlabel(self.inputs[0])
-        plt.ylabel("gain")
-        plt.title("actual mass cal")
-        for name, x, y in zip(multifit_df["line"], peaks_uncalibrated, gain):
-            ax.annotate(str(name), (x, y))
-        plt.legend()
-        return ax
+        return axes
 
     def ph2energy(self, ph: ArrayLike) -> NDArray:
         "The quadratic gain calibration curve: ph -> energy"

@@ -122,7 +122,7 @@ class BestAssignmentPfitGainResult:
         # for now I'm counting on the roots being ordered, we want the positive root where gain goes zero
         # since our function is invalid outside that range
         if self.pfit_gain.degree() == 2:
-            return self.pfit_gain.roots()[1]
+            return np.real(self.pfit_gain.roots()[1])
         elif self.pfit_gain.degree() == 1:
             return self.pfit_gain.roots()[0]
         else:

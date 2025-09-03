@@ -14,7 +14,7 @@ from mass2.core.optimal_filtering import Filter, FilterMaker
 
 
 @dataclass(frozen=True)
-class Filter5LagStep(RecipeStep):
+class OptimalFilterStep(RecipeStep):
     """A step to apply a 5-lag optimal filter to pulse data in a DataFrame."""
 
     filter: Filter
@@ -40,6 +40,6 @@ class Filter5LagStep(RecipeStep):
         self.filter.plot()
         return plt.gca()
 
-    def drop_debug(self) -> "Filter5LagStep":
+    def drop_debug(self) -> "OptimalFilterStep":
         """Return a copy of this step with debugging information (the NoiseResult) removed."""
         return dataclasses.replace(self, spectrum=None)

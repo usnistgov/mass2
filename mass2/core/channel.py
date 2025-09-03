@@ -21,7 +21,7 @@ from .noise_channel import NoiseChannel
 from .recipe import Recipe, RecipeStep, SummarizeStep
 from .drift_correction import DriftCorrectStep
 from .optimal_filtering import FilterMaker
-from .filter_steps import Filter5LagStep
+from .filter_steps import OptimalFilterStep
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .misc import alwaysTrue
 from .offfiles import OffFile
@@ -280,6 +280,62 @@ class Channel:
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
         return mass2.misc.good_series(self.df, col, self.good_expr, use_expr)
+
+    @property
+    def last_avg_pulse(self) -> NDArray | None:
+        """Return the average pulse stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's signal model, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter_maker.signal_model
+        return None
+
+    @property
+    def last_filter(self) -> NDArray | None:
+        """Return the average pulse stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's signal model, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter.values
+        return None
+
+    @property
+    def last_noise_psd(self) -> tuple[NDArray, NDArray] | None:
+        """Return the noise PSD stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        tuple[NDArray, NDArray] | None
+            The last filtering step's (frequencies, noise spectrum), or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep) and step.spectrum is not None:
+                return step.spectrum.frequencies, step.spectrum.psd
+        return None
+
+    @property
+    def last_noise_autocorrelation(self) -> NDArray | None:
+        """Return the noise autocorrelation stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        NDArray | None
+            The last filtering step's noise autocorrelation, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep) and step.spectrum is not None:
+                return step.spectrum.autocorr_vec
+        return None
 
     def rough_cal_combinatoric(
         self,
@@ -580,7 +636,7 @@ class Channel:
             filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
-        step = Filter5LagStep(
+        step = OptimalFilterStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,

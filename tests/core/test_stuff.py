@@ -137,8 +137,8 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     df = pl.DataFrame({"pulse": pulse_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
     ch = ch.filter5lag()
-    step: mass2.core.Filter5LagStep = ch.steps[-1]
-    assert isinstance(step, mass2.core.Filter5LagStep)
+    step: mass2.core.OptimalFilterStep = ch.steps[-1]
+    assert isinstance(step, mass2.core.OptimalFilterStep)
     filter: mass2.core.Filter = step.filter
     assert filter.predicted_v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
     # test that the mass normaliztion in place
@@ -147,6 +147,10 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     # compare v_dv achieved (signal/fwhm) to predicted using 2.355*std=fwhm
     assert Maxsignal / (2.355 * np.std(ch.df["5lagy"].to_numpy())) == pytest.approx(mass_filter.predicted_v_over_dv, rel=5e-2)
     assert filter._filter_type == "5lag"
+
+    assert isinstance(ch.last_avg_pulse, np.ndarray)
+    assert isinstance(ch.last_noise_autocorrelation, np.ndarray)
+    assert isinstance(ch.last_noise_psd[1], np.ndarray)
 
 
 def test_noise_autocorr():

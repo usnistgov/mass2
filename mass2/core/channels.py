@@ -9,6 +9,7 @@ from numpy.typing import ArrayLike
 from typing import Any
 import polars as pl
 import pylab as plt
+import matplotlib
 import numpy as np
 import functools
 import joblib
@@ -169,6 +170,184 @@ class Channels:
 
         plt.tight_layout()
 
+    def _limited_chan_list(self, limit: int | None = 20, channels: list[int] | None = None) -> list[int]:
+        """A helper to get a list of channel numbers, limited to the given number if needed, and including only
+        channel numbers from `channels` if not None."""
+        limited_chan = list(self.channels.keys())
+        if channels is not None:
+            limited_chan = list(set(limited_chan).intersection(set(channels)))
+            limited_chan.sort()
+        if limit and len(limited_chan) > limit:
+            limited_chan = limited_chan[:limit]
+        return limited_chan
+
+    def plot_filters(
+        self,
+        limit: int | None = 20,
+        channels: list[int] | None = None,
+        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        axis: plt.Axes | None = None,
+    ) -> plt.Axes:
+        """Plot the optimal filters for the channels in this Channels object.
+
+        Parameters
+        ----------
+        limit : int | None, optional
+            Plot at most this many filters if not None, by default 20
+        channels : list[int] | None, optional
+            Plot only channels with numbers in this list if not None, by default None
+        colormap : matplotlib.colors.Colormap, optional
+            The color scale to use, by default plt.cm.viridis
+        axis : plt.Axes | None, optional
+            A `plt.Axes` to plot on, or if None a new one, by default None
+
+        Returns
+        -------
+        plt.Axes
+            The `plt.Axes` containing the plot.
+        """
+        if axis is None:
+            fig = plt.figure()
+            axis = fig.subplots()
+
+        plot_these_chan = self._limited_chan_list(limit, channels)
+        n_expected = len(plot_these_chan)
+        for i, ch_num in enumerate(plot_these_chan):
+            ch = self.channels[ch_num]
+            # The next line _assumes_ a 5-lag filter. Fix as needed.
+            x = np.arange(ch.header.n_samples - 4) - ch.header.n_presamples + 2
+            y = ch.last_filter
+            if y is not None:
+                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        plt.legend()
+        plt.xlabel("Samples after trigger")
+        plt.title("Optimal filters")
+
+    def plot_avg_pulses(
+        self,
+        limit: int | None = 20,
+        channels: list[int] | None = None,
+        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        axis: plt.Axes | None = None,
+    ) -> plt.Axes:
+        """Plot the average pulses (the signal model) for the channels in this Channels object.
+
+        Parameters
+        ----------
+        limit : int | None, optional
+            Plot at most this many filters if not None, by default 20
+        channels : list[int] | None, optional
+            Plot only channels with numbers in this list if not None, by default None
+        colormap : matplotlib.colors.Colormap, optional
+            The color scale to use, by default plt.cm.viridis
+        axis : plt.Axes | None, optional
+            A `plt.Axes` to plot on, or if None a new one, by default None
+
+        Returns
+        -------
+        plt.Axes
+            The `plt.Axes` containing the plot.
+        """
+        if axis is None:
+            fig = plt.figure()
+            axis = fig.subplots()
+
+        plot_these_chan = self._limited_chan_list(limit, channels)
+        n_expected = len(plot_these_chan)
+        for i, ch_num in enumerate(plot_these_chan):
+            ch = self.channels[ch_num]
+            x = np.arange(ch.header.n_samples) - ch.header.n_presamples
+            y = ch.last_avg_pulse
+            if y is not None:
+                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        plt.legend()
+        plt.xlabel("Samples after trigger")
+        plt.title("Average pulses")
+
+    def plot_noise_spectrum(
+        self,
+        limit: int | None = 20,
+        channels: list[int] | None = None,
+        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        axis: plt.Axes | None = None,
+    ) -> plt.Axes:
+        """Plot the noise power spectrum for the channels in this Channels object.
+
+        Parameters
+        ----------
+        limit : int | None, optional
+            Plot at most this many filters if not None, by default 20
+        channels : list[int] | None, optional
+            Plot only channels with numbers in this list if not None, by default None
+        colormap : matplotlib.colors.Colormap, optional
+            The color scale to use, by default plt.cm.viridis
+        axis : plt.Axes | None, optional
+            A `plt.Axes` to plot on, or if None a new one, by default None
+
+        Returns
+        -------
+        plt.Axes
+            The `plt.Axes` containing the plot.
+        """
+        if axis is None:
+            fig = plt.figure()
+            axis = fig.subplots()
+
+        plot_these_chan = self._limited_chan_list(limit, channels)
+        n_expected = len(plot_these_chan)
+        for i, ch_num in enumerate(plot_these_chan):
+            ch = self.channels[ch_num]
+            freqpsd = ch.last_noise_psd
+            if freqpsd is not None:
+                freq, psd = freqpsd
+                plt.plot(freq, psd, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        plt.legend()
+        plt.loglog()
+        plt.xlabel("Frequency (Hz)")
+        plt.title("Noise power spectral density")
+
+    def plot_noise_autocorr(
+        self,
+        limit: int | None = 20,
+        channels: list[int] | None = None,
+        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        axis: plt.Axes | None = None,
+    ) -> plt.Axes:
+        """Plot the noise power autocorrelation for the channels in this Channels object.
+
+        Parameters
+        ----------
+        limit : int | None, optional
+            Plot at most this many filters if not None, by default 20
+        channels : list[int] | None, optional
+            Plot only channels with numbers in this list if not None, by default None
+        colormap : matplotlib.colors.Colormap, optional
+            The color scale to use, by default plt.cm.viridis
+        axis : plt.Axes | None, optional
+            A `plt.Axes` to plot on, or if None a new one, by default None
+
+        Returns
+        -------
+        plt.Axes
+            The `plt.Axes` containing the plot.
+        """
+        if axis is None:
+            fig = plt.figure()
+            axis = fig.subplots()
+
+        plot_these_chan = self._limited_chan_list(limit, channels)
+        n_expected = len(plot_these_chan)
+        for i, ch_num in enumerate(plot_these_chan):
+            ch = self.channels[ch_num]
+            ac = ch.last_noise_autocorrelation
+            if ac is not None:
+                color = colormap(i / n_expected)
+                plt.plot(ac, color=color, label=f"Chan {ch_num}")
+                plt.plot(0, ac[0], "o", color=color)
+        plt.legend()
+        plt.xlabel("Lags")
+        plt.title("Noise autocorrelation")
+
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
         new_channels = {}
@@ -176,15 +355,15 @@ class Channels:
         for key, channel in self.channels.items():
             try:
                 new_channels[key] = f(channel)
-            except KeyboardInterrupt:
-                raise
+            except KeyboardInterrupt as kint:
+                raise kint
             except Exception as ex:
                 error_type: type = type(ex)
                 error_message: str = str(ex)
                 backtrace: str = traceback.format_exc()
                 if allow_throw:
                     raise
-                print(f"{key=} {channel=} failed this step")
+                print(f"{key=} {channel=} failed the step {f}")
                 print(f"{error_type=}")
                 print(f"{error_message=}")
                 new_bad_channels[key] = channel.as_bad(error_type, error_message, backtrace)
