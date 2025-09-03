@@ -453,8 +453,9 @@ class FilterATS(Filter):
 
 
 @njit
-def _filter_records_ats(x: ArrayLike, values: NDArray, dt_values: NDArray) -> tuple[float, float]:
+def _filter_records_ats(x: NDArray, values: NDArray, dt_values: NDArray) -> tuple[np.ndarray, np.ndarray]:
     "A numba-JIT speedup of the core computation"
+    x = x.astype(values.dtype)
     conv0 = np.dot(x, values)
     conv1 = np.dot(x, dt_values)
     arrival_time = conv1 / conv0
