@@ -847,3 +847,33 @@ def test_a_fit_that_was_failing_with_too_small_a_fwhm():
     params = model.guess(counts, bin_centers=bin_centers, dph_de=dph_de_guess)
     params["dph_de"].set(0.09086, vary=False)
     model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=1.5)
+
+
+def test_is_fitter_maximum_likelihood():
+    """Check for biased estimation of Mn K-alpha resolution, based on https://arxiv.org/pdf/1312.5622
+    figure 3b. It has 10 bins per eV, 2.5 eV actual resolution, and 1000 x-ray values, and it shows that
+    Neyman's chi^2 produces an expected bias of -0.6 on estimating the resolution.
+
+    We run 20 fits and show that the median fitted resolution exceeds 2.45 eV. This doesn't strictly
+    _prove_ that it's a maximum-likelihood estimator, but it's good evidence.
+    """
+    Npulses = 1000
+    Nfits = 20
+    resolution = 2.5
+    seed = 482031
+    rng = np.random.default_rng(seed)
+    line = mass2.spectra["MnKAlpha"]
+    model = line.model()
+    fit_res = []
+    for _ in range(Nfits):
+        energies = line.rvs(Npulses, resolution, rng=rng)
+        c, bin_edges = np.histogram(energies, 180, range=(5865, 5925))
+        e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
+        params = model.guess(c, bin_centers=e, dph_de=1)
+        params["dph_de"].set(1.0, vary=False)
+        result = model.fit(c, params, bin_centers=e, dph_de=1)
+
+        fit_res.append(result.best_values["fwhm"])
+    median_res = np.median(fit_res)
+    assert median_res > 2.43, "A maximum-likelihood fit should not have the large negative bias of Neyman's chi^2"
+    assert median_res < 2.57, "A maximum-likelihood fit should not have the large positive bias of Pearson's chi^2"
