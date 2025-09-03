@@ -45,17 +45,11 @@ jobs:
         activate-environment: true
         python-version: ${{ matrix.python-version }}
         enable-cache: true
+        ignore-nothing-to-cache: true
+        prune-cache: false
         cache-dependency-glob: |
           **/uv.lock
           **/pyproject.toml
-
-    - name: Report if the cache was restored
-      if: steps.setup-uv.outputs.cache-hit == 'true'
-      run: echo "Cache was restored"
-
-    - name: Report if the cache was NOT restored
-      if: steps.setup-uv.outputs.cache-hit != 'true'
-      run: echo "Cache was NOT restored"
 
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"

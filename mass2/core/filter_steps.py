@@ -1,5 +1,5 @@
 """
-Provide `Filter5LagStep`, a step to apply a 5-lag optimal filter to pulse data in a DataFrame.
+Provide `OptimalFilterStep`, a step to apply an optimal filter to pulse data in a DataFrame.
 """
 
 import polars as pl
@@ -15,7 +15,7 @@ from mass2.core.optimal_filtering import Filter, FilterMaker
 
 @dataclass(frozen=True)
 class OptimalFilterStep(RecipeStep):
-    """A step to apply a 5-lag optimal filter to pulse data in a DataFrame."""
+    """A step to apply an optimal filter to pulse data in a DataFrame."""
 
     filter: Filter
     spectrum: NoiseResult | None
@@ -23,7 +23,7 @@ class OptimalFilterStep(RecipeStep):
     transform_raw: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Apply the 5-lag optimal filter to the input DataFrame and return a new DataFrame with results."""
+        """Apply the optimal filter to the input DataFrame and return a new DataFrame with results."""
         dfs = []
         for df_iter in df.iter_slices(10000):
             raw = df_iter[self.inputs[0]].to_numpy()

@@ -10,6 +10,48 @@ def ATSF(pulse, npre, noise, sample_time_sec, peak=0.0, f_3db=None, cut_pre=0, c
     return maker.compute_ats(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
 
 
+def test_ATSF():
+    """Test the simple ATSF filter computation does not error, and is insensitive to DC."""
+    nSamples = 100
+    nPresamples = 50
+    nPost = nSamples - nPresamples
+
+    # Some fake data, fake noise, and a fake noise spectrum
+    pulse_like = np.append(np.zeros(nPresamples), np.linspace(nPost - 1, 0, nPost))
+    deriv_like = np.append(np.zeros(nPresamples), -np.ones(nPost))
+    pulse = np.vstack((pulse_like, deriv_like)).T
+
+    rng = np.random.default_rng(1492)
+    fake_noise = rng.standard_normal(nSamples)
+    fake_noise[0] = 10.0
+    dt = 6.72e-6
+    autocorr = np.zeros(nSamples)
+    autocorr[0] = 1.0
+    f = ATSF(pulse, nPresamples, autocorr, dt)
+    assert np.isclose(f.values.sum(), 0)
+
+    nPSD = 1 + (nSamples // 2)
+    fPSD = np.linspace(0, 0.5, nPSD)
+    PSD = 1 + 10 / (1 + (fPSD / 0.1) ** 2)
+
+    maker_no_psd = FilterMaker(pulse_like, nPresamples, fake_noise, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like))
+    with pytest.raises(ValueError):
+        maker_no_psd.compute_fourier()  # impossible with no PSD
+
+    maker = FilterMaker(
+        pulse_like, nPresamples, fake_noise, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
+    )
+
+    for computer in (maker.compute_ats, maker.compute_fourier):
+        filter_to_test = computer(f_3db=None)
+        assert isinstance(filter_to_test, Filter)
+        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/o lowpass"
+
+        filter_to_test = computer(f_3db=1e4)
+        assert isinstance(filter_to_test, Filter)
+        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/ f_3db"
+
+
 @pytest.mark.filterwarnings("ignore:invalid value encountered")
 def test_dc_insensitive():
     """When f_3db or fmax applied, filter should not become DC-sensitive.
