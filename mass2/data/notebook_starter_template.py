@@ -8,6 +8,8 @@ app = marimo.App(width="medium", app_title="Mass2 initial analysis")
 def _():
     import pylab as plt
     import marimo as mo
+    import polars as pl
+    import numpy as np
     import mass2
 
     def load_data():
