@@ -85,7 +85,7 @@ def laplace_entropy_array(x: ArrayLike, w: float = 1.0) -> float:
 
     Parameters
     ----------
-    x_in : ArrayLike
+    x : ArrayLike
         The vector of data of which we want the entropy.
     w : float, optional
         The width (exponential scale length) of the Laplace distribution
@@ -128,7 +128,7 @@ def laplace_entropy_approx(x: ArrayLike, w: float = 1.0) -> float:
 
     Parameters
     ----------
-    x_in : ArrayLike
+    x : ArrayLike
         The vector of data of which we want the entropy.
     w : float, optional
         The width (exponential scale length) of the Laplace distribution
