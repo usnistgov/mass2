@@ -665,8 +665,7 @@ class Channels:
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
         """
-        if isinstance(path, str):
-            path = pathlib.Path(path)
+        path = pathlib.Path(path)
         if os.path.exists(path):
             if os.path.exists(path / "data_all.pkl") and not overwrite:
                 raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
@@ -696,8 +695,7 @@ class Channels:
         path : Path | str
             Directory work was saved in.
         """
-        if isinstance(path, str):
-            path = pathlib.Path(path)
+        path = pathlib.Path(path)
         assert os.path.exists(path) and os.path.isdir(path)
 
         pickle_file = path / "data_all.pkl"
