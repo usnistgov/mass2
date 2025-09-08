@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.15.2"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -72,26 +72,6 @@ def _(mo):
 
 
 @app.cell
-def _(data2):
-    data2.ch0.df.columns
-    return
-
-
-@app.cell
-def _(data3, mass2):
-    data3.ch0.plot_scatter("timestamp", "energy_pulse_rms", color_col="state_label")
-    mass2.show()
-    return
-
-
-@app.cell
-def _(data3, mass2):
-    data3.ch0.plot_scatter("energy_5lagy_dc", "5lagy_dc", color_col="state_label")
-    mass2.show()
-    return
-
-
-@app.cell
 def _(data, mass2):
     def _do_analysis(ch: mass2.Channel) -> mass2.Channel:
         return ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
@@ -99,6 +79,12 @@ def _(data, mass2):
     data2 = data.map(_do_analysis)
     data2 = data2.with_experiment_state_by_path()
     return (data2,)
+
+
+@app.cell
+def _(data2):
+    data2.ch0.df.columns
+    return
 
 
 @app.cell
@@ -128,6 +114,20 @@ def _(data2, mass2, pl):
 
     data3 = data2.map(_do_analysis)
     return (data3,)
+
+
+@app.cell
+def _(data3, mass2):
+    data3.ch0.plot_scatter("timestamp", "energy_pulse_rms", color_col="state_label")
+    mass2.show()
+    return
+
+
+@app.cell
+def _(data3, mass2):
+    data3.ch0.plot_scatter("energy_5lagy_dc", "5lagy_dc", color_col="state_label")
+    mass2.show()
+    return
 
 
 @app.cell
