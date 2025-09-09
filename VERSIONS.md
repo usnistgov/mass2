@@ -2,7 +2,28 @@
 
 ## Mass Version 2 (2025-)
 
-**2.0.0alpha** August 4, 2025-
+**2.0.0 beta 3** September 3, 2025-
+
+* Added a way to generate Arrival-Time-Safe filters and make into a `RecipeStep` (issue 67).
+* Made GitHub Actions CI system cache the big `pulsedata` requirement (issue 61).
+* Require `numpy` version >= 2.0.
+
+**2.0.0 beta 2** September 3, 2025
+
+* Add convenience functions to return and plot key facts from a Channel's Recipe (issue 59).
+* Add regression tests like Mass1 had (issue 62).
+* Finish documentation strings; reorg doc pages made from them (issues 18, 19).
+
+**2.0.0 beta 1** August 29, 2025
+
+* Add `Recipe.trim_dead_ends()` to generate a recipe that removes steps not needed to reach a certain end (issue 38).
+* Optionally drop debugging information from steps in `trim_dead_ends()` to make MUCH smaller recipe pickles (issue 40).
+* Add sub-keV fluorescence line shapes learned from HAUSKat 2024 measurements on C, N, O, Fe, Ni, Cu (issue 37).
+* Figured out how to render matplotlib images in documentation with `mkdocs-matplotlib` plugin (issue 47).
+* Reorganized documentation and make a Getting Started page (issues 45+46).
+* Added complete modern type annotations, to run with zero mypy errors (issue 56).
+
+**2.0.0alpha** August 20, 2025
 
 * Complete rewrite of MASS for version 2. Base data wrangling on [Pola.rs](https://pola.rs/).
 * Allow `Channel` objects to have callable to transform raw data (e.g., by inverting it) (issue 12).
@@ -13,13 +34,7 @@
   better (issue 24).
 * Add `FilterMaker.compute_5lag_noexp()` and `.compute_5lag_constrained()` for constrained optimal filters (issue 29).
 * Read external trigger times into the Mass2 dataframe (issue 28).
-* Add `Recipe.trim_dead_ends()` to generate a recipe that removes steps not needed to reach a certain end (issue 38).
-* Optionally drop debugging information from steps in `trim_dead_ends()` to make MUCH smaller recipe pickles (issue 40).
-* Add sub-keV fluorescence line shapes learned from HAUSKat 2024 measurements on C, N, O, Fe, Ni, Cu (issue 37).
-* Figured out how to render matplotlib images in documentation with `mkdocs-matplotlib` plugin (issue 47).
-* Reorganized documentation and make a Getting Started page (issues 45+46).
-* Added complete modern type annotations, to run with zero mypy errors (issue 56).
-* Add convenience functions to return and plot key facts from a Channel's Recipe (issue 59).
+
 
 
 ## Mass Version 1 (2010-2025)

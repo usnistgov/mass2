@@ -580,6 +580,37 @@ class Channel:
         )
         return self.with_step(step)
 
+    def compute_average_pulse(self, pulse_col: str = "pulse", use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> NDArray:
+        """Compute an average pulse given a use expression.
+
+        Parameters
+        ----------
+        pulse_col : str, optional
+            Name of the column in self.df containing raw pulses, by default "pulse"
+        use_expr : pl.Expr, optional
+            Selection (in addition to self.good_expr) to use, by default pl.lit(True)
+        limit : int, optional
+            Use no more than this many pulses, by default 2000
+
+        Returns
+        -------
+        NDArray
+            _description_
+        """
+        avg_pulse = (
+            self.df.lazy()
+            .filter(self.good_expr)
+            .filter(use_expr)
+            .select(pulse_col)
+            .limit(limit)
+            .collect()
+            .to_series()
+            .to_numpy()
+            .mean(axis=0)
+        )
+        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
+        return avg_pulse
+
     def filter5lag(
         self,
         pulse_col: str = "pulse",
@@ -611,25 +642,14 @@ class Channel:
         Channel
             This channel with a Filter5LagStep added to the recipe.
         """
-        avg_pulse = (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(pulse_col)
-            .limit(2000)
-            .collect()
-            .to_series()
-            .to_numpy()
-            .mean(axis=0)
-        )
-        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
         assert self.noise
-        spectrum5lag = self.noise.spectrum(trunc_front=2, trunc_back=2)
+        noiseresult = self.noise.spectrum(trunc_back=2, trunc_front=2)
+        avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             n_pretrigger=self.header.n_presamples,
-            noise_psd=spectrum5lag.psd,
-            noise_autocorr=spectrum5lag.autocorr_vec,
+            noise_psd=noiseresult.psd,
+            noise_autocorr=noiseresult.autocorr_vec,
             sample_time_sec=self.header.frametime_s,
         )
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
@@ -642,7 +662,112 @@ class Channel:
             good_expr=self.good_expr,
             use_expr=use_expr,
             filter=filter5lag,
-            spectrum=spectrum5lag,
+            spectrum=noiseresult,
+            filter_maker=filter_maker,
+            transform_raw=self.transform_raw,
+        )
+        return self.with_step(step)
+
+    def compute_ats_model(self, pulse_col: str, use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> tuple[NDArray, NDArray]:
+        """Compute the average pulse and arrival-time model for an ATS filter.
+        We use the first `limit` pulses that pass `good_expr` and `use_expr`.
+
+        Parameters
+        ----------
+        pulse_col : str
+            _description_
+        use_expr : pl.Expr, optional
+            _description_, by default pl.lit(True)
+        limit : int, optional
+            _description_, by default 2000
+
+        Returns
+        -------
+        tuple[NDArray, NDArray]
+            _description_
+        """
+        df = (
+            self.df.lazy()
+            .filter(self.good_expr)
+            .filter(use_expr)
+            .limit(limit)
+            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .collect()
+        )
+
+        # Adjust promptness: subtract a linear trend with pulse_rms
+        prms = df["pulse_rms"].to_numpy()
+        promptness = df["promptness"].to_numpy()
+        poly = np.poly1d(np.polyfit(prms, promptness, 1))
+        df = df.with_columns(promptshifted=(promptness - poly(prms)))
+
+        # Rescale promptness quadratically to span approximately [-0.5, +0.5], dropping any pulses with abs(t) > 0.45.
+        x, y, z = np.percentile(df["promptshifted"], [10, 50, 90])
+        A = np.array([[x * x, x, 1], [y * y, y, 1], [z * z, z, 1]])
+        param = np.linalg.solve(A, [-0.4, 0, +0.4])
+        ATime = np.poly1d(param)(df["promptshifted"])
+        df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
+
+        # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
+        pulse = df["pulse"].to_numpy()
+        avg_pulse = np.zeros(self.header.n_samples, dtype=float)
+        dt_model = np.zeros(self.header.n_samples, dtype=float)
+        for i in range(self.header.n_presamples, self.header.n_samples):
+            slope, offset = np.polyfit(df["ATime"], (pulse[:, i] - df["pretrig_mean"]), 1)
+            dt_model[i] = -slope
+            avg_pulse[i] = offset
+        return avg_pulse, dt_model
+
+    def filterATS(
+        self,
+        pulse_col: str = "pulse",
+        peak_y_col: str = "ats_y",
+        peak_x_col: str = "ats_x",
+        f_3db: float = 25e3,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "Channel":
+        """Compute an arrival-time-safe (ATS) optimal filter and apply it.
+
+        Parameters
+        ----------
+        pulse_col : str, optional
+            Which column contains raw data, by default "pulse"
+        peak_y_col : str, optional
+            Column to contain the optimal filter results, by default "ats_y"
+        peak_x_col : str, optional
+            Column to contain the ATS filter's estimate of arrival-time/phase, by default "ats_x"
+        f_3db : float, optional
+            A low-pass filter 3 dB point to apply to the computed filter, by default 25e3
+        use_expr : pl.Expr, optional
+            An expression to select pulses for averaging, by default pl.lit(True)
+
+        Returns
+        -------
+        Channel
+            This channel with a Filter5LagStep added to the recipe.
+        """
+        assert self.noise
+        mprms = self.good_series("pulse_rms", use_expr).median()
+        use = use_expr.and_(np.abs(pl.col("pulse_rms") / mprms - 1.0) < 0.3)
+        limit = 4000
+        avg_pulse, dt_model = self.compute_ats_model(pulse_col, use, limit)
+        noiseresult = self.noise.spectrum()
+        filter_maker = FilterMaker(
+            signal_model=avg_pulse,
+            dt_model=dt_model,
+            n_pretrigger=self.header.n_presamples,
+            noise_psd=noiseresult.psd,
+            noise_autocorr=noiseresult.autocorr_vec,
+            sample_time_sec=self.header.frametime_s,
+        )
+        filter_ats = filter_maker.compute_ats(f_3db=f_3db)
+        step = OptimalFilterStep(
+            inputs=["pulse"],
+            output=[peak_x_col, peak_y_col],
+            good_expr=self.good_expr,
+            use_expr=use_expr,
+            filter=filter_ats,
+            spectrum=noiseresult,
             filter_maker=filter_maker,
             transform_raw=self.transform_raw,
         )
