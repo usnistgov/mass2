@@ -24,6 +24,7 @@ from .channel import Channel, ChannelHeader, BadChannel
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
+from .misc import pickle_object, unpickle_object
 from . import ljhutil
 
 
@@ -653,3 +654,57 @@ class Channels:
                 npulses=len(df),
             )
         return Channels(channels, description)
+
+    def save_analysis(self, path: Path | str, overwrite: bool = False) -> None:
+        """Save an analysis-in-progress completely to a directory
+
+        Parameters
+        ----------
+        path : Path | str
+            Directory to save work in. If it doesn't exist, its parent should.
+        overwrite : bool, optional
+            If `path` exists, whether to overwrite it, by default False
+        """
+        if isinstance(path, str):
+            path = pathlib.Path(path)
+        if os.path.exists(path):
+            if os.path.exists(path / "data_all.pkl") and not overwrite:
+                raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
+            if not os.path.isdir(path):
+                raise ValueError(f"save_analysis(path={path}) requires that `path` be a directory, if it exists")
+        else:
+            os.mkdir(path)
+            assert os.path.exists(path) and os.path.isdir(path)
+
+        channels = {}
+        for ch_num, ch in self.channels.items():
+            fname = path / f"data_chan{ch_num:04d}.parquet"
+            df = ch.df.drop("pulse", "timestamp", "subframecount")
+            df.write_parquet(fname)
+            steps = ch.steps.trim_dead_ends(None, drop_debug=True)
+            channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+        data = dataclasses.replace(self, channels=channels, bad_channels={})
+        pickle_file = path / "data_all.pkl"
+        pickle_object(data, pickle_file)
+
+    @staticmethod
+    def load_analysis(path: Path | str) -> "Channels":
+        """Load an analysis-in-progress from a directory
+
+        Parameters
+        ----------
+        path : Path | str
+            Directory work was saved in.
+        """
+        if isinstance(path, str):
+            path = pathlib.Path(path)
+        assert os.path.exists(path) and os.path.isdir(path)
+
+        pickle_file = path / "data_all.pkl"
+        data: Channels = unpickle_object(pickle_file)
+        channels = {}
+        for ch_num, ch in data.channels.items():
+            fname = path / f"data_chan{ch_num:04d}.parquet"
+            df = pl.read_parquet(fname)
+            channels[ch_num] = dataclasses.replace(ch, df=df)
+        return dataclasses.replace(data, channels=channels)
