@@ -74,11 +74,11 @@ requires = ["setuptools>=61", "setuptools_scm>=8", "wheel", "numpy>=1.14"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-include-package-data = false # Set to false if you're explicitly defining includes/excludes
+include-package-data = true # Set to false if you're explicitly defining includes/excludes
 
 [tool.setuptools.packages.find]
-include = ["mass2*"]
-exclude = ["site*", "docs*"]
+include = ["mass2*", "examples"]
+exclude = ["site*", "build*", "docs*"]
 
 [tool.setuptools.package-data]
 mass2 = [
