@@ -174,7 +174,8 @@ def _(data2, mass2, pl):
     def analysis_step2(ch: mass2.Channel) -> mass2.Channel: # type annotation helps autocompletions later
         return (ch
             .driftcorrect(indicator_col="pretrig_mean",
-                          uncorrected_col="5lagy")
+                          uncorrected_col="5lagy",
+                         corrected_col="5lagy_dc")
             .rough_cal_combinatoric(line_names, 
                                          uncalibrated_col="5lagy_dc",
                                          calibrated_col="energy_5lagy_dc",
@@ -251,6 +252,12 @@ def _(data3, dropdown_ch, mass2):
                                             binsize=15)
     _result.plotm()
     mass2.show()
+    return
+
+
+@app.cell
+def _(data3):
+    data3.dfg().select("timestamp","energy_5lagy_dc_pc", "state_label","ch_num")
     return
 
 

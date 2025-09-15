@@ -33,6 +33,7 @@ class FilterStack:
     def add(self, film: "Filter | FilterStack") -> None:
         """Add a Filter or FilterStack to this FilterStack."""
         self.components.append(film)
+        return self
 
     def add_filter(
         self,
