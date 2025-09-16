@@ -20,7 +20,7 @@ def create_notebook(path: pathlib.Path, notebook_path_str: str | None, overwrite
     else:
         raise ValueError(f"{path} must point to a file or dir")
     if notebook_path_str is None:
-        notebook_path = data_dir/"notebook_from_template.py"
+        notebook_path = data_dir / "notebook_from_template.py"
     else:
         notebook_path = pathlib.Path(notebook_path_str)
     if notebook_path.is_file() and not overwrite:
@@ -40,13 +40,13 @@ def main():
         description="Start a mass2 notebook session by loading a set of LJH files",
     )
     parser.add_argument("path", type=str, nargs="?", default=".", help="directory to find LJH files (default: current directory)")
-    parser.add_argument("-n", "--notebook-path", type=str, required=False, default=None, help="path to the marimo notebook that will be created")
+    parser.add_argument(
+        "-n", "--notebook-path", type=str, required=False, default=None, help="path to the marimo notebook that will be created"
+    )
     parser.add_argument("-f", "--force", action="store_true", help="overwrite existing notebook")
     args = parser.parse_args()
     path = pathlib.Path(args.path).absolute()
-    notebook_path = create_notebook(path=path, 
-                                    notebook_path_str=args.notebook_path, 
-                                    overwrite = args.force)
+    notebook_path = create_notebook(path=path, notebook_path_str=args.notebook_path, overwrite=args.force)
     print(f"Created file {notebook_path}")
     print(f"Next time:    marimo edit {notebook_path}")
     subprocess.run(["marimo", "edit", notebook_path], check=False, capture_output=True)
