@@ -218,6 +218,10 @@ class Channel:
             _, step_size = misc.midpoints_and_step_size(bin_edges)
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
+            try:
+                group_name_str = int(group_name_str) # try to make integer group names be integers
+            except:
+                pass
             counts_dict[group_name_str] = counts
             plt.step(bin_centers, counts, where="mid", label=group_name_str)
             # Plot the histogram for the current group
@@ -387,7 +391,7 @@ class Channel:
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,
