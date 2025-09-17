@@ -166,7 +166,7 @@ class BestAssignmentPfitGainResult:
         # and given that we've selected for well formed calibrations,
         # we know which root we want
         b, a = self.pfit_gain.convert().coef
-        y = energy
+        y = np.asarray(energy)
         ph = y * b / (1 - y * a)
         return ph
 
@@ -177,7 +177,7 @@ class BestAssignmentPfitGainResult:
         # so
         # x = y*a
         (a,) = self.pfit_gain.convert().coef
-        y = energy
+        y = np.asarray(energy)
         ph = y * a
         return ph
 
