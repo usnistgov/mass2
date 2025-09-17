@@ -259,6 +259,7 @@ class Filter(ABC):
     nominal_peak: float
     variance: float
     predicted_v_over_dv: float
+    n_pretrigger: int
     dt_values: np.ndarray | None
     const_values: np.ndarray | None
     signal_model: np.ndarray | None
@@ -292,11 +293,12 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
-        axis.plot(self.values, label="mass 5lag filter", **kwargs)
+        t = np.arange(len(self.values)) - self.n_pretrigger
+        axis.plot(t, self.values, label="mass 5lag filter", **kwargs)
         axis.grid()
-        axis.set_title(f"{self._filter_type=} V/dV={self.predicted_v_over_dv:.2f}")
+        axis.set_title(f"Filter type={self._filter_type} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
-        axis.set_xlabel("Lag Time (s)")
+        axis.set_xlabel("Samples")
         plt.gcf().tight_layout()
 
     def report(self, std_energy: float = 5898.8) -> None:
@@ -604,7 +606,20 @@ class FilterMaker:
         else:
             vdv = peak / (8 * np.log(2) * variance) ** 0.5
         return Filter5Lag(
-            filt_noconst, peak, variance, vdv, None, None, avg_signal, None, 1 + 2 * shorten, fmax, f_3db, cut_pre, cut_post
+            filt_noconst,
+            peak,
+            variance,
+            vdv,
+            self.n_pretrigger - 2,
+            None,
+            None,
+            avg_signal,
+            None,
+            1 + 2 * shorten,
+            fmax,
+            f_3db,
+            cut_pre,
+            cut_post,
         )
 
     def compute_5lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
@@ -761,6 +776,7 @@ class FilterMaker:
             peak,
             variance_fourier,
             vdv,
+            self.n_pretrigger - 2,
             None,
             None,
             truncated_avg_signal,
@@ -848,7 +864,20 @@ class FilterMaker:
         variance = bracketR(filt_noconst, noise_autocorr)
         vdv = peak / (np.log(2) * 8 * variance) ** 0.5
         return FilterATS(
-            filt_noconst, peak, variance, vdv, filt_dt, filt_baseline, avg_signal, dt_model, 1, fmax, f_3db, cut_pre, cut_post
+            filt_noconst,
+            peak,
+            variance,
+            vdv,
+            self.n_pretrigger,
+            filt_dt,
+            filt_baseline,
+            avg_signal,
+            dt_model,
+            1,
+            fmax,
+            f_3db,
+            cut_pre,
+            cut_post,
         )
 
     def _compute_autocorr(self, cut_pre: int = 0, cut_post: int = 0) -> np.ndarray:
