@@ -673,21 +673,35 @@ class Channels:
 
         if os.path.exists(path) and not overwrite:
             raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
+
+        def drop_columns(df: pl.DataFrame, *columns: str) -> pl.DataFrame:
+            columns_to_drop = set(columns)
+            columns_to_drop = columns_to_drop.intersection(df.columns)
+            for c in columns_to_drop:
+                df = df.drop(c)
+            return df
+
         with ZipFile(str(path), "w") as zf:
             channels = {}
+            bad_channels = {}
             for ch_num, ch in self.channels.items():
-                df = ch.df
-                columns_to_drop = {"pulse", "timestamp", "subframecount"}
-                columns_to_drop = columns_to_drop.intersection(df.columns)
-                for c in columns_to_drop:
-                    df = df.drop(c)
+                df = drop_columns(ch.df, "pulse", "timestamp", "subframecount")
                 buffer = io.BytesIO()
                 df.write_parquet(buffer)
                 fname = f"data_chan{ch_num:04d}.parquet"
                 zf.writestr(fname, buffer.getvalue())
                 steps = ch.steps.trim_dead_ends(None, drop_debug=True)
                 channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
-            data = dataclasses.replace(self, channels=channels, bad_channels={})
+            for ch_num, badch in self.bad_channels.items():
+                df = drop_columns(badch.ch.df, "pulse", "timestamp", "subframecount")
+                buffer = io.BytesIO()
+                df.write_parquet(buffer)
+                fname = f"data_bad_chan{ch_num:04d}.parquet"
+                zf.writestr(fname, buffer.getvalue())
+                steps = badch.ch.steps.trim_dead_ends(None, drop_debug=True)
+                ch = dataclasses.replace(badch.ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+            data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
             bytes = pickle_stream(data)
             zf.writestr(pickle_file, bytes)
@@ -708,8 +722,15 @@ class Channels:
             pickle_bytes = zf.read("data_all.pkl")
             data: Channels = unpickle_stream(pickle_bytes)
             channels = {}
+            bad_channels = {}
             for ch_num, ch in data.channels.items():
                 fname = f"data_chan{ch_num:04d}.parquet"
                 df = pl.read_parquet(zf.read(fname))
-                channels[ch_num] = dataclasses.replace(ch, df=df)
-            return dataclasses.replace(data, channels=channels)
+                nsteps = len(ch.steps)
+                channels[ch_num] = dataclasses.replace(ch, df=df, df_history=[df] * nsteps)
+            for ch_num, badch in data.bad_channels.items():
+                fname = f"data_bad_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(fname))
+                ch = dataclasses.replace(badch.ch, df=df)
+                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+            return dataclasses.replace(data, channels=channels, bad_channels=bad_channels)
