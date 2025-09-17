@@ -100,13 +100,13 @@ class PowerSpectrum:
             raise ValueError(f"wrong size data segment.  len(data)={len(data)} but require {self.m2}")
         if np.isnan(data).any():
             raise ValueError("data contains NaN")
-        if window is None:
+        if isinstance(window, np.ndarray):
+            assert len(window) == self.m2
+            w = window
+        elif window is None:
             w = np.ones(self.m2)
         elif callable(window):
             w = window(self.m2)
-        elif isinstance(window, np.ndarray):
-            assert len(window) == self.m2
-            w = window
         else:
             raise TypeError("Window not understood")
         wksp = w * data
@@ -159,7 +159,7 @@ class PowerSpectrum:
     def plot(
         self,
         axis: plt.Axes | None = None,
-        arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
+        arb_to_unit_scale_and_label: tuple[float, str] = (1, "arb"),
         sqrt_psd: bool = True,
         **plotkwarg: Any,
     ) -> None:
@@ -287,13 +287,13 @@ def computeSpectrum(
     N = len(data)
     M = N // (2 * segfactor)
     window_length = 2 * M
-    if window is None:
+    if isinstance(window, np.ndarray):
+        assert len(window) == window_length
+        w = np.array(window)
+    elif window is None:
         w = np.ones(window_length, dtype=float)
     elif callable(window):
         w = window(window_length)
-    elif isinstance(window, np.ndarray):
-        assert len(window) == window_length
-        w = np.array(window)
     else:
         raise TypeError("Window not understood")
 
