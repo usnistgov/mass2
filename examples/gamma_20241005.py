@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.15.0"
+__generated_with = "0.15.2"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -25,7 +25,7 @@ def _(mo):
     mo.md(
         """
     # Load data
-    Here we load the data from two ljh representing pulse data taken with a TES array looking at a Gd-153 gamma ray source. 
+    Here we load the data from two ljh representing pulse data taken with a TES array looking at a Gd-153 gamma ray source.
 
     *	The source is Gd-153
     *	The two strongest peaks in these spectra will be the 97 keV and 103 keV peaks.
@@ -47,7 +47,7 @@ def _(mass2, mo, pulsedata):
         pulse_folder=_p.pulse_folder, noise_folder=_p.noise_folder
     )
     print(data)
-    mo.md("Here we see thae we've loaded two channels into a `Channels` object, which contains two `Channel` objects. The channel numbers are 2 and 5.")
+    mo.md("Here we see that we've loaded two channels into a `Channels` object, which contains two `Channel` objects. The channel numbers are 2 and 5.")
     return (data,)
 
 
@@ -67,7 +67,8 @@ def _(data, mo):
 def _(data, mass2, plt):
     plt.figure()
     _pulses = data.ch0.df["pulse"].limit(20).to_numpy().T
-    plt.plot(_pulses)
+    _pulses2 = _pulses - _pulses[:150].mean(axis=0)
+    plt.plot(_pulses2)
     plt.ylabel("signal (arb)")
     plt.ylabel("sample number")
     plt.title(f"the first 20 pulses of channel {data.ch0.header.description}")
@@ -120,6 +121,14 @@ def _(data, mass2):
 
 
 @app.cell
+def _(data2, mass2, mo):
+    mo.md("Here we see the spectrum of both channels")
+    data2.plot_noise_spectrum()
+    mass2.show()
+    return
+
+
+@app.cell
 def _(mo):
     mo.md(
         r"""
@@ -149,7 +158,7 @@ def _(data2, mass2):
 
 @app.cell
 def _(data2, mass2, np):
-    data2.ch0.plot_hist(col="5lagy", bin_edges=np.arange(0,16000, 10))
+    data2.ch0.plot_hist(col="5lagy", bin_edges=np.arange(0,16000, 1))
     mass2.show()
     return
 
@@ -158,7 +167,7 @@ def _(data2, mass2, np):
 def _(mo):
     mo.md(
         r"""
-    # Analsyis Step 2: Calibration and Corrections
+    # Analysis Step 2: Calibration and Corrections
 
     Here we call `driftcorrect` which attempts to remove correlation between `pretrig_mean` and `5lagy`. Then we call `rough_cal_combinatoric` which identifies peaks and assigns them to lines. In this dataset the strongest two lines by far are 97 keV and 103 keV, so it will be easy for the algorithm to assign them. Then we do a second drift correct, this time trying to remove the correlation between sub-sample arrival time of the pulse and energy. We use the same algorithm as for the `pretrig_mean` correlation removal, but different columns as arguments.
 
@@ -170,12 +179,12 @@ def _(mo):
 
 @app.cell
 def _(data2, mass2, pl):
-    line_names = [97000, 103000]
+    line_names = [97431, 103180]
     def analysis_step2(ch: mass2.Channel) -> mass2.Channel: # type annotation helps autocompletions later
         return (ch
             .driftcorrect(indicator_col="pretrig_mean",
                           uncorrected_col="5lagy")
-            .rough_cal_combinatoric(line_names, 
+            .rough_cal_combinatoric(line_names,
                                          uncalibrated_col="5lagy_dc",
                                          calibrated_col="energy_5lagy_dc",
                                     ph_smoothing_fwhm=50 # choose something close to the width of the lines in the uncalibrated plot, and small compared to the spacings
@@ -184,14 +193,14 @@ def _(data2, mass2, pl):
                          uncorrected_col="5lagy_dc",
                           corrected_col="5lagy_dc_pc",
                          use_expr=pl.col("energy_5lagy_dc").is_between(90_000,110_000))
-            .rough_cal_combinatoric(line_names, 
+            .rough_cal_combinatoric(line_names,
                                          uncalibrated_col="5lagy_dc_pc",
                                          calibrated_col="energy_5lagy_dc_pc",
                                     ph_smoothing_fwhm=50 # choose something close to the width of the lines in the uncalibrated plot, and small compared to the spacings
-                                         )            
+                                         )
                )
     data3 = data2.map(analysis_step2, allow_throw=True)
-    return (data3,)
+    return data3, line_names
 
 
 @app.cell
@@ -236,20 +245,157 @@ def _(mo):
         r"""
     # Fits to determine energy resolution
 
-    We fine 60 eV for Ch 2 and 76 eV for Ch5, pretty close to Dan B.'s results.
+    We find 58 eV for Ch 2 and 72 eV for Ch5, pretty close to Dan B.'s results his email from Nov 11, 2024 says he got 56 and 71 eV).
     """
     )
     return
 
 
 @app.cell
-def _(data3, dropdown_ch, mass2):
-    _result = data3.channels[dropdown_ch.value].linefit(97000, 
-                                            col="energy_5lagy_dc_pc",   
-                                            dlo=200, 
-                                            dhi=200,
-                                            binsize=15)
+def _(data3, dropdown_ch, line_names, mass2):
+    _result = data3.channels[dropdown_ch.value].linefit(line_names[0],
+                                            col="energy_5lagy_dc_pc",
+                                            dlo=150,
+                                            dhi=150,
+                                            binsize=8)
     _result.plotm()
+    mass2.show()
+    return
+
+
+@app.cell
+def _(data3, mass2, np):
+    data3.ch0.plot_hist("pulse_rms", np.linspace(1800, 2200, 2000));
+    mass2.show()
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(
+        r"""
+    ## Advanced analysis
+
+    Below here are some explorations that you would _not_ normally do. We are taking the opportunity of having these analyzed pulses to explore a question that we often ask, or at least _should_ ask:
+
+    > What is the value of each complex analysis step? How much resolution do we gain from taking them?
+
+    To get some idea how resolution would come out if we didn't put the full analysis pipeline into action, let's assess these two gamma-ray data sets by several metrics:
+
+    1. Peak value (baseline subtracted, of course)
+    2. Pulse mean (baseline subtracted, of course)
+    3. Pulse rms (baseline subtracted, of course)
+    4. Least-squares fit to a pulse model
+    5. Least-squares fit to a pulse model plus a dp/dt term to account for arrival-time shifts
+    6. Plain optimal filter output
+    7. Optimal filter + drift correction
+    8. Optimal filter + drift correction + arrival-time correction
+
+    In each case, we need to account for the nonlinearity of the TESs. This requires an energy calibration that anchors the energy scale at the 97.421 and 103.180 keV peaks.
+    """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(data3, mass2, np, pl):
+    def white_noise_filters(ch: mass2.Channel) -> mass2.Channel:
+        sig_model = ch.steps[1].filter_maker.signal_model.copy()
+        sig_model -= sig_model[:ch.header.n_presamples-1].mean()
+        sig_model[:ch.header.n_presamples-1] = 0
+        sig_model /= sig_model.max()
+        M2 = np.vstack((np.ones_like(sig_model), sig_model))
+        M3 = np.vstack((M2, np.hstack((0, np.diff(sig_model)))))
+        filter2 = np.linalg.pinv(M2.T)[1]
+        filter3 = np.linalg.pinv(M3.T)[1]
+        pulses = ch.df["pulse"].to_numpy()
+
+        fake_autocorr = ch.steps[1].filter_maker.noise_autocorr.copy()
+        fake_autocorr[1:] = 0
+        maker = mass2.core.FilterMaker(sig_model, ch.header.n_presamples, fake_autocorr,
+                                       sample_time_sec=ch.header.frametime_s)
+        f5lag = maker.compute_5lag(f_3db=25000)
+        white_5lagy, _ = f5lag.filter_records(pulses)
+        _, dc_result = mass2.core.analysis_algorithms.drift_correct(ch.df["pretrig_mean"].to_numpy(), white_5lagy)
+        mpm = dc_result["median_pretrig_mean"]
+        slope = dc_result["slope"]
+        white_5lagy_dc = white_5lagy * (1 + (ch.df["pretrig_mean"].to_numpy()-mpm) * slope)
+        npre = ch.header.n_presamples
+
+        new_df = pl.DataFrame({
+            "white_filt5lag": white_5lagy,
+            "white_filt5lag_dc": white_5lagy_dc,
+            "pulse_average390": pulses[:, npre:390].mean(axis=1) - pulses[:, :npre].mean(axis=1),
+            "fit_white": pulses.dot(filter2),
+            "fit_white_dpdt": pulses.dot(filter3),
+        })
+        return ch.with_columns(new_df)
+
+    data4 = data3.map(white_noise_filters)
+    data4.ch0.df
+    return (data4,)
+
+
+@app.cell
+def _(data4, dropdown_ch, line_names, mass2, np, pl, plt):
+    # Now run fits on every field of interest
+    def run_fits(ch: mass2.Channel):
+        df = ch.df.filter((pl.col("energy_5lagy_dc_pc")-100000).abs() < 4000).filter(ch.good_expr)
+        keys = (
+            "pulse_average",
+            "pulse_average390",
+            "peak_value",
+            "pulse_rms",
+            "white_filt5lag",
+            "white_filt5lag_dc",
+            "5lagy",
+            "5lagy_dc",
+            "5lagy_dc_pc",
+        )
+        resolution = {}
+        plt.figure()
+        model = mass2.calibration.algorithms.get_model(97431, has_linear_background=True, has_tails=False)
+        for i, key in enumerate(keys):
+            v97 = df.filter((pl.col("energy_5lagy_dc_pc")-97431).abs() < 1000)[key].to_numpy()
+            v103 = df.filter((pl.col("energy_5lagy_dc_pc")-103180).abs() < 1000)[key].to_numpy()
+            ph = np.array([mass2.mathstat.robust.trimean(x) for x in (v97, v103)])
+            energy = np.asarray(line_names)
+            calmaker = mass2.calibration.EnergyCalibrationMaker(ph, energy, 0*ph, 0*ph, ["97.431 keV", "103.180 keV"])
+            cal = calmaker.make_calibration_gain()
+            e = cal(df[key].to_numpy())
+
+            mad = mass2.core.misc.median_absolute_deviation(e)
+            _bin_edges = np.linspace(97431-5*mad, 97431+5*mad, 150)
+            bin_centers, counts = mass2.misc.hist_of_series(pl.Series(e), _bin_edges)
+        #     mass2.mathstat.utilities.plot_as_stepped_hist(plt.gca(), counts, bin_centers, label=key)
+        # plt.legend()
+            params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
+            params["dph_de"].set(1.0, vary=False)
+            result = model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
+            result.set_label_hints(
+                binsize=bin_centers[1] - bin_centers[0],
+                ds_shortname=ch.header.description,
+                attr_str=key,
+                unit_str="eV",
+                cut_hint="",
+            )
+            ax = plt.subplot(3, 3, 1+i)
+            result.plotm(ax)
+            plt.legend().remove()
+            resolution[key] = result.best_values["fwhm"]
+
+        for k in keys:
+            print(f"{k:20s}: {resolution[k]:6.2f} eV")
+
+    run_fits(data4.channels[dropdown_ch.value])
+    mass2.show()
+    return
+
+
+@app.cell
+def _(data4, mass2):
+    data4.plot_noise_autocorr()
+    print(data4.ch0)
     mass2.show()
     return
 
