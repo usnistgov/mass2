@@ -29,6 +29,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
     header = mass2.ChannelHeader(
         "dummy for test",
+        data_source=None,
         ch_num=ch_num,
         frametime_s=frametime_s,
         n_presamples=n // 2,
@@ -130,6 +131,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
     header = mass2.ChannelHeader(
         "dummy for test",
+        data_source=None,
         ch_num=0,
         frametime_s=frametime_s,
         n_presamples=n // 2,

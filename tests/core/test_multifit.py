@@ -42,6 +42,7 @@ def generate_and_fit_fake_data(
         df,
         header=mass2.ChannelHeader(
             description="Fake spectral data for testing MultiFit",
+            data_source=None,
             ch_num=1,
             frametime_s=0.1,
             n_presamples=100,

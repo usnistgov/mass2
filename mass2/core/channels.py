@@ -647,6 +647,7 @@ class Channels:
                 df,
                 header=ChannelHeader(
                     description="from df",
+                    data_source=None,
                     ch_num=ch_num,
                     frametime_s=frametime_s,
                     n_presamples=n_presamples,
