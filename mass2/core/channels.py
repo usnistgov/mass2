@@ -694,7 +694,7 @@ class Channels:
                 A copy of `ch` amenable to pickling with the dataframe and dataframe history removed and with trimmed steps.
             """
             # Don't store the memmapped LJH file info (if present) in the Parquet file
-            df = ch.df.select(pl.exclude(["pulse", "timestamp", "subframecount"]))
+            df = ch.df.select(pl.exclude("pulse", "timestamp", "subframecount"))
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
