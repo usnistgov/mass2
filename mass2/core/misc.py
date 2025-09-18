@@ -36,16 +36,6 @@ def unpickle_object(filename: str | Path) -> Any:
         return obj
 
 
-def pickle_stream(obj: Any) -> bytes:
-    """Pickle an object to the given stream using dill."""
-    return dill.dumps(obj)
-
-
-def unpickle_stream(stream: str | bytes) -> Any:
-    """Unpickle an object from the given stream using dill."""
-    return dill.loads(stream)
-
-
 def smallest_positive_real(arr: ArrayLike) -> float:
     """Return the smallest positive real number in the given array-like object."""
 

@@ -15,6 +15,7 @@ import functools
 import joblib
 import traceback
 import lmfit
+import dill
 import io
 import os
 import pathlib
@@ -26,7 +27,6 @@ from .channel import Channel, ChannelHeader, BadChannel
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
-from .misc import pickle_stream, unpickle_stream
 from . import ljhutil
 
 
@@ -703,8 +703,7 @@ class Channels:
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
-            bytes = pickle_stream(data)
-            zf.writestr(pickle_file, bytes)
+            zf.writestr(pickle_file, dill.dumps(data))
 
     @staticmethod
     def load_analysis(path: Path | str) -> "Channels":
@@ -719,8 +718,9 @@ class Channels:
         path.exists() and path.is_file()
 
         with ZipFile(path, "r") as zf:
-            pickle_bytes = zf.read("data_all.pkl")
-            data: Channels = unpickle_stream(pickle_bytes)
+            pickle_file = "data_all.pkl"
+            pickle_bytes = zf.read(pickle_file)
+            data: Channels = dill.loads(pickle_bytes)
             channels = {}
             bad_channels = {}
             for ch_num, ch in data.channels.items():
