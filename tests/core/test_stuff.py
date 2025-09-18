@@ -473,16 +473,55 @@ def test_steps():
 
 
 def test_save_analysis(tmpdir):
+    """Test save and load analysis features, including a bad channel, for dummy data."""
     ch_num = 94
+    bad_num = 95
     ch = dummy_channel(ch_num=ch_num)
-    ch2 = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
-    data = mass2.Channels({ch_num: ch2}, description="dummy dataset", bad_channels={})
+    ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
+    ch2 = dummy_channel(ch_num=bad_num)
+    ch2 = ch2.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
+    bch = ch2.as_bad(None, "testing that bad channels also get saved/restored", backtrace=None)
+    data = mass2.Channels({ch_num: ch}, description="dummy dataset", bad_channels={bad_num: bch})
+
     dir = pathlib.Path(tmpdir)
     savefile = dir / "test_save"
     actual_savefile = savefile.with_suffix(".zip")
     data.save_analysis(savefile)
     data2 = mass2.Channels.load_analysis(actual_savefile)
-    rch2 = data2.channels[ch_num]
-    assert len(rch2.df) == len(ch2.df)
-    assert rch2.header.ch_num == ch_num
-    assert_frame_equal(rch2.df, ch2.df.drop("pulse"))
+
+    # Verify that the good channel's data is restored
+    # It's a dummy channel, not ljh-backed, so the pulse data will be gone.
+    restored_ch = data2.channels[ch_num]
+    assert len(restored_ch.df) == len(ch.df)
+    assert restored_ch.header.ch_num == ch_num
+    assert_frame_equal(restored_ch.df, ch.df.drop("pulse"), check_column_order=False)
+
+    restored_ch2 = data2.bad_channels[bad_num]
+    assert len(restored_ch2.ch.df) == len(ch2.df)
+    assert restored_ch2.ch.header.ch_num == bad_num
+    assert_frame_equal(restored_ch2.ch.df, ch2.df.drop("pulse"))
+
+
+def test_save_analysis_with_ljh(tmpdir):
+    """Test save and load analysis features for LJH-based data, including restoration of raw data columns."""
+
+    def _do_steps(ch: mass2.Channel) -> mass2.Channel:
+        return ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
+
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=5000, exclude_ch_nums=[4102])
+    data = data.map(_do_steps)
+    ch = data.channels[4109]
+
+    dir = pathlib.Path(tmpdir)
+    savefile = dir / "test_save"
+    actual_savefile = savefile.with_suffix(".zip")
+    data.save_analysis(savefile)
+    data2 = mass2.Channels.load_analysis(actual_savefile)
+
+    # Verify that the good channel's data is restored
+    # It's an ljh-backed channel, so the raw pulse and timing data should be restored, too.
+    restored_ch = data2.channels[4109]
+    assert restored_ch.header.ch_num == 4109
+    assert len(restored_ch.df) == len(ch.df)
+    assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)

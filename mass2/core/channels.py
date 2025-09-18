@@ -695,26 +695,42 @@ class Channels:
                 df = df.drop(c)
             return df
 
+        def store_and_remove_dataframe(ch: Channel, zf: ZipFile, parquet_file: str) -> Channel:
+            """Store the `ch.df` to a parquet file of the given name in the ZipFile (open for writing).
+            Return a copy of `ch` with a trivial dataframe and dataframe history.
+            Also replace each step in `ch.steps` with a version having debug info trimmed out.
+
+            Parameters
+            ----------
+            ch : Channel
+                The channel to modify by storing dataframe to parquet and removing it.
+            zf : ZipFile
+                A ZipFile object currently open for writing.
+            parquet_file : str
+                The name to use for storing the parquet file within `zf`
+
+            Returns
+            -------
+            Channel
+                A copy of `ch` with the dataframe and dataframe history removed and with trimmed steps.
+            """
+            # Don't store the memmapped LJH file info (if present) in the Parquet file
+            df = drop_columns(ch.df, "pulse", "timestamp", "subframecount")
+            buffer = io.BytesIO()
+            df.write_parquet(buffer)
+            zf.writestr(parquet_file, buffer.getvalue())
+            steps = ch.steps.trim_debug_info()
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+
         with ZipFile(str(path), "w") as zf:
             channels = {}
             bad_channels = {}
             for ch_num, ch in self.channels.items():
-                # Don't store the memmapped LJH file info (if present) in the Parquet file
-                df = drop_columns(ch.df, "pulse", "timestamp", "subframecount")
-                buffer = io.BytesIO()
-                df.write_parquet(buffer)
                 fname = f"data_chan{ch_num:04d}.parquet"
-                zf.writestr(fname, buffer.getvalue())
-                steps = ch.steps.trim_debug_info()
-                channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                channels[ch_num] = store_and_remove_dataframe(ch, zf, fname)
             for ch_num, badch in self.bad_channels.items():
-                df = drop_columns(badch.ch.df, "pulse", "timestamp", "subframecount")
-                buffer = io.BytesIO()
-                df.write_parquet(buffer)
                 fname = f"data_bad_chan{ch_num:04d}.parquet"
-                zf.writestr(fname, buffer.getvalue())
-                steps = badch.ch.steps.trim_debug_info()
-                ch = dataclasses.replace(badch.ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                ch = store_and_remove_dataframe(badch.ch, zf, fname)
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
@@ -732,32 +748,49 @@ class Channels:
         path = pathlib.Path(path)
         path.exists() and path.is_file()
 
+        def restore_dataframe(ch: Channel, zf: ZipFile, parquet_file: str) -> Channel:
+            """Take a channel and replace its dataframe with whatever is found in the given parquet file
+
+            Parameters
+            ----------
+            ch : Channel
+                A channel, loaded from a pickle file, with an empty dataframe
+            zf : ZipFile
+                A ZipFile object currently open for reading.
+            parquet_file : str | Path
+                Path to an Apache Parquet file containing data to replace the existing dataframe
+
+            Returns
+            -------
+            Channel
+                The Channel `ch` but with `ch.df` updated from the parquet file.
+            """
+            df = pl.read_parquet(zf.read(parquet_file))
+
+            # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
+            print(f"Joe sees {ch.header.data_source=}")
+            if ch.header.data_source is not None:
+                ljh_path = ch.header.data_source
+                if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
+                    raw_ch = Channel.from_ljh(ljh_path)
+                    df = pl.concat([df, raw_ch.df], how="horizontal")
+            df_history = [df] * len(ch.steps)
+            return dataclasses.replace(ch, df=df, df_history=df_history)
+
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"
             pickle_bytes = zf.read(pickle_file)
             data: Channels = dill.loads(pickle_bytes)
-            channels = {}
-            bad_channels = {}
+
+            restored_channels = {}
             for ch_num, ch in data.channels.items():
                 fname = f"data_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(fname))
-                # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-                if ch.header.data_source is not None:
-                    ljh_path = ch.header.data_source
-                    if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                        raw_ch = Channel.from_ljh(ljh_path)
-                        df = pl.concat([df, raw_ch.df], how="horizontal")
-                df_history = [df] * len(ch.steps)
-                channels[ch_num] = dataclasses.replace(ch, df=df, df_history=df_history)
+                restored_channels[ch_num] = restore_dataframe(ch, zf, fname)
+
+            restored_bad_channels = {}
             for ch_num, badch in data.bad_channels.items():
                 fname = f"data_bad_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(fname))
-                ch = dataclasses.replace(badch.ch, df=df)
-                # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-                if ch.header.data_source is not None:
-                    ljh_path = ch.header.data_source
-                    if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                        raw_ch = Channel.from_ljh(ljh_path)
-                        df = pl.concat([df, raw_ch.df], how="horizontal")
-                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
-            return dataclasses.replace(data, channels=channels, bad_channels=bad_channels)
+                ch = restore_dataframe(badch.ch, zf, fname)
+                restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+
+            return dataclasses.replace(data, channels=restored_channels, bad_channels=restored_bad_channels)
