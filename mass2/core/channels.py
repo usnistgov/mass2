@@ -675,6 +675,19 @@ class Channels:
             raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
 
         def drop_columns(df: pl.DataFrame, *columns: str) -> pl.DataFrame:
+            """Return a copy of the dataframe with the named column or columns removed by `DataFrame.drop()`.
+            It is not an error to name columns that don't exist.
+
+            Parameters
+            ----------
+            df : pl.DataFrame
+                Frame to modify
+
+            Returns
+            -------
+            pl.DataFrame
+                The input frame, with named columns removed.
+            """
             columns_to_drop = set(columns)
             columns_to_drop = columns_to_drop.intersection(df.columns)
             for c in columns_to_drop:
@@ -690,7 +703,7 @@ class Channels:
                 df.write_parquet(buffer)
                 fname = f"data_chan{ch_num:04d}.parquet"
                 zf.writestr(fname, buffer.getvalue())
-                steps = ch.steps.trim_dead_ends(None, drop_debug=True)
+                steps = ch.steps.trim_debug_info()
                 channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
             for ch_num, badch in self.bad_channels.items():
                 df = drop_columns(badch.ch.df, "pulse", "timestamp", "subframecount")
@@ -698,7 +711,7 @@ class Channels:
                 df.write_parquet(buffer)
                 fname = f"data_bad_chan{ch_num:04d}.parquet"
                 zf.writestr(fname, buffer.getvalue())
-                steps = badch.ch.steps.trim_dead_ends(None, drop_debug=True)
+                steps = badch.ch.steps.trim_debug_info()
                 ch = dataclasses.replace(badch.ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)

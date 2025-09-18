@@ -315,3 +315,21 @@ class Recipe(Sequence[RecipeStep]):
                 else:
                     steps.append(self[i])
         return Recipe(steps)
+
+    def trim_debug_info(self) -> "Recipe":
+        """Create a new Recipe object with all debug info removed from each step, but no steps removed.
+
+        The following are exactly equivalent:
+        >>> recipe2 = recipe.trim_debug_info()
+        >>> recipe2 = recipe.trim_dead_ends(required_fields=None, drop_debug=True)
+
+        Returns
+        -------
+        Recipe
+            A copy of `self`, except that `drop_debug()` is called to replace each step with a less-baggage
+            version of that step.
+        """
+        slim_steps = []
+        for step in self:
+            slim_steps.append(step.drop_debug())
+        return Recipe(slim_steps)
