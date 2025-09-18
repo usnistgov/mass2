@@ -748,25 +748,21 @@ class Channels:
         path = pathlib.Path(path)
         path.exists() and path.is_file()
 
-        def restore_dataframe(ch: Channel, zf: ZipFile, parquet_file: str) -> Channel:
-            """Take a channel and replace its dataframe with whatever is found in the given parquet file
+        def restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
+            """Take a channel and replace its dataframe with the given one, loaded from a parquet file
 
             Parameters
             ----------
             ch : Channel
                 A channel, loaded from a pickle file, with an empty dataframe
-            zf : ZipFile
-                A ZipFile object currently open for reading.
-            parquet_file : str | Path
-                Path to an Apache Parquet file containing data to replace the existing dataframe
+            df : DataFrame
+                A replacement dataframe for the existing one (typically, the existing one is empty)
 
             Returns
             -------
             Channel
-                The Channel `ch` but with `ch.df` updated from the parquet file.
+                The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
-            df = pl.read_parquet(zf.read(parquet_file))
-
             # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
             print(f"Joe sees {ch.header.data_source=}")
             if ch.header.data_source is not None:
@@ -784,13 +780,15 @@ class Channels:
 
             restored_channels = {}
             for ch_num, ch in data.channels.items():
-                fname = f"data_chan{ch_num:04d}.parquet"
-                restored_channels[ch_num] = restore_dataframe(ch, zf, fname)
+                parquet_file = f"data_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(parquet_file))
+                restored_channels[ch_num] = restore_dataframe(ch, df)
 
             restored_bad_channels = {}
             for ch_num, badch in data.bad_channels.items():
-                fname = f"data_bad_chan{ch_num:04d}.parquet"
-                ch = restore_dataframe(badch.ch, zf, fname)
+                parquet_file = f"data_bad_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(parquet_file))
+                ch = restore_dataframe(badch.ch, df)
                 restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
 
             return dataclasses.replace(data, channels=restored_channels, bad_channels=restored_bad_channels)
