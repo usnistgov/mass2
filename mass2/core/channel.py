@@ -219,7 +219,7 @@ class Channel:
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             try:
-                group_name_str = int(group_name_str) # try to make integer group names be integers
+                group_name_str = int(group_name_str)  # try to make integer group names be integers
             except:
                 pass
             counts_dict[group_name_str] = counts
