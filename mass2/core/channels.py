@@ -15,9 +15,12 @@ import functools
 import joblib
 import traceback
 import lmfit
+import dill
+import io
 import os
 import pathlib
 from pathlib import Path
+from zipfile import ZipFile
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel
@@ -653,3 +656,94 @@ class Channels:
                 npulses=len(df),
             )
         return Channels(channels, description)
+
+    def save_analysis(self, path: Path | str, overwrite: bool = False) -> None:
+        """Save an analysis-in-progress completely to a directory
+
+        Parameters
+        ----------
+        path : Path | str
+            Directory to save work in. If it doesn't exist, its parent should.
+        overwrite : bool, optional
+            If `path` exists, whether to overwrite it, by default False
+        """
+        path = pathlib.Path(path)
+        if path.suffix != ".zip":
+            path = path.with_suffix(".zip")
+
+        if os.path.exists(path) and not overwrite:
+            raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
+
+        def drop_columns(df: pl.DataFrame, *columns: str) -> pl.DataFrame:
+            """Return a copy of the dataframe with the named column or columns removed by `DataFrame.drop()`.
+            It is not an error to name columns that don't exist.
+
+            Parameters
+            ----------
+            df : pl.DataFrame
+                Frame to modify
+
+            Returns
+            -------
+            pl.DataFrame
+                The input frame, with named columns removed.
+            """
+            columns_to_drop = set(columns)
+            columns_to_drop = columns_to_drop.intersection(df.columns)
+            for c in columns_to_drop:
+                df = df.drop(c)
+            return df
+
+        with ZipFile(str(path), "w") as zf:
+            channels = {}
+            bad_channels = {}
+            for ch_num, ch in self.channels.items():
+                df = drop_columns(ch.df, "pulse", "timestamp", "subframecount")
+                buffer = io.BytesIO()
+                df.write_parquet(buffer)
+                fname = f"data_chan{ch_num:04d}.parquet"
+                zf.writestr(fname, buffer.getvalue())
+                steps = ch.steps.trim_debug_info()
+                channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            for ch_num, badch in self.bad_channels.items():
+                df = drop_columns(badch.ch.df, "pulse", "timestamp", "subframecount")
+                buffer = io.BytesIO()
+                df.write_parquet(buffer)
+                fname = f"data_bad_chan{ch_num:04d}.parquet"
+                zf.writestr(fname, buffer.getvalue())
+                steps = badch.ch.steps.trim_debug_info()
+                ch = dataclasses.replace(badch.ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+            data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
+            pickle_file = "data_all.pkl"
+            zf.writestr(pickle_file, dill.dumps(data))
+
+    @staticmethod
+    def load_analysis(path: Path | str) -> "Channels":
+        """Load an analysis-in-progress from a zipfile
+
+        Parameters
+        ----------
+        path : Path | str
+            Zipfile that work was saved in.
+        """
+        path = pathlib.Path(path)
+        path.exists() and path.is_file()
+
+        with ZipFile(path, "r") as zf:
+            pickle_file = "data_all.pkl"
+            pickle_bytes = zf.read(pickle_file)
+            data: Channels = dill.loads(pickle_bytes)
+            channels = {}
+            bad_channels = {}
+            for ch_num, ch in data.channels.items():
+                fname = f"data_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(fname))
+                nsteps = len(ch.steps)
+                channels[ch_num] = dataclasses.replace(ch, df=df, df_history=[df] * nsteps)
+            for ch_num, badch in data.bad_channels.items():
+                fname = f"data_bad_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(fname))
+                ch = dataclasses.replace(badch.ch, df=df)
+                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+            return dataclasses.replace(data, channels=channels, bad_channels=bad_channels)

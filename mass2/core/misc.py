@@ -4,6 +4,7 @@ Miscellaneous utility functions used in mass2 for plotting, pickling, statistics
 
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
+from pathlib import Path
 import numpy as np
 import pylab as plt
 import polars as pl
@@ -21,14 +22,14 @@ def show(fig: plt.Figure | None = None) -> mo.Html:
     return mo.mpl.interactive(fig)
 
 
-def pickle_object(obj: Any, filename: str) -> None:
+def pickle_object(obj: Any, filename: str | Path) -> None:
     """Pickle the given object to the given filename using dill.
     Mass2 Recipe objects are compatible with `dill` but _not_ with the standard `pickle` module."""
     with open(filename, "wb") as file:
         dill.dump(obj, file)
 
 
-def unpickle_object(filename: str) -> Any:
+def unpickle_object(filename: str | Path) -> Any:
     """Unpickle an object from the given filename using dill."""
     with open(filename, "rb") as file:
         obj = dill.load(file)

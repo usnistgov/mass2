@@ -2,10 +2,12 @@ import numpy as np
 import os
 import pytest
 import polars as pl
+from polars.testing import assert_frame_equal
 
 import mass2
 import pulsedata
 import tempfile
+import pathlib
 
 
 def test_ljh_to_polars():
@@ -16,7 +18,7 @@ def test_ljh_to_polars():
     _df, _header_df = ljh.to_polars()
 
 
-def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16)):
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
     rng = np.random.default_rng(seed)
     n = len(signal)
     noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 20 + 5000, dtype=np.int16)
@@ -27,7 +29,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16)):
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
     header = mass2.ChannelHeader(
         "dummy for test",
-        ch_num=0,
+        ch_num=ch_num,
         frametime_s=frametime_s,
         n_presamples=n // 2,
         n_samples=n,
@@ -466,3 +468,19 @@ def test_steps():
 
     with pytest.raises(ValueError):
         steps.trim_dead_ends("this field doesn't exist")
+
+
+def test_save_analysis(tmpdir):
+    ch_num = 94
+    ch = dummy_channel(ch_num=ch_num)
+    ch2 = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv()
+    data = mass2.Channels({ch_num: ch2}, description="dummy dataset", bad_channels={})
+    dir = pathlib.Path(tmpdir)
+    savefile = dir / "test_save"
+    actual_savefile = savefile.with_suffix(".zip")
+    data.save_analysis(savefile)
+    data2 = mass2.Channels.load_analysis(actual_savefile)
+    rch2 = data2.channels[ch_num]
+    assert len(rch2.df) == len(ch2.df)
+    assert rch2.header.ch_num == ch_num
+    assert_frame_equal(rch2.df, ch2.df.drop("pulse"))

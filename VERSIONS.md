@@ -8,6 +8,7 @@
 * Made GitHub Actions CI system cache the big `pulsedata` requirement (issue 61).
 * Require `numpy` version >= 2.0.
 * Improve README installation instructions.
+* Add a save/restore function for in-progress analysis (issue 70).
 
 **2.0.0 beta 2** September 3, 2025
 
