@@ -478,8 +478,6 @@ def test_save_analysis(tmpdir):
     dir = pathlib.Path(tmpdir)
     savefile = dir / "test_save"
     actual_savefile = savefile.with_suffix(".zip")
-    print(f"{savefile=}")
-    print(f"{actual_savefile=}")
     data.save_analysis(savefile)
     data2 = mass2.Channels.load_analysis(actual_savefile)
     rch2 = data2.channels[ch_num]
