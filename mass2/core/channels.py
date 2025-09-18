@@ -675,7 +675,6 @@ class Channels:
         if os.path.exists(zip_path) and not overwrite:
             raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")
 
-
         def store_dataframe_to_parquet_and_return_pickleable_channel(ch: Channel, zf: ZipFile, parquet_path: str) -> Channel:
             """Store the `ch.df` to a parquet file of the given name in the ZipFile (open for writing).
             Prepare `ch` for pickling by removing its dataframe and dataframe history, and stripping debug info from `steps`
