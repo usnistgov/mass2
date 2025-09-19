@@ -9,6 +9,7 @@
 * Require `numpy` version >= 2.0.
 * Improve README installation instructions.
 * Add a save/restore function for in-progress analysis (issue 70).
+* Add mouseover and clickable features to scatter plots (issue 71).
 
 **2.0.0 beta 2** September 3, 2025
 
