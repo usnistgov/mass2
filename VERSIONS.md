@@ -9,6 +9,7 @@
 * Require `numpy` version >= 2.0.
 * Improve README installation instructions.
 * Add a save/restore function for in-progress analysis (issue 70).
+* Add mouseover and clickable features to scatter plots (issue 71).
 * Restore analysis also finds LJH files and memmaps their raw data fields (issue 77).
 
 **2.0.0 beta 2** September 3, 2025

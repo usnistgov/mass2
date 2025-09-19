@@ -11,6 +11,7 @@ import os
 import lmfit
 import polars as pl
 import pylab as plt
+from matplotlib.backend_bases import MouseEvent
 import marimo as mo
 import functools
 import numpy as np
@@ -250,26 +251,121 @@ class Channel:
         use_good_expr: bool = True,
         skip_none: bool = True,
         ax: plt.Axes | None = None,
+        annotate: bool = True,
     ) -> None:
-        """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`."""
+        """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
+
+        Parameters
+        ----------
+        x_col : str
+            Name of the column to put on the x axis
+        y_col : str
+            Name of the column to put on the y axis
+        color_col : str | None, optional
+            Name of the column to color points by (generally a category like "state_label"), by default None
+        use_expr : pl.Expr, optional
+            An expression to select plottable points, by default pl.lit(True)
+        use_good_expr : bool, optional
+            Whether to apply the object's `good_expr` before plotting, by default True
+        skip_none : bool, optional
+            Whether to skip color categories with no name, by default True
+        ax : plt.Axes | None, optional
+            Axes to plot on, by default None
+        annotate : bool, optional
+            Whether to annotate points that are hovered over or clicked on by the mouse, by default True
+        """
         if ax is None:
-            plt.figure()
+            fig = plt.figure()
             ax = plt.gca()
         plt.sca(ax)  # set current axis so I can use plt api
+        fig = plt.gcf()
+        filter_expr = use_expr
         if use_good_expr:
             filter_expr = self.good_expr.and_(use_expr)
-        else:
-            filter_expr = self.good_expr
-        df_small = self.df.lazy().filter(filter_expr).select(x_col, y_col, color_col).collect()
+        df_small = self.df.lazy().with_row_index(name="index").filter(filter_expr).select(x_col, y_col, color_col, "index").collect()
+        lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
                 continue
-            plt.plot(
+            (line,) = plt.plot(
                 data.select(x_col).to_series(),
                 data.select(y_col).to_series(),
                 ".",
                 label=name,
             )
+            lines_pnums.append((line, data.select("index").to_series()))
+
+        if annotate:
+            annotation = ax.annotate(
+                "",
+                xy=(0, 0),
+                xytext=(-20, 20),
+                textcoords="offset points",
+                bbox=dict(boxstyle="round", fc="w"),
+                arrowprops=dict(arrowstyle="->"),
+            )
+            annotation.set_visible(False)
+
+            def update_note(points: list) -> None:
+                """Generate a matplotlib hovering note about the data point index
+
+                Parameters
+                ----------
+                points : list
+                    List of the plotted data points that are hovered over
+                """
+                # TODO: this only works if the first line object has the pulse we want.
+                line, pnum = lines_pnums[0]
+                x, y = line.get_data()
+                annotation.xy = (x[points[0]], y[points[0]])
+                text2 = " ".join([str(pnum[int(n)]) for n in points])
+                if len(points) > 1:
+                    text = f"Pulses [{text2}]"
+                else:
+                    text = f"Pulse {text2}"
+                annotation.set_text(text)
+                annotation.get_bbox_patch().set_alpha(0.75)
+
+            def hover(event: MouseEvent) -> None:
+                """Callback to be used when mouse hovers near a plotted point
+
+                Parameters
+                ----------
+                event : MouseEvent
+                    The mouse-related event; contains location information
+                """
+                vis = annotation.get_visible()
+                if event.inaxes != ax:
+                    return
+                cont, ind = line.contains(event)
+                if cont:
+                    update_note(ind["ind"])
+                    annotation.set_visible(True)
+                    fig.canvas.draw_idle()
+                elif vis:
+                    annotation.set_visible(False)
+                    fig.canvas.draw_idle()
+
+            def click(event: MouseEvent) -> None:
+                """Callback to be used when mouse clicks near a plotted point
+
+                Parameters
+                ----------
+                event : MouseEvent
+                    The mouse-related event; contains location information
+                """
+                if event.inaxes != ax:
+                    return
+                cont, ind = line.contains(event)
+                if cont:
+                    pnum = lines_pnums[0][1]
+                    rownum = pnum[int(ind["ind"][0])]
+                    print(f"This is pulse# {rownum}")
+                    print(self.df.drop("pulse").row(rownum, named=True))
+
+            fig.canvas.mpl_connect("motion_notify_event", hover)
+            fig.canvas.mpl_connect("button_press_event", click)
+
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
         title_str = f"""{self.header.description}
