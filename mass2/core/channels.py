@@ -647,6 +647,7 @@ class Channels:
                 df,
                 header=ChannelHeader(
                     description="from df",
+                    data_source=None,
                     ch_num=ch_num,
                     frametime_s=frametime_s,
                     n_presamples=n_presamples,
@@ -657,8 +658,8 @@ class Channels:
             )
         return Channels(channels, description)
 
-    def save_analysis(self, path: Path | str, overwrite: bool = False) -> None:
-        """Save an analysis-in-progress completely to a directory
+    def save_analysis(self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False) -> None:
+        """Save an analysis-in-progress completely to a zip file, only tested for ljh backed channels so far
 
         Parameters
         ----------
@@ -666,53 +667,54 @@ class Channels:
             Directory to save work in. If it doesn't exist, its parent should.
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
+        trim_debug : bool, optional
+            Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
         """
-        path = pathlib.Path(path)
-        if path.suffix != ".zip":
-            path = path.with_suffix(".zip")
+        zip_path = pathlib.Path(zip_path)
+        if zip_path.suffix != ".zip":
+            zip_path = zip_path.with_suffix(".zip")
 
-        if os.path.exists(path) and not overwrite:
-            raise ValueError(f"Set save_analysis(...overwrite=True) to overwrite the existing {path=}")
+        if os.path.exists(zip_path) and not overwrite:
+            raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")
 
-        def drop_columns(df: pl.DataFrame, *columns: str) -> pl.DataFrame:
-            """Return a copy of the dataframe with the named column or columns removed by `DataFrame.drop()`.
-            It is not an error to name columns that don't exist.
+        def store_dataframe_to_parquet_and_return_pickleable_channel(ch: Channel, zf: ZipFile, parquet_path: str) -> Channel:
+            """Store the `ch.df` to a parquet file of the given name in the ZipFile (open for writing).
+            Prepare `ch` for pickling by removing its dataframe and dataframe history, and stripping debug info from `steps`
 
             Parameters
             ----------
-            df : pl.DataFrame
-                Frame to modify
+            ch : Channel
+                The channel to modify by storing dataframe to parquet and removing it.
+            zf : ZipFile
+                A ZipFile object currently open for writing.
+            parquet_file : str
+                The name to use for storing the parquet file within `zf`
 
             Returns
             -------
-            pl.DataFrame
-                The input frame, with named columns removed.
+            Channel
+                A copy of `ch` amenable to pickling with the dataframe and dataframe history removed and with trimmed steps.
             """
-            columns_to_drop = set(columns)
-            columns_to_drop = columns_to_drop.intersection(df.columns)
-            for c in columns_to_drop:
-                df = df.drop(c)
-            return df
+            # Don't store the memmapped LJH file info (if present) in the Parquet file
+            df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+            buffer = io.BytesIO()
+            df.write_parquet(buffer)
+            zf.writestr(parquet_path, buffer.getvalue())
+            if trim_debug:
+                steps = ch.steps.trim_debug_info()
+            else:
+                steps = ch.steps
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
 
-        with ZipFile(str(path), "w") as zf:
+        with ZipFile(str(zip_path), "w") as zf:
             channels = {}
             bad_channels = {}
             for ch_num, ch in self.channels.items():
-                df = drop_columns(ch.df, "pulse", "timestamp", "subframecount")
-                buffer = io.BytesIO()
-                df.write_parquet(buffer)
-                fname = f"data_chan{ch_num:04d}.parquet"
-                zf.writestr(fname, buffer.getvalue())
-                steps = ch.steps.trim_debug_info()
-                channels[ch_num] = dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                parquet_path = f"data_chan{ch_num:04d}.parquet"
+                channels[ch_num] = store_dataframe_to_parquet_and_return_pickleable_channel(ch, zf, parquet_path)
             for ch_num, badch in self.bad_channels.items():
-                df = drop_columns(badch.ch.df, "pulse", "timestamp", "subframecount")
-                buffer = io.BytesIO()
-                df.write_parquet(buffer)
-                fname = f"data_bad_chan{ch_num:04d}.parquet"
-                zf.writestr(fname, buffer.getvalue())
-                steps = badch.ch.steps.trim_debug_info()
-                ch = dataclasses.replace(badch.ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+                parquet_path = f"data_bad_chan{ch_num:04d}.parquet"
+                ch = store_dataframe_to_parquet_and_return_pickleable_channel(badch.ch, zf, parquet_path)
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
@@ -730,20 +732,49 @@ class Channels:
         path = pathlib.Path(path)
         path.exists() and path.is_file()
 
+        def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
+            """Take a channel and replace its dataframe with the given one, loaded from a parquet file
+
+            Parameters
+            ----------
+            ch : Channel
+                A channel, loaded from a pickle file, with an empty dataframe
+            df : DataFrame
+                A replacement dataframe for the existing one (typically, the existing one is empty)
+
+            Returns
+            -------
+            Channel
+                The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
+            """
+            # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
+            if ch.header.data_source is not None:
+                ljh_path = ch.header.data_source
+                if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
+                    ljh_backed_chan = Channel.from_ljh(ljh_path)
+                    df = df.with_columns(ljh_backed_chan.df)
+            # df_history is needed for some debug plots to work. This version has strictly more columns than required
+            # at each history point. TODO: We could use the steps inputs and outputs to trim the appropriate columns.
+            # For getting started, though, it's easier just to let each dataframe in history equal the final dataframe.
+            df_history = [df] * len(ch.steps)
+            return dataclasses.replace(ch, df=df, df_history=df_history)
+
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"
             pickle_bytes = zf.read(pickle_file)
             data: Channels = dill.loads(pickle_bytes)
-            channels = {}
-            bad_channels = {}
+
+            restored_channels = {}
             for ch_num, ch in data.channels.items():
-                fname = f"data_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(fname))
-                nsteps = len(ch.steps)
-                channels[ch_num] = dataclasses.replace(ch, df=df, df_history=[df] * nsteps)
+                parquet_file = f"data_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(parquet_file))
+                restored_channels[ch_num] = _restore_dataframe(ch, df)
+
+            restored_bad_channels = {}
             for ch_num, badch in data.bad_channels.items():
-                fname = f"data_bad_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(fname))
-                ch = dataclasses.replace(badch.ch, df=df)
-                bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
-            return dataclasses.replace(data, channels=channels, bad_channels=bad_channels)
+                parquet_file = f"data_bad_chan{ch_num:04d}.parquet"
+                df = pl.read_parquet(zf.read(parquet_file))
+                ch = _restore_dataframe(badch.ch, df)
+                restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
+
+            return dataclasses.replace(data, channels=restored_channels, bad_channels=restored_bad_channels)

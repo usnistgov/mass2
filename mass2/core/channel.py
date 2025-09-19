@@ -36,6 +36,7 @@ class ChannelHeader:
     """Metadata about a Channel, of the sort read from file header."""
 
     description: str  # filename or date/run number, etc
+    data_source: str | None  # complete file path, if read from a file
     ch_num: int
     frametime_s: float
     n_presamples: int
@@ -45,8 +46,10 @@ class ChannelHeader:
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
         """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
+        filepath = df["Filename"][0]
         return cls(
-            description=os.path.split(df["Filename"][0])[-1],
+            description=os.path.split(filepath)[-1],
+            data_source=filepath,
             ch_num=df["Channel"][0],
             frametime_s=df["Timebase"][0],
             n_presamples=df["Presamples"][0],
@@ -899,6 +902,7 @@ class Channel:
         df_header = df_header.with_columns(pl.Series("Filename", [off.filename]))
         header = ChannelHeader(
             f"{os.path.split(off.filename)[1]}",
+            off.filename,
             off.header["ChannelNumberMatchingName"],
             off.framePeriodSeconds,
             off._mmap["recordPreSamples"][0],
