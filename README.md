@@ -38,10 +38,10 @@ With raw pulse records and MASS, you can:
 * Estimate and apply accurate functions for absolute-energy calibration.
 * Win friends and influence people.
 
-As of this writing (August 8, 2025), Mass2 consists of 9000 lines of Python (plus 2500 lines of test code and 2500 lines of examples in Marimo notebooks). It used to use extension modules in Cython, but we removed the last of these in early 2025.
+As of this writing (September 18, 2025), Mass2 consists of 10,000 lines of Python (plus 3000 lines of test code and 5200 lines of examples in Marimo notebooks). It used to use extension modules in Cython, but we removed the last of these in early 2025.
 
 ### Versions
-* MASS version 2 was begin in August 2025. It is still unstable, in alpha or pre-alpha status. Find it at https://github.com/usnistgov/mass2
+* MASS version 2 was begun in August 2025. It is still in beta-testing status. Find it at https://github.com/usnistgov/mass2
 * MASS version 1 was begun in November 2010. Bug-fix development continues. Find it at https://github.com/usnistgov/mass
 
 
@@ -104,17 +104,29 @@ source ${NEW_ENVIRONMENT}/bin/activate
 echo ". ~/${NEW_ENVIRONMENT}/bin/activate" >> ~/.bashrc
 ```
 
-Now that you have `uv` and a new environment, and you've activated that environment, you can install `mass2`. Navigate to the desired directory and install it. The `-e` flag means "editable", i.e., so you can edit the code and have changes be reflected.
+Now that you have `uv` and a new environment, and you've activated that environment, you can install `mass2`. Are you a user who wants to try the example notebooks, or wants to edit the Mass2 source code? If so, navigate to the desired directory and install it. The `-e` flag means "editable", i.e., so you can edit the code and have changes be reflected.
+
+Users who contribute to MASS will prefer to set up password-free connections with an ssh key. They should use ssh-based cloning:
 ```bash
 cd /wherever/he/mass/directory/should/live
 #
+git clone git+ssh://git@github.com/usnistgov/mass2.git
+cd mass2
 uv pip install --upgrade pip uv
-uv pip install -e git+https://github.com/usnistgov/mass2.git#egg=mass2
+uv pip install -e .
 ```
 
-The above (HTTPS) cloning method is probably simpler initially (no ssh setup). On the other hand, users who contribute to MASS will prefer to set up password-free connections with an ssh key. For them, instead of using the last line above, contributors should use ssh-based cloning:
+If you want to avoid ssh setup, and you're willing to forgo making future contributions to Mass until you figure out GitHub's authentication methods, you can use the following (HTTPS) cloning method. It is simpler initially (no ssh setup):
 ```bash
-uv pip install -e git+ssh://git@github.com/usnistgov/mass2.git#egg=mass
+git clone https://github.com/usnistgov/mass2.git
+cd mass2
+uv pip install --upgrade pip uv
+uv pip install -e .
+```
+
+Finally, if you don't need to run examples or edit Mass2, you can install it in your uv virtual environment like this
+```bash
+uv pip install git+https://github.com/usnistgov/mass2.git#egg=mass
 ```
 
 If you install in any virtual environment, the install location will be inside the `MYVENV/src/mass` where `MYVENV` is the name of your venv. You can switch git branches and update from GitHub in that directory and have everything take effect immediately.
