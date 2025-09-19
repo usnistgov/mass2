@@ -15,7 +15,6 @@ def _():
     import tempfile
     import os
     import mass2.core.mass_add_lines_truebq
-    import lmfit
     import pulsedata
     return mass2, np, os, pl, plt, pulsedata, tempfile
 
@@ -28,11 +27,13 @@ def _(mass2, pl, pulsedata):
         # lets just fill it in with None where we can
         # and see what we can do
         ch = mass2.Channel(df,
-                          header = mass2.ChannelHeader(description=filename,
-                                                       ch_num=1,
-                                                      frametime_s=1e-5,df=None,n_presamples=None, n_samples=None),
-                          npulses=len(df),
-                          good_expr=pl.col("category")=="clean")
+                           header=mass2.ChannelHeader(
+                               description=filename,
+                               data_source=filename,
+                               ch_num=1,
+                               frametime_s=1e-5, df=None, n_presamples=None, n_samples=None),
+                           npulses=len(df),
+                           good_expr=pl.col("category") == "clean")
         return ch
     ch5um = from_parquet(pulsedata.parquet["truebq_202508_5um_Pu239.parquet"])
     ch20um = from_parquet(pulsedata.parquet["truebq_202508_20um_Pu239.parquet"])
@@ -102,7 +103,7 @@ def _(mass2):
 @app.cell
 def _(ch20um, mass2, model, np, params):
     bin_edges_fit = np.arange(5_210_000, 5_275_000, 250.0)
-    bin_centers_fit, counts_noco = ch20um.hist("energy_5lagy",bin_edges_fit)
+    bin_centers_fit, counts_noco = ch20um.hist("energy_5lagy", bin_edges_fit)
     result = model.fit(counts_noco, params, bin_centers=bin_centers_fit)
     result.plotm()
     mass2.show()

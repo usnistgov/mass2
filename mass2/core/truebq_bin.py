@@ -146,6 +146,7 @@ class TriggerResult:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
             self.data_source.description,
+            None,
             self.data_source.channel_number,
             self.data_source.frametime_s,
             npre,
@@ -185,6 +186,7 @@ class TriggerResult:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
             self.data_source.description,
+            None,
             self.data_source.channel_number,
             self.data_source.frametime_s,
             npre,
@@ -240,6 +242,7 @@ class TriggerResult:
     #     df = pl.concat(dfs)
     #     ch_header = ChannelHeader(
     #         self.data_source.description,
+    #         None,
     #         self.data_source.channel_number,
     #         self.data_source.frametime_s,
     #         npre,
