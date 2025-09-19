@@ -250,8 +250,7 @@ class Channel:
         ax: plt.Axes | None = None,
         annotate: bool = True,
     ) -> None:
-        (
-            """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
+        """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
         Parameters
         ----------
@@ -270,10 +269,8 @@ class Channel:
         ax : plt.Axes | None, optional
             Axes to plot on, by default None
         annotate : bool, optional
-            Whether to annotate points that are hovered over or clicked on by the mouse, by default False
+            Whether to annotate points that are hovered over or clicked on by the mouse, by default True
         """
-            """"""
-        )
         if ax is None:
             fig = plt.figure()
             ax = plt.gca()
@@ -307,6 +304,13 @@ class Channel:
             annotation.set_visible(False)
 
             def update_note(points: list) -> None:
+                """Generate a matplotlib hovering note about the data point index
+
+                Parameters
+                ----------
+                points : list
+                    List of the plotted data points that are hovered over
+                """
                 # TODO: this only works if the first line object has the pulse we want.
                 line, pnum = lines_pnums[0]
                 x, y = line.get_data()
@@ -320,6 +324,13 @@ class Channel:
                 annotation.get_bbox_patch().set_alpha(0.75)
 
             def hover(event: MouseEvent) -> None:
+                """Callback to be used when mouse hovers near a plotted point
+
+                Parameters
+                ----------
+                event : MouseEvent
+                    The mouse-related event; contains location information
+                """
                 vis = annotation.get_visible()
                 if event.inaxes != ax:
                     return
@@ -333,6 +344,13 @@ class Channel:
                     fig.canvas.draw_idle()
 
             def click(event: MouseEvent) -> None:
+                """Callback to be used when mouse clicks near a plotted point
+
+                Parameters
+                ----------
+                event : MouseEvent
+                    The mouse-related event; contains location information
+                """
                 if event.inaxes != ax:
                     return
                 cont, ind = line.contains(event)
