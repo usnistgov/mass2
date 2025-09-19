@@ -658,7 +658,7 @@ class Channels:
             )
         return Channels(channels, description)
 
-    def save_analysis(self, zip_path: Path | str, overwrite: bool = False) -> None:
+    def save_analysis(self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False) -> None:
         """Save an analysis-in-progress completely to a zip file, only tested for ljh backed channels so far
 
         Parameters
@@ -667,6 +667,8 @@ class Channels:
             Directory to save work in. If it doesn't exist, its parent should.
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
+        trim_debug : bool, optional
+            Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
         """
         zip_path = pathlib.Path(zip_path)
         if zip_path.suffix != ".zip":
@@ -694,11 +696,14 @@ class Channels:
                 A copy of `ch` amenable to pickling with the dataframe and dataframe history removed and with trimmed steps.
             """
             # Don't store the memmapped LJH file info (if present) in the Parquet file
-            df = ch.df.select(pl.exclude("pulse", "timestamp", "subframecount"))
+            df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
-            steps = ch.steps.trim_debug_info()
+            if trim_debug:
+                steps = ch.steps.trim_debug_info()
+            else:
+                steps = ch.steps
             return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
 
         with ZipFile(str(zip_path), "w") as zf:
@@ -727,7 +732,7 @@ class Channels:
         path = pathlib.Path(path)
         path.exists() and path.is_file()
 
-        def restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
+        def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file
 
             Parameters
@@ -743,12 +748,14 @@ class Channels:
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
             # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-            print(f"Joe sees {ch.header.data_source=}")
             if ch.header.data_source is not None:
                 ljh_path = ch.header.data_source
                 if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                    raw_ch = Channel.from_ljh(ljh_path)
-                    df = pl.concat([df, raw_ch.df], how="horizontal")
+                    ljh_backed_chan = Channel.from_ljh(ljh_path)
+                    df = df.with_columns(ljh_backed_chan.df)
+            # df_history is needed for some debug plots to work. This version has strictly more columns than required
+            # at each history point. TODO: We could use the steps inputs and outputs to trim the appropriate columns.
+            # For getting started, though, it's easier just to let each dataframe in history equal the final dataframe.
             df_history = [df] * len(ch.steps)
             return dataclasses.replace(ch, df=df, df_history=df_history)
 
@@ -761,13 +768,13 @@ class Channels:
             for ch_num, ch in data.channels.items():
                 parquet_file = f"data_chan{ch_num:04d}.parquet"
                 df = pl.read_parquet(zf.read(parquet_file))
-                restored_channels[ch_num] = restore_dataframe(ch, df)
+                restored_channels[ch_num] = _restore_dataframe(ch, df)
 
             restored_bad_channels = {}
             for ch_num, badch in data.bad_channels.items():
                 parquet_file = f"data_bad_chan{ch_num:04d}.parquet"
                 df = pl.read_parquet(zf.read(parquet_file))
-                ch = restore_dataframe(badch.ch, df)
+                ch = _restore_dataframe(badch.ch, df)
                 restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
 
             return dataclasses.replace(data, channels=restored_channels, bad_channels=restored_bad_channels)

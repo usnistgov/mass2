@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-)
 
-**2.0.0 beta 3** September 18, 2025
+**2.0.0 beta 3** September 19, 2025
 
 * Added a way to generate Arrival-Time-Safe filters and make into a `RecipeStep` (issue 67).
 * Made GitHub Actions CI system cache the big `pulsedata` requirement (issue 61).
