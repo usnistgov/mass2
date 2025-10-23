@@ -467,6 +467,7 @@ class Channels:
         noise_folder: str | Path | None = None,
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
+        include_ch_nums: list[int] | None = None,
     ) -> "Channels":
         """Create an instance from a directory of LJH files."""
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
@@ -474,7 +475,7 @@ class Channels:
         if exclude_ch_nums is None:
             exclude_ch_nums = []
         if noise_folder is None:
-            paths = ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums)
+            paths = ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums)
             if limit is not None:
                 paths = paths[:limit]
             pairs = [(path, "") for path in paths]
