@@ -6,18 +6,25 @@ app = marimo.App(width="medium", app_title="Mass2 initial analysis")
 
 @app.cell
 def _():
+    import numpy as np
+    import polars as pl
     import pylab as plt
+    import scipy as sp
     import marimo as mo
     import mass2
 
+
+@app.cell
+def _():
     def load_data():
         #
         # Notebook control parameters; change these to control what's loaded:
         #
         directory = TEMPLATE_DIRECTORY
+        noise_directory = None
         max_files_limit = 2  # Set to None if you prefer no limit
         exclude_ch_nums = []
-        return mass2.core.Channels.from_ljh_folder(directory, limit=max_files_limit, exclude_ch_nums=exclude_ch_nums)
+        return mass2.core.Channels.from_ljh_folder(directory, noise_directory, limit=max_files_limit, exclude_ch_nums=exclude_ch_nums)
 
     return load_data, mass2, mo, plt
 
