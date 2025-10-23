@@ -503,22 +503,62 @@ class Channels:
         return output_dir / filename
 
     def get_experiment_state_df(self, experiment_state_path: str | Path | None = None) -> pl.DataFrame:
-        """Return a DataFrame containing experiment state information,
-        loading from the given path or (if None) inferring it from an LJH file."""
+        """Return a DataFrame containing experiment state information.
+
+        Parameters
+        ----------
+        experiment_state_path : str | Path | None, optional
+            load experiment state info from the given path or (if None) infer the path from an LJH file, by default None
+
+        Returns
+        -------
+        pl.DataFrame
+            A Data Frame with a table of experiment state labels and the corresponding start time (in Polars timestamp format).
+        """
         if experiment_state_path is None:
             ljh_path = self.get_an_ljh_path()
             experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
-        # _col0, _col1 = df.columns
         df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
-        # strip whitespace from state_label column
-        sl_series = df.select(pl.col("state_label").str.strip_chars()).to_series()
-        df_es = df_es.with_columns(state_label=pl.Series(values=sl_series, dtype=pl.Categorical))
+
+        # Strip leading/trailing whitespace from state labels. Convert string -> categorical
+        df_labels = df.select(pl.col("state_label").str.strip_chars()).cast(pl.Categorical)
+        df_es = df_es.with_columns(df_labels)
         return df_es
 
+    def with_experiment_state_df(self, df_es: pl.DataFrame) -> "Channels":
+        """Return a copy of this Channels object with experiment state information added to each Channel.
+
+        Parameters
+        ----------
+        df_es : pl.DataFrame
+            experiment state info
+
+        Returns
+        -------
+        Channels
+            An enhanced copy of self, with experiment state information added to each channel.
+        """
+        # TODO: the following is less performant than making a use_expr for each state,
+        # and using .set_sorted on the timestamp column.
+        ch2s = {}
+        for ch_num, ch in self.channels.items():
+            ch2s[ch_num] = ch.with_experiment_state_df(df_es)
+        return Channels(ch2s, self.description)
+
     def with_experiment_state_by_path(self, experiment_state_path: str | None = None) -> "Channels":
-        """Return a copy of this Channels object with experiment state information added,
-        loaded from the given path."""
+        """Return a copy of this Channels object with experiment state information added to each Channel.
+
+        Parameters
+        ----------
+        experiment_state_path : str | Path | None, optional
+            load experiment state info from the given path or (if None) infer the path from an LJH file, by default None
+
+        Returns
+        -------
+        Channels
+            An enhanced copy of self, with experiment state information added to each channel.
+        """
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
@@ -544,16 +584,6 @@ class Channels:
             return channel.with_external_trigger_df(df_ext)
 
         return self.map(with_etrig_df)
-
-    def with_experiment_state_df(self, df_es: pl.DataFrame) -> "Channels":
-        """Return a copy of this Channels object with experiment state information added to each Channel,
-        found from the given DataFrame."""
-        # this is not as performant as making use_exprs for states
-        # and using .set_sorted on the timestamp column
-        ch2s = {}
-        for ch_num, ch in self.channels.items():
-            ch2s[ch_num] = ch.with_experiment_state_df(df_es)
-        return Channels(ch2s, self.description)
 
     def with_steps_dict(self, steps_dict: dict[int, Recipe]) -> "Channels":
         """Return a copy of this Channels object with the given Recipe objects added to each Channel."""
