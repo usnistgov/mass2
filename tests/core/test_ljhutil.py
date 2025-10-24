@@ -4,7 +4,7 @@ import numpy as np
 
 import pulsedata
 from mass2 import LJHFile
-from mass2.core.ljhutil import ljh_truncate
+from mass2.core.ljhutil import ljh_truncate, find_ljh_files, extract_channel_number
 
 # ruff: noqa: PLR0914
 
@@ -76,3 +76,46 @@ def test_ljh_truncate_timestamp(tmp_path_factory):
     run_test_ljh_truncate_timestamp(tmp_path_factory, src_name, 100, 1722086440535870 / 1e6)
     run_test_ljh_truncate_timestamp(tmp_path_factory, src_name, 334, 1722086441003870 / 1e6)
     run_test_ljh_truncate_timestamp(tmp_path_factory, src_name, 1000, 1722086442335960 / 1e6)
+
+
+def test_find_ljh_files(tmp_path):
+    strpath = str(tmp_path)
+    all_chnum = set(range(8))
+    for i in all_chnum:
+        fpath = tmp_path / f"test_chan{i}.ljh"
+        fpath.touch()
+
+    # exclude, include, expect
+    testset = (
+        ([], None, all_chnum),
+        ([], all_chnum, all_chnum),
+        ([], [], []),
+        ([], [2, 3, 4], [2, 3, 4]),
+        ([], [2, 3, 10, -2], [2, 3]),
+        ([1, 3, 5], None, [0, 2, 4, 6, 7]),
+        ([1, 3, 5, 6, 7, 10, 200], None, [0, 2, 4]),
+        ([1, 3, 5], [2, 4, 6], [2, 4, 6]),
+        ([1, 3, 5, 99, 100, 101], [2, 4, 6, 6, 6, 6, 4], [2, 4, 6]),
+        ([1, 3, 5], [2, 4, 5], "this should error"),
+        ([2, 1], [1, 2], "this should error"),
+    )
+    for excl, incl, expect in testset:
+        # If excl and incl have any overlap, raise an error
+        if incl is not None and len(set(excl).intersection(incl)) > 0:
+
+            def func():
+                return find_ljh_files(strpath, exclude_ch_nums=excl, include_ch_nums=incl)
+
+            pytest.raises(ValueError, func)
+            continue
+
+        # Test that the expected filenames are found, both by human- and computer-based expectations
+        filenames = find_ljh_files(strpath, exclude_ch_nums=excl, include_ch_nums=incl)
+        result = set([extract_channel_number(f) for f in filenames])
+        assert set(expect) == result
+        compute_expected = all_chnum.copy()
+        if excl is not None and len(excl) > 0:
+            compute_expected.difference_update(excl)
+        if incl is not None:
+            compute_expected.intersection_update(incl)
+        assert compute_expected == result

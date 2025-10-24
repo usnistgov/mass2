@@ -43,16 +43,46 @@ def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[s
     return list(matching_folders)
 
 
-def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool = False, exclude_ch_nums: list[int] = []) -> list[str]:
-    """
-    Finds all .ljh files in the given folder and its subfolders.
+def find_ljh_files(
+    folder: str,
+    ext: str = ".ljh",
+    search_subdirectories: bool = False,
+    exclude_ch_nums: list[int] = [],
+    include_ch_nums: list[int] | None = None,
+) -> list[str]:
+    """Finds all files of a specific file extension in the given folder and (optionally) its subfolders.
 
-    Args:
-    - folder (str): The root directory to start the search from.
+    An optional list of channel numbers can be excluded from the results. Also optionally, the results
+    can be restricted only to a specific list of channel numbers.
 
-    Returns:
-    - list[str]: A list of paths to .ljh files.
+    Parameters
+    ----------
+    folder : str
+        Folder to search for data files
+    ext : str, optional
+        The filename extension to search for, by default ".ljh"
+    search_subdirectories : bool, optional
+        Whether to search the subdirectories of `folder` recursively, by default False
+    exclude_ch_nums : list[int], optional
+        List of channel numbers to exclude from the results, by default []
+    include_ch_nums : list[int] | None, optional
+        If not None, then a list of channel # such that results are excluded if they don't appear in the list, by default None
+
+    Returns
+    -------
+    list[str]
+        A list of paths to .ljh files.
+
+    Raises
+    ------
+    ValueError
+        When the `include_ch_nums` list exists and contains one or more channels also in `exclude_ch_nums`.
     """
+    if include_ch_nums is not None:
+        overlap = set(include_ch_nums).intersection(exclude_ch_nums)
+        if len(overlap) > 0:
+            raise ValueError(f"exclude and include lists should not overlap, but both include channels {overlap}")
+
     ljh_files = []
     if search_subdirectories:
         pathgen = os.walk(folder)
@@ -61,9 +91,11 @@ def find_ljh_files(folder: str, ext: str = ".ljh", search_subdirectories: bool =
     for dirpath, _, filenames in pathgen:
         for filename in filenames:
             if filename.endswith(ext):
-                if extract_channel_number(filename) in exclude_ch_nums:
+                ch_num = extract_channel_number(filename)
+                if ch_num in exclude_ch_nums:
                     continue
-                ljh_files.append(os.path.join(dirpath, filename))
+                if include_ch_nums is None or (ch_num in include_ch_nums):
+                    ljh_files.append(os.path.join(dirpath, filename))
     return ljh_files
 
 
@@ -85,7 +117,7 @@ def extract_channel_number(file_path: str) -> int:
 
 
 def match_files_by_channel(
-    folder1: str, folder2: str, limit: int | None = None, exclude_ch_nums: list[int] = []
+    folder1: str, folder2: str, limit: int | None = None, exclude_ch_nums: list[int] = [], include_ch_nums: list[int] | None = None
 ) -> list[tuple[str, str]]:
     """
     Matches .ljh files from two folders by channel number.
@@ -96,9 +128,14 @@ def match_files_by_channel(
 
     Returns:
     - list[Iterator[tuple[str, str]]]: A list of iterators, each containing pairs of paths with matching channel numbers.
+
+    Raises
+    ------
+    ValueError
+        When the `include_ch_nums` list exists and contains one or more channels also in `exclude_ch_nums`.
     """
-    files1 = find_ljh_files(folder1)
-    files2 = find_ljh_files(folder2)
+    files1 = find_ljh_files(folder1, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums)
+    files2 = find_ljh_files(folder2, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums)
     # print(f"in folder {folder1} found {len(files1)} files")
     # print(f"in folder {folder2} found {len(files2)} files")
 
@@ -121,7 +158,7 @@ def match_files_by_channel(
 
     matching_pairs = []
     for channel in sorted(files1_by_channel.keys()):
-        if channel in files2_by_channel.keys() and channel not in exclude_ch_nums:
+        if channel in files2_by_channel.keys():
             matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
     if limit is not None:
         matching_pairs = matching_pairs[:limit]
