@@ -95,9 +95,20 @@ def test_find_ljh_files(tmp_path):
         ([1, 3, 5], None, [0, 2, 4, 6, 7]),
         ([1, 3, 5, 6, 7, 10, 200], None, [0, 2, 4]),
         ([1, 3, 5], [2, 4, 6], [2, 4, 6]),
-        ([1, 3, 5], [2, 4, 5], [2, 4]),
+        ([1, 3, 5, 99, 100, 101], [2, 4, 6, 6, 6, 6, 4], [2, 4, 6]),
+        ([1, 3, 5], [2, 4, 5], "this should error"),
+        ([2, 1], [1, 2], "this should error"),
     )
     for excl, incl, expect in testset:
+        # If excl and incl have any overlap, raise an error
+        if incl is not None and len(set(excl).intersection(incl)) > 0:
+
+            def func():
+                return find_ljh_files(strpath, exclude_ch_nums=excl, include_ch_nums=incl)
+
+            pytest.raises(ValueError, func)
+            continue
+
         # Test that the expected filenames are found, both by human- and computer-based expectations
         filenames = find_ljh_files(strpath, exclude_ch_nums=excl, include_ch_nums=incl)
         result = set([extract_channel_number(f) for f in filenames])
