@@ -70,9 +70,8 @@ def find_ljh_files(
                 ch_num = extract_channel_number(filename)
                 if ch_num in exclude_ch_nums:
                     continue
-                if include_ch_nums is not None and ch_num not in include_ch_nums:
-                    continue
-                ljh_files.append(os.path.join(dirpath, filename))
+                if include_ch_nums is None or (ch_num in include_ch_nums):
+                    ljh_files.append(os.path.join(dirpath, filename))
     return ljh_files
 
 
@@ -94,7 +93,7 @@ def extract_channel_number(file_path: str) -> int:
 
 
 def match_files_by_channel(
-    folder1: str, folder2: str, limit: int | None = None, exclude_ch_nums: list[int] = []
+    folder1: str, folder2: str, limit: int | None = None, exclude_ch_nums: list[int] = [], include_ch_nums: list[int] | None = None
 ) -> list[tuple[str, str]]:
     """
     Matches .ljh files from two folders by channel number.
@@ -131,7 +130,8 @@ def match_files_by_channel(
     matching_pairs = []
     for channel in sorted(files1_by_channel.keys()):
         if channel in files2_by_channel.keys() and channel not in exclude_ch_nums:
-            matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
+            if include_ch_nums is None or channel in include_ch_nums:
+                matching_pairs.append((files1_by_channel[channel], files2_by_channel[channel]))
     if limit is not None:
         matching_pairs = matching_pairs[:limit]
     return matching_pairs

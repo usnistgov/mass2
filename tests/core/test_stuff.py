@@ -411,6 +411,15 @@ def test_external_trigger_experiment_state():
     assert snext.unique().count() == 48751
 
 
+def test_include_exclude():
+    "Check that both the include and exclude lists work as intended"
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    data9 = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, exclude_ch_nums=[4102])
+    assert set(data9.channels.keys()) == {4109}
+    data2 = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, include_ch_nums=[4102])
+    assert set(data2.channels.keys()) == {4102}
+
+
 def test_steps():
     "Apply some steps, and be sure that `Recipe.trim_dead_ends(...) works"
 
@@ -429,7 +438,7 @@ def test_steps():
         )
 
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
-    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=5000, exclude_ch_nums=[4102])
+    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, exclude_ch_nums=[4102])
     data = data.map(_do_steps)
     ch = data.channels[4109]
 

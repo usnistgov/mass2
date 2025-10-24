@@ -482,7 +482,9 @@ class Channels:
         else:
             assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
             noise_folder = str(noise_folder)
-            pairs = ljhutil.match_files_by_channel(pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums)
+            pairs = ljhutil.match_files_by_channel(
+                pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums
+            )
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"   from_ljh_folder has {len(pairs)} pairs")
