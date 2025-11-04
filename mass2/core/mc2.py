@@ -1,0 +1,54 @@
+import argparse
+import glob
+import os
+from pathlib import Path
+import polars as pl
+import mass2
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Perform online analysis on a set of LJH files while they are being written",
+    )
+    parser.add_argument("-F", "--force", action="store_true", help="force overwrite of existing analysis? (default: False)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="print more facts (default: False)")
+    parser.add_argument("recipefile", type=str, nargs=1, help="pickle file with dictionary of recipes")
+    parser.add_argument("ljhpath", type=str, nargs=1, help="")
+
+    args = parser.parse_args()
+    main_loop(args.recipefile, Path(args.ljhpath), args.force, args.verbose)
+
+
+def main_loop(recipefile: str, ljhpath: Path, force: bool = False, verbose: bool = False) -> None:
+    data = mass2.core.Channels.from_ljh_folder(ljhpath)
+
+    output_dir = ljhpath / "mc2"
+    filefullpath = data.ch0.header.df["Filename"][0]
+    _, filename = os.path.split(filefullpath)
+    prefix = filename.split("_chan")[0]
+    parquet_model = output_dir / f"{prefix}_analyzed_"
+    if output_dir.exists():
+        if force:
+            os.rename(output_dir, ljhpath / "mc2_prev")
+        elif len(glob.glob(output_dir / "*_analyzed_*.parquet")) > 0:
+            raise OSError(
+                f"Cannot use existing output directory {output_dir} with parquet files, unless you choose the --force argument"
+            )
+
+    else:
+        ljhpath.mkdir("mc2")
+
+    parquet_counter = 0
+    while True:
+        parquet_file = str(parquet_model) + f"{parquet_counter:04d}.parquet"
+        data = data.load_recipes(recipefile)
+        df = pl.DataFrame()
+        for ch_num, ch in data.channels.items():
+            chdf = ch.df.drop("pulse")
+            df = pl.concat(df, chdf)
+        df.write_parquet(parquet_file)
+        parquet_counter += 1
+
+        break
+        # TODO: wipe old info from each channel in data, add any incremental data newly added to the LJH file.
+        # For a quick test, we could maybe just read LJH files 1000 pulses at a time.
