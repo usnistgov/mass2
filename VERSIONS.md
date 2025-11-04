@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-)
 
-**2.0.0** October, 2025
+**2.0.0** November 4, 2025
 * Add a way to open LJH files for specific channels only, an include list (issue 81).
 * Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
