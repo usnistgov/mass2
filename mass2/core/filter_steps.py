@@ -37,8 +37,9 @@ class OptimalFilterStep(RecipeStep):
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         """Plot the filter shape for debugging purposes."""
-        self.filter.plot()
-        return plt.gca()
+        axis = plt.figure()
+        self.filter.plot(axis)
+        return axis
 
     def drop_debug(self) -> "OptimalFilterStep":
         """Return a copy of this step with debugging information (the NoiseResult) removed."""
