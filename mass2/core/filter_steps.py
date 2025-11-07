@@ -37,7 +37,8 @@ class OptimalFilterStep(RecipeStep):
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         """Plot the filter shape for debugging purposes."""
-        axis = plt.figure()
+        plt.figure()
+        axis = plt.subplot(111)
         self.filter.plot(axis)
         return axis
 
