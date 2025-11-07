@@ -282,9 +282,15 @@ class Channel:
         filter_expr = use_expr
         if use_good_expr:
             filter_expr = self.good_expr.and_(use_expr)
-        df_small = self.df.lazy().with_row_index(name="index").filter(filter_expr).select(x_col, y_col, color_col, "index").collect()
+        index_name = "pulse_idx"
+        # Caused errors in Polars 1.35 if this was "index". See issue #85.
+        columns_to_keep = (x_col, y_col, color_col, index_name)
+        if color_col is None:
+            columns_to_keep = (x_col, y_col, index_name)
+        df_small = self.df.lazy().with_row_index(name=index_name).filter(filter_expr).select(*columns_to_keep).collect()
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
-        for (name,), data in df_small.group_by(color_col, maintain_order=True):
+
+        for name, data in df_small.group_by(color_col, maintain_order=True):
             if name is None and skip_none and color_col is not None:
                 continue
             (line,) = plt.plot(
@@ -293,7 +299,7 @@ class Channel:
                 ".",
                 label=name,
             )
-            lines_pnums.append((line, data.select("index").to_series()))
+            lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
             annotation = ax.annotate(
