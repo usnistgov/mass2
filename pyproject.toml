@@ -18,6 +18,7 @@ dependencies = [
     "fastdtw",
     "h5py >= 3.0",
     "indexedproperty",
+    "llvmlite >= 0.45",
     "lmfit>=0.9.11",
     "marimo",
     "matplotlib>1.5",
