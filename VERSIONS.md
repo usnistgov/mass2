@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-)
 
+**2.0.1** November 7, 2025-
+* Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
+
 **2.0.0** November 4, 2025
 * Add a way to open LJH files for specific channels only, an include list (issue 81).
 
