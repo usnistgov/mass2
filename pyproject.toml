@@ -16,7 +16,7 @@ dependencies = [
     "deprecation",
     "dill",
     "fastdtw",
-    "h5py>=2.7",
+    "h5py >= 3.0",
     "indexedproperty",
     "lmfit>=0.9.11",
     "marimo",
