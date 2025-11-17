@@ -2,7 +2,9 @@
 
 ## Mass Version 2 (2025-)
 
-**2.0.1** November, 2025-
+**2.0.1** November 7, 2025-
+* Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
+* Make the `OptimalFilterStep.dbg_plot()` generate a new figure (issue 83).
 * Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
 **2.0.0** November 4, 2025
