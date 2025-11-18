@@ -142,7 +142,7 @@ def _(avg_pulse, np):
 @app.cell
 def _(ch4, get_residual_rms, mass2, pl):
     ch5: mass2.Channel =ch4.with_column_map_step(f=get_residual_rms, input_col="pulse", output_col = "residual_rms")
-    ch5 = ch5.with_categorize_step({"clean":pl.lit(True),"reject_by_residual_rms":pl.col("residual_rms")>200})
+    ch5 = ch5.with_categorize_step({"clean":pl.lit(True),"residual_rms>100":pl.col("residual_rms")>100,"residual_rms>150":pl.col("residual_rms")>150,"residual_rms>200":pl.col("residual_rms")>200})
     return (ch5,)
 
 
@@ -156,13 +156,28 @@ def _(ch5: "mass2.Channel"):
 def _(ch5: "mass2.Channel", pl, plt):
     plt.figure()
     plt.title("rejected pulses based on residual_rms>200")
-    plt.plot(ch5.df.filter(pl.col("category")=="reject_by_residual_rms").limit(100)["pulse"].to_numpy().T)
+    plt.plot(ch5.df.filter(pl.col("category")=="residual_rms>200").limit(100)["pulse"].to_numpy().T)
+    plt.gcf()
+    return
+
+
+@app.cell
+def _(ch5: "mass2.Channel", pl, plt):
+    plt.figure()
+    plt.title("rejected pulses based on residual_rms>150")
+    plt.plot(ch5.df.filter(pl.col("category")=="residual_rms>150").limit(100)["pulse"].to_numpy().T)
+    plt.gcf()
+    return
+
+
+@app.cell
+def _():
     return
 
 
 @app.cell
 def _(ch5: "mass2.Channel", np, plt):
-    ch5.plot_hist("residual_rms", np.arange(0, 200,1))
+    ch5.plot_hist("residual_rms", np.arange(0, 400,1))
     plt.gcf()
     return
 
