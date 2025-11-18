@@ -488,34 +488,34 @@ class Channel:
         )
         return self.with_step(step)
 
-    def rough_cal(  # noqa: PLR0917
-        self,
-        line_names: list[str | float],
-        uncalibrated_col: str = "filtValue",
-        calibrated_col: str | None = None,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
-        max_fractional_energy_error_3rd_assignment: float = 0.1,
-        min_gain_fraction_at_ph_30k: float = 0.25,
-        fwhm_pulse_height_units: float = 75,
-        n_extra_peaks: int = 10,
-        acceptable_rms_residual_e: float = 10,
-    ) -> "Channel":
-        """Learn a rough calibration by trying to assign the 3 brightest peaks,
-        then fitting a line to those and looking for other peaks that fit that line.
-        """
-        step = mass2.core.RoughCalibrationStep.learn_3peak(
-            self,
-            line_names,
-            uncalibrated_col,
-            calibrated_col,
-            use_expr,
-            max_fractional_energy_error_3rd_assignment,
-            min_gain_fraction_at_ph_30k,
-            fwhm_pulse_height_units,
-            n_extra_peaks,
-            acceptable_rms_residual_e,
-        )
-        return self.with_step(step)
+    # def rough_cal(  # noqa: PLR0917
+    #     self,
+    #     line_names: list[str | float],
+    #     uncalibrated_col: str = "filtValue",
+    #     calibrated_col: str | None = None,
+    #     use_expr: pl.Expr = pl.lit(True),
+    #     max_fractional_energy_error_3rd_assignment: float = 0.1,
+    #     min_gain_fraction_at_ph_30k: float = 0.25,
+    #     fwhm_pulse_height_units: float = 75,
+    #     n_extra_peaks: int = 10,
+    #     acceptable_rms_residual_e: float = 10,
+    # ) -> "Channel":
+    #     """Learn a rough calibration by trying to assign the 3 brightest peaks,
+    #     then fitting a line to those and looking for other peaks that fit that line.
+    #     """
+    #     step = mass2.core.RoughCalibrationStep.learn_3peak(
+    #         self,
+    #         line_names,
+    #         uncalibrated_col,
+    #         calibrated_col,
+    #         use_expr,
+    #         max_fractional_energy_error_3rd_assignment,
+    #         min_gain_fraction_at_ph_30k,
+    #         fwhm_pulse_height_units,
+    #         n_extra_peaks,
+    #         acceptable_rms_residual_e,
+    #     )
+    #     return self.with_step(step)
 
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
