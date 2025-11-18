@@ -493,7 +493,7 @@ class Channel:
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,

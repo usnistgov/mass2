@@ -322,7 +322,7 @@ def hist_smoothed(
 ) -> tuple[ndarray, ndarray, ndarray]:
     """Compute a histogram of pulse heights and smooth it with a Gaussian of given FWHM."""
     pulse_heights = pulse_heights.astype(np.float64)
-    # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
+    # convert to float64 to avoid wrapping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
     assert len(pulse_heights > 10), "not enough pulses"
     if bin_edges is None:
@@ -512,6 +512,8 @@ def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str])
     ph = np.asarray(ph)
     e = np.asarray(e)
     rms_e_residual, pha = find_optimal_assignment(ph, e)
+    if e[0] == 0:
+        raise ValueError("cannot use energy=0 points to learn gain based calibration")
     gain = pha / e
     deg = min(len(e) - 1, 2)
     if deg == 0:
