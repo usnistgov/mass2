@@ -1082,7 +1082,6 @@ dependencies = [
     { name = "packaging" },
     { name = "polars" },
     { name = "progress" },
-    { name = "pulsedata" },
     { name = "pyqt5" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
@@ -1131,7 +1130,6 @@ requires-dist = [
     { name = "packaging" },
     { name = "polars" },
     { name = "progress" },
-    { name = "pulsedata", git = "https://github.com/ggggggggg/pulsedata" },
     { name = "pyqt5" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
@@ -1815,11 +1813,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/50/e6/eecf58810b9d12e6427369784efe814a1eec0f492084ce8eb8f4d89d6d61/psutil-7.0.0-cp37-abi3-win32.whl", hash = "sha256:ba3fcef7523064a6c9da440fc4d6bd07da93ac726b5733c29027d7dc95b39d99", size = 241053, upload-time = "2025-02-13T21:54:34.31Z" },
     { url = "https://files.pythonhosted.org/packages/50/1b/6921afe68c74868b4c9fa424dad3be35b095e16687989ebbb50ce4fceb7c/psutil-7.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:4cf3d4eb1aa9b348dec30105c55cd9b7d4629285735a102beb4441e38db90553", size = 244885, upload-time = "2025-02-13T21:54:37.486Z" },
 ]
-
-[[package]]
-name = "pulsedata"
-version = "0.1.0"
-source = { git = "https://github.com/ggggggggg/pulsedata#b56a0c2654aa6595fa962e5a5a1c523af47b2c00" }
 
 [[package]]
 name = "py"
