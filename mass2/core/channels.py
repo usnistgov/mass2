@@ -733,9 +733,9 @@ class Channels:
             """
             # Don't store the memmapped LJH pulse info (if present) in the Parquet file
             if trim_timestamp_and_subframecount:
-                df = ch.df.drop("pulse", strict=False)
-            else:
                 df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+            else:
+                df = ch.df.drop("pulse", strict=False)
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
