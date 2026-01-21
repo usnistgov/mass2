@@ -691,7 +691,9 @@ class Channels:
             )
         return Channels(channels, description)
 
-    def save_analysis(self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False, trim_timestamp_and_subframecount: bool = False) -> None:
+    def save_analysis(
+        self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False, trim_timestamp_and_subframecount: bool = False
+    ) -> None:
         """Save an analysis-in-progress completely to a zip file, only tested for ljh backed channels so far
 
         Parameters
@@ -703,7 +705,7 @@ class Channels:
         trim_debug : bool, optional
             Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
         trim_timestamp_and_subframecount: bool, optional
-            Whether to make the save file smaller at the cost of reduced information avaialble when the ljh files are 
+            Whether to make the save file smaller at the cost of reduced information avaialble when the ljh files are
             not available, eg when loading on another computer.
         """
         zip_path = pathlib.Path(zip_path)

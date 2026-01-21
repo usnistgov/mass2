@@ -704,7 +704,8 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df.lazy()
+            self.df
+            .lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -793,7 +794,8 @@ class Channel:
             _description_
         """
         df = (
-            self.df.lazy()
+            self.df
+            .lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -997,7 +999,8 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df
+            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1029,7 +1032,8 @@ class Channel:
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
         """Add external trigger times from an existing dataframe"""
         df2 = (
-            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+            self.df
+            .with_columns(subframecount=pl.col("framecount") * self.subframediv)
             .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
             .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
         )

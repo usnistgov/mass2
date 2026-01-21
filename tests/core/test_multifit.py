@@ -54,7 +54,8 @@ def generate_and_fit_fake_data(
 
     # Set up MultiFit
     multifit = (
-        mass2.MultiFit(default_fit_width=80, default_bin_size=1)
+        mass2
+        .MultiFit(default_fit_width=80, default_bin_size=1)
         .with_line("MnKAlpha")
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
