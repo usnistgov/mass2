@@ -1,5 +1,6 @@
 import numpy as np
 import mass2
+import polars as pl
 
 # set seed to control shuffle in the function and random errors in make_truth_ph
 rng = np.random.default_rng(1)
@@ -130,3 +131,41 @@ def test_rank_3peak_assignments():
     df3peak, _dfe = mass2.core.rough_cal.rank_3peak_assignments(ph, e, map(str, e))
     ph_assigned_top_rank = np.array([df3peak["ph0"][0], df3peak["ph1"][0], df3peak["ph2"][0]])
     assert np.allclose(ph_truth_with_err, ph_assigned_top_rank)
+
+
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
+    rng = np.random.default_rng(seed)
+    n = len(signal)
+    noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 20 + 5000, dtype=np.int16)
+    pulse_traces = np.outer(rng.uniform(0.8, 1.2, size=npulses), signal).astype(np.int16)
+    header_df = pl.DataFrame()
+    frametime_s = 1e-5
+    df_noise = pl.DataFrame({"pulse": noise_traces})
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    header = mass2.ChannelHeader(
+        "dummy for test",
+        data_source=None,
+        ch_num=ch_num,
+        frametime_s=frametime_s,
+        n_presamples=n // 2,
+        n_samples=n,
+        df=header_df,
+    )
+    df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    return ch
+
+
+def test_one_peak_rough_cal_combinatoric():
+    ch = dummy_channel(signal = np.ones(50, dtype=np.int16)*100)
+    ch = ch.summarize_pulses()
+    ch = ch.rough_cal_combinatoric(["AlKAlpha"], "peak_value", 
+                                   calibrated_col="energy_peak_value",
+                                   ph_smoothing_fwhm=5)
+    
+def test_one_peak_rough_cal_combinatoric_height_info():
+    ch = dummy_channel(signal = np.ones(50, dtype=np.int16)*100)
+    ch = ch.summarize_pulses()
+    ch = ch.rough_cal_combinatoric_height_info(["AlKAlpha"],[[1]], "peak_value", 
+                                   calibrated_col="energy_peak_value",
+                                   ph_smoothing_fwhm=5)
