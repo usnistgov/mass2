@@ -157,15 +157,14 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
 
 
 def test_one_peak_rough_cal_combinatoric():
-    ch = dummy_channel(signal = np.ones(50, dtype=np.int16)*100)
+    ch = dummy_channel(signal=np.ones(50, dtype=np.int16) * 100)
     ch = ch.summarize_pulses()
-    ch = ch.rough_cal_combinatoric(["AlKAlpha"], "peak_value", 
-                                   calibrated_col="energy_peak_value",
-                                   ph_smoothing_fwhm=5)
-    
+    ch = ch.rough_cal_combinatoric(["AlKAlpha"], "peak_value", calibrated_col="energy_peak_value", ph_smoothing_fwhm=5)
+
+
 def test_one_peak_rough_cal_combinatoric_height_info():
-    ch = dummy_channel(signal = np.ones(50, dtype=np.int16)*100)
+    ch = dummy_channel(signal=np.ones(50, dtype=np.int16) * 100)
     ch = ch.summarize_pulses()
-    ch = ch.rough_cal_combinatoric_height_info(["AlKAlpha"],[[1]], "peak_value", 
-                                   calibrated_col="energy_peak_value",
-                                   ph_smoothing_fwhm=5)
+    ch = ch.rough_cal_combinatoric_height_info(
+        ["AlKAlpha"], [[1]], "peak_value", calibrated_col="energy_peak_value", ph_smoothing_fwhm=5
+    )
