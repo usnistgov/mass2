@@ -816,10 +816,16 @@ class RoughCalibrationStep(RecipeStep):
         assert len(uncalibrated) > 10, "not enough pulses"
         pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
+        if len(line_names) > 1:
+            # exclude pulses with values where the gain is negative
+            good_expr_with_new_info = ch.good_expr.and_(pl.col(uncalibrated_col) < assignment_result.phzerogain())
+        else:
+            # phzerogain doesn't exist if there is only one line
+            good_expr_with_new_info = ch.good_expr
         step = cls(
             [uncalibrated_col],
             [calibrated_col],
-            ch.good_expr.and_(pl.col(uncalibrated_col) < assignment_result.phzerogain()),
+            good_expr_with_new_info,
             use_expr=use_expr,
             pfresult=pfresult,
             assignment_result=assignment_result,
