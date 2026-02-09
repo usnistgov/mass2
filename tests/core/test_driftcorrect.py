@@ -7,7 +7,7 @@ import polars as pl
 current_dir = Path(__file__).parent.resolve()
 
 
-def channel_from_df(df, ch_num: int = 0, n_presamples: int=1, n_samples:int=2):
+def channel_from_df(df, ch_num: int = 0, n_presamples: int = 1, n_samples: int = 2):
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     header = mass2.ChannelHeader(
@@ -22,6 +22,7 @@ def channel_from_df(df, ch_num: int = 0, n_presamples: int=1, n_samples:int=2):
     ch = mass2.Channel(df, header, npulses=len(df), noise=None)
     return ch
 
+
 def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
     N = int(N)
     rng = np.random.default_rng(42)
@@ -35,13 +36,12 @@ def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
 
 
 def test_bens_data():
-    path = current_dir/"parquets"/"dc_test_from_bens_data_20260209.parquet"
+    path = current_dir / "parquets" / "dc_test_from_bens_data_20260209.parquet"
     df = pl.read_parquet(path)
-    df = df.with_columns(df.select(peak_value_f=pl.col("peak_value")*1.0))
+    df = df.with_columns(df.select(peak_value_f=pl.col("peak_value") * 1.0))
     dc = mass2.core.drift_correct(indicator=df["rel_sec"].to_numpy(), uncorrected=df["peak_value"].to_numpy())
     ch = channel_from_df(df)
     ch = ch.driftcorrect(indicator_col="rel_sec", uncorrected_col="peak_value", corrected_col="peak_value_dc")
 
     print(ch.df.limit(10))
-    assert ch.df.std()["peak_value_dc"][0]<ch.df.std()["peak_value"][0]
-
+    assert ch.df.std()["peak_value_dc"][0] < ch.df.std()["peak_value"][0]
