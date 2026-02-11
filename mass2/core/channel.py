@@ -233,7 +233,7 @@ class Channel:
             # plt.plot(bin_centers, counts, label=group_name)
         # Customize the plot
         ax.set_xlabel(str(col))
-        if len(counts_dict)>0:
+        if len(counts_dict) > 0:
             ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
@@ -253,7 +253,7 @@ class Channel:
         skip_none: bool = True,
         ax: plt.Axes | None = None,
         annotate: bool = False,
-        decimate_by_n: int = 1
+        decimate_by_n: int = 1,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -290,7 +290,15 @@ class Channel:
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
-        df_small = self.df.lazy().with_row_index(name=index_name).filter(filter_expr).select(*columns_to_keep).gather_every(decimate_by_n).collect()
+        df_small = (
+            self.df
+            .lazy()
+            .with_row_index(name=index_name)
+            .filter(filter_expr)
+            .select(*columns_to_keep)
+            .gather_every(decimate_by_n)
+            .collect()
+        )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
 
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
