@@ -31,7 +31,7 @@ jobs:
       # max-parallel: 8
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.10", "3.14"]
         # Explicitly quote the version string (see https://github.com/actions/runner/issues/1989),
         # or else 3.10 specifically will be read as 3.1
 
