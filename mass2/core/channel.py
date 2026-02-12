@@ -233,7 +233,8 @@ class Channel:
             # plt.plot(bin_centers, counts, label=group_name)
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
+        if len(counts_dict) > 0:
+            ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
@@ -242,7 +243,7 @@ class Channel:
         plt.tight_layout()
         return bin_centers, counts_dict
 
-    def plot_scatter(
+    def plot_scatter(  # noqa: PLR0917
         self,
         x_col: str,
         y_col: str,
@@ -251,7 +252,8 @@ class Channel:
         use_good_expr: bool = True,
         skip_none: bool = True,
         ax: plt.Axes | None = None,
-        annotate: bool = True,
+        annotate: bool = False,
+        max_points: int | None = None,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -273,6 +275,10 @@ class Channel:
             Axes to plot on, by default None
         annotate : bool, optional
             Whether to annotate points that are hovered over or clicked on by the mouse, by default True
+        max_points: int, optional
+            Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
+            from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
+            be consistent with the `max_points` requirement.
         """
         if ax is None:
             fig = plt.figure()
@@ -285,10 +291,25 @@ class Channel:
         index_name = "pulse_idx"
         # Caused errors in Polars 1.35 if this was "index". See issue #85.
 
+        # Plot only 1 data value out of every n, if max_points argument is an integer.
+        # Compute n from the ratio of all points to max_points.
+        plot_every_nth = 1
+        if max_points is not None:
+            if max_points < self.npulses:
+                plot_every_nth = 1 + (self.npulses - 1) // max_points
+
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
-        df_small = self.df.lazy().with_row_index(name=index_name).filter(filter_expr).select(*columns_to_keep).collect()
+        df_small = (
+            self.df
+            .lazy()
+            .with_row_index(name=index_name)
+            .filter(filter_expr)
+            .select(*columns_to_keep)
+            .gather_every(plot_every_nth)
+            .collect()
+        )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
 
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
