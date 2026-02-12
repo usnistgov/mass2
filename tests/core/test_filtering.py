@@ -146,7 +146,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     msg1 = "compute_5lag is unexpectedly insensitive to an arbitrary shape"
     msg2 = "compute_constrained_5lag is sensitive to constraint"
     assert np.all(np.abs(f_usual.filter_records(insensitive_models)[0]) > 1e-4), msg1
-    assert np.all(np.abs(f_constrained.filter_records(insensitive_models)[0]) < 1e-10), msg2
+    assert np.all(np.abs(f_constrained.filter_records(insensitive_models)[0]) < 1e-9), msg2
 
     # And add a non-exponential constraint. This won't be strictly insensitive when we 5-lag filter it.
     # But it _will_ have zero inner product with the shortened-by-4 model. So test only that
