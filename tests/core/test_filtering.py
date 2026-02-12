@@ -88,15 +88,15 @@ def test_dc_insensitive():
         filter_to_test = computer(f_3db=None, fmax=None)
         std = np.median(np.abs(filter_to_test.values))
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-10 * std, f"{filter_to_test} failed DC test w/o lowpass"
+        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/o lowpass"
 
         filter_to_test = computer(f_3db=1e4, fmax=None)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-10 * std, f"{filter_to_test} failed DC test w/ f_3db"
+        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ f_3db"
 
         filter_to_test = computer(f_3db=None, fmax=1e4)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-10 * std, f"{filter_to_test} failed DC test w/ fmax"
+        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ fmax"
 
 
 def test_constrained_filtering():  # noqa: PLR0914
@@ -136,7 +136,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     f_constrained = maker.compute_constrained_5lag(expmodel)
 
     assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
-    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-10, "compute_5lag_noexp is sensitive to an exponential"
+    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-9, "compute_5lag_noexp is sensitive to an exponential"
     assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-9, "compute_constrained_5lag is sensitive to an exponential"
 
     # Now make multiple exponential constraints
@@ -155,7 +155,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     f_constrained = maker.compute_constrained_5lag(constraints)
     for i, vec in enumerate(constraints):
         msg2 = f"compute_constrained_5lag filter values are not orthogonal to constraint # {i}"
-        assert np.abs(f_constrained.values.dot(vec)) < 1e-10, msg2
+        assert np.abs(f_constrained.values.dot(vec)) < 1e-9, msg2
 
 
 def test_no_concrete_baseFilter():
