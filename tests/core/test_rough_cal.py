@@ -11,7 +11,7 @@ def make_truth_ph(
     e_spurious,
     e_err_scale,
     pfit_gain_truth=np.polynomial.Polynomial([6, -1e-6, -1e-10]),
-):
+) -> None:
     # return peak heights by inverting a quadratic gain curve and adding energy errors
     cba_truth = pfit_gain_truth.convert().coef
     assert len(cba_truth) == 3
@@ -34,7 +34,7 @@ def make_truth_ph(
     return ph, ph_truth_with_err
 
 
-def test_find_optimal_assignment_many():
+def test_find_optimal_assignment_many() -> None:
     e = np.arange(1000, 9000, 1000)  # energies of "real" peaks
     e_spurious = [
         100,
@@ -61,7 +61,7 @@ def test_find_optimal_assignment_many():
     assert np.allclose([result.ph2energy(result.energy2ph(ee)) for ee in e], e)
 
 
-def test_find_optimal_assignment_1():
+def test_find_optimal_assignment_1() -> None:
     e = np.array([1000])  # energies of "real" peaks
     e_spurious = [
         100,
@@ -86,7 +86,7 @@ def test_find_optimal_assignment_1():
     assert np.allclose([result.ph2energy(result.energy2ph(ee)) for ee in e], e)
 
 
-def test_find_optimal_assignment_2():
+def test_find_optimal_assignment_2() -> None:
     e = np.array([1000, 3000])  # energies of "real" peaks
     e_spurious = [
         100,
@@ -111,7 +111,7 @@ def test_find_optimal_assignment_2():
     assert np.allclose([result.ph2energy(result.energy2ph(ee)) for ee in e], e)
 
 
-def test_find_optimal_assignment_3():
+def test_find_optimal_assignment_3() -> None:
     e = np.array([1000, 3000, 5000])  # energies of "real" peaks
     e_spurious = [3300, 3700, 4500]  # energies of spurious or fake peaks
     ph, ph_truth_with_err = make_truth_ph(e=e, e_spurious=e_spurious, e_err_scale=10)
@@ -124,7 +124,7 @@ def test_find_optimal_assignment_3():
     assert np.allclose([result.ph2energy(result.energy2ph(ee)) for ee in e], e)
 
 
-def test_rank_3peak_assignments():
+def test_rank_3peak_assignments() -> None:
     e = np.array([1000, 3000, 5000])  # energies of "real" peaks
     e_spurious = [2900, 3700, 4500]  # energies of spurious or fake peaks
     ph, ph_truth_with_err = make_truth_ph(e=e, e_spurious=e_spurious, e_err_scale=10)
@@ -133,7 +133,7 @@ def test_rank_3peak_assignments():
     assert np.allclose(ph_truth_with_err, ph_assigned_top_rank)
 
 
-def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
+def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0) -> mass2.Channel:
     rng = np.random.default_rng(seed)
     n = len(signal)
     noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 20 + 5000, dtype=np.int16)
@@ -156,15 +156,35 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     return ch
 
 
-def test_one_peak_rough_cal_combinatoric():
+def test_one_peak_rough_cal_combinatoric() -> None:
     ch = dummy_channel(signal=np.ones(50, dtype=np.int16) * 100)
     ch = ch.summarize_pulses()
     ch = ch.rough_cal_combinatoric(["AlKAlpha"], "peak_value", calibrated_col="energy_peak_value", ph_smoothing_fwhm=5)
 
 
-def test_one_peak_rough_cal_combinatoric_height_info():
+def test_one_peak_rough_cal_combinatoric_height_info() -> None:
     ch = dummy_channel(signal=np.ones(50, dtype=np.int16) * 100)
     ch = ch.summarize_pulses()
     ch = ch.rough_cal_combinatoric_height_info(
         ["AlKAlpha"], [[1]], "peak_value", calibrated_col="energy_peak_value", ph_smoothing_fwhm=5
     )
+
+
+def test_two_peak_rough_cal_combinatoric() -> None:
+    """When two peaks happen to have a gain that grows with energy, you will get an energy assignment
+    that extrapolates to zero gain for negative-size pulses. This is fine, but it is NOT fine to
+    cut pulses that exceed that value (as ALL pulses will exceed it). Tests for issue #95."""
+    signal = np.zeros(50, dtype=np.int16)
+    signal[25:] = 1000
+    chA = dummy_channel(signal=signal)
+    chB = dummy_channel(signal=signal * 2)
+    df = pl.concat([chA.df, chB.df])
+
+    ch = mass2.Channel(df, chA.header, npulses=len(df), noise=chA.noise)
+    ch = ch.summarize_pulses()
+    # Try to calibrate with 2 peaks, like with ^153Gd data
+    ch = ch.rough_cal_combinatoric([100, 180], "pulse_average", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
+    assignment = ch.steps[-1].assignment_result
+    assert assignment.phzerogain() < 0
+    df_good = ch.df.filter(ch.good_expr)
+    assert len(df_good) > 0
