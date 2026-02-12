@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-)
 
+**2.0.2** February 12, 2026 -
+* Fix change in the `numpy.linalg.svd` naming (issue 97).
+
 **2.0.1** February 12, 2026
 * Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
 * Make the `OptimalFilterStep.dbg_plot()` generate a new figure (issue 83).
