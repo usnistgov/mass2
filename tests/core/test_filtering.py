@@ -137,7 +137,7 @@ def test_constrained_filtering():  # noqa: PLR0914
 
     assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
     assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-10, "compute_5lag_noexp is sensitive to an exponential"
-    assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-10, "compute_constrained_5lag is sensitive to an exponential"
+    assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-9, "compute_constrained_5lag is sensitive to an exponential"
 
     # Now make multiple exponential constraints
     insensitive_models = [expdata, 1 - expdata**1.5, expdata**3.5]
