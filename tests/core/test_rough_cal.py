@@ -168,3 +168,23 @@ def test_one_peak_rough_cal_combinatoric_height_info() -> None:
     ch = ch.rough_cal_combinatoric_height_info(
         ["AlKAlpha"], [[1]], "peak_value", calibrated_col="energy_peak_value", ph_smoothing_fwhm=5
     )
+
+
+def test_two_peak_rough_cal_combinatoric() -> None:
+    """When two peaks happen to have a gain that grows with energy, you will get an energy assignment
+    that extrapolates to zero gain for negative-size pulses. This is fine, but it is NOT fine to
+    cut pulses that exceed that value (as ALL pulses will exceed it). Tests for issue #95."""
+    signal = np.zeros(50, dtype=np.int16)
+    signal[25:] = 1000
+    chA = dummy_channel(signal=signal)
+    chB = dummy_channel(signal=signal * 2)
+    df = pl.concat([chA.df, chB.df])
+
+    ch = mass2.Channel(df, chA.header, npulses=len(df), noise=chA.noise)
+    ch = ch.summarize_pulses()
+    # Try to calibrate with 2 peaks, like with ^153Gd data
+    ch = ch.rough_cal_combinatoric([100, 180], "pulse_average", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
+    assignment = ch.steps[-1].assignment_result
+    assert assignment.phzerogain() < 0
+    df_good = ch.df.filter(ch.good_expr)
+    assert len(df_good) > 0
