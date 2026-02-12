@@ -243,7 +243,7 @@ class Channel:
         plt.tight_layout()
         return bin_centers, counts_dict
 
-    def plot_scatter(
+    def plot_scatter(  # noqa: PLR0917
         self,
         x_col: str,
         y_col: str,
@@ -253,7 +253,7 @@ class Channel:
         skip_none: bool = True,
         ax: plt.Axes | None = None,
         annotate: bool = False,
-        decimate_by_n: int = 1,
+        max_points: int | None = None,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -275,6 +275,10 @@ class Channel:
             Axes to plot on, by default None
         annotate : bool, optional
             Whether to annotate points that are hovered over or clicked on by the mouse, by default True
+        max_points: int, optional
+            Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
+            from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
+            be consistent with the `max_points` requirement.
         """
         if ax is None:
             fig = plt.figure()
@@ -287,16 +291,22 @@ class Channel:
         index_name = "pulse_idx"
         # Caused errors in Polars 1.35 if this was "index". See issue #85.
 
+        # Plot only 1 data value out of every n, if max_points argument is an integer.
+        # Compute n from the ratio of all points to max_points.
+        plot_every_nth = 1
+        if max_points is not None:
+            if max_points < self.npulses:
+                plot_every_nth = 1 + (self.npulses - 1) // max_points
+
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
         df_small = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .with_row_index(name=index_name)
             .filter(filter_expr)
             .select(*columns_to_keep)
-            .gather_every(decimate_by_n)
+            .gather_every(plot_every_nth)
             .collect()
         )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
@@ -714,8 +724,7 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -804,8 +813,7 @@ class Channel:
             _description_
         """
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -1009,8 +1017,7 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1042,8 +1049,7 @@ class Channel:
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
         """Add external trigger times from an existing dataframe"""
         df2 = (
-            self.df
-            .with_columns(subframecount=pl.col("framecount") * self.subframediv)
+            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
             .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
             .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
         )
