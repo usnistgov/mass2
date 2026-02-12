@@ -5,6 +5,8 @@
 **2.0.1** November 7, 2025-
 * Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
 * Make the `OptimalFilterStep.dbg_plot()` generate a new figure (issue 83).
+* Fix combinatoric rough cal with one peak (PR 92).
+* Fix combinatoric rough cal with two peaks and increasing gain (issue 95).
 
 **2.0.0** November 4, 2025
 * Add a way to open LJH files for specific channels only, an include list (issue 81).
