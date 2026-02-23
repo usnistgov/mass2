@@ -402,6 +402,61 @@ class Filter5Lag(Filter):
 
 
 @dataclass(frozen=True)
+class Filter1Lag(Filter):
+    """Represent an optimal filter, specifically one intended for single-lag convolution with data
+
+    Returns
+    -------
+    Filter1Lag
+        An optimal filter, for single-lag convolution (i.e., a dot product) with the data
+    """
+
+    def __post_init__(self) -> None:
+        """Post-init checks that this filter, indeed, is a 1-lag one"""
+        assert self.convolution_lags == 1
+
+    @property
+    def is_arrival_time_safe(self) -> bool:
+        """Is this an arrival-time-safe filter?"""
+        return False
+
+    @property
+    def _filter_type(self) -> str:
+        """Name for this filter type"""
+        return "1lag"
+
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Filter one microcalorimeter record or an array of records.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            A 1-d array, a single pulse record, or a 2-d array, where `x[i, :]` is pulse record number `i`.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            1. The optimally filtered value, or an array (one per row) if the input is a 2-d array.
+            2. The phase, or arrival-time estimate in samples. Same shape as the filtered value.
+
+        Raises
+        ------
+        AssertionError
+            If the input array is the wrong length
+        """
+        x = np.asarray(x)
+        if x.ndim == 1:
+            x = x.reshape((1, len(x)))
+        _, nsamp = x.shape
+        assert nsamp == len(self.values)
+        dotproduct = np.dot(x, self.values)
+
+        peak_x = np.zeros_like(x)
+        peak_y = dotproduct
+        return peak_y, peak_x
+
+
+@dataclass(frozen=True)
 class FilterATS(Filter):
     """Represent an optimal filter according to the arrival-time-safe, single-lag design of 2015.
 

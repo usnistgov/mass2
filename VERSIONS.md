@@ -4,6 +4,7 @@
 
 **2.0.2** February 12, 2026 -
 * Fix change in the `numpy.linalg.svd` naming (issue 97).
+* Add one-lag optimal filters for optical TESs (issue 99).
 
 **2.0.1** February 12, 2026
 * Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
