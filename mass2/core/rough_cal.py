@@ -56,7 +56,8 @@ def rank_3peak_assignments(
     df1 = df1.filter((pl.col("e0") < pl.col("e1")).and_(pl.col("ph0") < pl.col("ph1")))
     # 2) the gain slope must be negative
     df1 = (
-        df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
+        df1
+        .with_columns(gain1=pl.col("ph1") / pl.col("e1"))
         .with_columns(gain_slope=(pl.col("gain1") - pl.col("gain0")) / (pl.col("ph1") - pl.col("ph0")))
         .filter(pl.col("gain_slope") < 0)
     )
@@ -322,7 +323,7 @@ def hist_smoothed(
 ) -> tuple[ndarray, ndarray, ndarray]:
     """Compute a histogram of pulse heights and smooth it with a Gaussian of given FWHM."""
     pulse_heights = pulse_heights.astype(np.float64)
-    # convert to float64 to avoid warpping subtraction and platform specific behavior regarding uint16s
+    # convert to float64 to avoid wrapping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
     assert len(pulse_heights > 10), "not enough pulses"
     if bin_edges is None:
@@ -512,6 +513,8 @@ def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str])
     ph = np.asarray(ph)
     e = np.asarray(e)
     rms_e_residual, pha = find_optimal_assignment(ph, e)
+    if e[0] == 0:
+        raise ValueError("cannot use energy=0 points to learn gain based calibration")
     gain = pha / e
     deg = min(len(e) - 1, 2)
     if deg == 0:
@@ -813,10 +816,19 @@ class RoughCalibrationStep(RecipeStep):
         assert len(uncalibrated) > 10, "not enough pulses"
         pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
+        # phzerogain doesn't exist if there is only one line, and it might make no sense even if it does.
+        good_expr_with_new_info = ch.good_expr
+        if len(line_names) > 1:
+            # Fix issue #95: don't cut pulses exceeding max_ph if that value is negative or cuts most pulses.
+            # exclude pulses with values where the gain is negative
+            max_ph = assignment_result.phzerogain()
+            if max_ph > 0 and max_ph > np.median(uncalibrated):
+                good_expr_with_new_info = ch.good_expr.and_(pl.col(uncalibrated_col) < max_ph)
+
         step = cls(
             [uncalibrated_col],
             [calibrated_col],
-            ch.good_expr.and_(pl.col(uncalibrated_col) < assignment_result.phzerogain()),
+            good_expr_with_new_info,
             use_expr=use_expr,
             pfresult=pfresult,
             assignment_result=assignment_result,
