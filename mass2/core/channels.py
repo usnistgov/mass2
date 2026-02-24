@@ -565,7 +565,7 @@ class Channels:
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
-    def with_external_trigger_by_path(self, path: str | None = None) -> "Channels":
+    def with_external_trigger_by_path(self, path: str | pathlib.Path | None = None) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
         from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented)."""
         if path is None:

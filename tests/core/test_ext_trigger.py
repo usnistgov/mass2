@@ -35,3 +35,13 @@ def test_external_trigger_experiment_state():
     assert sprev.unique().count() == 48750
     assert sthis.unique().count() == 92090
     assert snext.unique().count() == 48751
+
+
+def test_external_trigger_LJH_issue101():
+    heates_paths = pulsedata.pulse_noise_ljh_pairs["heates20240212"]
+    data1 = mass2.Channels.from_ljh_folder(heates_paths.pulse_folder, heates_paths.noise_folder)
+    trigpath = heates_paths.pulse_folder / "20240212_run0019_external_trigger.bin"
+    data2 = data1.with_external_trigger_by_path(trigpath)
+    for cnum, bc in data2.bad_channels.items():
+        print(f"Chan {cnum:4d} bad: {bc.error_msg}")
+    assert len(data2.bad_channels) == 0
