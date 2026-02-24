@@ -1126,7 +1126,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.18" },
     { name = "mktestdocs", marker = "extra == 'docs'" },
     { name = "numba" },
-    { name = "numpy", specifier = ">=2.0" },
+    { name = "numpy", specifier = ">=2.0,<=2.3" },
     { name = "packaging" },
     { name = "polars" },
     { name = "progress" },

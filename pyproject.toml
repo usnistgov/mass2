@@ -22,17 +22,18 @@ dependencies = [
     "marimo",
     "matplotlib>1.5",
     "numba",
-    "numpy>=2.0",
+    # Numba can't run with numpy 2.4 as of today
+    "numpy>=2.0,<=2.3",
     "packaging",
     "polars",
     "progress",
-    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
+    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata>0.0.4",
     "pyqt5",
     "pyyaml",
     "scikit-learn",
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
     "scipy>=1.12",
-    "tornado",  # for matplotlib plots in Marimo
+    "tornado", # for matplotlib plots in Marimo
     "uncertainties",
     "xraydb",
 ]
