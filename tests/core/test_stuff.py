@@ -396,7 +396,8 @@ def test_steps():
     # Perform 5 offical Recipe: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
-            ch.summarize_pulses()
+            ch
+            .summarize_pulses()
             .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
             .filter5lag(f_3db=10000)
             .with_column_map_step("pretrig_rms", "pointless_pretrig_meansq", squareme)
