@@ -44,7 +44,7 @@ def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[s
 
 
 def find_ljh_files(
-    folder: str,
+    folder: str | pathlib.Path,
     ext: str = ".ljh",
     search_subdirectories: bool = False,
     exclude_ch_nums: list[int] = [],
