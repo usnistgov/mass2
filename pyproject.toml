@@ -22,7 +22,8 @@ dependencies = [
     "marimo",
     "matplotlib>1.5",
     "numba",
-    "numpy>=2.0",
+    # Numpy 2.4 is not currently compatible with numba
+    "numpy>=2.0,<=2.3",
     "packaging",
     "polars",
     "progress",
