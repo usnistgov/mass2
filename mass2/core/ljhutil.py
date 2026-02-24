@@ -57,7 +57,7 @@ def find_ljh_files(
 
     Parameters
     ----------
-    folder : str
+    folder : str | pathlib.Path
         Folder to search for data files
     ext : str, optional
         The filename extension to search for, by default ".ljh"
@@ -83,6 +83,7 @@ def find_ljh_files(
         if len(overlap) > 0:
             raise ValueError(f"exclude and include lists should not overlap, but both include channels {overlap}")
 
+    folder = str(folder)
     ljh_files = []
     if search_subdirectories:
         pathgen = os.walk(folder)

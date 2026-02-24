@@ -260,7 +260,7 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
     hists = np.zeros((nf, NBINS), dtype=float)
     for i, P in enumerate(Pctrs):
         use = Pbin == i
-        c, b = np.histogram(pulse_heights[use], NBINS, range=tuple(phrange))
+        c, b = np.histogram(pulse_heights[use], NBINS, range=tuple(phrange.astype(float)))
         hists[i] = c
     bctr = 0.5 * (b[1] - b[0]) + b[:-1]
 
