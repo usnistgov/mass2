@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.20.2"
 app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
@@ -10,6 +10,7 @@ def _():
     import pylab as plt
     import numpy as np
     import marimo as mo
+
     return mo, np, pl, plt
 
 
@@ -18,6 +19,7 @@ def _():
     import mass2
     import pulsedata
     import pathlib
+
     return mass2, pulsedata
 
 
@@ -313,16 +315,14 @@ def _(data5, dropdown_ch, mass2):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ### TODOS
     * hunter run on all data again and report any errors
     * plot rms_residual_energy vs channel number
     * plot gain spline vs channel
     * plot filt_value vs area
     * make a drift at a line plot
-    """
-    )
+    """)
     return
 
 
