@@ -84,7 +84,7 @@ def test_dc_insensitive():
         expmodel = np.exp(-np.linspace(0, 1, nSamples - 4))
         return maker.compute_constrained_5lag(expmodel, f_3db=f_3db, fmax=fmax)
 
-    for computer in (maker.compute_ats, maker.compute_fourier, maker.compute_5lag, compute_5lag_noexp):
+    for computer in (maker.compute_ats, maker.compute_fourier, maker.compute_5lag, compute_5lag_noexp, maker.compute_1lag):
         filter_to_test = computer(f_3db=None, fmax=None)
         std = np.median(np.abs(filter_to_test.values))
         mean = filter_to_test.values.mean()
@@ -133,11 +133,13 @@ def test_constrained_filtering():  # noqa: PLR0914
     expmodel = expdata[2:-2]
     f_usual = maker.compute_5lag()
     f_noexp = maker.compute_5lag_noexp(tau)
-    f_constrained = maker.compute_constrained_5lag(expmodel)
+    f_constrained5 = maker.compute_constrained_5lag(expmodel)
+    f_constrained1 = maker.compute_constrained_1lag(expdata)
 
     assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
     assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-9, "compute_5lag_noexp is sensitive to an exponential"
-    assert np.abs(f_constrained.filter_records(expdata)[0]) < 1e-9, "compute_constrained_5lag is sensitive to an exponential"
+    assert np.abs(f_constrained5.filter_records(expdata)[0]) < 1e-9, "compute_constrained_5lag is sensitive to an exponential"
+    assert np.abs(f_constrained1.filter_records(expdata)[0]) < 1e-9, "compute_constrained_1lag is sensitive to an exponential"
 
     # Now make multiple exponential constraints
     insensitive_models = [expdata, 1 - expdata**1.5, expdata**3.5]

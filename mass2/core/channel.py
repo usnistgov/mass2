@@ -1052,11 +1052,12 @@ class Channel:
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
         """Add external trigger times from an existing dataframe"""
-        df2 = (
-            self.df
-            .with_columns(subframecount=pl.col("framecount") * self.subframediv)
-            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
-            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        df = self.df
+        # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
+        if "subframecount" not in df:
+            df = self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+        df2 = df.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig").join_asof(
+            df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig"
         )
         return self.with_replacement_df(df2)
 
