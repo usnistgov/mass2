@@ -27,7 +27,7 @@ dependencies = [
     "packaging",
     "polars",
     "progress",
-    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata>0.0.4",
+    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
     "pyqt5",
     "pyyaml",
     "scikit-learn",
