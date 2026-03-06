@@ -79,6 +79,11 @@ class Channel:
         """A short name for this channel, suitable for plot titles."""
         return self.header.description
 
+    @property
+    def number(self) -> int:
+        "Channel number, from the filename"
+        return self.header.ch_num
+
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -91,7 +96,7 @@ class Channel:
         mo_ui = mo.ui.dropdown(
             desc_ind,
             value=first_non_summarize_step.description,
-            label=f"choose step for ch {self.header.ch_num}",
+            label=f"choose step for ch {self.number}",
         )
 
         def show() -> mo.Html:
@@ -1152,7 +1157,7 @@ class Channel:
 
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
         """Save the recipe steps to a pickle file, keyed by channel number."""
-        steps = {self.header.ch_num: self.steps}
+        steps = {self.number: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
