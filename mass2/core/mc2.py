@@ -12,6 +12,16 @@ def main() -> None:
     )
     parser.add_argument("-F", "--force", action="store_true", help="force overwrite of existing analysis? (default: False)")
     parser.add_argument("-v", "--verbose", action="store_true", help="print more facts (default: False)")
+    parser.add_argument(
+        "-o", "--output-dir", nargs="?", const=None, default=None, help="store output to this directory (default: $ljhpath/mc2)"
+    )
+    parser.add_argument(
+        "-p", "--analysis-period", default=10.0, type=float, help="repeat basic analysis at this repetition period (seconds)"
+    )
+    # parser.add_argument("-f", "--fast-analysis-period", default=1.0, type=float,
+    #                     help="repeat basic analysis at this repetition period for any fast channels (seconds)")
+    # parser.add_argument("-c", "--fast-channels", type=int, nargs="*", default=None,
+    #                     help="analyze this subset of channel numbers at a faster rate")
     parser.add_argument("recipefile", type=str, nargs=1, help="pickle file with dictionary of recipes")
     parser.add_argument("ljhpath", type=str, nargs=1, help="")
 
