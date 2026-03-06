@@ -260,6 +260,7 @@ class Channel:
         axis: plt.Axes | None = None,
         annotate: bool = False,
         max_points: int | None = None,
+        extended_title: bool = True,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -285,6 +286,8 @@ class Channel:
             Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
             from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
             be consistent with the `max_points` requirement.
+        extended title : bool, optional
+            Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
         if axis is None:
             fig = plt.figure()
@@ -401,9 +404,22 @@ class Channel:
 
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
-        title_str = f"""{self.header.description}
-        use_expr={str(use_expr)}
-        good_expr={str(self.good_expr)}"""
+
+        if extended_title:
+            title_parts = [self.header.description]
+
+            def truncated_str(s: str, max=50) -> str:
+                if len(s) <= 50:
+                    return s
+                return s[:50] + "..."
+
+            if use_expr is not pl.lit(True):
+                usestr = truncated_str("Use: " + str(use_expr))
+                title_parts.append(usestr)
+            title_parts.append("Good: " + truncated_str(str(self.good_expr)))
+            title_str = "\n".join(title_parts)
+        else:
+            title_str = self.header.description
         plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
