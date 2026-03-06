@@ -6,11 +6,12 @@ from dataclasses import dataclass, field
 import dataclasses
 from typing import Any
 from numpy.typing import ArrayLike, NDArray
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Collection
 import os
 import lmfit
 import polars as pl
 import pylab as plt
+from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
 import marimo as mo
 import functools
@@ -407,6 +408,112 @@ class Channel:
         if color_col is not None:
             plt.legend(title=color_col)
         plt.tight_layout()
+
+    def plot_pulses(  # noqa: PLR0917
+        self,
+        length: int = 30,
+        skip: int = 0,
+        random: bool = False,
+        record_numbers: Collection[Any] | pl.Series | None = None,
+        subtract_baseline: bool = False,
+        derivative: bool = False,
+        summarize: bool = True,
+        summary_columns: Collection[Any] | None = None,
+        use_expr: pl.Expr = pl.lit(True),
+        use_good_expr: bool = True,
+        axis: plt.Axes | None = None,
+        cm: str | Colormap = "viridis_r",
+    ) -> None:
+        """Plot some example pulses
+
+        Parameters
+        ----------
+        length : int, optional
+            How many pulses to plot, by default 30
+        skip : int, optional
+            Start plotting at this pulse record number, by default 0
+        random : bool, optional
+            Whether to plot `length` randomly selected records, by default False
+            If True, `skip` is ignored.
+        record_numbers : Collection[Any] | pl.Series | None, optional
+            Plot the specified records, numbered from 0 for the first in the dataframe, by default None.
+            If given, `length`, `skip`, and `random` are ignored.
+        subtract_baseline : bool, optional
+            Whether to subtract the pretrigger mean before plotting each record, by default False
+        derivative : bool, optional
+            Whether to plot the "derivative" of a pulse (actually the successive differences), by default False
+        summarize : bool, optional
+            Whether to summarize key facts about each plotted pulse to the terminal, by default True
+        summary_columns : Collection[Any] | None, optional
+            Which specific data columns to report in the summary to the terminal, by default None
+            If None, then a pre-selected set are reported.
+        use_expr : pl.Expr, optional
+            An expression to select plottable points, by default pl.lit(True)
+        use_good_expr : bool, optional
+            Whether to apply the object's `good_expr` before plotting, by default True
+            If True, then the existing `good_expr` will be applied AND the `use_expr` will be, too.
+        axis : plt.Axes | None, optional
+            Axes to plot on, by default None
+            If None, create a new figure.
+        cm : str | Colormap, optional
+            The colormap to use for distinguishing pulses, by default "viridis_r"
+        """
+        if axis is None:
+            _, axis = plt.subplots()  # Create a new figure if no axis is provided
+
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr = use_expr
+
+        if isinstance(cm, str):
+            cm = plt.get_cmap(cm)
+
+        lf = self.df.lazy().with_row_index("Record #")
+        if record_numbers is None:
+            if random:
+                title = f"{length} random pulses"
+                lf = lf.filter(filter_expr).collect().sample(length).lazy().sort("Record #")
+            else:
+                title = f"Pulses #[{skip},{skip + length - 1}]"
+                lf = lf.filter(filter_expr).slice(skip, length)
+        else:
+            title = f"Pulses #{record_numbers}"
+            lf = lf.filter(pl.col("Record #").is_in(record_numbers))
+        plt.title(f"{title} from Chan {self.number}")
+        if summarize:
+            # Preferred data info to print to terminal.
+            if summary_columns is None:
+                summary_columns = [
+                    "Record #",
+                    "pretrig_mean",
+                    "pulse_rms",
+                    "pulse_average",
+                    "rise_time",
+                    "peak_value",
+                    "energy_5lagy",
+                    "state_label",
+                ]
+            # Remove preferred column if it doesn't exist
+            columns = [c for c in summary_columns if c in lf.collect_schema().names()]
+            summary_df = lf.select(columns).collect()
+            summary_df.show(limit=None)
+
+        plot_columns = ("pulse", "pretrig_mean")
+        df = lf.select(plot_columns).collect()
+        N = len(df)
+        pulses = df["pulse"]
+        ptmean = df["pretrig_mean"]
+        for i in range(N):
+            pulse = pulses[i].to_numpy()
+            color = cm(i / N)
+            if subtract_baseline:
+                pulse = pulse - ptmean[i]  # noqa: PLR6104
+            if derivative:
+                pulse = np.hstack((0, np.diff(pulse)))
+            axis.plot(pulse, color=color)
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
