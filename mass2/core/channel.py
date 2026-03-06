@@ -251,7 +251,7 @@ class Channel:
         use_expr: pl.Expr = pl.lit(True),
         use_good_expr: bool = True,
         skip_none: bool = True,
-        ax: plt.Axes | None = None,
+        axis: plt.Axes | None = None,
         annotate: bool = False,
         max_points: int | None = None,
     ) -> None:
@@ -271,7 +271,7 @@ class Channel:
             Whether to apply the object's `good_expr` before plotting, by default True
         skip_none : bool, optional
             Whether to skip color categories with no name, by default True
-        ax : plt.Axes | None, optional
+        axis : plt.Axes | None, optional
             Axes to plot on, by default None
         annotate : bool, optional
             Whether to annotate points that are hovered over or clicked on by the mouse, by default True
@@ -280,10 +280,10 @@ class Channel:
             from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
             be consistent with the `max_points` requirement.
         """
-        if ax is None:
+        if axis is None:
             fig = plt.figure()
-            ax = plt.gca()
-        plt.sca(ax)  # set current axis so I can use plt api
+            axis = plt.gca()
+        plt.sca(axis)  # set current axis so I can use plt api
         fig = plt.gcf()
         filter_expr = use_expr
         if use_good_expr:
@@ -302,8 +302,7 @@ class Channel:
         if color_col is not None:
             columns_to_keep.append(color_col)
         df_small = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .with_row_index(name=index_name)
             .filter(filter_expr)
             .select(*columns_to_keep)
@@ -324,7 +323,7 @@ class Channel:
             lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
-            annotation = ax.annotate(
+            annotation = axis.annotate(
                 "",
                 xy=(0, 0),
                 xytext=(-20, 20),
@@ -363,7 +362,7 @@ class Channel:
                     The mouse-related event; contains location information
                 """
                 vis = annotation.get_visible()
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -382,7 +381,7 @@ class Channel:
                 event : MouseEvent
                     The mouse-related event; contains location information
                 """
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -725,8 +724,7 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -815,8 +813,7 @@ class Channel:
             _description_
         """
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -1020,8 +1017,7 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
