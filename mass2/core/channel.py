@@ -493,8 +493,8 @@ class Channel:
                 title = f"{length} random pulses"
                 lf = lf.filter(filter_expr).collect().sample(length).lazy().sort("Record #")
             else:
-                title = f"Pulses #[{skip},{skip + length - 1}]"
                 lf = lf.filter(filter_expr).slice(skip, length)
+                title = f"{length} selected pulses"
         else:
             title = f"Pulses #{record_numbers}"
             lf = lf.filter(pl.col("Record #").is_in(record_numbers))
