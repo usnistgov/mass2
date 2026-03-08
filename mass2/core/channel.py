@@ -311,8 +311,7 @@ class Channel:
         if color_col is not None:
             columns_to_keep.append(color_col)
         df_small = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .with_row_index(name=index_name)
             .filter(filter_expr)
             .select(*columns_to_keep)
@@ -409,7 +408,7 @@ class Channel:
         if extended_title:
             title_parts = [self.header.description]
 
-            def truncated_str(s: str, max=50) -> str:
+            def truncated_str(s: str, max: int = 50) -> str:
                 if len(s) <= 50:
                     return s
                 return s[:50] + "..."
@@ -493,7 +492,9 @@ class Channel:
             filter_expr = use_expr
 
         if isinstance(cm, str):
-            cm = plt.get_cmap(cm)
+            cmap = plt.get_cmap(cm)
+        else:
+            cmap = cm
 
         lf = self.df.lazy().with_row_index("Record #")
         if record_numbers is None:
@@ -532,7 +533,7 @@ class Channel:
         ptmean = df["pretrig_mean"]
         for i in range(N):
             pulse = pulses[i].to_numpy()
-            color = cm(i / N)
+            color = cmap(i / N)
             if subtract_baseline:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
@@ -860,8 +861,7 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -950,8 +950,7 @@ class Channel:
             _description_
         """
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -1155,8 +1154,7 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )

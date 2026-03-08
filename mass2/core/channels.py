@@ -258,11 +258,11 @@ class Channels:
         plot_these_chan = self._limited_chan_list(limit, channels)
         frametime_ms = self.channels[plot_these_chan[0]].header.frametime_s * 1e3
 
-        def samples2ms(s):
-            return s * frametime_ms
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
 
-        def ms2samples(ms):
-            return ms / frametime_ms
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
 
         upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
         upper_axis.set_xlabel("Time after trigger (ms)")
