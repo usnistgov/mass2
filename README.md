@@ -11,7 +11,7 @@
 MASS is the work of physicists from NIST Boulder Labs and the University of Colorado, with substantial contributions from:
 
 * [Joe Fowler](https://github.com/joefowler/), project director
-* [Galen O'Neil](https://github.com/ggggggggg/), co-director
+* [Galen O'Neil](https://github.com/ggggggggg/), co-director emeritus
 * [Dan Becker](https://github.com/danbek/)
 * Young-Il Joe
 * Jamie Titus
