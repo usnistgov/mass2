@@ -254,24 +254,24 @@ def myfigure(size, fignum=9):
     the requested size tuple (width,height) is different by more than 0.01 inches
     in either dimension from the current figure's size."""
     curr_size = plt.gcf().get_size_inches()
-    if abs(curr_size[0] - size[0]) + abs(curr_size[1] - size[1]) > .01:
+    if abs(curr_size[0] - size[0]) + abs(curr_size[1] - size[1]) > 0.01:
         plt.close(fignum)
     return plt.figure(fignum, figsize=size)
 
 
-def imshow(matrix, fraction=.09, *args, **kwargs):
+def imshow(matrix, fraction=0.09, *args, **kwargs):
     """Plot a matrix using pylab.imshow with rectangular pixels
     and a color bar. Argument 'fraction' is passed to the colorbar.
     All others go to pylab.imshow()"""
     plt.clf()
-    plt.imshow(matrix, interpolation='none', *args, **kwargs)
+    plt.imshow(matrix, interpolation="none", *args, **kwargs)
     plt.colorbar(fraction=fraction)
 
 
 def hist(x, bins=100, range=None, *args, **kwargs):
     """Plot a histogram using the (non-default) 'histtype="step"' argument
     and default bins=100.."""
-    kwargs.setdefault('histtype', 'step')
+    kwargs.setdefault("histtype", "step")
     return plt.hist(x, bins=bins, range=range, *args, **kwargs)
 
 
