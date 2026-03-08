@@ -591,3 +591,96 @@ def time_drift_correct(  # noqa: PLR0914
     info["entropies"] = (H1, H2, H3)
     info["model"] = model
     return info
+
+
+@njit
+def resample_pulses(pulses: NDArray, shifts: ArrayLike | float | int) -> NDArray:
+    """Resample multiple pulses (in place). The data will be modified and returned.
+
+    Shifts can be integer or not; if shifts have a fractional part, linear interpolation is used.
+
+    Positive values of `shifts` delay the values in a pulse record, and the initial value or values
+    are padded by copying the first value of the pulse record. Negative values shift the pulse earlier
+    in the record, and the final value is used to pad the end of the new record.
+
+    Parameters
+    ----------
+    pulses : NDArray
+        Array of pulses to resample _in place_. Size (N,M) for N pulses, each of length M.
+    shifts : ArrayLike | float | int
+        The number of samples to shift each pulse. Array of size `N`, or a scalar. If scalar,
+        apply the same shift to all `N` pulses. Values can be non-integer, producing a linear
+        interpolation of the data.
+
+    Returns
+    -------
+    NDArray
+        The `pulses` input array, which is modified by this operation.
+    """
+    # Positive shift means delay the record and pad the start.
+    # Negative shift means rewind the record and pad the end.
+    assert len(pulses.shape) == 2
+    Npulses, Nsamples = pulses.shape
+    if np.isscalar(shifts):
+        shift_vec = np.zeros(Npulses, dtype=float)
+        shift_vec.fill(shifts)
+        return resample_pulses(pulses, shift_vec)
+
+    shifts = np.asarray(shifts)
+    assert len(shifts) == Npulses
+    assert np.abs(shifts).max() < Nsamples
+
+    for pulse, shift in zip(pulses, shifts):
+        resample_one_pulse(pulse, shift)
+    return pulses
+
+
+@njit
+def resample_one_pulse(pulse: NDArray, shift: float | int) -> NDArray:
+    """Resample one pulses (in place). The data will be modified and returned.
+
+    Shift can be integer or not; if shift has a fractional part, linear interpolation is used.
+
+    Positive values of `shift` delay the values in a pulse record, and the initial value or values
+    are padded by copying the first value of the pulse record. Negative values shift the pulse earlier
+    in the record, and the final value is used to pad the end of the new record.
+
+    Parameters
+    ----------
+    pulse : NDArray
+        Pulse to resample _in place_.
+    shift : float | int
+        The number of samples to shift each pulse. Value can be non-integer, producing a linear
+        interpolation of the data.
+
+    Returns
+    -------
+    NDArray
+        The `pulse` input vector, which is modified by this operation.
+    """
+    Nsamples = len(pulse)
+    if shift > 0.0:
+        fullshift = int(shift)
+        fracshift = shift - fullshift
+        # integer shift
+        if fullshift > 0:
+            pulse[fullshift:] = pulse[:-fullshift]
+        # linear interpolation for the fraction
+        pulse[fullshift + 1 :] = np.rint((1.0 - fracshift) * pulse[fullshift + 1 :] + fracshift * pulse[fullshift:-1])
+        # fill the initial values
+        pulse[:fullshift] = pulse[fullshift]
+
+    elif shift < 0.0:
+        fullshift = -int(-shift)
+        fracshift = fullshift - shift
+        # integer shift
+        if fullshift < 0:
+            pulse[:fullshift] = pulse[-fullshift:]
+        # linear interpolation for the fraction
+        pulse[: Nsamples + fullshift - 1] = np.rint(
+            (1 - fracshift) * pulse[: Nsamples + fullshift - 1] + fracshift * pulse[1 : Nsamples + fullshift]
+        )
+        # fill the final values
+        pulse[Nsamples + fullshift :] = pulse[-1]
+    # Edge case of shift == 0.0 is a no-op and can be ignored.
+    return pulse

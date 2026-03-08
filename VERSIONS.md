@@ -4,6 +4,7 @@
 
 **2.0.3** March 6, 2026-
 * Add some convenient plotting features like `Channel.plot_pulses`.
+* Add `shift_pulses` and `shift_one_pulse` to `mass2.core.analysis_algorithms`.
 
 **2.0.2** February 24, 2026
 * Adapt to change in the `numpy.linalg.svd` API (issue 97).
