@@ -435,6 +435,7 @@ class Channel:
         derivative: bool = False,
         summarize: bool = True,
         summary_columns: Collection[Any] | None = None,
+        pulse_field: str = "pulse",
         use_expr: pl.Expr = pl.lit(True),
         use_good_expr: bool = True,
         axis: plt.Axes | None = None,
@@ -463,6 +464,8 @@ class Channel:
         summary_columns : Collection[Any] | None, optional
             Which specific data columns to report in the summary to the terminal, by default None
             If None, then a pre-selected set are reported.
+        pulse_field : str
+            The column name in the polars dataframe where plottable pulses, by default "pulse"
         use_expr : pl.Expr, optional
             An expression to select plottable points, by default pl.lit(True)
         use_good_expr : bool, optional
@@ -474,6 +477,10 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
+        assert self.df[pulse_field].dtype in {pl.Array, pl.List}, (
+            f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
+        )
+
         if axis is None:
             _, axis = plt.subplots()  # Create a new figure if no axis is provided
 
@@ -517,10 +524,10 @@ class Channel:
             summary_df = lf.select(columns).collect()
             summary_df.show(limit=None)
 
-        plot_columns = ("pulse", "pretrig_mean")
+        plot_columns = (pulse_field, "pretrig_mean")
         df = lf.select(plot_columns).collect()
         N = len(df)
-        pulses = df["pulse"]
+        pulses = df[pulse_field]
         ptmean = df["pretrig_mean"]
         for i in range(N):
             pulse = pulses[i].to_numpy()
