@@ -61,10 +61,14 @@ jobs:
         version: "latest"
         args: "format"
 
-    - name: Detect changed files during a Workflow run and commit them back to the repository
-      uses: stefanzweifel/git-auto-commit-action@v6
-      with:
-        commit_message: 'automatic style fixes by ruff'
+    # - name: Detect changed files during a Workflow run and commit them back to the repository
+    #   uses: stefanzweifel/git-auto-commit-action@v6
+    #   with:
+    #     commit_message: 'automatic style fixes by ruff'
+    # We used this for several months, but as of March 2026, it's giving me trouble. I think
+    # it's to do with an incompatible ruff setting between my computer and this action. When both
+    # make (incompatible) changes, the change-plus-commit implied in this action will fail.
+    # For now, remove the action and see if it fixes things.
 
     - name: Install the project
       run: uv sync --all-extras --dev
