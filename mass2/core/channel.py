@@ -85,6 +85,21 @@ class Channel:
         "Channel number, from the filename"
         return self.header.ch_num
 
+    @property
+    def frametime_s(self) -> float:
+        "Sample (or frame) period in seconds, from the file header"
+        return self.header.frametime_s
+
+    @property
+    def n_presamples(self) -> int:
+        "Pretrigger samples in each pulse record, from the file header"
+        return self.header.n_presamples
+
+    @property
+    def n_samples(self) -> int:
+        "Samples per pulse, from the file header"
+        return self.header.n_samples
+
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -311,8 +326,7 @@ class Channel:
         if color_col is not None:
             columns_to_keep.append(color_col)
         df_small = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .with_row_index(name=index_name)
             .filter(filter_expr)
             .select(*columns_to_keep)
@@ -786,11 +800,11 @@ class Channel:
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
-            frametime_s=self.header.frametime_s,
+            frametime_s=self.frametime_s,
             peak_index=peak_index,
             pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
-            n_presamples=self.header.n_presamples,
+            n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
         )
         return self.with_step(step)
@@ -862,8 +876,7 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -873,7 +886,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
-        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
+        avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
     def filter5lag(
@@ -912,10 +925,10 @@ class Channel:
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
             filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
@@ -952,8 +965,7 @@ class Channel:
             _description_
         """
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -976,9 +988,9 @@ class Channel:
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         pulse = df["pulse"].to_numpy()
-        avg_pulse = np.zeros(self.header.n_samples, dtype=float)
-        dt_model = np.zeros(self.header.n_samples, dtype=float)
-        for i in range(self.header.n_presamples, self.header.n_samples):
+        avg_pulse = np.zeros(self.n_samples, dtype=float)
+        dt_model = np.zeros(self.n_samples, dtype=float)
+        for i in range(self.n_presamples, self.n_samples):
             slope, offset = np.polyfit(df["ATime"], (pulse[:, i] - df["pretrig_mean"]), 1)
             dt_model[i] = -slope
             avg_pulse[i] = offset
@@ -1021,10 +1033,10 @@ class Channel:
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             dt_model=dt_model,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
@@ -1157,8 +1169,7 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1311,7 +1322,7 @@ class Channel:
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
-        tpi_microsec = (self.typical_peak_ind() - self.header.n_presamples) * (1e6 * self.header.frametime_s)
+        tpi_microsec = (self.typical_peak_ind() - self.n_presamples) * (1e6 * self.frametime_s)
         plottables = (
             ("pulse_rms", "Pulse RMS", "#dd00ff", None),
             ("pulse_average", "Pulse Avg", "purple", None),
@@ -1330,9 +1341,7 @@ class Channel:
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
-        df = df.with_columns(
-            ((pl.col("peak_index") - self.header.n_presamples) * (1e6 * self.header.frametime_s)).alias("peak_time_µs")
-        )
+        df = df.with_columns(((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"))
         df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
@@ -1366,7 +1375,7 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         pulse = self.df[col][index].to_numpy()
-        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
+        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
             print(f"pulse index={index}")
