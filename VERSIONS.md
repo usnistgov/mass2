@@ -1,9 +1,12 @@
 # Mass Versions
 
-## Mass Version 2 (2025-)
+## Mass Version 2 (2025-present)
+
+**2.0.3** March 6, 2026-
+* Add some convenient plotting features like `Channel.plot_pulses`.
 
 **2.0.2** February 24, 2026
-* Fix change in the `numpy.linalg.svd` naming (issue 97).
+* Adapt to change in the `numpy.linalg.svd` API (issue 97).
 * Add one-lag optimal filters for optical TESs (issue 99).
 * Fix problem reading external trigger data with LJH files (issue 101).
 * Seven security updates to `uv.lock` prompted by GitHub's "dependabot"

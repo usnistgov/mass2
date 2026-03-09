@@ -49,10 +49,10 @@ rng = np.random.default_rng(1066)
 N = 100000
 energies = line.rvs(size=N, instrument_gaussian_fwhm=2.2, rng=rng)  # draw from the distribution
 plt.clf()
-sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype="step", lw=2);
+sim, bin_edges, _ = plt.hist(energies, 120, range=[5865, 5925], histtype="step", lw=2)
 binsize = bin_edges[1] - bin_edges[0]
-e = bin_edges[:-1] + 0.5*binsize
-plt.plot(e, line(e, instrument_gaussian_fwhm=2.2)*N*binsize, "k", lw=0.5)
+e = bin_edges[:-1] + 0.5 * binsize
+plt.plot(e, line(e, instrument_gaussian_fwhm=2.2) * N * binsize, "k", lw=0.5)
 plt.xlabel("Energy (eV)")
 plt.title("Mn K$\\alpha$ random deviates and theory curve")
 ```
@@ -136,19 +136,19 @@ resultC.plot()
 By default, the `has_tails=True` will set up a non-zero low-energy tail and allow it to vary, while the high-energy tail is set to zero amplitude and doesn't vary. Use these numbered examples if you want to fit for a high-energy tail (1), to fix the low-E tail at some non-zero level (2) or to turn off the low-E tail completely (3):
 
 ```python
-  # 1. To let the low-E and high-E tail both vary simultaneously
-  params["tail_share_hi"].set(.1, vary=True)
-  params["tail_tau_hi"].set(30, vary=True)
+# 1. To let the low-E and high-E tail both vary simultaneously
+params["tail_share_hi"].set(0.1, vary=True)
+params["tail_tau_hi"].set(30, vary=True)
 
-  # 2. To fix the sum of low-E and high-E tail at a 10% level, with low-E tau=30 eV, but
-  # the share of the low vs high tail can vary
-  params["tail_frac"].set(.1, vary=False)
-  params["tail_tau"].set(30, vary=False)
+# 2. To fix the sum of low-E and high-E tail at a 10% level, with low-E tau=30 eV, but
+# the share of the low vs high tail can vary
+params["tail_frac"].set(0.1, vary=False)
+params["tail_tau"].set(30, vary=False)
 
-  # 3. To turn off low-E tail
-  params["tail_frac"].set(.1, vary=True)
-  params["tail_share_hi"].set(1, vary=False)
-  params["tail_tau"].set(vary=False)
+# 3. To turn off low-E tail
+params["tail_frac"].set(0.1, vary=True)
+params["tail_share_hi"].set(1, vary=False)
+params["tail_tau"].set(vary=False)
 ```
 
 ### Fitting with a quantum efficiency model
@@ -169,11 +169,14 @@ resultD.plotm()
 
 fit_counts = resultD.params["integral"].value
 localqe = qemodel(mass2.STANDARD_FEATURES["MnKAlpha"])
-fit_observed = fit_counts*localqe
+fit_observed = fit_counts * localqe
 fit_err = resultD.params["integral"].stderr
-count_err = fit_err*localqe
-print("Fit finds {:.0f}±{:.0f} counts before QE, or {:.0f}±{:.0f} observed. True value {:d}.".format(
-    round(fit_counts, -1), round(fit_err, -1), round(fit_observed, -1), round(count_err, -1), N))
+count_err = fit_err * localqe
+print(
+    "Fit finds {:.0f}±{:.0f} counts before QE, or {:.0f}±{:.0f} observed. True value {:d}.".format(
+        round(fit_counts, -1), round(fit_err, -1), round(fit_observed, -1), round(count_err, -1), N
+    )
+)
 ```
 
 ```text
@@ -195,26 +198,27 @@ With or without a QE model, "integral" refers to the number of photons that woul
 # mkdocs: render
 import dataclasses
 from mass2.calibration.fluorescence_lines import SpectralLine
+
 e_ctr = 1000.0
 Nsig = 10000
 Nbg = 1000
 
 sigma = 1.0
-x_gauss = rng.standard_normal(Nsig)*sigma + e_ctr
+x_gauss = rng.standard_normal(Nsig) * sigma + e_ctr
 hwhm = 1.0
-x_lorentz = rng.standard_cauchy(Nsig)*hwhm + e_ctr
-x_voigt = rng.standard_cauchy(Nsig)*hwhm + rng.standard_normal(Nsig)*sigma + e_ctr
-bg = rng.uniform(e_ctr-5, e_ctr+5, size=Nbg)
+x_lorentz = rng.standard_cauchy(Nsig) * hwhm + e_ctr
+x_voigt = rng.standard_cauchy(Nsig) * hwhm + rng.standard_normal(Nsig) * sigma + e_ctr
+bg = rng.uniform(e_ctr - 5, e_ctr + 5, size=Nbg)
 
 # Gaussian fit
-c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr-5, e_ctr+5])
-bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
+c, b = np.histogram(np.hstack([x_gauss, bg]), 50, [e_ctr - 5, e_ctr + 5])
+bin_ctr = b[:-1] + (b[1] - b[0]) * 0.5
 line = SpectralLine.quick_monochromatic_line("testline", e_ctr, 0, 0)
 line = dataclasses.replace(line, linetype="Gaussian")
 model = line.model()
 params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-params["fwhm"].set(2.3548*sigma)
-params["background"].set(Nbg/len(c))
+params["fwhm"].set(2.3548 * sigma)
+params["background"].set(Nbg / len(c))
 resultG = model.fit(c, params, bin_centers=bin_ctr)
 resultG.plotm()
 # print(resultG.fit_report())
@@ -223,14 +227,14 @@ resultG.plotm()
 ```python
 # mkdocs: render
 # Lorentzian fit
-c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr-5, e_ctr+5])
-bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, 0)
+c, b = np.histogram(np.hstack([x_lorentz, bg]), 50, [e_ctr - 5, e_ctr + 5])
+bin_ctr = b[:-1] + (b[1] - b[0]) * 0.5
+line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm * 2, 0)
 line = dataclasses.replace(line, linetype="Lorentzian")
 model = line.model()
 params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-params["fwhm"].set(2.3548*sigma)
-params["background"].set(Nbg/len(c))
+params["fwhm"].set(2.3548 * sigma)
+params["background"].set(Nbg / len(c))
 resultL = model.fit(c, params, bin_centers=bin_ctr)
 resultL.plotm()
 # print(resultL.fit_report())
@@ -238,14 +242,14 @@ resultL.plotm()
 ```python
 # mkdocs: render
 # Voigt fit
-c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr-5, e_ctr+5])
-bin_ctr = b[:-1] + (b[1]-b[0]) * 0.5
-line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm*2, sigma)
+c, b = np.histogram(np.hstack([x_voigt, bg]), 50, [e_ctr - 5, e_ctr + 5])
+bin_ctr = b[:-1] + (b[1] - b[0]) * 0.5
+line = SpectralLine.quick_monochromatic_line("testline", e_ctr, hwhm * 2, sigma)
 line = dataclasses.replace(line, linetype="Voigt")
 model = line.model()
 params = model.guess(c, bin_centers=bin_ctr, dph_de=1)
-params["fwhm"].set(2.3548*sigma)
-params["background"].set(Nbg/len(c))
+params["fwhm"].set(2.3548 * sigma)
+params["background"].set(Nbg / len(c))
 resultV = model.fit(c, params, bin_centers=bin_ctr)
 resultV.plotm()
 # print(resultV.fit_report())
