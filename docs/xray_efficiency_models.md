@@ -26,7 +26,7 @@ import pylab as plt
 from uncertainties import unumpy as unp  # useful for working with arrays with uncertainties aka uarray
 from uncertainties import ufloat
 
-EBIT_model = mass2.materials.filterstack_models['EBIT 2018']
+EBIT_model = mass2.materials.filterstack_models["EBIT 2018"]
 print(EBIT_model)
 ```
 
@@ -56,16 +56,18 @@ Next, we examine the function `get_efficiency(xray_energies_eV)`, which is an me
 # mkdocs: render
 sparse_xray_energies_eV = np.arange(2000, 10000, 1000)
 stack_efficiency = EBIT_model.get_efficiency(sparse_xray_energies_eV)
-stack_efficiency_uncertain = EBIT_model.get_efficiency(sparse_xray_energies_eV, uncertain=True) # you have to opt into getting uncertainties out
+stack_efficiency_uncertain = EBIT_model.get_efficiency(
+    sparse_xray_energies_eV, uncertain=True
+)  # you have to opt into getting uncertainties out
 filter50K_efficiency = EBIT_model.components[3].get_efficiency(sparse_xray_energies_eV)
 
 print("stack efficiencies")
-print([f"{x}" for x in stack_efficiency_uncertain]) # this is a hack to get uarrays to print with auto chosen number of sig figs
-print(stack_efficiency) # this is a hack to get uarrays to print with auto chosen number of sig figs
-print(unp.nominal_values(stack_efficiency)) # you can easily strip uncertainties, see uncertains package docs for more info
+print([f"{x}" for x in stack_efficiency_uncertain])  # this is a hack to get uarrays to print with auto chosen number of sig figs
+print(stack_efficiency)  # this is a hack to get uarrays to print with auto chosen number of sig figs
+print(unp.nominal_values(stack_efficiency))  # you can easily strip uncertainties, see uncertains package docs for more info
 
 print("filter50K efficiencies")
-print(filter50K_efficiency) # if you want to remove the uncertainties, eg for plotting
+print(filter50K_efficiency)  # if you want to remove the uncertainties, eg for plotting
 ```
 
 ```text
@@ -87,7 +89,7 @@ Testing with energy range 100 to 20,000 eV, 1 eV steps.
 
 ```python
 # mkdocs: render
-xray_energies_eV = np.arange(100,20000,10)
+xray_energies_eV = np.arange(100, 20000, 10)
 EBIT_model.plot_efficiency(xray_energies_eV)
 ```
 ```python
@@ -116,13 +118,13 @@ a particular Film, the code will add a ±100% uncertainty on that component. Thi
 
 ```python
 # mkdocs: render
-custom_model = mass2.materials.FilterStack(name='My Filter Stack')
-custom_model.add_filter(name='My Bi Absorber', material='Bi', thickness_nm=ufloat(4.0e3, .1e3), absorber=True)
-custom_model.add_filter(name='My Al 50mK Filter', material='Al', thickness_nm=ufloat(100.0, 10))
-custom_model.add_filter(name='My Si 3K Filter', material='Si', thickness_nm=ufloat(500.0, 2))
-custom_filter = mass2.materials.FilterStack(name='My meshed 50K Filter')
-custom_filter.add_filter(name='Al Film', material='Al', thickness_nm=ufloat(100.0, 10))
-custom_filter.add_filter(name='Ni Mesh', material='Ni', thickness_nm=ufloat(10.0e3, .1e3), fill_fraction=ufloat(0.2, 0.01))
+custom_model = mass2.materials.FilterStack(name="My Filter Stack")
+custom_model.add_filter(name="My Bi Absorber", material="Bi", thickness_nm=ufloat(4.0e3, 0.1e3), absorber=True)
+custom_model.add_filter(name="My Al 50mK Filter", material="Al", thickness_nm=ufloat(100.0, 10))
+custom_model.add_filter(name="My Si 3K Filter", material="Si", thickness_nm=ufloat(500.0, 2))
+custom_filter = mass2.materials.FilterStack(name="My meshed 50K Filter")
+custom_filter.add_filter(name="Al Film", material="Al", thickness_nm=ufloat(100.0, 10))
+custom_filter.add_filter(name="Ni Mesh", material="Ni", thickness_nm=ufloat(10.0e3, 0.1e3), fill_fraction=ufloat(0.2, 0.01))
 custom_model.add(custom_filter)
 
 custom_model.plot_efficiency(xray_energies_eV)
@@ -138,13 +140,13 @@ Usage examples and efficiency curves of these classes are shown below.
 
 ```python
 # mkdocs: render
-premade_filter_stack = mass2.materials.FilterStack(name='A Stack of Premade Filters')
-f1 = mass2.materials.AlFilmWithOxide(name='My Oxidized Al Filter', Al_thickness_nm=50.0)
-f2 = mass2.materials.AlFilmWithPolymer(name='My Polymer Backed Al Filter', Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
+premade_filter_stack = mass2.materials.FilterStack(name="A Stack of Premade Filters")
+f1 = mass2.materials.AlFilmWithOxide(name="My Oxidized Al Filter", Al_thickness_nm=50.0)
+f2 = mass2.materials.AlFilmWithPolymer(name="My Polymer Backed Al Filter", Al_thickness_nm=100.0, polymer_thickness_nm=200.0)
 f3 = mass2.materials.LEX_HT(name="My LEX HT Filter")
 premade_filter_stack.add(f1)
 premade_filter_stack.add(f2)
 premade_filter_stack.add(f3)
-low_xray_energies_eV = np.arange(100,3000,5)
+low_xray_energies_eV = np.arange(100, 3000, 5)
 premade_filter_stack.plot_efficiency(low_xray_energies_eV)
 ```

@@ -81,7 +81,8 @@ class TriggerResult:
 
         # trigger indices (raw) → restrict to plotted window → convert to decimated indices
         trig_inds_raw = (
-            pl.DataFrame({"trig_inds": self.trig_inds})
+            pl
+            .DataFrame({"trig_inds": self.trig_inds})
             .filter(pl.col("trig_inds").is_between(raw_start, raw_stop))
             .to_series()
             .to_numpy()

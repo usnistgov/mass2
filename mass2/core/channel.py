@@ -6,11 +6,12 @@ from dataclasses import dataclass, field
 import dataclasses
 from typing import Any
 from numpy.typing import ArrayLike, NDArray
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Collection
 import os
 import lmfit
 import polars as pl
 import pylab as plt
+from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
 import marimo as mo
 import functools
@@ -79,6 +80,26 @@ class Channel:
         """A short name for this channel, suitable for plot titles."""
         return self.header.description
 
+    @property
+    def ch_num(self) -> int:
+        "Channel number, from the filename"
+        return self.header.ch_num
+
+    @property
+    def frametime_s(self) -> float:
+        "Sample (or frame) period in seconds, from the file header"
+        return self.header.frametime_s
+
+    @property
+    def n_presamples(self) -> int:
+        "Pretrigger samples in each pulse record, from the file header"
+        return self.header.n_presamples
+
+    @property
+    def n_samples(self) -> int:
+        "Samples per pulse, from the file header"
+        return self.header.n_samples
+
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
         desc_ind = {step.description: i for i, step in enumerate(self.steps)}
@@ -91,7 +112,7 @@ class Channel:
         mo_ui = mo.ui.dropdown(
             desc_ind,
             value=first_non_summarize_step.description,
-            label=f"choose step for ch {self.header.ch_num}",
+            label=f"choose step for ch {self.ch_num}",
         )
 
         def show() -> mo.Html:
@@ -233,7 +254,8 @@ class Channel:
             # plt.plot(bin_centers, counts, label=group_name)
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
+        if len(counts_dict) > 0:
+            ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
@@ -242,7 +264,7 @@ class Channel:
         plt.tight_layout()
         return bin_centers, counts_dict
 
-    def plot_scatter(
+    def plot_scatter(  # noqa: PLR0917
         self,
         x_col: str,
         y_col: str,
@@ -250,8 +272,10 @@ class Channel:
         use_expr: pl.Expr = pl.lit(True),
         use_good_expr: bool = True,
         skip_none: bool = True,
-        ax: plt.Axes | None = None,
-        annotate: bool = True,
+        axis: plt.Axes | None = None,
+        annotate: bool = False,
+        max_points: int | None = None,
+        extended_title: bool = True,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -269,15 +293,21 @@ class Channel:
             Whether to apply the object's `good_expr` before plotting, by default True
         skip_none : bool, optional
             Whether to skip color categories with no name, by default True
-        ax : plt.Axes | None, optional
+        axis : plt.Axes | None, optional
             Axes to plot on, by default None
         annotate : bool, optional
             Whether to annotate points that are hovered over or clicked on by the mouse, by default True
+        max_points: int, optional
+            Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
+            from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
+            be consistent with the `max_points` requirement.
+        extended title : bool, optional
+            Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
-        if ax is None:
+        if axis is None:
             fig = plt.figure()
-            ax = plt.gca()
-        plt.sca(ax)  # set current axis so I can use plt api
+            axis = plt.gca()
+        plt.sca(axis)  # set current axis so I can use plt api
         fig = plt.gcf()
         filter_expr = use_expr
         if use_good_expr:
@@ -285,10 +315,25 @@ class Channel:
         index_name = "pulse_idx"
         # Caused errors in Polars 1.35 if this was "index". See issue #85.
 
+        # Plot only 1 data value out of every n, if max_points argument is an integer.
+        # Compute n from the ratio of all points to max_points.
+        plot_every_nth = 1
+        if max_points is not None:
+            if max_points < self.npulses:
+                plot_every_nth = 1 + (self.npulses - 1) // max_points
+
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
-        df_small = self.df.lazy().with_row_index(name=index_name).filter(filter_expr).select(*columns_to_keep).collect()
+        df_small = (
+            self.df
+            .lazy()
+            .with_row_index(name=index_name)
+            .filter(filter_expr)
+            .select(*columns_to_keep)
+            .gather_every(plot_every_nth)
+            .collect()
+        )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
 
         for (name,), data in df_small.group_by(color_col, maintain_order=True):
@@ -303,7 +348,7 @@ class Channel:
             lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
-            annotation = ax.annotate(
+            annotation = axis.annotate(
                 "",
                 xy=(0, 0),
                 xytext=(-20, 20),
@@ -342,7 +387,7 @@ class Channel:
                     The mouse-related event; contains location information
                 """
                 vis = annotation.get_visible()
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -361,7 +406,7 @@ class Channel:
                 event : MouseEvent
                     The mouse-related event; contains location information
                 """
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -375,13 +420,141 @@ class Channel:
 
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
-        title_str = f"""{self.header.description}
-        use_expr={str(use_expr)}
-        good_expr={str(self.good_expr)}"""
+
+        if extended_title:
+            title_parts = [self.header.description]
+
+            def truncated_str(s: str, max: int = 50) -> str:
+                if len(s) <= 50:
+                    return s
+                return s[:50] + "..."
+
+            if use_expr is not pl.lit(True):
+                usestr = truncated_str("Use: " + str(use_expr))
+                title_parts.append(usestr)
+            title_parts.append("Good: " + truncated_str(str(self.good_expr)))
+            title_str = "\n".join(title_parts)
+        else:
+            title_str = self.header.description
         plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
         plt.tight_layout()
+
+    def plot_pulses(  # noqa: PLR0917
+        self,
+        length: int = 30,
+        skip: int = 0,
+        random: bool = False,
+        record_numbers: Collection[Any] | pl.Series | None = None,
+        subtract_baseline: bool = False,
+        derivative: bool = False,
+        summarize: bool = True,
+        summary_columns: Collection[Any] | None = None,
+        pulse_field: str = "pulse",
+        use_expr: pl.Expr = pl.lit(True),
+        use_good_expr: bool = True,
+        axis: plt.Axes | None = None,
+        cm: str | Colormap = "viridis_r",
+    ) -> None:
+        """Plot some example pulses
+
+        Parameters
+        ----------
+        length : int, optional
+            How many pulses to plot, by default 30
+        skip : int, optional
+            Start plotting at this pulse record number, by default 0
+        random : bool, optional
+            Whether to plot `length` randomly selected records, by default False
+            If True, `skip` is ignored.
+        record_numbers : Collection[Any] | pl.Series | None, optional
+            Plot the specified records, numbered from 0 for the first in the dataframe, by default None.
+            If given, `length`, `skip`, and `random` are ignored.
+        subtract_baseline : bool, optional
+            Whether to subtract the pretrigger mean before plotting each record, by default False
+        derivative : bool, optional
+            Whether to plot the "derivative" of a pulse (actually the successive differences), by default False
+        summarize : bool, optional
+            Whether to summarize key facts about each plotted pulse to the terminal, by default True
+        summary_columns : Collection[Any] | None, optional
+            Which specific data columns to report in the summary to the terminal, by default None
+            If None, then a pre-selected set are reported.
+        pulse_field : str
+            The column name in the polars dataframe where plottable pulses, by default "pulse"
+        use_expr : pl.Expr, optional
+            An expression to select plottable points, by default pl.lit(True)
+        use_good_expr : bool, optional
+            Whether to apply the object's `good_expr` before plotting, by default True
+            If True, then the existing `good_expr` will be applied AND the `use_expr` will be, too.
+        axis : plt.Axes | None, optional
+            Axes to plot on, by default None
+            If None, create a new figure.
+        cm : str | Colormap, optional
+            The colormap to use for distinguishing pulses, by default "viridis_r"
+        """
+        assert self.df[pulse_field].dtype in {pl.Array, pl.List}, (
+            f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
+        )
+
+        if axis is None:
+            _, axis = plt.subplots()  # Create a new figure if no axis is provided
+
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr = use_expr
+
+        if isinstance(cm, str):
+            cmap = plt.get_cmap(cm)
+        else:
+            cmap = cm
+
+        lf = self.df.lazy().with_row_index("Record #")
+        if record_numbers is None:
+            if random:
+                title = f"{length} random pulses"
+                lf = lf.filter(filter_expr).collect().sample(length).lazy().sort("Record #")
+            else:
+                lf = lf.filter(filter_expr).slice(skip, length)
+                title = f"{length} selected pulses"
+        else:
+            title = f"Pulses #{record_numbers}"
+            lf = lf.filter(pl.col("Record #").is_in(record_numbers))
+        plt.title(f"{title} from Chan {self.ch_num}")
+        if summarize:
+            # Preferred data info to print to terminal.
+            if summary_columns is None:
+                summary_columns = [
+                    "Record #",
+                    "pretrig_mean",
+                    "pulse_rms",
+                    "pulse_average",
+                    "rise_time",
+                    "peak_value",
+                    "energy_5lagy",
+                    "state_label",
+                ]
+            # Remove preferred column if it doesn't exist
+            columns = [c for c in summary_columns if c in lf.collect_schema().names()]
+            summary_df = lf.select(columns).collect()
+            summary_df.show(limit=None)
+
+        plot_columns = (pulse_field, "pretrig_mean")
+        df = lf.select(plot_columns).collect()
+        N = len(df)
+        pulses = df[pulse_field]
+        ptmean = df["pretrig_mean"]
+        for i in range(N):
+            pulse = pulses[i].to_numpy()
+            color = cmap(i / N)
+            if subtract_baseline:
+                pulse = pulse - ptmean[i]  # noqa: PLR6104
+            if derivative:
+                pulse = np.hstack((0, np.diff(pulse)))
+            axis.plot(pulse, color=color)
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
@@ -493,7 +666,7 @@ class Channel:
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,
@@ -628,11 +801,11 @@ class Channel:
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
-            frametime_s=self.header.frametime_s,
+            frametime_s=self.frametime_s,
             peak_index=peak_index,
             pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
-            n_presamples=self.header.n_presamples,
+            n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
         )
         return self.with_step(step)
@@ -704,7 +877,8 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df.lazy()
+            self.df
+            .lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -714,7 +888,7 @@ class Channel:
             .to_numpy()
             .mean(axis=0)
         )
-        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
+        avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
     def filter5lag(
@@ -753,10 +927,10 @@ class Channel:
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
             filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
@@ -793,7 +967,8 @@ class Channel:
             _description_
         """
         df = (
-            self.df.lazy()
+            self.df
+            .lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -816,9 +991,9 @@ class Channel:
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         pulse = df["pulse"].to_numpy()
-        avg_pulse = np.zeros(self.header.n_samples, dtype=float)
-        dt_model = np.zeros(self.header.n_samples, dtype=float)
-        for i in range(self.header.n_presamples, self.header.n_samples):
+        avg_pulse = np.zeros(self.n_samples, dtype=float)
+        dt_model = np.zeros(self.n_samples, dtype=float)
+        for i in range(self.n_presamples, self.n_samples):
             slope, offset = np.polyfit(df["ATime"], (pulse[:, i] - df["pretrig_mean"]), 1)
             dt_model[i] = -slope
             avg_pulse[i] = offset
@@ -861,10 +1036,10 @@ class Channel:
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             dt_model=dt_model,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
@@ -997,7 +1172,8 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df
+            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1028,10 +1204,12 @@ class Channel:
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
         """Add external trigger times from an existing dataframe"""
-        df2 = (
-            self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
-            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
-            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        df = self.df
+        # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
+        if "subframecount" not in df:
+            df = self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
+        df2 = df.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig").join_asof(
+            df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig"
         )
         return self.with_replacement_df(df2)
 
@@ -1130,7 +1308,7 @@ class Channel:
 
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
         """Save the recipe steps to a pickle file, keyed by channel number."""
-        steps = {self.header.ch_num: self.steps}
+        steps = {self.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
@@ -1148,7 +1326,7 @@ class Channel:
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
-        tpi_microsec = (self.typical_peak_ind() - self.header.n_presamples) * (1e6 * self.header.frametime_s)
+        tpi_microsec = (self.typical_peak_ind() - self.n_presamples) * (1e6 * self.frametime_s)
         plottables = (
             ("pulse_rms", "Pulse RMS", "#dd00ff", None),
             ("pulse_average", "Pulse Avg", "purple", None),
@@ -1167,9 +1345,7 @@ class Channel:
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
-        df = df.with_columns(
-            ((pl.col("peak_index") - self.header.n_presamples) * (1e6 * self.header.frametime_s)).alias("peak_time_µs")
-        )
+        df = df.with_columns(((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"))
         df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
@@ -1203,7 +1379,7 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         pulse = self.df[col][index].to_numpy()
-        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
+        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
             print(f"pulse index={index}")

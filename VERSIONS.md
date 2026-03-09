@@ -1,11 +1,23 @@
 # Mass Versions
 
-## Mass Version 2 (2025-)
+## Mass Version 2 (2025-present)
 
-**2.0.1** November 7, 2025-
+**2.0.3** March 6, 2026-
+* Add some convenient plotting features like `Channel.plot_pulses`.
+* CI testing: use Python 3.10 and 3.14 (replacing 3.13).
+
+**2.0.2** February 24, 2026
+* Adapt to change in the `numpy.linalg.svd` API (issue 97).
+* Add one-lag optimal filters for optical TESs (issue 99).
+* Fix problem reading external trigger data with LJH files (issue 101).
+* Seven security updates to `uv.lock` prompted by GitHub's "dependabot"
+
+**2.0.1** February 12, 2026
 * Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
 * Make the `OptimalFilterStep.dbg_plot()` generate a new figure (issue 83).
-* CI testing: use Python 3.10 and 3.14 (replacing 3.13).
+* Fix combinatoric rough cal with one peak (PR 92).
+* Add argument to `Channel.plot_scatter()` to plot some max number of points (PR 94).
+* Fix combinatoric rough cal with two peaks and increasing gain (issue 95).
 
 **2.0.0** November 4, 2025
 * Add a way to open LJH files for specific channels only, an include list (issue 81).

@@ -19,10 +19,10 @@ import mass2
 n = 500
 Maxsignal = 1000.0
 sigma_noise = 1.0
-tau = [.05, .25]
-t = np.linspace(-1, 1, n+4)
+tau = [0.05, 0.25]
+t = np.linspace(-1, 1, n + 4)
 npre = (t < 0).sum()
-signal = (np.exp(-t/tau[1]) - np.exp(-t/tau[0]) )
+signal = np.exp(-t / tau[1]) - np.exp(-t / tau[0])
 signal[t <= 0] = 0
 signal *= Maxsignal / signal.max()
 truncated_signal = signal[2:-2]
@@ -38,6 +38,7 @@ print(f"Filter rms value:             {filt_5lag.variance**0.5:.4f}")
 print(f"Filter predicted V/dV (FWHM): {filt_5lag.predicted_v_over_dv:.4f}")
 
 from numpy.testing import assert_allclose
+
 assert_allclose(filt_5lag.nominal_peak, 1000)
 assert_allclose(filt_5lag.variance**0.5, 0.1549, rtol=1e-3)
 assert_allclose(filt_5lag.predicted_v_over_dv, 2741.6517)
@@ -60,6 +61,7 @@ This code produces a filter maker ``maker`` and an optimal filter ``filt_5lag`` 
 import numpy as np
 import mass2
 
+
 def verify_close(x, y, rtol=1e-5, topic=None):
     if topic is not None:
         print(f"Checking {topic:20s}: ", end="")
@@ -67,11 +69,12 @@ def verify_close(x, y, rtol=1e-5, topic=None):
     print(f"x={x:.4e}, y={y:.4e} are close to each other? {isclose}")
     assert isclose
 
+
 def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
-    tau = [.05, .25]
-    t = np.linspace(-1, 1, n+4)
+    tau = [0.05, 0.25]
+    t = np.linspace(-1, 1, n + 4)
     npre = (t < 0).sum()
-    signal = (np.exp(-t/tau[1]) - np.exp(-t/tau[0]) )
+    signal = np.exp(-t / tau[1]) - np.exp(-t / tau[0])
     signal[t <= 0] = 0
     signal *= Maxsignal / signal.max()
     truncated_signal = signal[2:-2]
@@ -83,17 +86,18 @@ def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
 
     # Check filter's normalization
     f = filt_5lag.values
-    verify_close(Maxsignal, f.dot(truncated_signal), rtol=1e-5, topic = "Filter normalization")
+    verify_close(Maxsignal, f.dot(truncated_signal), rtol=1e-5, topic="Filter normalization")
 
     # Check filter's variance
-    expected_dV = sigma_noise / n**0.5 * signal.max()/truncated_signal.std()
+    expected_dV = sigma_noise / n**0.5 * signal.max() / truncated_signal.std()
     verify_close(expected_dV, filt_5lag.variance**0.5, rtol=1e-5, topic="Expected variance")
 
     # Check filter's V/dV calculation
-    fwhm_sigma_ratio = np.sqrt(8*np.log(2))
+    fwhm_sigma_ratio = np.sqrt(8 * np.log(2))
     expected_V_dV = Maxsignal / (expected_dV * fwhm_sigma_ratio)
     verify_close(expected_V_dV, filt_5lag.predicted_v_over_dv, rtol=1e-5, topic="Expected V/\u03b4v")
     print()
+
 
 test_mass_5lag_filters(100, 1.0, 500)
 test_mass_5lag_filters(400, 1.0, 500)

@@ -256,6 +256,17 @@ class Channels:
             axis = fig.subplots()
 
         plot_these_chan = self._limited_chan_list(limit, channels)
+        frametime_ms = self.channels[plot_these_chan[0]].header.frametime_s * 1e3
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+
         n_expected = len(plot_these_chan)
         for i, ch_num in enumerate(plot_these_chan):
             ch = self.channels[ch_num]
@@ -266,6 +277,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Average pulses")
+        plt.tight_layout()
 
     def plot_noise_spectrum(
         self,
@@ -565,7 +577,7 @@ class Channels:
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
-    def with_external_trigger_by_path(self, path: str | None = None) -> "Channels":
+    def with_external_trigger_by_path(self, path: str | pathlib.Path | None = None) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
         from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented)."""
         if path is None:
@@ -691,7 +703,9 @@ class Channels:
             )
         return Channels(channels, description)
 
-    def save_analysis(self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False) -> None:
+    def save_analysis(
+        self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False, trim_timestamp_and_subframecount: bool = False
+    ) -> None:
         """Save an analysis-in-progress completely to a zip file, only tested for ljh backed channels so far
 
         Parameters
@@ -702,6 +716,9 @@ class Channels:
             If `path` exists, whether to overwrite it, by default False
         trim_debug : bool, optional
             Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
+        trim_timestamp_and_subframecount: bool, optional
+            Whether to make the save file smaller at the cost of reduced information avaialble when the ljh files are
+            not available, eg when loading on another computer.
         """
         zip_path = pathlib.Path(zip_path)
         if zip_path.suffix != ".zip":
@@ -728,8 +745,11 @@ class Channels:
             Channel
                 A copy of `ch` amenable to pickling with the dataframe and dataframe history removed and with trimmed steps.
             """
-            # Don't store the memmapped LJH file info (if present) in the Parquet file
-            df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+            # Don't store the memmapped LJH pulse info (if present) in the Parquet file
+            if trim_timestamp_and_subframecount:
+                df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+            else:
+                df = ch.df.drop("pulse", strict=False)
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())

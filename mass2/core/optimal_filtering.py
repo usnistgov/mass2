@@ -402,6 +402,61 @@ class Filter5Lag(Filter):
 
 
 @dataclass(frozen=True)
+class Filter1Lag(Filter):
+    """Represent an optimal filter, specifically one intended for single-lag convolution with data
+
+    Returns
+    -------
+    Filter1Lag
+        An optimal filter, for single-lag convolution (i.e., a dot product) with the data
+    """
+
+    def __post_init__(self) -> None:
+        """Post-init checks that this filter, indeed, is a 1-lag one"""
+        assert self.convolution_lags == 1
+
+    @property
+    def is_arrival_time_safe(self) -> bool:
+        """Is this an arrival-time-safe filter?"""
+        return False
+
+    @property
+    def _filter_type(self) -> str:
+        """Name for this filter type"""
+        return "1lag"
+
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Filter one microcalorimeter record or an array of records.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            A 1-d array, a single pulse record, or a 2-d array, where `x[i, :]` is pulse record number `i`.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            1. The optimally filtered value, or an array (one per row) if the input is a 2-d array.
+            2. The phase, or arrival-time estimate in samples. Same shape as the filtered value.
+
+        Raises
+        ------
+        AssertionError
+            If the input array is the wrong length
+        """
+        x = np.asarray(x)
+        if x.ndim == 1:
+            x = x.reshape((1, len(x)))
+        _, nsamp = x.shape
+        assert nsamp == len(self.values)
+        dotproduct = np.dot(x, self.values)
+
+        peak_x = np.zeros_like(x)
+        peak_y = dotproduct
+        return peak_y, peak_x
+
+
+@dataclass(frozen=True)
 class FilterATS(Filter):
     """Represent an optimal filter according to the arrival-time-safe, single-lag design of 2015.
 
@@ -526,6 +581,130 @@ class FilterMaker:
     whitener: ToeplitzWhitener | None = None
     sample_time_sec: float = 0.0
     peak: float = 0.0
+
+    def compute_constrained_1lag(
+        self,
+        constraints: ArrayLike | None = None,
+        fmax: float | None = None,
+        f_3db: float | None = None,
+        cut_pre: int = 0,
+        cut_post: int = 0,
+    ) -> Filter:
+        """Compute a single constrained optimal filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter. Can be used with 0-lag "convolution" only,
+        so cannot estimate arrival time.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        constraints: ndarray, optional
+            The vector or vectors to which the filter should be orthogonal. If a 2d array, each _row_
+            is a constraint, and the number of columns should be equal to the len(self.signal_model)
+            minus `(cut_pre+cut_post)`.
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 1-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+        if cut_pre < 0 or cut_post < 0:
+            raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
+
+        if self.noise_autocorr is None and self.whitener is None:
+            raise ValueError("FilterMaker must have noise_autocorr or whitener arguments to generate 1-lag filters")
+        noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
+        avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
+
+        n = len(avg_signal)
+        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+        pulse_model = np.vstack((avg_signal, np.ones_like(avg_signal)))
+        if constraints is not None:
+            pulse_model = np.vstack((pulse_model, constraints))
+        assert pulse_model.shape[1] == n
+
+        noise_corr = noise_autocorr[:n]
+        TS = ToeplitzSolver(noise_corr, symmetric=True)
+        Rinv_model = np.vstack([TS(r) for r in pulse_model])
+        A = pulse_model.dot(Rinv_model.T)
+        all_filters = np.linalg.solve(A, Rinv_model)
+        filt_noconst = all_filters[0]
+
+        band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
+
+        self._normalize_filter(filt_noconst, avg_signal)
+        variance = bracketR(filt_noconst, noise_corr)
+
+        # Set weights in the cut_pre and cut_post windows to 0
+        if cut_pre > 0 or cut_post > 0:
+            filt_noconst = np.hstack([np.zeros(cut_pre), filt_noconst, np.zeros(cut_post)])
+
+        if variance <= 0:
+            vdv = np.inf
+        else:
+            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+        return Filter1Lag(
+            filt_noconst,
+            peak,
+            variance,
+            vdv,
+            self.n_pretrigger,
+            None,
+            None,
+            avg_signal,
+            None,
+            1,
+            fmax,
+            f_3db,
+            cut_pre,
+            cut_post,
+        )
+
+    def compute_1lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
+        """Compute a single filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter. Can be used with 0-lag "convolution" only,
+        so cannot estimate arrival time.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 1-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+        return self.compute_constrained_1lag(None, fmax=fmax, f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
 
     def compute_constrained_5lag(
         self,
