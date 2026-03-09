@@ -301,7 +301,7 @@ class Channel:
             Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
             from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
             be consistent with the `max_points` requirement.
-        extended title : bool, optional
+        extended_title : bool, optional
             Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
         if axis is None:
@@ -326,8 +326,7 @@ class Channel:
         if color_col is not None:
             columns_to_keep.append(color_col)
         df_small = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .with_row_index(name=index_name)
             .filter(filter_expr)
             .select(*columns_to_keep)
@@ -877,8 +876,7 @@ class Channel:
             _description_
         """
         avg_pulse = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .select(pulse_col)
@@ -967,8 +965,7 @@ class Channel:
             _description_
         """
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
@@ -1172,8 +1169,7 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )

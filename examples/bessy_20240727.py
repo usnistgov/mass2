@@ -1,21 +1,19 @@
 import marimo
 
-__generated_with = "0.15.2"
+__generated_with = "0.20.4"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     #MASS version 2: introduction to internals
     MASS is the Microcalorimeter Analysis Software Suite. Version 2 is a replacement for Version 1 of MASS (2011-2025). Version 2 supports many algorithms for pulse filtering, calibration, and corrections. It is built on modern open source data science software, including [Pola.rs](https://pola.rs) and [Marimo](https://marimo.io). MASS v2 supports some key features that v1 struggled with, including:
 
       * consecutive data set analysis
       * online (aka realtime) analysis
       * easily supporting different analysis chains
-    """
-    )
+    """)
     return
 
 
@@ -26,23 +24,23 @@ def _():
     import numpy as np
     import marimo as mo
     import pulsedata
+
     return mo, np, pl, plt, pulsedata
 
 
 @app.cell
 def _():
     import mass2
+
     return (mass2,)
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # Load data
     Here we load the data, then we explore the internals a bit to show how MASS version 2 is built.
-    """
-    )
+    """)
     return
 
 
@@ -58,16 +56,14 @@ def _(mass2, pulsedata):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # basic analysis
     The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
     The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
 
     The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
-    """
-    )
+    """)
     return
 
 

@@ -710,7 +710,7 @@ class Channels:
 
         Parameters
         ----------
-        path : Path | str
+        zip_path : Path | str
             Directory to save work in. If it doesn't exist, its parent should.
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
