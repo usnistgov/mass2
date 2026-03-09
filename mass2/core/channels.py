@@ -256,6 +256,17 @@ class Channels:
             axis = fig.subplots()
 
         plot_these_chan = self._limited_chan_list(limit, channels)
+        frametime_ms = self.channels[plot_these_chan[0]].header.frametime_s * 1e3
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+
         n_expected = len(plot_these_chan)
         for i, ch_num in enumerate(plot_these_chan):
             ch = self.channels[ch_num]
@@ -266,6 +277,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Average pulses")
+        plt.tight_layout()
 
     def plot_noise_spectrum(
         self,

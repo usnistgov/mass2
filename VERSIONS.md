@@ -1,13 +1,18 @@
 # Mass Versions
 
-## Mass Version 2 (2025-)
+## Mass Version 2 (2025-present)
+
+**2.0.3** March 6, 2026-
+* Add some convenient plotting features like `Channel.plot_pulses`.
+* CI testing: use Python 3.10 and 3.14 (replacing 3.13).
+* Add `resample_pulses` and `resample_one_pulse` to `mass2.core.analysis_algorithms`.
 
 **2.0.3** March 2, 2026-
 * Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
 
 **2.0.2** February 24, 2026
-* Fix change in the `numpy.linalg.svd` naming (issue 97).
+* Adapt to change in the `numpy.linalg.svd` API (issue 97).
 * Add one-lag optimal filters for optical TESs (issue 99).
 * Fix problem reading external trigger data with LJH files (issue 101).
 * Seven security updates to `uv.lock` prompted by GitHub's "dependabot"

@@ -21,8 +21,8 @@ from . import common
 from . import mathstat
 from . import core
 
-# at the top level lets import things we image people will want to use regularly, and try to avoid importing
-# implementation details
+# At the top level, let's import things we imagine people will want to use regularly.
+# Try to avoid importing implementation details.
 from .calibration import STANDARD_FEATURES, spectra
 from .core import (
     LJHFile,
