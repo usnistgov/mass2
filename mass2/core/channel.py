@@ -81,7 +81,7 @@ class Channel:
         return self.header.description
 
     @property
-    def number(self) -> int:
+    def ch_num(self) -> int:
         "Channel number, from the filename"
         return self.header.ch_num
 
@@ -97,7 +97,7 @@ class Channel:
         mo_ui = mo.ui.dropdown(
             desc_ind,
             value=first_non_summarize_step.description,
-            label=f"choose step for ch {self.number}",
+            label=f"choose step for ch {self.ch_num}",
         )
 
         def show() -> mo.Html:
@@ -508,7 +508,7 @@ class Channel:
         else:
             title = f"Pulses #{record_numbers}"
             lf = lf.filter(pl.col("Record #").is_in(record_numbers))
-        plt.title(f"{title} from Chan {self.number}")
+        plt.title(f"{title} from Chan {self.ch_num}")
         if summarize:
             # Preferred data info to print to terminal.
             if summary_columns is None:
@@ -1293,7 +1293,7 @@ class Channel:
 
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
         """Save the recipe steps to a pickle file, keyed by channel number."""
-        steps = {self.number: self.steps}
+        steps = {self.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
