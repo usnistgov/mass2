@@ -26,28 +26,31 @@ def main() -> None:
     parser.add_argument("ljhpath", type=str, nargs=1, help="")
 
     args = parser.parse_args()
-    main_loop(args.recipefile, Path(args.ljhpath), args.force, args.verbose)
 
-
-def main_loop(recipefile: str, ljhpath: Path, force: bool = False, verbose: bool = False) -> None:
+    ljhpath = Path(args.ljhpath)
     data = mass2.core.Channels.from_ljh_folder(ljhpath)
 
     output_dir = ljhpath / "mc2"
     filefullpath = data.ch0.header.df["Filename"][0]
     _, filename = os.path.split(filefullpath)
     prefix = filename.split("_chan")[0]
-    parquet_model = output_dir / f"{prefix}_analyzed_"
+    parquet_model = str(output_dir / f"{prefix}_analyzed_")
     if output_dir.exists():
-        if force:
+        search_path = output_dir / "*_analyzed_*.parquet"
+        if args.force:
             os.rename(output_dir, ljhpath / "mc2_prev")
-        elif len(glob.glob(output_dir / "*_analyzed_*.parquet")) > 0:
+        elif len(glob.glob(str(search_path))) > 0:
             raise OSError(
                 f"Cannot use existing output directory {output_dir} with parquet files, unless you choose the --force argument"
             )
 
     else:
-        ljhpath.mkdir("mc2")
+        output_dir.mkdir()
 
+    run_recipe_loop(data, args.recipefile, parquet_model, args.verbose)
+
+
+def run_recipe_loop(data: mass2.Channels, recipefile: str, parquet_model: str, verbose: bool = False) -> None:
     parquet_counter = 0
     while True:
         parquet_file = str(parquet_model) + f"{parquet_counter:04d}.parquet"
@@ -55,7 +58,7 @@ def main_loop(recipefile: str, ljhpath: Path, force: bool = False, verbose: bool
         df = pl.DataFrame()
         for ch_num, ch in data.channels.items():
             chdf = ch.df.drop("pulse")
-            df = pl.concat(df, chdf)
+            df = pl.concat([df, chdf])
         df.write_parquet(parquet_file)
         parquet_counter += 1
 
