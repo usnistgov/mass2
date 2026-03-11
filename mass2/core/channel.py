@@ -610,6 +610,20 @@ class Channel:
         return None
 
     @property
+    def last_v_over_dv(self) -> float | None:
+        """Return the predicted V/dV stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        float | None
+            The last filtering step's predicted V/dV ratio, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter.predicted_v_over_dv
+        return None
+
+    @property
     def last_noise_psd(self) -> tuple[NDArray, NDArray] | None:
         """Return the noise PSD stored in the last recipe step that's an optimal filter step
 

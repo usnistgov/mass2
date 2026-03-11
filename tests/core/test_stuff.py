@@ -154,7 +154,10 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     assert isinstance(ch.last_avg_pulse, np.ndarray)
     assert isinstance(ch.last_noise_autocorrelation, np.ndarray)
-    assert isinstance(ch.last_noise_psd[1], np.ndarray)
+    psd = ch.last_noise_psd
+    assert psd is not None
+    assert isinstance(psd[1], np.ndarray)
+    assert isinstance(ch.last_v_over_dv, float)
 
 
 def test_noise_autocorr():
