@@ -116,6 +116,56 @@ class SummarizeStep(RecipeStep):
 
 
 @dataclass(frozen=True)
+class ChangeTimeZoneStep(RecipeStep):
+    """Replace all polars `Datetime` type series in the dataframe with ones using the given time zone.
+
+    Alternatively, replace only the columns named in `inputs` if not an empty collection.
+
+    Usage:
+    >>> ctzstep = mass2.core.ChangeTimeZoneStep.new("America/Chicago")
+    >>> ch2 = ch.with_step(ctzstep)
+    """
+
+    new_time_zone: str
+
+    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+        "Change timezones for all `Datetime`-type series in `df`"
+
+        # When there are no fields listed in self.inputs, convert all `pl.Datetime`-type columns
+        if len(self.inputs) == 0:
+            return df.with_columns(pl.col(pl.Datetime).dt.convert_time_zone(self.new_time_zone))
+
+        def change_zone(col_name: str):
+            return pl.col(col_name).dt.convert_time_zone(self.new_time_zone)
+
+        return df.with_columns([change_zone(col_name) for col_name in self.inputs])
+
+    @classmethod
+    def new(cls, new_time_zone: str, inputs: list[str] = []) -> "ChangeTimeZoneStep":
+        """Create a ChangeTimeZoneStep
+
+        Parameters
+        ----------
+        new_time_zone : str
+            The time zone to change to
+        inputs : list[str], optional
+            the dataframe columns to change, by default [], which means all the columns of type Datetime
+
+        Returns
+        -------
+        ChangeTimeZoneStep
+            A RecipeStep for changing time zones.
+        """
+        return cls(
+            inputs=inputs,
+            output=[],
+            good_expr=pl.lit(True),
+            use_expr=pl.lit(True),
+            new_time_zone=new_time_zone,
+        )
+
+
+@dataclass(frozen=True)
 class ColumnAsNumpyMapStep(RecipeStep):
     """
     This step is meant for interactive exploration, it takes a column and applies a function to it,
