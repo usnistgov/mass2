@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterable, Collection
 import os
 import lmfit
 import polars as pl
+from polars.datatypes import Datetime
 import pylab as plt
 from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
@@ -19,18 +20,22 @@ import numpy as np
 import time
 from pathlib import Path
 
-from .noise_channel import NoiseChannel
-from .recipe import Recipe, RecipeStep, SummarizeStep
-from .drift_correction import DriftCorrectStep
-from .optimal_filtering import FilterMaker
-from .filter_steps import OptimalFilterStep
-from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
-from .misc import alwaysTrue
-from .offfiles import OffFile
-from . import misc
-from ..calibration.line_models import GenericLineModel, LineModelResult
-from ..calibration.fluorescence_lines import SpectralLine
+import tzlocal
+
 import mass2
+from ..calibration.fluorescence_lines import SpectralLine
+from ..calibration.line_models import GenericLineModel, LineModelResult
+from . import misc
+from .offfiles import OffFile
+from .misc import alwaysTrue
+from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
+from .filter_steps import OptimalFilterStep
+from .optimal_filtering import FilterMaker
+from .drift_correction import DriftCorrectStep
+from .recipe import Recipe, RecipeStep, SummarizeStep
+from .noise_channel import NoiseChannel
+
+_local_timezone_name = tzlocal.get_localzone_name()
 
 
 @dataclass(frozen=True)
@@ -1186,7 +1191,12 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(
+                pl.from_epoch("unixnano", time_unit="ns")
+                .dt.cast_time_unit("us")
+                .dt.convert_time_zone(_local_timezone_name)
+                .alias("timestamp")
+            )
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1206,6 +1216,20 @@ class Channel:
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+
+        # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
+        times = df_es["timestamp"]
+        expt_state_time_type = times.dtype
+        self_time_type = self.df["timestamp"].dtype
+        assert isinstance(expt_state_time_type, Datetime)
+        assert isinstance(self_time_type, Datetime)
+        desired_time_zone = self_time_type.time_zone
+        if desired_time_zone is None:
+            desired_time_zone = _local_timezone_name
+        if expt_state_time_type.time_zone != desired_time_zone:
+            times = times.dt.convert_time_zone(desired_time_zone)
+            df_es = df_es.select(pl.exclude("timestamp")).with_columns(timestamp=times)
+
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
