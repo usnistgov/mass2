@@ -314,7 +314,10 @@ class Channel:
         extended_title : bool, optional
             Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
+        # You can't have both kinds of colors: you either use `color_col` for categorical coloring,
+        # or cont_color_col for continuous coloring, or neither.
         assert color_col is None or cont_color_col is None
+
         if axis is None:
             fig = plt.figure()
             axis = plt.gca()
@@ -1242,7 +1245,7 @@ class Channel:
             desired_time_zone = _local_timezone_name
         if expt_state_time_type.time_zone != desired_time_zone:
             times = times.dt.convert_time_zone(desired_time_zone)
-            df_es = df_es.select(pl.exclude("timestamp")).with_columns(timestamp=times)
+            df_es = df_es.with_columns(timestamp=times)
 
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
