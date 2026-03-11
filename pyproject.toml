@@ -35,6 +35,7 @@ dependencies = [
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
     "scipy>=1.12",
     "tornado", # for matplotlib plots in Marimo
+    "tzlocal",
     "uncertainties",
     "xraydb",
 ]

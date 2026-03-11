@@ -3,6 +3,7 @@ import numpy as np
 import os
 import struct
 from packaging.version import Version
+import tzlocal
 
 from mass2 import LJHFile
 
@@ -18,7 +19,7 @@ def test_read_header():
         assert header_d["Timestamp offset (s)"] > 1.0e9
 
 
-def test_ljh_all_versions(tmp_path):
+def test_ljh_all_versions(tmp_path):  # noqa: PLR0914
     """Generate fake LJH files using the Version 2.0, 2.1, and 2.2 headers found in ljh_example_headers/
     Fill them with random pulse data and equally-spaced timestamps and rowcounts. Check that they are read
     back correctly."""
@@ -79,3 +80,7 @@ def test_ljh_all_versions(tmp_path):
         if version == v220:
             assert np.all(df["subframecount"].to_numpy() == rowcount)
         assert np.all(df["posix_usec"].to_numpy() == times_microsec + time_offset)
+
+        s0 = df["timestamp"]
+        s1 = s0.dt.convert_time_zone(tzlocal.get_localzone_name())
+        assert (s0 == s1).all()
