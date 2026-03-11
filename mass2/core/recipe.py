@@ -2,6 +2,7 @@
 Define RecipeStep and Recipe classes for processing pulse data in a sequence of steps.
 """
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, overload
 from collections.abc import Iterable, Callable, Sequence
@@ -12,7 +13,7 @@ from . import pulse_algorithms
 
 
 @dataclass(frozen=True)
-class RecipeStep:
+class RecipeStep(ABC):
     """Represent one step in a data processing recipe.
 
     A step has inputs, outputs, and a calculation method. It also has a good_expr and use_expr that
@@ -36,10 +37,12 @@ class RecipeStep:
         """A short description of this step, including its inputs and outputs."""
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
+    @abstractmethod
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         """Calculate the outputs from the inputs in the given DataFrame, returning a new DataFrame."""
-        # TODO: should this be an abstract method?
-        return df.filter(self.good_expr)
+        # A simplest possible implementation would be something like:
+        # return df.filter(self.good_expr)
+        pass
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         """Generate a diagnostic plot of the results after this step."""
