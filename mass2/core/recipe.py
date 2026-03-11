@@ -135,7 +135,7 @@ class ChangeTimeZoneStep(RecipeStep):
         if len(self.inputs) == 0:
             return df.with_columns(pl.col(pl.Datetime).dt.convert_time_zone(self.new_time_zone))
 
-        def change_zone(col_name: str):
+        def change_zone(col_name: str) -> pl.Expr:
             return pl.col(col_name).dt.convert_time_zone(self.new_time_zone)
 
         return df.with_columns([change_zone(col_name) for col_name in self.inputs])
