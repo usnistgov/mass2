@@ -960,7 +960,7 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
-        noiseresult = self.noise.spectrum(trunc_back=2, trunc_front=2)
+        noiseresult = self.noise.spectrum()
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
