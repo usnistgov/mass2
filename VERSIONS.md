@@ -3,11 +3,13 @@
 ## Mass Version 2 (2025-present)
 
 **2.0.3** March 6, 2026-
-* Add some convenient plotting features like `Channel.plot_pulses`.
+* Add some convenient plotting features like `Channel.plot_pulses()`.
+* Add secondary x axis to that method and to `Channels.plot_avg_pulse()` to give time in ms.
 * CI testing: use Python 3.10 and 3.14 (replacing 3.13).
 * Add `resample_pulses` and `resample_one_pulse` to `mass2.core.analysis_algorithms`.
 * Add an example notebook `examples/f3db_sweep_example.py` with multiple opt filters (PR 114).
 * Interpret all times in the local timezone. Add `ChangeTimeZoneStep` to change that (PR 115).
+* Fix `Channel.filter5lag()` so it can switch to Fourier-based filters for very long records (>10k).
 
 **2.0.2** February 24, 2026
 * Adapt to change in the `numpy.linalg.svd` API (issue 97).

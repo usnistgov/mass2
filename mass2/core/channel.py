@@ -567,6 +567,19 @@ class Channel:
             summary_df = lf.select(columns).collect()
             summary_df.show(limit=None)
 
+        frametime_ms = self.frametime_s * 1e3
+        sample_x = np.arange(self.header.n_samples) - self.header.n_presamples
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+        plt.xlabel("Samples after trigger")
+
         plot_columns = (pulse_field, "pretrig_mean")
         df = lf.select(plot_columns).collect()
         N = len(df)
@@ -579,7 +592,7 @@ class Channel:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
                 pulse = np.hstack((0, np.diff(pulse)))
-            axis.plot(pulse, color=color)
+            axis.plot(sample_x, pulse, color=color)
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
