@@ -517,7 +517,8 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
-        assert self.df[pulse_field].dtype in {pl.Array, pl.List}, (
+        pulse_type = self.df[pulse_field].dtype
+        assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
         )
 
@@ -936,6 +937,7 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
+        skip_autocorr_if_length_over: int = 10000,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -953,6 +955,9 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
+        skip_autocorr_if_length_over : int
+            Don't compute noise autocorrelation if the record length exceeds this limit, by default 10000.
+            If autocorrelation isn't computed, filters will be Fourier-space filters.
 
         Returns
         -------
@@ -970,8 +975,15 @@ class Channel:
             sample_time_sec=self.frametime_s,
         )
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+            if noiseresult.autocorr_vec is None:
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+            else:
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
+            if noiseresult.autocorr_vec is None:
+                raise NotImplementedError(
+                    "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
+                )
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
         step = OptimalFilterStep(
             inputs=["pulse"],
