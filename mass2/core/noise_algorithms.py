@@ -160,7 +160,7 @@ def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "b
 
 
 def calc_noise_result(
-    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 10000
+    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 100_000
 ) -> "NoiseResult":
     """Analyze the noise as Mass has always done.
 

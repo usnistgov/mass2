@@ -937,7 +937,7 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
-        skip_autocorr_if_length_over: int = 10000,
+        fourier_if_length_over: int = 10000,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -955,9 +955,10 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
-        skip_autocorr_if_length_over : int
-            Don't compute noise autocorrelation if the record length exceeds this limit, by default 10000.
-            If autocorrelation isn't computed, filters will be Fourier-space filters.
+        fourier_if_length_over : int
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
 
         Returns
         -------
@@ -974,11 +975,16 @@ class Channel:
             noise_autocorr=noiseresult.autocorr_vec,
             sample_time_sec=self.frametime_s,
         )
+
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            if noiseresult.autocorr_vec is None:
-                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
-            else:
+            if (
+                noiseresult.autocorr_vec is not None
+                and len(avg_pulse) <= len(noiseresult.autocorr_vec)
+                and len(avg_pulse) <= fourier_if_length_over
+            ):
                 filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+            else:
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
         else:
             if noiseresult.autocorr_vec is None:
                 raise NotImplementedError(

@@ -89,7 +89,7 @@ class NoiseChannel:
         excursion_nsigma: float = 5,
         trunc_front: int = 0,
         trunc_back: int = 0,
-        skip_autocorr_if_length_over: int = 10000,
+        skip_autocorr_if_length_over: int = 100_000,
     ) -> NoiseResult:
         """Compute and return the noise result from the noise traces."""
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
