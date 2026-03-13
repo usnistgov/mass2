@@ -517,7 +517,8 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
-        assert self.df[pulse_field].dtype in {pl.Array, pl.List}, (
+        pulse_type = self.df[pulse_field].dtype
+        assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
         )
 
@@ -566,6 +567,19 @@ class Channel:
             summary_df = lf.select(columns).collect()
             summary_df.show(limit=None)
 
+        frametime_ms = self.frametime_s * 1e3
+        sample_x = np.arange(self.header.n_samples) - self.header.n_presamples
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+        plt.xlabel("Samples after trigger")
+
         plot_columns = (pulse_field, "pretrig_mean")
         df = lf.select(plot_columns).collect()
         N = len(df)
@@ -578,7 +592,7 @@ class Channel:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
                 pulse = np.hstack((0, np.diff(pulse)))
-            axis.plot(pulse, color=color)
+            axis.plot(sample_x, pulse, color=color)
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
@@ -936,6 +950,8 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -953,6 +969,13 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
 
         Returns
         -------
@@ -960,7 +983,20 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
-        noiseresult = self.noise.spectrum(trunc_back=2, trunc_front=2)
+        shortening_5lag = 4  # 5-lag filters shorten the pulse by 2 on each end
+        n_samples_5lag = self.n_samples - shortening_5lag
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert n_samples_5lag <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_5lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_5lag}; {suggest}"
+
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
@@ -969,9 +1005,17 @@ class Channel:
             noise_autocorr=noiseresult.autocorr_vec,
             sample_time_sec=self.frametime_s,
         )
+
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+            if fourier:
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+            else:
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
+            if fourier:
+                raise NotImplementedError(
+                    "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
+                )
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
         step = OptimalFilterStep(
             inputs=["pulse"],
