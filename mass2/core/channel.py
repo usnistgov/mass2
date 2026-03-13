@@ -983,16 +983,19 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
+        shortening_5lag = 4  # 5-lag filters shorten the pulse by 2 on each end
+        n_samples_5lag = self.n_samples - shortening_5lag
         if not fourier:
             suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
-            assert self.n_samples <= longest_autocorr_filter, (
+            assert n_samples_5lag <= longest_autocorr_filter, (
                 f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
             )
 
         noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
         if not fourier:
             assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
-            assert self.n_samples <= len(noiseresult.autocorr_vec), f"Autocorrelation result is too short; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_5lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_5lag}; {suggest}"
 
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
