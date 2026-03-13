@@ -950,7 +950,8 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
-        fourier_if_length_over: int = 10000,
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -968,7 +969,10 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
-        fourier_if_length_over : int
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
             Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
             (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
             If exceeded, filters will be Fourier-space filters.
@@ -979,7 +983,17 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
-        noiseresult = self.noise.spectrum()
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert self.n_samples <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            assert self.n_samples <= len(noiseresult.autocorr_vec), f"Autocorrelation result is too short; {suggest}"
+
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
@@ -990,16 +1004,12 @@ class Channel:
         )
 
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            if (
-                noiseresult.autocorr_vec is not None
-                and len(avg_pulse) <= len(noiseresult.autocorr_vec)
-                and len(avg_pulse) <= fourier_if_length_over
-            ):
-                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
-            else:
+            if fourier:
                 filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+            else:
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
-            if noiseresult.autocorr_vec is None:
+            if fourier:
                 raise NotImplementedError(
                     "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
                 )
