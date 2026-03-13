@@ -20,12 +20,15 @@ LOG = logging.getLogger("mass")
 LOG.setLevel(logging.ERROR)
 
 def windows_monkey_patch_to_use_utf8_by_default_for_pathlib_read_text_otherwise_we_get_errors_in_test_mkdocs():
-    import pathlib
-
+    import pathlib, sys
     _original_read_text = pathlib.Path.read_text
 
-    def _utf8_read_text(self, encoding=None, errors=None, newline=None):
-        return _original_read_text(self, encoding=encoding or "utf-8", errors=errors, newline=newline)
+    if sys.version_info >= (3, 13):
+        def _utf8_read_text(self, encoding=None, errors=None, newline=None):
+            return _original_read_text(self, encoding=encoding or "utf-8", errors=errors, newline=newline)
+    else:
+        def _utf8_read_text(self, encoding=None, errors=None, newline=None):
+            return _original_read_text(self, encoding=encoding or "utf-8", errors=errors) # python 3.12 and below don't accept
 
     pathlib.Path.read_text = _utf8_read_text
 
