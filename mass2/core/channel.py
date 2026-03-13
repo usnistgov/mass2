@@ -80,6 +80,17 @@ class Channel:
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
 
+    def __post_init__(self) -> None:
+        pulse_col = "pulse"
+        if pulse_col in self.df.columns:
+            dtype = self.df[pulse_col].dtype
+            if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
+                # is column "pulse" exists, check if it has the same number of samples as the header
+                raise ValueError(
+                    f"Column '{pulse_col}' has array width {dtype.size} "
+                    f"but header.n_samples={self.header.n_samples}"
+                )
+
     @property
     def shortname(self) -> str:
         """A short name for this channel, suitable for plot titles."""

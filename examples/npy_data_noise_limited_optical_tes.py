@@ -22,7 +22,7 @@ def _(mass2, pl, pulse_traces):
         frametime_s = 1e-5
         df_noise = pl.DataFrame({"pulse": noise_traces})
         noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
-        nsamples, npulses = pulses_traces.shape
+        npulses, nsamples = pulses_traces.shape
         header = mass2.ChannelHeader(
             description="from npy arrays",
             data_source=None,
