@@ -3,6 +3,8 @@ import os
 import pytest
 import polars as pl
 from polars.testing import assert_frame_equal
+import dataclasses
+
 
 import mass2
 import pulsedata
@@ -524,8 +526,8 @@ def test_change_time_zone():
     assert (df1["timestamp"] == df2["timestamp"]).all()
     assert ch.df["timestamp"].dtype != df2["timestamp"].dtype
 
+
 def test_channel_mismatched_n_samples():
-    import dataclasses
     ch = dummy_channel()
     bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 1)
     with pytest.raises(ValueError, match="n_samples"):

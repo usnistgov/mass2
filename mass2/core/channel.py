@@ -81,15 +81,12 @@ class Channel:
     transform_raw: Callable | None = None
 
     def __post_init__(self) -> None:
+        # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
         pulse_col = "pulse"
         if pulse_col in self.df.columns:
             dtype = self.df[pulse_col].dtype
             if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
-                # is column "pulse" exists, check if it has the same number of samples as the header
-                raise ValueError(
-                    f"Column '{pulse_col}' has array width {dtype.size} "
-                    f"but header.n_samples={self.header.n_samples}"
-                )
+                raise ValueError(f"Column '{pulse_col}' has array width {dtype.size} but header.n_samples={self.header.n_samples}")
 
     @property
     def shortname(self) -> str:

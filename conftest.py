@@ -7,6 +7,10 @@ import warnings
 import logging
 import matplotlib
 
+import platform
+import pathlib
+import sys
+
 # Suppress matplotlib warnings during tests. See
 # https://stackoverflow.com/questions/55109716/c-argument-looks-like-a-single-numeric-rgb-or-rgba-sequence
 # from matplotlib.axes._axes import _log as matplotlib_axes_logger
@@ -19,17 +23,26 @@ warnings.filterwarnings("ignore")  # not sure what this does
 LOG = logging.getLogger("mass")
 LOG.setLevel(logging.ERROR)
 
+
 def windows_monkey_patch_to_use_utf8_by_default_for_pathlib_read_text_otherwise_we_get_errors_in_test_mkdocs():
-    import pathlib, sys
+    "Apparently, doctests fail on Windows without re-encoding path text. Or something like that."
+    os_type = platform.system()
+    if os_type != "Windows":
+        return
+
     _original_read_text = pathlib.Path.read_text
 
     if sys.version_info >= (3, 13):
+
         def _utf8_read_text(self, encoding=None, errors=None, newline=None):
             return _original_read_text(self, encoding=encoding or "utf-8", errors=errors, newline=newline)
+
     else:
+        # python 3.12 and below don't accept the newline argument
         def _utf8_read_text(self, encoding=None, errors=None, newline=None):
-            return _original_read_text(self, encoding=encoding or "utf-8", errors=errors) # python 3.12 and below don't accept
+            return _original_read_text(self, encoding=encoding or "utf-8", errors=errors)
 
     pathlib.Path.read_text = _utf8_read_text
+
 
 windows_monkey_patch_to_use_utf8_by_default_for_pathlib_read_text_otherwise_we_get_errors_in_test_mkdocs()
