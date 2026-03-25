@@ -27,6 +27,7 @@ from .channel import Channel, ChannelHeader, BadChannel
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
+from .misc import plot_zoomable
 from . import ljhutil
 
 
@@ -170,8 +171,7 @@ class Channels:
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
-
-        plt.tight_layout()
+        plot_zoomable()
 
     def _limited_chan_list(self, limit: int | None = 20, channels: list[int] | None = None) -> list[int]:
         """A helper to get a list of channel numbers, limited to the given number if needed, and including only
@@ -225,6 +225,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Optimal filters")
+        plot_zoomable()
 
     def plot_avg_pulses(
         self,
@@ -277,7 +278,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Average pulses")
-        plt.tight_layout()
+        plot_zoomable()
 
     def plot_noise_spectrum(
         self,
@@ -320,6 +321,7 @@ class Channels:
         plt.loglog()
         plt.xlabel("Frequency (Hz)")
         plt.title("Noise power spectral density")
+        plot_zoomable()
 
     def plot_noise_autocorr(
         self,
@@ -362,6 +364,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Lags")
         plt.title("Noise autocorrelation")
+        plot_zoomable()
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""

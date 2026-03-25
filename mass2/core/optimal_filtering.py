@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 from mass2.mathstat.toeplitz import ToeplitzSolver
+from .misc import plot_zoomable
 
 
 @dataclass(frozen=True)
@@ -299,6 +300,7 @@ class Filter(ABC):
         axis.set_title(f"Filter type={self._filter_type} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Samples")
+        plot_zoomable()
 
     def report(self, std_energy: float = 5898.8) -> None:
         """Report on estimated V/dV for the filter.

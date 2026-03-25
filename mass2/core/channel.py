@@ -27,7 +27,7 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .offfiles import OffFile
-from .misc import alwaysTrue
+from .misc import alwaysTrue, plot_zoomable
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
@@ -208,6 +208,7 @@ class Channel:
         ax.set_xlabel(str(col))
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} for {self.shortname}")
+        plot_zoomable()
 
         return bin_centers, counts
 
@@ -272,6 +273,7 @@ class Channel:
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
+        plot_zoomable()
 
         return bin_centers, counts_dict
 
@@ -328,7 +330,6 @@ class Channel:
             fig = plt.figure()
             axis = plt.gca()
         plt.sca(axis)  # set current axis so I can use plt api
-        fig = plt.gcf()
         filter_expr = use_expr
         if use_good_expr:
             filter_expr = self.good_expr.and_(use_expr)
@@ -378,6 +379,7 @@ class Channel:
                 lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
+            fig = plt.gcf()
             annotation = axis.annotate(
                 "",
                 xy=(0, 0),
@@ -469,7 +471,7 @@ class Channel:
         plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
-        plt.tight_layout()
+        plot_zoomable()
 
     def plot_pulses(  # noqa: PLR0917
         self,
@@ -599,6 +601,7 @@ class Channel:
             if derivative:
                 pulse = np.hstack((0, np.diff(pulse)))
             axis.plot(sample_x, pulse, color=color)
+        plot_zoomable()
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
