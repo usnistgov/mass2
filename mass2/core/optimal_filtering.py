@@ -299,7 +299,6 @@ class Filter(ABC):
         axis.set_title(f"Filter type={self._filter_type} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Samples")
-        plt.gcf().tight_layout()
 
     def report(self, std_energy: float = 5898.8) -> None:
         """Report on estimated V/dV for the filter.

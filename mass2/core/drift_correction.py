@@ -65,7 +65,6 @@ class DriftCorrectStep(RecipeStep):
             plt.gca(),
         )
         plt.legend()
-        plt.tight_layout()
         return plt.gca()
 
     @classmethod

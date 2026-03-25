@@ -184,7 +184,6 @@ class MultiFit:
         for ax in axes[n:]:
             ax.axis("off")
 
-        plt.tight_layout()
         return fig, axes
 
     def plot_results_and_pfit(self, uncalibrated_name: str, previous_energy2ph: Callable, n_extra_axes: int = 0) -> plt.Axes:

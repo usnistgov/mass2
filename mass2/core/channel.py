@@ -209,7 +209,6 @@ class Channel:
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} for {self.shortname}")
 
-        plt.tight_layout()
         return bin_centers, counts
 
     def plot_hists(
@@ -274,7 +273,6 @@ class Channel:
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
 
-        plt.tight_layout()
         return bin_centers, counts_dict
 
     def plot_scatter(  # noqa: PLR0917

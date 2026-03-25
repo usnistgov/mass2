@@ -236,7 +236,6 @@ class NoiseResult:
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
         plt.title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
-        axis.figure.tight_layout()
 
     def plot_log_rebinned(
         self,
@@ -285,4 +284,3 @@ class NoiseResult:
         axis.grid(True, which="both")
         axis.set_xlabel("Frequency (Hz)")
         axis.set_title(f"Log-rebinned noise from {len(self.frequencies) * 2 - 2} samples")
-        axis.figure.tight_layout()
