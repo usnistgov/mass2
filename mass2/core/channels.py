@@ -190,7 +190,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the optimal filters for the channels in this Channels object.
 
         Parameters
@@ -203,11 +203,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -233,7 +228,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the average pulses (the signal model) for the channels in this Channels object.
 
         Parameters
@@ -246,11 +241,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -286,7 +276,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power spectrum for the channels in this Channels object.
 
         Parameters
@@ -299,11 +289,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -329,7 +314,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power autocorrelation for the channels in this Channels object.
 
         Parameters
@@ -342,11 +327,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
