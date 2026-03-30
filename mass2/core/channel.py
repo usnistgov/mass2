@@ -1293,6 +1293,7 @@ class Channel:
         description: str = "",
         ch_num: int = 0,
         invert_data: bool = False,
+        timestamps: bool = True,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1315,6 +1316,8 @@ class Channel:
             A channel id number, by default 0
         invert_data : bool, optional
             Whether to take the negative of the raw data, by default False
+        timestamps : bool, optional
+            Whether to generate timestamp guesses, based on file creation time, by default True
 
         Returns
         -------
@@ -1334,12 +1337,20 @@ class Channel:
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
-        initial_time = 1772564400_000_000
-        timestamps = initial_time + np.asarray(np.arange(npulses) * int(1e6 * nsamples / samplerate), dtype=np.int64)
-        pulse_df = pl.DataFrame({
-            "pulse": pdata.T,
-            "timestamp": timestamps,
-        }).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+        datadict = {"pulse": pdata.T}
+        pulse_df = pl.DataFrame(datadict)
+
+        # Numpy files don't contain pulse timestamps. Just assume:
+        # a) the records are contiguous in time, and
+        # b) the file's creation time = the time of the first record.
+        # This is clearly wrong, but it at least gives SOME timestamp values.
+        # If you don't like it, set timestamps to False.
+        if timestamps:
+            us_per_second = 1e6
+            ns_per_us = 1000
+            initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
+            times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
 
         if noise_fname is None:
             nch = None
