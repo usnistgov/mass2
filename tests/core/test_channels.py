@@ -532,3 +532,19 @@ def test_channel_mismatched_n_samples():
     bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 1)
     with pytest.raises(ValueError, match="n_samples"):
         mass2.Channel(ch.df, bad_header, npulses=ch.npulses, noise=ch.noise)
+
+
+def test_ch_from_numpy():
+    "Test that we can read pulse data from a numpy file"
+    nsamp, npulses = 100, 60
+    raw = np.random.default_rng().normal(10000, 1000, size=(nsamp, npulses)).astype(np.int16)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fname = os.path.join(tmpdir, "data.npy")
+        np.save(fname, raw)
+
+        ch = mass2.Channel.from_numpy(10000, nsamp // 2, fname, fname, "description", ch_num=5)
+        data = mass2.Channels.from_oneChannel(ch)
+        assert data.ch0.noise is not None
+        for i in range(npulses):
+            assert np.all(data.ch0.df["pulse"][i].to_numpy() == raw[:, i])
+            assert np.all(data.ch0.noise.df["pulse"][i].to_numpy() == raw[:, i])

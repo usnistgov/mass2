@@ -1283,6 +1283,81 @@ class Channel:
         channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
+    @classmethod
+    def from_numpy(
+        cls,
+        samplerate: float,
+        npresamples: int,
+        pulse_fname: str,
+        noise_fname: str | None = None,
+        description: str = "",
+        ch_num: int = 0,
+        invert_data: bool = False,
+    ) -> "Channel":
+        """Create a Channel object from a numpy *.npy file representing pulse records.
+        Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
+        use array[0, :, :] as the pulse data. Because the numpy file is not stored with a header,
+        information such as sample rate and # of presamples must be given.
+
+        Parameters
+        ----------
+        samplerate : float
+            Samples per second
+        npresamples : int
+            How many samples in each record precede the pulse trigger
+        pulse_fname : str
+            File containing the raw pulse data  (assumes a *.npy file)
+        noise_fname : str | None, optional
+            File containing the raw noise data, by default None
+        description : str, optional
+            A description to store with the channel, by default ""
+        ch_num : int, optional
+            A channel id number, by default 0
+        invert_data : bool, optional
+            Whether to take the negative of the raw data, by default False
+
+        Returns
+        -------
+        mass2.Channel
+            The Channel created from the numpy file
+        """
+
+        def load(fname: str) -> NDArray:
+            data = np.load(fname)
+            if data.ndim == 3:
+                data = data[0, :, :]
+            assert data.ndim == 2
+            if invert_data:
+                data = -data
+            return data
+
+        frametime_s = 1 / samplerate
+        pdata = load(pulse_fname)
+        nsamples, npulses = pdata.shape
+        initial_time = 1772564400_000_000
+        timestamps = initial_time + np.asarray(np.arange(npulses) * int(1e6 * nsamples / samplerate), dtype=np.int64)
+        pulse_df = pl.DataFrame({
+            "pulse": pdata.T,
+            "timestamp": timestamps,
+        }).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+
+        if noise_fname is None:
+            nch = None
+        else:
+            ndata = load(noise_fname)
+            noise_df = pl.DataFrame({"pulse": ndata.T})
+            nh = {
+                "filename": noise_fname,
+                "continuous": True,
+                "Presamples": npresamples,
+            }
+            noise_header = pl.DataFrame(nh)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+
+        source = os.path.basename(pulse_fname)
+        header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
+        return cls(pulse_df, header, npulses, noise=nch)
+
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
 

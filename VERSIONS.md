@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.0.4** March 30, 2026-
+* Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests.
+
 **2.0.3** March 13, 2026
 * Add some convenient plotting features like `Channel.plot_pulses()`.
 * Add secondary x axis to that method and to `Channels.plot_avg_pulse()` to give time in ms.
