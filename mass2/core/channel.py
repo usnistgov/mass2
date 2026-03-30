@@ -951,7 +951,7 @@ class Channel:
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
-    def filter5lag(
+    def filter5lag(  # noqa: PLR0917
         self,
         pulse_col: str = "pulse",
         peak_y_col: str = "5lagy",
@@ -961,6 +961,8 @@ class Channel:
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
         fourier: bool = False,
         longest_autocorr_filter: int = 10_000,
+        cut_pre: int = 0,
+        cut_post: int = 0,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -985,6 +987,10 @@ class Channel:
             Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
             (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
             If exceeded, filters will be Fourier-space filters.
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
 
         Returns
         -------
@@ -1017,15 +1023,16 @@ class Channel:
 
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
             if fourier:
-                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
             else:
-                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         else:
             if fourier:
                 raise NotImplementedError(
                     "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
                 )
-            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
+            ets = time_constant_s_of_exp_to_be_orthogonal_to
+            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
