@@ -5,7 +5,7 @@
 **2.0.4** March 30, 2026-
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
 * Some improvements to plotting:
-  * Remove `plt.tight_layout()` in mass; prefer use of `figure.constrained_layout.use : True` in matplotlibrc.
+  * Remove `plt.tight_layout()` in mass; prefer user set `figure.constrained_layout.use : True` in matplotlibrc.
   * Set most mass plots to call `plot_zoomable`, which turns on mouse zooming (same as typing 'O' in window).
 * Make the parameters `cut_pre` and `cut_post` work with Fourier-domain filters.
 

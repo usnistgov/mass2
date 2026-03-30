@@ -1292,16 +1292,18 @@ class Channel:
         return channel
 
     @classmethod
-    def from_numpy(
+    def from_numpy(  # noqa: PLR0917
         cls,
         samplerate: float,
         npresamples: int,
-        pulse_fname: str,
-        noise_fname: str | None = None,
+        pulse_fname: str | Path,
+        noise_fname: str | Path | None = None,
         description: str = "",
         ch_num: int = 0,
         invert_data: bool = False,
         timestamps: bool = True,
+        row_index: bool = False,
+        rescale: float = 1.0,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1314,9 +1316,9 @@ class Channel:
             Samples per second
         npresamples : int
             How many samples in each record precede the pulse trigger
-        pulse_fname : str
+        pulse_fname : str | Path
             File containing the raw pulse data  (assumes a *.npy file)
-        noise_fname : str | None, optional
+        noise_fname : str | Path | None, optional
             File containing the raw noise data, by default None
         description : str, optional
             A description to store with the channel, by default ""
@@ -1326,6 +1328,10 @@ class Channel:
             Whether to take the negative of the raw data, by default False
         timestamps : bool, optional
             Whether to generate timestamp guesses, based on file creation time, by default True
+        row_index: bool, optional
+            Whether to generate a column "index" counting [0...n-1], by default False
+        rescale: float, optional
+            Multiply the raw data by this value to get reasonable scaling, by default 1.0
 
         Returns
         -------
@@ -1333,20 +1339,22 @@ class Channel:
             The Channel created from the numpy file
         """
 
-        def load(fname: str) -> NDArray:
-            data = np.load(fname)
+        def load(fname: str | Path) -> NDArray:
+            data = np.load(str(fname))
             if data.ndim == 3:
                 data = data[0, :, :]
             assert data.ndim == 2
             if invert_data:
                 data = -data
-            return data
+            return data * rescale
 
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
         datadict = {"pulse": pdata.T}
         pulse_df = pl.DataFrame(datadict)
+        if row_index:
+            pulse_df = pulse_df.with_row_index()
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and

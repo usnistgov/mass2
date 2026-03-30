@@ -1,7 +1,15 @@
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.21.1"
 app = marimo.App(width="medium")
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Some examples of studying optical TES data from numpy files
+    """)
+    return
 
 
 @app.cell
@@ -13,47 +21,24 @@ def _():
     import mass2
     import pulsedata
 
-    return mass2, np, pl, plt, pulsedata
+    return mass2, mo, np, pl, plt, pulsedata
 
 
 @app.cell
-def _(mass2, pl, pulse_traces):
-    def channel_from_npy_arrays(pulses_traces, noise_traces, npresamples, frametime_s, ch_num: int = 0):
-        header_df = pl.DataFrame()
-        frametime_s = 1e-5
-        df_noise = pl.DataFrame({"pulse": noise_traces})
-        noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
-        npulses, nsamples = pulses_traces.shape
-        header = mass2.ChannelHeader(
-            description="from npy arrays",
-            data_source=None,
-            ch_num=ch_num,
-            frametime_s=frametime_s,
-            n_presamples=npresamples,
-            n_samples=nsamples,
-            df=header_df,
-        )
-        df = pl.DataFrame({"pulse": pulse_traces}).with_row_index()
-        ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
-        return ch
-
-    return (channel_from_npy_arrays,)
-
-
-@app.cell
-def _(np, pulsedata):
+def _(mass2, pulsedata):
     pulse_noise_pair = pulsedata.numpy["noise_limited_optical_tes"]
     noisepath = pulse_noise_pair.noise
     pulsepath = pulse_noise_pair.pulse
-    # it's easier to work with positive going pulses for now with typical scale around 1000 units large
-    pulse_traces = np.load(pulsepath)[0].T*-1e4
-    noise_traces = np.load(noisepath)[0].T*1e4
-    return noise_traces, pulse_traces
-
-
-@app.cell
-def _(channel_from_npy_arrays, noise_traces, pulse_traces):
-    ch = channel_from_npy_arrays(pulse_traces, noise_traces, npresamples=300, frametime_s=6.25e-5)
+    ch = mass2.Channel.from_numpy(
+        samplerate = 16e3,
+        npresamples=300,
+        pulse_fname=pulsepath,
+        noise_fname=noisepath,
+        description="from npy arrays",
+        invert_data=True,
+        row_index=True,
+        rescale=1e4
+    )
     return (ch,)
 
 
