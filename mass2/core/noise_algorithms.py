@@ -186,7 +186,6 @@ def calc_noise_result(
     data = np.asarray(data)
     data_zeromean = data - np.mean(data)
     (n_pulses, nsamples) = data_zeromean.shape
-    # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
     if nsamples <= skip_autocorr_if_length_over:
         if continuous:
