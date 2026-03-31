@@ -15,6 +15,14 @@ import dill
 import marimo as mo
 
 
+def plot_zoomable() -> None:
+    "Make the current figure start out in zoomable mode"
+    fig = plt.gcf()
+    toolbar = fig.canvas.toolbar
+    if toolbar is not None:
+        toolbar.zoom()
+
+
 def show(fig: plt.Figure | None = None) -> mo.Html:
     """Create a Marimo interactive view of the given Matplotlib figure (or the current figure if None)."""
     if fig is None:
@@ -70,7 +78,7 @@ def sigma_mad(x: ArrayLike) -> float:
 
 
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
-    """RReturn the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
+    """Return the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
     mid = np.median(x)
     return mid + nsigma * sigma_mad(x)
@@ -112,6 +120,7 @@ def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes 
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
+    plot_zoomable()
     return axis
 
 

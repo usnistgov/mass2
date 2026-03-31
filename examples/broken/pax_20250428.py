@@ -235,7 +235,6 @@ def _(ch_num, data3, mass2, np, plt):
         plt.xlabel(x_label)
         plt.ylabel("signal (arb)")
         plt.title(ch.header.description)
-        plt.tight_layout()
         return plt.gca()
 
     plot_pulses(data3.channels[ch_num], spread_col="energy_5lagy_dc")

@@ -93,8 +93,9 @@ class NoiseChannel:
     ) -> NoiseResult:
         """Compute and return the noise result from the noise traces."""
         records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        continuous = self.is_continuous and trunc_front == 0 and trunc_back == 0
         spectrum = mass2.core.noise_algorithms.calc_noise_result(
-            records, continuous=self.is_continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
+            records, continuous=continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
         )
         return spectrum
 

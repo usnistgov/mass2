@@ -77,7 +77,6 @@ class PretrigMeanJumpFixStep(RecipeStep):
         plt.legend()
         plt.xlabel("timestamp")
         plt.ylabel("pretrig mean")
-        plt.tight_layout()
         return plt.gca()
 
 

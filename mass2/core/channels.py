@@ -27,6 +27,7 @@ from .channel import Channel, ChannelHeader, BadChannel
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
+from .misc import plot_zoomable
 from . import ljhutil
 
 
@@ -170,8 +171,7 @@ class Channels:
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
-
-        plt.tight_layout()
+        plot_zoomable()
 
     def _limited_chan_list(self, limit: int | None = 20, channels: list[int] | None = None) -> list[int]:
         """A helper to get a list of channel numbers, limited to the given number if needed, and including only
@@ -190,7 +190,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the optimal filters for the channels in this Channels object.
 
         Parameters
@@ -203,11 +203,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -225,6 +220,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Optimal filters")
+        plot_zoomable()
 
     def plot_avg_pulses(
         self,
@@ -232,7 +228,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the average pulses (the signal model) for the channels in this Channels object.
 
         Parameters
@@ -245,11 +241,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -277,7 +268,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Average pulses")
-        plt.tight_layout()
+        plot_zoomable()
 
     def plot_noise_spectrum(
         self,
@@ -285,7 +276,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power spectrum for the channels in this Channels object.
 
         Parameters
@@ -298,11 +289,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -320,6 +306,7 @@ class Channels:
         plt.loglog()
         plt.xlabel("Frequency (Hz)")
         plt.title("Noise power spectral density")
+        plot_zoomable()
 
     def plot_noise_autocorr(
         self,
@@ -327,7 +314,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power autocorrelation for the channels in this Channels object.
 
         Parameters
@@ -340,11 +327,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -362,6 +344,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Lags")
         plt.title("Noise autocorrelation")
+        plot_zoomable()
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
