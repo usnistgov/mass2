@@ -4,6 +4,7 @@
 
 **2.0.4** March 30, 2026-
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests.
+* Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
 **2.0.3** March 13, 2026
 * Add some convenient plotting features like `Channel.plot_pulses()`.
@@ -15,9 +16,6 @@
 * Let `Channel.filter5lag()` user can elect Fourier-based filters for very long records (PR 117).
 * Check on `Channel` creation that raw pulses (if any) match the header's `n_samples` (issue 118).
 * This is the last release fully reviewed by project Co-Director (now Emeritus) Galen O'Neil.
-
-**2.0.3** March 2, 2026-
-* Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
 
 **2.0.2** February 24, 2026
