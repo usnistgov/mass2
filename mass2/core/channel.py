@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterable, Collection
 import os
 import lmfit
 import polars as pl
+from polars.datatypes import Datetime
 import pylab as plt
 from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
@@ -19,18 +20,22 @@ import numpy as np
 import time
 from pathlib import Path
 
-from .noise_channel import NoiseChannel
-from .recipe import Recipe, RecipeStep, SummarizeStep
-from .drift_correction import DriftCorrectStep
-from .optimal_filtering import FilterMaker
-from .filter_steps import OptimalFilterStep
-from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
-from .misc import alwaysTrue
-from .offfiles import OffFile
-from . import misc
-from ..calibration.line_models import GenericLineModel, LineModelResult
-from ..calibration.fluorescence_lines import SpectralLine
+import tzlocal
+
 import mass2
+from ..calibration.fluorescence_lines import SpectralLine
+from ..calibration.line_models import GenericLineModel, LineModelResult
+from . import misc
+from .offfiles import OffFile
+from .misc import alwaysTrue
+from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
+from .filter_steps import OptimalFilterStep
+from .optimal_filtering import FilterMaker
+from .drift_correction import DriftCorrectStep
+from .recipe import Recipe, RecipeStep, SummarizeStep
+from .noise_channel import NoiseChannel
+
+_local_timezone_name = tzlocal.get_localzone_name()
 
 
 @dataclass(frozen=True)
@@ -74,6 +79,14 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+
+    def __post_init__(self) -> None:
+        # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
+        pulse_col = "pulse"
+        if pulse_col in self.df.columns:
+            dtype = self.df[pulse_col].dtype
+            if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
+                raise ValueError(f"Column '{pulse_col}' has array width {dtype.size} but header.n_samples={self.header.n_samples}")
 
     @property
     def shortname(self) -> str:
@@ -268,6 +281,7 @@ class Channel:
         self,
         x_col: str,
         y_col: str,
+        cont_color_col: str | None = None,
         color_col: str | None = None,
         use_expr: pl.Expr = pl.lit(True),
         use_good_expr: bool = True,
@@ -285,8 +299,12 @@ class Channel:
             Name of the column to put on the x axis
         y_col : str
             Name of the column to put on the y axis
+        cont_color_col : str | None, optional
+            Name of the column to use for continuously coloring points, by default None
         color_col : str | None, optional
-            Name of the column to color points by (generally a category like "state_label"), by default None
+            Name of the column to discretely color points by (generally a low cardinality
+            category like "state_label"), by default None
+            At least of `cont_color_col` and `color_col` must be None
         use_expr : pl.Expr, optional
             An expression to select plottable points, by default pl.lit(True)
         use_good_expr : bool, optional
@@ -304,6 +322,10 @@ class Channel:
         extended_title : bool, optional
             Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
+        # You can't have both kinds of colors: you either use `color_col` for categorical coloring,
+        # or cont_color_col for continuous coloring, or neither.
+        assert color_col is None or cont_color_col is None
+
         if axis is None:
             fig = plt.figure()
             axis = plt.gca()
@@ -325,6 +347,8 @@ class Channel:
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
+        if cont_color_col is not None:
+            columns_to_keep.append(cont_color_col)
         df_small = (
             self.df.lazy()
             .with_row_index(name=index_name)
@@ -335,16 +359,25 @@ class Channel:
         )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
 
-        for (name,), data in df_small.group_by(color_col, maintain_order=True):
-            if name is None and skip_none and color_col is not None:
-                continue
-            (line,) = plt.plot(
-                data.select(x_col).to_series(),
-                data.select(y_col).to_series(),
-                ".",
-                label=name,
+        if cont_color_col is not None:
+            line = plt.scatter(
+                df_small.select(x_col).to_series(),
+                df_small.select(y_col).to_series(),
+                s=3,
+                c=df_small.select(cont_color_col).to_series(),
             )
-            lines_pnums.append((line, data.select(index_name).to_series()))
+
+        else:
+            for (name,), data in df_small.group_by(color_col, maintain_order=True):
+                if name is None and skip_none and color_col is not None:
+                    continue
+                (line,) = plt.plot(
+                    data.select(x_col).to_series(),
+                    data.select(y_col).to_series(),
+                    ".",
+                    label=name,
+                )
+                lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
             annotation = axis.annotate(
@@ -492,7 +525,8 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
-        assert self.df[pulse_field].dtype in {pl.Array, pl.List}, (
+        pulse_type = self.df[pulse_field].dtype
+        assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
         )
 
@@ -541,6 +575,19 @@ class Channel:
             summary_df = lf.select(columns).collect()
             summary_df.show(limit=None)
 
+        frametime_ms = self.frametime_s * 1e3
+        sample_x = np.arange(self.header.n_samples) - self.header.n_presamples
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+        plt.xlabel("Samples after trigger")
+
         plot_columns = (pulse_field, "pretrig_mean")
         df = lf.select(plot_columns).collect()
         N = len(df)
@@ -553,7 +600,7 @@ class Channel:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
                 pulse = np.hstack((0, np.diff(pulse)))
-            axis.plot(pulse, color=color)
+            axis.plot(sample_x, pulse, color=color)
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
@@ -585,6 +632,20 @@ class Channel:
         for step in reversed(self.steps):
             if isinstance(step, OptimalFilterStep):
                 return step.filter.values
+        return None
+
+    @property
+    def last_v_over_dv(self) -> float | None:
+        """Return the predicted V/dV stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        float | None
+            The last filtering step's predicted V/dV ratio, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter.predicted_v_over_dv
         return None
 
     @property
@@ -897,6 +958,8 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -914,6 +977,13 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
 
         Returns
         -------
@@ -921,7 +991,20 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
-        noiseresult = self.noise.spectrum(trunc_back=2, trunc_front=2)
+        shortening_5lag = 4  # 5-lag filters shorten the pulse by 2 on each end
+        n_samples_5lag = self.n_samples - shortening_5lag
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert n_samples_5lag <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_5lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_5lag}; {suggest}"
+
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
@@ -930,9 +1013,17 @@ class Channel:
             noise_autocorr=noiseresult.autocorr_vec,
             sample_time_sec=self.frametime_s,
         )
+
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+            if fourier:
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+            else:
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
         else:
+            if fourier:
+                raise NotImplementedError(
+                    "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
+                )
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
         step = OptimalFilterStep(
             inputs=["pulse"],
@@ -1169,7 +1260,12 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(
+                pl.from_epoch("unixnano", time_unit="ns")
+                .dt.cast_time_unit("us")
+                .dt.convert_time_zone(_local_timezone_name)
+                .alias("timestamp")
+            )
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1187,8 +1283,108 @@ class Channel:
         channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
+    @classmethod
+    def from_numpy(
+        cls,
+        samplerate: float,
+        npresamples: int,
+        pulse_fname: str,
+        noise_fname: str | None = None,
+        description: str = "",
+        ch_num: int = 0,
+        invert_data: bool = False,
+        timestamps: bool = True,
+    ) -> "Channel":
+        """Create a Channel object from a numpy *.npy file representing pulse records.
+        Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
+        use array[0, :, :] as the pulse data. Because the numpy file is not stored with a header,
+        information such as sample rate and # of presamples must be given.
+
+        Parameters
+        ----------
+        samplerate : float
+            Samples per second
+        npresamples : int
+            How many samples in each record precede the pulse trigger
+        pulse_fname : str
+            File containing the raw pulse data  (assumes a *.npy file)
+        noise_fname : str | None, optional
+            File containing the raw noise data, by default None
+        description : str, optional
+            A description to store with the channel, by default ""
+        ch_num : int, optional
+            A channel id number, by default 0
+        invert_data : bool, optional
+            Whether to take the negative of the raw data, by default False
+        timestamps : bool, optional
+            Whether to generate timestamp guesses, based on file creation time, by default True
+
+        Returns
+        -------
+        mass2.Channel
+            The Channel created from the numpy file
+        """
+
+        def load(fname: str) -> NDArray:
+            data = np.load(fname)
+            if data.ndim == 3:
+                data = data[0, :, :]
+            assert data.ndim == 2
+            if invert_data:
+                data = -data
+            return data
+
+        frametime_s = 1 / samplerate
+        pdata = load(pulse_fname)
+        nsamples, npulses = pdata.shape
+        datadict = {"pulse": pdata.T}
+        pulse_df = pl.DataFrame(datadict)
+
+        # Numpy files don't contain pulse timestamps. Just assume:
+        # a) the records are contiguous in time, and
+        # b) the file's creation time = the time of the first record.
+        # This is clearly wrong, but it at least gives SOME timestamp values.
+        # If you don't like it, set timestamps to False.
+        if timestamps:
+            us_per_second = 1e6
+            ns_per_us = 1000
+            initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
+            times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+
+        if noise_fname is None:
+            nch = None
+        else:
+            ndata = load(noise_fname)
+            noise_df = pl.DataFrame({"pulse": ndata.T})
+            nh = {
+                "filename": noise_fname,
+                "continuous": True,
+                "Presamples": npresamples,
+            }
+            noise_header = pl.DataFrame(nh)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+
+        source = os.path.basename(pulse_fname)
+        header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
+        return cls(pulse_df, header, npulses, noise=nch)
+
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+
+        # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
+        times = df_es["timestamp"]
+        expt_state_time_type = times.dtype
+        self_time_type = self.df["timestamp"].dtype
+        assert isinstance(expt_state_time_type, Datetime)
+        assert isinstance(self_time_type, Datetime)
+        desired_time_zone = self_time_type.time_zone
+        if desired_time_zone is None:
+            desired_time_zone = _local_timezone_name
+        if expt_state_time_type.time_zone != desired_time_zone:
+            times = times.dt.convert_time_zone(desired_time_zone)
+            df_es = df_es.with_columns(timestamp=times)
+
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")

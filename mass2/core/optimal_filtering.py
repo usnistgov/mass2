@@ -945,7 +945,6 @@ class FilterMaker:
             noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
             kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()
             variance_fourier = 1.0 / kappa
-            print(kappa, noise_ft_squared)
         else:
             ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)

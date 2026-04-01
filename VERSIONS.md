@@ -2,10 +2,19 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.0.3** March 6, 2026-
-* Add some convenient plotting features like `Channel.plot_pulses`.
+**2.0.4** March 30, 2026-
+* Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests.
+
+**2.0.3** March 13, 2026
+* Add some convenient plotting features like `Channel.plot_pulses()`.
+* Add secondary x axis to that method and to `Channels.plot_avg_pulse()` to give time in ms.
 * CI testing: use Python 3.10 and 3.14 (replacing 3.13).
 * Add `resample_pulses` and `resample_one_pulse` to `mass2.core.analysis_algorithms`.
+* Add an example notebook `examples/f3db_sweep_example.py` with multiple opt filters (PR 114).
+* Interpret all times in the local timezone. Add `ChangeTimeZoneStep` to change that (PR 115).
+* Let `Channel.filter5lag()` user can elect Fourier-based filters for very long records (PR 117).
+* Check on `Channel` creation that raw pulses (if any) match the header's `n_samples` (issue 118).
+* This is the last release fully reviewed by project Co-Director (now Emeritus) Galen O'Neil.
 
 **2.0.3** March 2, 2026-
 * Add script `mc2` = Mass2 Continuous Computations for online analysis.

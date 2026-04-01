@@ -14,6 +14,11 @@ from packaging.version import Version
 from abc import ABC, abstractmethod
 
 
+import tzlocal
+
+_local_timezone_name = tzlocal.get_localzone_name()
+
+
 @dataclass(frozen=True)
 class LJHFile(ABC):
     """Represents the header and binary information of a single LJH file.
@@ -279,7 +284,10 @@ class LJHFile(ABC):
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
 
     def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+        self,
+        first_pulse: int = 0,
+        keep_posix_usec: bool = False,
+        force_continuous: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
@@ -289,7 +297,7 @@ class LJHFile(ABC):
             The pulse dataframe starts with this pulse record number, by default 0
         keep_posix_usec : bool, optional
             Whether to keep the raw `posix_usec` field in the pulse dataframe, by default False
-        force_continuous: bool
+        force_continuous : bool
             Whether to claim that the data stream is actually continuous (because it cannot be learned from
             data for LJH files before version 2.2.0). Only relevant for noise data files.
 
@@ -299,6 +307,9 @@ class LJHFile(ABC):
             (df, header_df)
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
+
+            The polars series "timestamp" will be converted to the time zone name
+            returned by tzlocal.get_localzone_name()
         """
         data = {
             "pulse": self._mmap["data"][first_pulse:],
@@ -311,7 +322,9 @@ class LJHFile(ABC):
             "subframecount": pl.UInt64,
         }
         df = pl.DataFrame(data, schema=schema)
-        df = df.select(pl.from_epoch("posix_usec", time_unit="us").alias("timestamp")).with_columns(df)
+        df = df.select(
+            pl.from_epoch("posix_usec", time_unit="us").dt.convert_time_zone(_local_timezone_name).alias("timestamp")
+        ).with_columns(df)
         if not keep_posix_usec:
             df = df.select(pl.exclude("posix_usec"))
         continuous = self.is_continuous or force_continuous

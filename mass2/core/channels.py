@@ -674,6 +674,11 @@ class Channels:
         return mass2.Channels(new_channels, self.description + other_data.description)
 
     @classmethod
+    def from_oneChannel(cls, ch: Channel) -> "Channels":
+        "Create a Channels object from a single Channel object"
+        return Channels({ch.ch_num: ch}, ch.header.description)
+
+    @classmethod
     def from_df(
         cls,
         df_in: pl.DataFrame,

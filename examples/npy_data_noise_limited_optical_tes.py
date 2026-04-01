@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.15"
+__generated_with = "0.20.4"
 app = marimo.App(width="medium")
 
 
@@ -12,6 +12,7 @@ def _():
     import marimo as mo
     import mass2
     import pulsedata
+
     return mass2, np, pl, plt, pulsedata
 
 
@@ -22,7 +23,7 @@ def _(mass2, pl, pulse_traces):
         frametime_s = 1e-5
         df_noise = pl.DataFrame({"pulse": noise_traces})
         noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
-        nsamples, npulses = pulses_traces.shape
+        npulses, nsamples = pulses_traces.shape
         header = mass2.ChannelHeader(
             description="from npy arrays",
             data_source=None,
@@ -35,6 +36,7 @@ def _(mass2, pl, pulse_traces):
         df = pl.DataFrame({"pulse": pulse_traces}).with_row_index()
         ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
         return ch
+
     return (channel_from_npy_arrays,)
 
 

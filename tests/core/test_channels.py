@@ -3,6 +3,8 @@ import os
 import pytest
 import polars as pl
 from polars.testing import assert_frame_equal
+import dataclasses
+
 
 import mass2
 import pulsedata
@@ -154,7 +156,10 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
     assert isinstance(ch.last_avg_pulse, np.ndarray)
     assert isinstance(ch.last_noise_autocorrelation, np.ndarray)
-    assert isinstance(ch.last_noise_psd[1], np.ndarray)
+    psd = ch.last_noise_psd
+    assert psd is not None
+    assert isinstance(psd[1], np.ndarray)
+    assert isinstance(ch.last_v_over_dv, float)
 
 
 def test_noise_autocorr():
@@ -396,8 +401,7 @@ def test_steps():
     # Perform 5 offical Recipe: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
-            ch
-            .summarize_pulses()
+            ch.summarize_pulses()
             .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
             .filter5lag(f_3db=10000)
             .with_column_map_step("pretrig_rms", "pointless_pretrig_meansq", squareme)
@@ -502,3 +506,45 @@ def test_save_analysis_with_ljh(tmpdir):
     assert restored_ch.header.ch_num == 4109
     assert len(restored_ch.df) == len(ch.df)
     assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
+
+
+def test_change_time_zone():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    filename = p.pulse_folder / "20230626_run0001_chan4109.ljh"
+    ch = mass2.Channel.from_ljh(str(filename))
+
+    # Make sure that this test CHANGES time zones. The new zone will be Fiji time.
+    # In the unlikely event that you run these tests from Fiji, change to Tokyo time.
+    new_tz = "Pacific/Fiji"
+    if mass2.core.channel._local_timezone_name == new_tz:
+        new_tz = "Pacific/Tokyo"
+
+    df1 = ch.df.with_columns(pl.col(pl.Datetime).dt.convert_time_zone(new_tz))
+    step = mass2.core.ChangeTimeZoneStep.new(new_tz)
+    ch2 = ch.with_step(step)
+    df2 = ch2.df
+    assert (df1["timestamp"] == df2["timestamp"]).all()
+    assert ch.df["timestamp"].dtype != df2["timestamp"].dtype
+
+
+def test_channel_mismatched_n_samples():
+    ch = dummy_channel()
+    bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 1)
+    with pytest.raises(ValueError, match="n_samples"):
+        mass2.Channel(ch.df, bad_header, npulses=ch.npulses, noise=ch.noise)
+
+
+def test_ch_from_numpy():
+    "Test that we can read pulse data from a numpy file"
+    nsamp, npulses = 100, 60
+    raw = np.random.default_rng().normal(10000, 1000, size=(nsamp, npulses)).astype(np.int16)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fname = os.path.join(tmpdir, "data.npy")
+        np.save(fname, raw)
+
+        ch = mass2.Channel.from_numpy(10000, nsamp // 2, fname, fname, "description", ch_num=5)
+        data = mass2.Channels.from_oneChannel(ch)
+        assert data.ch0.noise is not None
+        for i in range(npulses):
+            assert np.all(data.ch0.df["pulse"][i].to_numpy() == raw[:, i])
+            assert np.all(data.ch0.noise.df["pulse"][i].to_numpy() == raw[:, i])
