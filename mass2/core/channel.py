@@ -213,7 +213,7 @@ class Channel:
 
         bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr, use_expr=use_expr)
         _, step_size = misc.midpoints_and_step_size(bin_edges)
-        plt.step(bin_centers, counts, where="mid")
+        ax.step(bin_centers, counts, where="mid")
 
         # Customize the plot
         ax.set_xlabel(str(col))
@@ -275,7 +275,7 @@ class Channel:
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
-            plt.step(bin_centers, counts, where="mid", label=group_name_str)
+            ax.step(bin_centers, counts, where="mid", label=group_name_str)
         # Customize the plot
         ax.set_xlabel(str(col))
         if len(counts_dict) > 0:
