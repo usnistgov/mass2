@@ -194,7 +194,18 @@ class Channel:
         use_good_expr: bool = True,
         use_expr: pl.Expr = pl.lit(True),
     ) -> tuple[NDArray, NDArray]:
-        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr."""
+        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr.
+
+        Args:
+            col (str): Name of the column to histogram
+            bin_edges (ArrayLike): Histogram bin edges
+            axis (plt.Axes | None, optional): The Axes to plot on, if None, create a new figure. Defaults to None.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+
+        Returns:
+            tuple[NDArray, NDArray]: Array of bin centers and counts, respectively
+        """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
@@ -209,7 +220,6 @@ class Channel:
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} for {self.shortname}")
         plot_zoomable()
-
         return bin_centers, counts
 
     def plot_hists(
@@ -223,13 +233,21 @@ class Channel:
         skip_none: bool = True,
     ) -> tuple[NDArray, dict[str, NDArray]]:
         """
-        Plots histograms for the given column, grouped by the specified column.
+        Plots histograms for values in the given column, grouped by the specified column. There will be
+        one separate histogram for each distinct values of the `group_by_col` column.
 
-        Parameters:
-        - col (str): The column name to plot.
-        - bin_edges (array-like): The edges of the bins for the histogram.
-        - group_by_col (str): The column name to group by. This is required.
-        - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+        Args:
+            col (str): The column name to plot.
+            bin_edges (array-like): The edges of the bins for the histogram.
+            group_by_col (str): The column name to group by. This is required.
+            axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+            skip_none (bool, optional): Whether to skip None in the groupings. Defaults to True.
+
+        Returns:
+            tuple[NDArray,dict[str, NDArray]]: Array of bin centers and a dictionary mapping group name to
+            counts in the histograms.
         """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
@@ -258,13 +276,6 @@ class Channel:
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
             plt.step(bin_centers, counts, where="mid", label=group_name_str)
-            # Plot the histogram for the current group
-            # if group_name == "EBIT":
-            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=group_name_str)
-            # else:
-            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=group_name_str)
-            # bin_centers, counts = misc.hist_of_series(values, bin_edges)
-            # plt.plot(bin_centers, counts, label=group_name)
         # Customize the plot
         ax.set_xlabel(str(col))
         if len(counts_dict) > 0:
