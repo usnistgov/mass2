@@ -31,7 +31,7 @@ from .multifit import (
 from . import filter_steps
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
-from .drift_correction import drift_correct, DriftCorrectStep
+from .drift_correction import drift_correct, DriftCorrectStep, TimeDriftCorrectStep
 from . import rough_cal
 from .channel import Channel, ChannelHeader, BadChannel
 from .truebq_bin import TrueBqBin
