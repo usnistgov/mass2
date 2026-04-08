@@ -7,7 +7,9 @@
 * Some improvements to plotting:
   * Remove `plt.tight_layout()` in mass; prefer user set `figure.constrained_layout.use : True` in matplotlibrc.
   * Set most mass plots to call `plot_zoomable`, which turns on mouse zooming (same as typing 'O' in window).
+  * Fix bugs: failing to plot channel histograms on existing axes.
 * Make the parameters `cut_pre` and `cut_post` work with Fourier-domain filters.
+* Make a recipe step to use the time-drift-correct algorithm.
 
 **2.0.3** March 13, 2026
 * Add some convenient plotting features like `Channel.plot_pulses()`.
