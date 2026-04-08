@@ -31,7 +31,7 @@ from .misc import alwaysTrue, plot_zoomable
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
-from .drift_correction import DriftCorrectStep
+from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
 from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
 
@@ -1197,6 +1197,20 @@ class Channel:
             corrected_col=corrected_col,
             use_expr=use_expr,
         )
+        return self.with_step(step)
+
+    def time_drift_correct(
+        self,
+        time_col: str = "timestamp",
+        uncorrected_col: str = "5lagy_dc",
+        corrected_col: str = "5lagy_tdc",
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "Channel":
+        """Correct for gain drifing slowly with time."""
+        # by defining a seperate learn method that takes ch as an argument,
+        # we can move all the code for the step outside of Channel
+        step = TimeDriftCorrectStep.learn(ch=self, time_col=time_col, uncorrected_col=uncorrected_col,
+                                          corrected_col=corrected_col, use_expr=use_expr)
         return self.with_step(step)
 
     def linefit(  # noqa: PLR0917
