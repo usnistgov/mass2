@@ -349,7 +349,6 @@ plt.plot(t_ms, maker.signal_model, "r")
 plt.title("Model pulse")
 plt.xlabel("Time after trigger (ms)")
 plt.ylabel("Signal (arbs)")
-plt.tight_layout()
 ```
 
 ### Corrections and energy calibration
@@ -399,7 +398,6 @@ ax = plt.subplot(212)
 ch.plot_hist("5lagy_dc", np.linspace(0, 2600, 1001), axis=ax, use_expr=use)
 plt.title("Uncalibrated, optimally filtered pulse heights")
 plt.xlabel("Pulse heights (arbs)")
-plt.tight_layout()
 ```
 
 Now, an improved calibration can be achieved with actual fits to the known calibration lines. (One subtle aspect of this improved calibration is that there must be an existing calibration _from_ the same field into energy that you want to use for the final. In this case, we must have that second `rough_cal_combinatoric` above, because only that second one uses the field `5lagy_dc` as its input. This allows the `multifit` calibration routine to know about the energy scale well enough to find the lines to fit. Furthermore, we have to track which step it was whose calibration we are improving upon. Here, that is the previous step, called `-1` in python. The first rough calibration wouldn't meet our needs, because it is a calibration from `pulse_rms` into energy, a totally different mapping.)
@@ -440,7 +438,6 @@ ch.plot_hist("energy_5lagy_best", edges, axis=ax2, use_expr=use_noncal)
 plt.title("Calibrated energy, state='SCAN3'")
 plt.xlabel("Pulse energy (eV)")
 plt.xlim([0, 1000])
-plt.tight_layout()
 ```
 
 ## Saving results and the `Recipe` system
