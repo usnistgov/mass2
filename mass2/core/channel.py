@@ -39,6 +39,25 @@ _local_timezone_name = tzlocal.get_localzone_name()
 
 
 @dataclass(frozen=True)
+class ExtTriggerControl:
+    """Parameters to control what columns are added when we incorporate external trigger timing info
+    """
+    ms_nearest_trig: bool = True
+    ms_last_trig: bool = False
+    ms_next_trig: bool = False
+    sf_last_trig: bool = False
+    sf_next_trig: bool = False
+
+    @property
+    def require_last(self) -> bool:
+        return self.ms_last_trig or self.sf_last_trig or self.ms_nearest_trig
+
+    @property
+    def require_next(self) -> bool:
+        return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig
+
+
+@dataclass(frozen=True)
 class ChannelHeader:
     """Metadata about a Channel, of the sort read from file header."""
 
