@@ -535,7 +535,7 @@ def test_channel_mismatched_n_samples():
 
 
 def test_ch_from_numpy():
-    "Test that we can random values from a numpy file"
+    "Test that we can read random values from a numpy file"
     nsamp, npulses = 100, 60
     raw = np.random.default_rng().normal(10000, 1000, size=(nsamp, npulses)).astype(np.int16)
     with tempfile.TemporaryDirectory() as tmpdir:
