@@ -1454,15 +1454,50 @@ class Channel:
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+    def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":
         """Add external trigger times from an existing dataframe"""
         df = self.df
+        _subframediv = self.subframediv
+        if _subframediv is None:
+            _subframediv = 64
+
         # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
         if "subframecount" not in df:
-            df = self.df.with_columns(subframecount=pl.col("framecount") * self.subframediv)
-        df2 = df.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig").join_asof(
-            df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig"
-        )
+            df = self.df.with_columns(subframecount=pl.col("framecount") * _subframediv)
+
+        assert output_control.require_last or output_control.require_next
+        subframe_time_ms = self.frametime_s * 1000. / _subframediv
+
+        df_subframe = df.select("subframecount")
+        if output_control.require_last:
+            df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+            delta = pl.col("subframecount").cast(pl.Int64) - pl.col("subframecount_prev_ext_trig")
+            df_subframe = df_subframe.with_columns(dsf_last_ext_trig=delta)
+        if output_control.require_next:
+            df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+            delta = pl.col("subframecount_next_ext_trig") - pl.col("subframecount").cast(pl.Int64)
+            df_subframe = df_subframe.with_columns(dsf_next_ext_trig=delta)
+
+        if output_control.ms_last_trig:
+            df_subframe = df_subframe.with_columns(ms_last_ext_trig=(pl.col("dsf_last_ext_trig") * subframe_time_ms))
+        if output_control.ms_next_trig:
+            df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
+        if output_control.ms_nearest_trig:
+            df_subframe = df_subframe.with_columns(
+                pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                            .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
+                            .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
+                        .alias("ms_nearest_ext_trig")
+                        )
+
+        # Drop columns that the user doesn't want
+        df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig", "subframecount")
+        if not output_control.sf_last_trig:
+            df_subframe = df_subframe.drop("dsf_last_ext_trig")
+        if not output_control.sf_next_trig:
+            df_subframe = df_subframe.drop("dsf_next_ext_trig")
+
+        df2 = self.df.with_columns(df_subframe)
         return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
