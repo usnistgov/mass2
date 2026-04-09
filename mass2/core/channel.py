@@ -47,14 +47,15 @@ class ExtTriggerControl:
     ms_next_trig: bool = False
     sf_last_trig: bool = False
     sf_next_trig: bool = False
+    absolute_sfs: bool = False
 
     @property
     def require_last(self) -> bool:
-        return self.ms_last_trig or self.sf_last_trig or self.ms_nearest_trig
+        return self.ms_last_trig or self.sf_last_trig or self.ms_nearest_trig or self.absolute_sfs
 
     @property
     def require_next(self) -> bool:
-        return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig
+        return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
 
 
 @dataclass(frozen=True)
@@ -1470,11 +1471,13 @@ class Channel:
 
         df_subframe = df.select("subframecount")
         if output_control.require_last:
-            df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+            df_subframe = df_subframe.join_asof(
+                df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
             delta = pl.col("subframecount").cast(pl.Int64) - pl.col("subframecount_prev_ext_trig")
             df_subframe = df_subframe.with_columns(dsf_last_ext_trig=delta)
         if output_control.require_next:
-            df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+            df_subframe = df_subframe.join_asof(
+                df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
             delta = pl.col("subframecount_next_ext_trig") - pl.col("subframecount").cast(pl.Int64)
             df_subframe = df_subframe.with_columns(dsf_next_ext_trig=delta)
 
@@ -1491,7 +1494,8 @@ class Channel:
                         )
 
         # Drop columns that the user doesn't want
-        df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig", "subframecount")
+        if not output_control.absolute_sfs:
+            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
         if not output_control.sf_last_trig:
             df_subframe = df_subframe.drop("dsf_last_ext_trig")
         if not output_control.sf_next_trig:
