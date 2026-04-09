@@ -2,7 +2,7 @@
 Data structures and methods for handling a single microcalorimeter channel's pulse data and metadata.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import dataclasses
 from typing import Any
 from numpy.typing import ArrayLike, NDArray
@@ -132,6 +132,21 @@ class Channel:
     def n_samples(self) -> int:
         "Samples per pulse, from the file header"
         return self.header.n_samples
+
+    def head(self, n: int) -> "Channel":
+        "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
+        df = self.df.head(n)
+        return replace(self, df=df, npulses=len(df))
+
+    def tail(self, n: int) -> "Channel":
+        "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        df = self.df.tail(n)
+        return replace(self, df=df, npulses=len(df))
+
+    def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
+        "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        df = self.df.sample(n=n, fraction=fraction, with_replacement=False)
+        return replace(self, df=df, npulses=len(df))
 
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
@@ -1510,6 +1525,11 @@ class Channel:
             self,
             df=df2,
         )
+
+    def drop(self, *args: str) -> "Channel":
+        "Return a Channel, after dropping one or more columns from the dataframe, by name"
+        df = self.df.drop(*args)
+        return self.with_replacement_df(df)
 
     def with_columns(self, df2: pl.DataFrame) -> "Channel":
         """Append columns from df2 to the existing dataframe, keeping all other attributes the same."""
