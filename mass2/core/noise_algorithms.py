@@ -186,7 +186,6 @@ def calc_noise_result(
     data = np.asarray(data)
     data_zeromean = data - np.mean(data)
     (n_pulses, nsamples) = data_zeromean.shape
-    # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
     if nsamples <= skip_autocorr_if_length_over:
         if continuous:
@@ -236,7 +235,6 @@ class NoiseResult:
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
         plt.title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
-        axis.figure.tight_layout()
 
     def plot_log_rebinned(
         self,
@@ -285,4 +283,3 @@ class NoiseResult:
         axis.grid(True, which="both")
         axis.set_xlabel("Frequency (Hz)")
         axis.set_title(f"Log-rebinned noise from {len(self.frequencies) * 2 - 2} samples")
-        axis.figure.tight_layout()

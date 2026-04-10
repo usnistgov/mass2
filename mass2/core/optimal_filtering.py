@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 from mass2.mathstat.toeplitz import ToeplitzSolver
+from mass2.core.misc import plot_zoomable
 
 
 @dataclass(frozen=True)
@@ -299,7 +300,7 @@ class Filter(ABC):
         axis.set_title(f"Filter type={self._filter_type} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Samples")
-        plt.gcf().tight_layout()
+        plot_zoomable()
 
     def report(self, std_energy: float = 5898.8) -> None:
         """Report on estimated V/dV for the filter.
@@ -939,6 +940,9 @@ class FilterMaker:
         sig_ft_weighted[0] = 0.0
         filt_fourier = np.fft.irfft(sig_ft_weighted) / window
         self._normalize_5lag_filter(filt_fourier, avg_signal)
+        # Set weights in the cut_pre and cut_post windows to 0
+        if cut_pre > 0 or cut_post > 0:
+            filt_fourier = np.hstack([np.zeros(cut_pre), filt_fourier, np.zeros(cut_post)])
 
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
         if self.noise_autocorr is None:

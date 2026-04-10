@@ -190,7 +190,7 @@ def pulse_2exp_with_tail(
         # value at peak
         max_val = np.exp(-t_peak / tau_fall) - np.exp(-t_peak / tau_rise)
     else:  # tau_fall == tau_rise
-        max_val = 1 / np.e
+        max_val = np.exp(-1)
 
     return (
         a_tail * np.exp(-tt / tau_tail) / np.exp(-tt[0] / tau_tail)  # normalized tail

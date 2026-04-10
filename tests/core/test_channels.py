@@ -535,7 +535,7 @@ def test_channel_mismatched_n_samples():
 
 
 def test_ch_from_numpy():
-    "Test that we can read pulse data from a numpy file"
+    "Test that we can read random values from a numpy file"
     nsamp, npulses = 100, 60
     raw = np.random.default_rng().normal(10000, 1000, size=(nsamp, npulses)).astype(np.int16)
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -548,3 +548,18 @@ def test_ch_from_numpy():
         for i in range(npulses):
             assert np.all(data.ch0.df["pulse"][i].to_numpy() == raw[:, i])
             assert np.all(data.ch0.noise.df["pulse"][i].to_numpy() == raw[:, i])
+
+
+def test_ch_from_numpy2():
+    "Test that we can read actual pulse data from a numpy file"
+    pulse_noise_pair = pulsedata.numpy["noise_limited_optical_tes"]
+    noisepath = pulse_noise_pair.noise
+    pulsepath = pulse_noise_pair.pulse
+    rate = 16000.0
+    npre = 300
+    ch = mass2.Channel.from_numpy(rate, npre, pulsepath, noisepath, "description", ch_num=5)
+    data = mass2.Channels.from_oneChannel(ch)
+    assert data.ch0.noise is not None
+    for i in range(ch.npulses):
+        pulse = data.ch0.df["pulse"][i].to_numpy()
+        assert np.all(pulse < 5000) and np.all(pulse > -5000)

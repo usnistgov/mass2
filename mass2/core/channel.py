@@ -27,11 +27,11 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .offfiles import OffFile
-from .misc import alwaysTrue
+from .misc import alwaysTrue, plot_zoomable
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
-from .drift_correction import DriftCorrectStep
+from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
 from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
 
@@ -194,7 +194,18 @@ class Channel:
         use_good_expr: bool = True,
         use_expr: pl.Expr = pl.lit(True),
     ) -> tuple[NDArray, NDArray]:
-        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr."""
+        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr.
+
+        Args:
+            col (str): Name of the column to histogram
+            bin_edges (ArrayLike): Histogram bin edges
+            axis (plt.Axes | None, optional): The Axes to plot on, if None, create a new figure. Defaults to None.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+
+        Returns:
+            tuple[NDArray, NDArray]: Array of bin centers and counts, respectively
+        """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
@@ -202,13 +213,14 @@ class Channel:
 
         bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr, use_expr=use_expr)
         _, step_size = misc.midpoints_and_step_size(bin_edges)
-        plt.step(bin_centers, counts, where="mid")
+        ax.step(bin_centers, counts, where="mid")
 
         # Customize the plot
         ax.set_xlabel(str(col))
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} for {self.shortname}")
 
+        plot_zoomable()
         return bin_centers, counts
 
     def plot_hists(
@@ -222,13 +234,21 @@ class Channel:
         skip_none: bool = True,
     ) -> tuple[NDArray, dict[str, NDArray]]:
         """
-        Plots histograms for the given column, grouped by the specified column.
+        Plots histograms for values in the given column, grouped by the specified column. There will be
+        one separate histogram for each distinct values of the `group_by_col` column.
 
-        Parameters:
-        - col (str): The column name to plot.
-        - bin_edges (array-like): The edges of the bins for the histogram.
-        - group_by_col (str): The column name to group by. This is required.
-        - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+        Args:
+            col (str): The column name to plot.
+            bin_edges (array-like): The edges of the bins for the histogram.
+            group_by_col (str): The column name to group by. This is required.
+            axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+            skip_none (bool, optional): Whether to skip None in the groupings. Defaults to True.
+
+        Returns:
+            tuple[NDArray,dict[str, NDArray]]: Array of bin centers and a dictionary mapping group name to
+            counts in the histograms.
         """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
@@ -256,14 +276,7 @@ class Channel:
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
-            plt.step(bin_centers, counts, where="mid", label=group_name_str)
-            # Plot the histogram for the current group
-            # if group_name == "EBIT":
-            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=group_name_str)
-            # else:
-            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=group_name_str)
-            # bin_centers, counts = misc.hist_of_series(values, bin_edges)
-            # plt.plot(bin_centers, counts, label=group_name)
+            ax.step(bin_centers, counts, where="mid", label=group_name_str)
         # Customize the plot
         ax.set_xlabel(str(col))
         if len(counts_dict) > 0:
@@ -272,6 +285,7 @@ class Channel:
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
+        plot_zoomable()
 
         return bin_centers, counts_dict
 
@@ -328,7 +342,6 @@ class Channel:
             fig = plt.figure()
             axis = plt.gca()
         plt.sca(axis)  # set current axis so I can use plt api
-        fig = plt.gcf()
         filter_expr = use_expr
         if use_good_expr:
             filter_expr = self.good_expr.and_(use_expr)
@@ -378,6 +391,7 @@ class Channel:
                 lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
+            fig = plt.gcf()
             annotation = axis.annotate(
                 "",
                 xy=(0, 0),
@@ -469,6 +483,7 @@ class Channel:
         plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
+        plot_zoomable()
 
     def plot_pulses(  # noqa: PLR0917
         self,
@@ -598,6 +613,7 @@ class Channel:
             if derivative:
                 pulse = np.hstack((0, np.diff(pulse)))
             axis.plot(sample_x, pulse, color=color)
+        plot_zoomable()
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
@@ -947,7 +963,7 @@ class Channel:
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
-    def filter5lag(
+    def filter5lag(  # noqa: PLR0917
         self,
         pulse_col: str = "pulse",
         peak_y_col: str = "5lagy",
@@ -957,6 +973,8 @@ class Channel:
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
         fourier: bool = False,
         longest_autocorr_filter: int = 10_000,
+        cut_pre: int = 0,
+        cut_post: int = 0,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -981,6 +999,10 @@ class Channel:
             Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
             (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
             If exceeded, filters will be Fourier-space filters.
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
 
         Returns
         -------
@@ -1013,15 +1035,16 @@ class Channel:
 
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
             if fourier:
-                filter5lag = filter_maker.compute_fourier(f_3db=f_3db)
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
             else:
-                filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         else:
             if fourier:
                 raise NotImplementedError(
                     "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
                 )
-            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
+            ets = time_constant_s_of_exp_to_be_orthogonal_to
+            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
@@ -1177,6 +1200,20 @@ class Channel:
         )
         return self.with_step(step)
 
+    def time_drift_correct(
+        self,
+        time_col: str = "timestamp",
+        uncorrected_col: str = "5lagy_dc",
+        corrected_col: str = "5lagy_tdc",
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "Channel":
+        """Correct for gain drifing slowly with time."""
+        # by defining a seperate learn method that takes ch as an argument,
+        # we can move all the code for the step outside of Channel
+        step = TimeDriftCorrectStep.learn(ch=self, time_col=time_col, uncorrected_col=uncorrected_col,
+                                          corrected_col=corrected_col, use_expr=use_expr)
+        return self.with_step(step)
+
     def linefit(  # noqa: PLR0917
         self,
         line: GenericLineModel | SpectralLine | str | float,
@@ -1281,16 +1318,18 @@ class Channel:
         return channel
 
     @classmethod
-    def from_numpy(
+    def from_numpy(  # noqa: PLR0917
         cls,
         samplerate: float,
         npresamples: int,
-        pulse_fname: str,
-        noise_fname: str | None = None,
+        pulse_fname: str | Path,
+        noise_fname: str | Path | None = None,
         description: str = "",
         ch_num: int = 0,
         invert_data: bool = False,
         timestamps: bool = True,
+        row_index: bool = False,
+        rescale: float = 1.0,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1303,9 +1342,9 @@ class Channel:
             Samples per second
         npresamples : int
             How many samples in each record precede the pulse trigger
-        pulse_fname : str
+        pulse_fname : str | Path
             File containing the raw pulse data  (assumes a *.npy file)
-        noise_fname : str | None, optional
+        noise_fname : str | Path | None, optional
             File containing the raw noise data, by default None
         description : str, optional
             A description to store with the channel, by default ""
@@ -1315,6 +1354,10 @@ class Channel:
             Whether to take the negative of the raw data, by default False
         timestamps : bool, optional
             Whether to generate timestamp guesses, based on file creation time, by default True
+        row_index: bool, optional
+            Whether to generate a column "index" counting [0...n-1], by default False
+        rescale: float, optional
+            Multiply the raw data by this value to get reasonable scaling, by default 1.0
 
         Returns
         -------
@@ -1322,20 +1365,22 @@ class Channel:
             The Channel created from the numpy file
         """
 
-        def load(fname: str) -> NDArray:
-            data = np.load(fname)
+        def load(fname: str | Path) -> NDArray:
+            data = np.load(str(fname))
             if data.ndim == 3:
                 data = data[0, :, :]
             assert data.ndim == 2
             if invert_data:
                 data = -data
-            return data
+            return data * rescale
 
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
         datadict = {"pulse": pdata.T}
         pulse_df = pl.DataFrame(datadict)
+        if row_index:
+            pulse_df = pulse_df.with_row_index()
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and
