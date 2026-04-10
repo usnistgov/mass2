@@ -11,6 +11,7 @@
 * Make the parameters `cut_pre` and `cut_post` work with Fourier-domain filters.
 * Make a recipe step to use the time-drift-correct algorithm (issue 125).
 * Add options to the external-trigger reader, letting user pick what quantities to keep (issue 128).
+* Keep pulse raw data outside each `Channel`'s dataframe, for memory economy (issue 126).
 
 **2.0.3** March 13, 2026
 * Add some convenient plotting features like `Channel.plot_pulses()`.

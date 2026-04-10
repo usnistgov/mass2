@@ -6,7 +6,7 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Any
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 import os
 import numpy as np
 import polars as pl
@@ -288,7 +288,7 @@ class LJHFile(ABC):
         first_pulse: int = 0,
         keep_posix_usec: bool = False,
         force_continuous: bool = False,
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, ArrayLike]]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
         Parameters
@@ -304,20 +304,22 @@ class LJHFile(ABC):
         Returns
         -------
         tuple[pl.DataFrame, pl.DataFrame]
-            (df, header_df)
+            (df, header_df, pulse_data)
             df: the dataframe containing raw pulse information, one row per pulse
             header_df: a one-row dataframe containing the information from the LJH file header
+            pulse_data: a dict with key "pulse" and value is the memmap to the data
 
             The polars series "timestamp" will be converted to the time zone name
             returned by tzlocal.get_localzone_name()
         """
+        pdata = {
+            "pulse": self._mmap["data"][first_pulse:]
+        }
         data = {
-            "pulse": self._mmap["data"][first_pulse:],
             "posix_usec": self.datatimes_raw[first_pulse:],
             "subframecount": self.subframecount[first_pulse:],
         }
         schema: pl._typing.SchemaDict = {
-            "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
             "subframecount": pl.UInt64,
         }
@@ -329,7 +331,7 @@ class LJHFile(ABC):
             df = df.drop("posix_usec")
         continuous = self.is_continuous or force_continuous
         header_df = pl.DataFrame(self.header).with_columns(continuous=continuous)
-        return df, header_df
+        return df, header_df, pdata
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
         """Write an LJH copy of this file, with a limited number of pulses.
@@ -473,10 +475,10 @@ class LJHFile_2_1(LJHFile):
 
     def to_polars(
         self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, ArrayLike]]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
-        return df.select(pl.exclude("subframecount")), df_header
+        df, df_header, pdata = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        return df.select(pl.exclude("subframecount")), df_header, pdata
 
 
 class LJHFile_2_0(LJHFile):
@@ -512,7 +514,7 @@ class LJHFile_2_0(LJHFile):
 
     def to_polars(
         self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
-    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, ArrayLike]]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
-        return df.select(pl.exclude("subframecount")), df_header
+        df, df_header, pdata = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        return df.select(pl.exclude("subframecount")), df_header, pdata

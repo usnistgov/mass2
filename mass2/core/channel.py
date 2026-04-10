@@ -92,6 +92,7 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
+    pulse_data: dict[str, ArrayLike]
     subframediv: int | None = None
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
@@ -103,8 +104,8 @@ class Channel:
     def __post_init__(self) -> None:
         # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
         pulse_col = "pulse"
-        if pulse_col in self.df.columns:
-            dtype = self.df[pulse_col].dtype
+        if pulse_col in self.pulse_data:
+            dtype = self.pulse_data[pulse_col].dtype
             if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
                 raise ValueError(f"Column '{pulse_col}' has array width {dtype.size} but header.n_samples={self.header.n_samples}")
 
@@ -136,17 +137,14 @@ class Channel:
     def head(self, n: int) -> "Channel":
         "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
         df = self.df.head(n)
-        return replace(self, df=df, npulses=len(df))
+        pulse = {k: v[:n] for (k, v) in self.pulse_data.items()}
+        return replace(self, df=df, npulses=len(df), pulse_data=pulse)
 
     def tail(self, n: int) -> "Channel":
         "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
         df = self.df.tail(n)
-        return replace(self, df=df, npulses=len(df))
-
-    def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
-        "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
-        df = self.df.sample(n=n, fraction=fraction, with_replacement=False)
-        return replace(self, df=df, npulses=len(df))
+        pulse = {k: v[-n:] for (k, v) in self.pulse_data.items()}
+        return replace(self, df=df, npulses=len(df), pulse_data=pulse)
 
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
@@ -491,7 +489,7 @@ class Channel:
                     pnum = lines_pnums[0][1]
                     rownum = pnum[int(ind["ind"][0])]
                     print(f"This is pulse# {rownum}")
-                    print(self.df.drop("pulse").row(rownum, named=True))
+                    print(self.df.row(rownum, named=True))
 
             fig.canvas.mpl_connect("motion_notify_event", hover)
             fig.canvas.mpl_connect("button_press_event", click)
@@ -637,7 +635,7 @@ class Channel:
         plot_columns = (pulse_field, "pretrig_mean")
         df = lf.select(plot_columns).collect()
         N = len(df)
-        pulses = df[pulse_field]
+        pulses = self.pulse_data[pulse_field][lf["Record #"]]
         ptmean = df["pretrig_mean"]
         for i in range(N):
             pulse = pulses[i].to_numpy()
@@ -856,7 +854,7 @@ class Channel:
         Always sets lower limit at 0, so don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+            df = self.df.filter(self.good_expr)
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
@@ -875,7 +873,7 @@ class Channel:
         Always sets lower limit at 0, so don't use for values that can be negative
         """
         if use_prev_good_expr:
-            df = self.df.lazy().select(pl.exclude("pulse")).filter(self.good_expr).collect()
+            df = self.df.filter(self.good_expr)
         else:
             df = self.df
         for i, (col, nsigma) in enumerate(col_nsigma_pairs):
@@ -890,7 +888,7 @@ class Channel:
     @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
         """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
-        raw = self.df.limit(100)[col].to_numpy()
+        raw = self.pulse_data[col][:100]
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
@@ -983,17 +981,17 @@ class Channel:
         NDArray
             _description_
         """
-        avg_pulse = (
+        chosen_pulses = (
             self.df.lazy()
+            .with_row_index("pulse_index")
             .filter(self.good_expr)
             .filter(use_expr)
-            .select(pulse_col)
             .limit(limit)
+            .select("pulse_index")
             .collect()
             .to_series()
-            .to_numpy()
-            .mean(axis=0)
         )
+        avg_pulse = self.pulse_data[pulse_col][chosen_pulses].mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
@@ -1114,7 +1112,8 @@ class Channel:
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .with_row_index("pulse_index")
+            .select("pulse_index", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1132,7 +1131,7 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        pulse = df["pulse"].to_numpy()
+        pulse = self.pulse_data[pulse_col][df["pulse_index"]]
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
@@ -1315,10 +1314,12 @@ class Channel:
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
         ljh = mass2.LJHFile.open(path)
-        df, header_df = ljh.to_polars(keep_posix_usec)
+        df, header_df, pdata = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+            df, header=header, npulses=ljh.npulses, pulse_data=pdata,
+            subframediv=ljh.subframediv, noise=noise_channel,
+            transform_raw=transform_raw
         )
         return channel
 
@@ -1411,10 +1412,8 @@ class Channel:
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
-        datadict = {"pulse": pdata.T}
-        pulse_df = pl.DataFrame(datadict)
-        if row_index:
-            pulse_df = pulse_df.with_row_index()
+        pulse_data = {"pulse": pdata.T}
+        pulse_df = pl.DataFrame()
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and
@@ -1427,23 +1426,26 @@ class Channel:
             initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
             times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
             pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+            if row_index:
+                pulse_df = pulse_df.with_row_index()
 
         if noise_fname is None:
             nch = None
         else:
             ndata = load(noise_fname)
-            noise_df = pl.DataFrame({"pulse": ndata.T})
+            noise_df = pl.DataFrame()
+            pdata = {"pulse": ndata.T}
             nh = {
                 "filename": noise_fname,
                 "continuous": True,
                 "Presamples": npresamples,
             }
             noise_header = pl.DataFrame(nh)
-            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+            nch = mass2.NoiseChannel(noise_df, noise_header, pdata, frametime_s)
 
         source = os.path.basename(pulse_fname)
         header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
-        return cls(pulse_df, header, npulses, noise=nch)
+        return cls(pulse_df, header, npulses, pulse_data=pulse_data, noise=nch)
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
@@ -1689,7 +1691,7 @@ class Channel:
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
-        pulse = self.df[col][index].to_numpy()
+        pulse = self.pulse_data[col][index]
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")

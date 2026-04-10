@@ -3,7 +3,7 @@ Hold a class to represent a channel with noise data only, and to analyze its noi
 """
 
 from typing import Any
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 from pathlib import Path
 from dataclasses import dataclass
 import polars as pl
@@ -18,6 +18,7 @@ class NoiseChannel:
 
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
+    pulse_data: dict[str, ArrayLike]
     frametime_s: float
 
     # @functools.cache
@@ -30,10 +31,10 @@ class NoiseChannel:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
-        noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
+        noise_traces = self.pulse_data[trace_col_name][:n_limit]
         excursion = excursion2d(noise_traces)
         max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
-        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
+        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion).with_row_index()
         return df_noise2, max_excursion
 
     def get_records_2d(
@@ -71,7 +72,8 @@ class NoiseChannel:
             Shape: (n_pulses, len(pulse))
         """
         df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"].to_numpy()
+        idx_clean_traces = df_noise2.filter(pl.col("excursion") <= max_excursion)["index"].to_numpy()
+        noise_traces_clean = self.pulse_data[trace_col_name][idx_clean_traces].to_numpy()
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -121,6 +123,6 @@ class NoiseChannel:
     def from_ljh(cls, path: str | Path) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
-        df, header_df = ljh.to_polars()
-        noise_channel = cls(df, header_df, header_df["Timebase"][0])
+        df, header_df, pdata = ljh.to_polars()
+        noise_channel = cls(df, header_df, pdata, header_df["Timebase"][0])
         return noise_channel

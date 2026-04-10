@@ -15,9 +15,9 @@ import pathlib
 def test_ljh_to_polars():
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     ljh_noise = mass2.LJHFile.open(p.noise_folder / "20230626_run0000_chan4102.ljh")
-    _df_noise, _header_df_noise = ljh_noise.to_polars()
+    _df_noise, _header_df_noise, _pdata = ljh_noise.to_polars()
     ljh = mass2.LJHFile.open(p.pulse_folder / "20230626_run0001_chan4102.ljh")
-    _df, _header_df = ljh.to_polars()
+    _df, _header_df, _pdata = ljh.to_polars()
 
 
 def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
@@ -27,8 +27,9 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     pulse_traces = np.outer(rng.uniform(0.8, 1.2, size=npulses), signal).astype(np.int16)
     header_df = pl.DataFrame()
     frametime_s = 1e-5
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    df_noise = pl.DataFrame()
+    pdata = {"pulse": noise_traces}
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, pdata, frametime_s)
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -38,8 +39,9 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         n_samples=n,
         df=header_df,
     )
-    df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    df = pl.DataFrame()
+    pdata = {"pulse": pulse_traces + noise_traces}
+    ch = mass2.Channel(df, header, npulses=npulses, pulse_data=pdata, noise=noise_ch)
     return ch
 
 
@@ -129,8 +131,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
     header_df = pl.DataFrame({"continuous": [True]})
     frametime_s = 1e-5
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    df_noise = pl.DataFrame()
+    pulse_data = {"pulse": noise_traces}
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, pulse_data, frametime_s)
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -140,8 +143,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
         n_samples=n,
         df=header_df,
     )
-    df = pl.DataFrame({"pulse": pulse_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    df = pl.DataFrame()
+    pulse_data = {"pulse": pulse_traces}
+    ch = mass2.Channel(df, header, npulses=npulses, pulse_data=pulse_data, noise=noise_ch)
     ch = ch.filter5lag()
     step: mass2.core.OptimalFilterStep = ch.steps[-1]
     assert isinstance(step, mass2.core.OptimalFilterStep)
@@ -529,9 +533,9 @@ def test_change_time_zone():
 
 def test_channel_mismatched_n_samples():
     ch = dummy_channel()
-    bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 1)
+    bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 97)
     with pytest.raises(ValueError, match="n_samples"):
-        mass2.Channel(ch.df, bad_header, npulses=ch.npulses, noise=ch.noise)
+        mass2.Channel(ch.df, bad_header, npulses=ch.npulses, pulse_data=ch.pulse_data, noise=ch.noise)
 
 
 def test_ch_from_numpy():
@@ -546,8 +550,8 @@ def test_ch_from_numpy():
         data = mass2.Channels.from_oneChannel(ch)
         assert data.ch0.noise is not None
         for i in range(npulses):
-            assert np.all(data.ch0.df["pulse"][i].to_numpy() == raw[:, i])
-            assert np.all(data.ch0.noise.df["pulse"][i].to_numpy() == raw[:, i])
+            assert np.all(data.ch0.pulse_data["pulse"][i] == raw[:, i])
+            assert np.all(data.ch0.noise.pulse_data["pulse"][i] == raw[:, i])
 
 
 def test_ch_from_numpy2():
@@ -561,5 +565,5 @@ def test_ch_from_numpy2():
     data = mass2.Channels.from_oneChannel(ch)
     assert data.ch0.noise is not None
     for i in range(ch.npulses):
-        pulse = data.ch0.df["pulse"][i].to_numpy()
+        pulse = data.ch0.pulse_data["pulse"][i]
         assert np.all(pulse < 5000) and np.all(pulse > -5000)

@@ -120,10 +120,11 @@ class TriggerResult:
             nsamples=n_record_samples,
             inds=inds,
         )
-        df = pl.DataFrame({"pulse": pulses, "framecount": inds})
+        df = pl.DataFrame({"framecount": inds})
         noise = NoiseChannel(
             df,
             header_df=self.data_source.header_df,
+            pulse_data={"pulse": pulses},
             frametime_s=self.data_source.frametime_s,
         )
         return noise
@@ -141,10 +142,11 @@ class TriggerResult:
         inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
         pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=inds)
         assert pulses.shape[0] == len(inds), "pulses and trig_inds must have the same length"
+        df = pl.DataFrame({"framecount": inds})
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            pulse_data = {"pulse": pulses * -1}
         else:
-            df = pl.DataFrame({"pulse": pulses, "framecount": inds})
+            pulse_data = {"pulse": pulses}
         ch_header = ChannelHeader(
             self.data_source.description,
             None,
@@ -154,7 +156,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), pulse_data=pulse_data, noise=noise)
         return ch
 
     def to_channel_mmap(
@@ -181,10 +183,11 @@ class TriggerResult:
             bin_path=self.data_source.bin_path,
             verbose=verbose,
         )
+        df = pl.DataFrame({"framecount": inds})
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            pulse_data = {"pulse": pulses * -1}
         else:
-            df = pl.DataFrame({"pulse": pulses, "framecount": inds})
+            pulse_data = {"pulse": pulses}
         ch_header = ChannelHeader(
             self.data_source.description,
             None,
@@ -194,71 +197,8 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), pulse_data=pulse_data, noise=noise)
         return ch
-
-    # def to_summarized_channel(
-    #     self,
-    #     noise_n_dead_samples_after_pulse_trigger,
-    #     npre,
-    #     npost,
-    #     peak_index=None,
-    #     pretrigger_ignore=0,
-    #     invert=False,
-    # ):
-    #     batch_size = 10000
-    #     n = len(self.trig_inds)
-    #     n_batches = np.ceil(n / batch_size).astype(int)
-    #     dfs = []
-    #     for i_batch in range(n_batches):
-    #         # i0 = i_batch*batch_size
-    #         # i1 = min((i_batch+1)*batch_size, n)
-    #         # inds = self.trig_inds[i0:i1]
-    #         inds = self.trig_inds
-    #         inds = inds[inds > npre]  # ensure all inds inbounds
-    #         inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
-    #         pulses = gather_pulses_from_inds_numpy_contiguous(
-    #             self.data_source.data,
-    #             npre=npre,
-    #             nsamples=npre + npost,
-    #             inds=inds,
-    #         )
-    #         if invert:
-    #             pulses *= -1
-    #         if i_batch == 0 and peak_index is None:  # learn peak index
-    #             peak_index = int(np.median(np.amax(pulses, axis=1)))
-    #         assert isinstance(peak_index, int), "peak_index must be an integer"
-    #         print(f"summarizing batch {i_batch=}/{n_batches=}")
-    #         print(f"{self.data_source.frametime_s=}, {peak_index=}, {pretrigger_ignore=}, {npre=}")
-    #         summary_np = pulse_algorithms.summarize_data_numba(
-    #             pulses,
-    #             self.data_source.frametime_s,
-    #             peak_samplenumber=peak_index,
-    #             pretrigger_ignore_samples=pretrigger_ignore,
-    #             nPresamples=npre,
-    #         )
-    #         df_batch = pl.from_numpy(summary_np)
-    #         df_batch = df_batch.with_columns(pl.DataFrame({"framecount": np.array(inds) + npre}))
-    #         dfs.append(df_batch)
-    #     df = pl.concat(dfs)
-    #     ch_header = ChannelHeader(
-    #         self.data_source.description,
-    #         None,
-    #         self.data_source.channel_number,
-    #         self.data_source.frametime_s,
-    #         npre,
-    #         npre + npost,
-    #         self.data_source.header_df,
-    #     )
-    #     noise = self.get_noise(
-    #         noise_n_dead_samples_after_pulse_trigger,
-    #         npre + npost,
-    #         max_noise_triggers=1000,
-    #     )
-    #     # The following lines are broken August 8, 2025. Replace them with something non-broken.
-    #     # pulse_storage = PulseStorageInArray(self.data_source.data, self.trig_inds, npre, npre + npost)
-    #     # ch = Channel(df, ch_header, noise, pulse_storage=pulse_storage)
-    #     return Channel(df, ch_header, npulses=len(df), noise=noise)
 
 
 @dataclass(frozen=True)
