@@ -46,6 +46,8 @@ class LJHFile(ABC):
     header_string: str
     header_size: int
     binary_size: int
+    first_pulse: int
+    last_pulse: int
     _mmap: np.memmap
     ljh_version: Version
 
@@ -142,6 +144,8 @@ class LJHFile(ABC):
             header_string,
             header_size,
             binary_size,
+            first_pulse,
+            npulses + first_pulse,
             mmap,
             ljh_version,
         )
@@ -349,7 +353,11 @@ class LJHFile(ABC):
         if not keep_posix_usec:
             df = df.drop("posix_usec")
         continuous = self.is_continuous or force_continuous
-        header_df = pl.DataFrame(self.header).with_columns(continuous=continuous)
+        header_df = pl.DataFrame(self.header).with_columns(
+            continuous=continuous,
+            first_pulse=self.first_pulse,
+            last_pulse=self.last_pulse,
+            )
         return df, header_df
 
     def write_truncated_ljh(self, filename: str, npulses: int) -> None:
