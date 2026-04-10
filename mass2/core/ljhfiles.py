@@ -48,7 +48,6 @@ class LJHFile(ABC):
     binary_size: int
     _mmap: np.memmap
     ljh_version: Version
-    max_pulses: int | None = None
 
     OVERLONG_HEADER: ClassVar[int] = 100
 
@@ -145,7 +144,6 @@ class LJHFile(ABC):
             binary_size,
             mmap,
             ljh_version,
-            npulses,
         )
 
     @classmethod
@@ -205,14 +203,15 @@ class LJHFile(ABC):
         """The size in bytes of each binary pulse record (including the timestamps)"""
         return self.dtype.itemsize
 
-    def reopen_binary(self, max_pulses: int | None = None) -> "LJHFile":
+    def reopen_binary(self, first_pulse: int = 0, last_pulse: int | None = None) -> "LJHFile":
         """Reopen the underlying binary section of the LJH file, in case its size has changed,
         without re-reading the LJH header section.
 
         Parameters
         ----------
-        max_pulses : Optional[int], optional
-            A limit to the number of pulses to memory map or None for no limit, by default None
+        first_pulse (int, optional): Index of the first pulse to read. Defaults to 0.
+        last_pulse (int | None, optional): Index of the pulse after the last pulse to read.
+            If larger than the file size or None, read to the end of the file. Defaults to None.
 
         Returns
         -------
@@ -221,20 +220,23 @@ class LJHFile(ABC):
         """
         current_binary_size = os.path.getsize(self.filename) - self.header_size
         npulses = current_binary_size // self.pulse_size_bytes
-        if max_pulses is not None:
-            npulses = min(max_pulses, npulses)
+        if last_pulse is not None:
+            npulses = min(last_pulse - first_pulse, npulses)
+            assert last_pulse > 0
+        assert first_pulse >= 0
+        binary_offset = self.header_size + self.pulse_size_bytes * first_pulse
+
         mmap = np.memmap(
             self.filename,
             self.dtype,
             mode="r",
-            offset=self.header_size,
+            offset=binary_offset,
             shape=(npulses,),
         )
         return dataclasses.replace(
             self,
             npulses=npulses,
             _mmap=mmap,
-            max_pulses=max_pulses,
             binary_size=current_binary_size,
         )
 
