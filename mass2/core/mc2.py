@@ -16,7 +16,7 @@ def main() -> None:
         "-o", "--output-dir", nargs="?", const=None, default=None, help="store output to this directory (default: $ljhpath/mc2)"
     )
     parser.add_argument(
-        "-p", "--analysis-period", default=10.0, type=float, 
+        "-p", "--analysis-period", default=10.0, type=float,
         help="repeat basic analysis at this repetition period in seconds (default: 10)"
     )
     # parser.add_argument("-f", "--fast-analysis-period", default=1.0, type=float,

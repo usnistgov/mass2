@@ -57,8 +57,24 @@ class LJHFile(ABC):
         return f"""mass2.core.ljhfiles.LJHFile.open("{self.filename}")"""
 
     @classmethod
-    def open(cls, filename: str | Path, max_pulses: int | None = None) -> "LJHFile":
-        """Open an LJH file, parsing its header information and returning an LJHFile object."""
+    def open(cls, filename: str | Path,
+             first_pulse: int = 0,
+             last_pulse: int | None = None) -> "LJHFile":
+        """Open an LJH file, parsing its header information and returning an LJHFile object with access to
+        all or part of the file.
+
+        Args:
+            filename (str | Path): LJH file path
+            first_pulse (int, optional): Index of the first pulse to read. Defaults to 0.
+            last_pulse (int | None, optional): Index of the pulse after the last pulse to read.
+                If larger than the file size or None, read to the end of the file. Defaults to None.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            LJHFile: _description_
+        """
         filename = str(filename)
         header_dict, header_string, header_size = cls.read_header(filename)
         channum = header_dict["Channel"]
@@ -97,7 +113,7 @@ class LJHFile(ABC):
                 ("data", np.uint16, nsamples),
             ])
             concrete_LJHFile_type = LJHFile_2_2
-        pulse_size_bytes = dtype.itemsize
+        record_size_bytes = dtype.itemsize
         binary_size = os.path.getsize(filename) - header_size
 
         # Fix long-standing bug in LJH files made by MATTER or XCALDAQ_client:
@@ -105,10 +121,13 @@ class LJHFile(ABC):
         if "DASTARD" not in client:
             npresamples += 3
 
-        npulses = binary_size // pulse_size_bytes
-        if max_pulses is not None:
-            npulses = min(max_pulses, npulses)
-        mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
+        npulses = binary_size // record_size_bytes
+        if last_pulse is not None:
+            npulses = min(last_pulse - first_pulse, npulses)
+            assert last_pulse > 0
+        assert first_pulse >= 0
+        binary_offset = header_size + record_size_bytes * first_pulse
+        mmap = np.memmap(filename, dtype, mode="r", offset=binary_offset, shape=(npulses,))
 
         return concrete_LJHFile_type(
             filename,
@@ -126,7 +145,7 @@ class LJHFile(ABC):
             binary_size,
             mmap,
             ljh_version,
-            max_pulses,
+            npulses,
         )
 
     @classmethod

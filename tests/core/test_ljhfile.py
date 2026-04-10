@@ -84,3 +84,12 @@ def test_ljh_all_versions(tmp_path):  # noqa: PLR0914
         s0 = df["timestamp"]
         s1 = s0.dt.convert_time_zone(tzlocal.get_localzone_name())
         assert (s0 == s1).all()
+
+        # Test opening the second quarter of the LJH file
+        first = npulse // 4
+        last = npulse // 2
+        shortfile = LJHFile.open(created_path, first_pulse=first, last_pulse=last)
+        assert shortfile.npulses == last - first
+        assert np.all(shortfile.datatimes_raw == times_microsec[first:last] + time_offset)
+        for i in range(first, last):
+            assert np.all(file.read_trace(i) == shortfile.read_trace(i - first))
