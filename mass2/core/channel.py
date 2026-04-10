@@ -1307,6 +1307,8 @@ class Channel:
         cls,
         path: str | Path,
         noise_path: str | Path | None = None,
+        first_pulse: int = 0,
+        last_pulse: int | None = None,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
     ) -> "Channel":
@@ -1315,7 +1317,7 @@ class Channel:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass2.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path, first_pulse=first_pulse, last_pulse=last_pulse)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
