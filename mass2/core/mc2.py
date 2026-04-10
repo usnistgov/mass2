@@ -16,7 +16,8 @@ def main() -> None:
         "-o", "--output-dir", nargs="?", const=None, default=None, help="store output to this directory (default: $ljhpath/mc2)"
     )
     parser.add_argument(
-        "-p", "--analysis-period", default=10.0, type=float, help="repeat basic analysis at this repetition period (seconds)"
+        "-p", "--analysis-period", default=10.0, type=float, 
+        help="repeat basic analysis at this repetition period in seconds (default: 10)"
     )
     # parser.add_argument("-f", "--fast-analysis-period", default=1.0, type=float,
     #                     help="repeat basic analysis at this repetition period for any fast channels (seconds)")
@@ -34,7 +35,7 @@ def main() -> None:
     filefullpath = data.ch0.header.df["Filename"][0]
     _, filename = os.path.split(filefullpath)
     prefix = filename.split("_chan")[0]
-    parquet_model = str(output_dir / f"{prefix}_analyzed_")
+    parquet_file_prefix = str(output_dir / f"{prefix}_analyzed_")
     if output_dir.exists():
         search_path = output_dir / "*_analyzed_*.parquet"
         if args.force:
@@ -47,17 +48,32 @@ def main() -> None:
     else:
         output_dir.mkdir()
 
-    run_recipe_loop(data, args.recipefile, parquet_model, args.verbose)
+    run_recipe_loop(data, args.recipefile, parquet_file_prefix, args.verbose)
 
 
-def run_recipe_loop(data: mass2.Channels, recipefile: str, parquet_model: str, verbose: bool = False) -> None:
+ENCODING = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def encode_counter(j: int, nchar: int = 4) -> str:
+    """Encode integer `j` as a base-32 string, using the 32 characters in ENCODING
+    (Crockford's base-32 encoding)."""
+    c = []
+    for i in range(nchar):
+        c.append(ENCODING[j % 32])
+        j //= 32
+    c.reverse()
+    return "".join(c)
+
+
+def run_recipe_loop(data: mass2.Channels, recipefile: str, parquet_file_prefix: str, verbose: bool = False) -> None:
     parquet_counter = 0
     while True:
-        parquet_file = str(parquet_model) + f"{parquet_counter:04d}.parquet"
+        code = encode_counter(parquet_counter)
+        parquet_file = str(parquet_file_prefix) + f"{code}.parquet"
         data = data.load_recipes(recipefile)
         df = pl.DataFrame()
         for ch_num, ch in data.channels.items():
-            chdf = ch.df.drop("pulse")
+            chdf = ch.df.drop("pulse").with_columns(channel=pl.lit(ch_num))
             df = pl.concat([df, chdf])
         df.write_parquet(parquet_file)
         parquet_counter += 1
