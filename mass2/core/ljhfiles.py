@@ -122,7 +122,7 @@ class LJHFile(ABC):
         if "DASTARD" not in client:
             npresamples += 3
 
-        npulses = binary_size // record_size_bytes
+        npulses = binary_size // record_size_bytes - first_pulse
         if last_pulse is not None:
             npulses = min(last_pulse - first_pulse, npulses)
             assert last_pulse > 0
@@ -223,7 +223,7 @@ class LJHFile(ABC):
             A new `LJHFile` object with the same header but a new memmap and number of pulses.
         """
         current_binary_size = os.path.getsize(self.filename) - self.header_size
-        npulses = current_binary_size // self.pulse_size_bytes
+        npulses = current_binary_size // self.pulse_size_bytes - first_pulse
         if last_pulse is not None:
             npulses = min(last_pulse - first_pulse, npulses)
             assert last_pulse > 0
