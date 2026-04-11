@@ -10,11 +10,14 @@ Created on Jun 9, 2014
 """
 
 import numpy as np
-from numpy.typing import NDArray, ArrayLike
-from typing import Any
-from collections.abc import Callable
+import polars as pl
 import scipy as sp
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from numpy.typing import NDArray, ArrayLike
 from numba import njit
+from typing import Any
 
 from mass2.mathstat.entropy import laplace_entropy
 from mass2.mathstat.interpolate import CubicSpline
@@ -291,6 +294,78 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     return drift_corr_param, drift_correct_info
 
 
+@dataclass(frozen=True)
+class ExtTriggerControl:
+    """Parameters to control what columns are added when we incorporate external trigger timing info
+    """
+    ms_nearest_trig: bool = True
+    ms_last_trig: bool = False
+    ms_next_trig: bool = False
+    sf_last_trig: bool = False
+    sf_next_trig: bool = False
+    absolute_sfs: bool = False
+
+    @property
+    def require_last(self) -> bool:
+        return self.ms_last_trig or self.sf_last_trig or self.ms_nearest_trig or self.absolute_sfs
+
+    @property
+    def require_next(self) -> bool:
+        return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
+
+
+def add_external_trigger(df: pl.DataFrame, df_ext: pl.DataFrame, output_control: ExtTriggerControl,
+                         subframediv: int, frametime_s: float) -> pl.DataFrame:
+    """Add external trigger info to a pulse dataframe, with columns of user's choice.
+
+    Args:
+        df (pl.DataFrame): The dataframe where each row is a pulse. Contains a "subframecount" column
+        df_ext (pl.DataFrame): The dataframe containing external trigger times in a "subframecount" column
+        output_control (ExtTriggerControl): Several fields that choose what columns to compute
+        subframediv (int): How many subframe divisions there are per frame
+        frametime_s (float): The DAQ system frame time in seconds.
+
+    Returns:
+        pl.DataFrame: The input frame `df` enhanced with new columns
+    """
+    assert output_control.require_last or output_control.require_next
+    subframe_time_ms = frametime_s * 1000. / subframediv
+
+    df_subframe = df.select("subframecount")
+    if output_control.require_last:
+        df_subframe = df_subframe.join_asof(
+            df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+        delta = pl.col("subframecount").cast(pl.Int64) - pl.col("subframecount_prev_ext_trig")
+        df_subframe = df_subframe.with_columns(dsf_last_ext_trig=delta)
+    if output_control.require_next:
+        df_subframe = df_subframe.join_asof(
+            df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        delta = pl.col("subframecount_next_ext_trig") - pl.col("subframecount").cast(pl.Int64)
+        df_subframe = df_subframe.with_columns(dsf_next_ext_trig=delta)
+
+    if output_control.ms_last_trig:
+        df_subframe = df_subframe.with_columns(ms_last_ext_trig=(pl.col("dsf_last_ext_trig") * subframe_time_ms))
+    if output_control.ms_next_trig:
+        df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
+    if output_control.ms_nearest_trig:
+        df_subframe = df_subframe.with_columns(
+            pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                        .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
+                        .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
+                    .alias("ms_nearest_ext_trig")
+                    )
+
+    # Drop columns that the user doesn't want
+    if not output_control.absolute_sfs:
+        df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
+    if not output_control.sf_last_trig:
+        df_subframe = df_subframe.drop("dsf_last_ext_trig")
+    if not output_control.sf_next_trig:
+        df_subframe = df_subframe.drop("dsf_next_ext_trig")
+
+    return df.with_columns(df_subframe)
+
+
 @njit
 def filter_signal_lowpass(sig: NDArray, fs: float, fcut: float) -> NDArray:
     """Tophat lowpass filter using an FFT
@@ -544,7 +619,7 @@ def time_drift_correct(  # noqa: PLR0914
     elif H3 <= 0 or H3 - H2 > 0.00001:
         model = model2
 
-    def safe_model(x: NDArray):
+    def safe_model(x: NDArray) -> NDArray:
         "Return the TDC model, but enforcing no adjustment for times outside the range we learned on"
         y = model(x)
         y[x < -1] = 0

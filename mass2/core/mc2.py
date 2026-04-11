@@ -8,7 +8,7 @@ import time
 import mass2
 
 
-def make_output(output_dir: Path, search_path: Path, force: bool):
+def make_output(output_dir: Path, search_path: Path, force: bool) -> None:
     if output_dir.exists() and len(glob.glob(str(search_path))) > 0:
         if force:
             newname = output_dir / ".." / "mc2_prev"
@@ -112,7 +112,7 @@ def last_good_expr(ch: mass2.Channel) -> pl.Expr:
     return pl.lit(True)
 
 
-def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str, args : argparse.Namespace) -> None:
+def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str, args: argparse.Namespace) -> None:
 
     recipefile = args.recipefile[0]
     analysis_period = args.analysis_period

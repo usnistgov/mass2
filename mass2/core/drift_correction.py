@@ -148,7 +148,7 @@ class TimeDriftCorrectStep(RecipeStep):
         time_s, uncorrected_s = ch.good_serieses([time_col, uncorrected_col], use_expr)
         time_float_s = time_s.dt.epoch("ms") / 1e3
         pk = np.median(uncorrected_s)
-        w = max(pk / 3000., 1.0)
+        w = float(max(pk / 3000., 1.0))
 
         correction = mass2.core.analysis_algorithms.time_drift_correct(
             time=time_float_s.to_numpy(),
