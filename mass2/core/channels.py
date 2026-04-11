@@ -406,7 +406,8 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
+    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str,
+                            first_pulse: int = 0, last_pulse: int | None = None) -> "Channels":
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
@@ -441,7 +442,7 @@ class Channels:
         """
         channels: dict[int, Channel] = {}
         for pulse_path, noise_path in pulse_noise_pairs:
-            channel = Channel.from_ljh(pulse_path, noise_path)
+            channel = Channel.from_ljh(pulse_path, noise_path, first_pulse=first_pulse, last_pulse=last_pulse)
             assert channel.header.ch_num not in channels.keys()
             channels[channel.header.ch_num] = channel
         return cls(channels, description)
@@ -463,6 +464,8 @@ class Channels:
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
         include_ch_nums: list[int] | None = None,
+        first_pulse: int = 0,
+        last_pulse: int | None = None
     ) -> "Channels":
         """Create an instance from a directory of LJH files."""
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
@@ -483,7 +486,7 @@ class Channels:
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"   from_ljh_folder has {len(pairs)} pairs")
-        data = cls.from_ljh_path_pairs(pairs, description)
+        data = cls.from_ljh_path_pairs(pairs, description, first_pulse=first_pulse, last_pulse=last_pulse)
         print(f"   and the Channels obj has {len(data.channels)} pairs")
         return data
 
