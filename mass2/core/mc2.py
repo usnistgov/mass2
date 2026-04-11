@@ -30,6 +30,7 @@ def main() -> None:
     )
     parser.add_argument("-F", "--force", action="store_true", help="force overwrite of existing analysis? (default: False)")
     parser.add_argument("-v", "--verbose", action="store_true", help="print more facts (default: False)")
+    parser.add_argument("-a", "--archival", action="store_true", help="data is archival, not live (default: False)")
     parser.add_argument(
         "-o", "--output-dir", nargs="?", const=None, default=None, help="store output to this directory (default: $ljhpath/mc2)"
     )
@@ -57,6 +58,8 @@ def main() -> None:
     parser.add_argument("ljhpath", type=str, nargs=1, help="")
 
     args = parser.parse_args()
+    if args.archival:
+        args.analysis_period = 0.0
     ljhpath = Path(args.ljhpath[0])
 
     output_dir = args.output_dir
@@ -79,10 +82,10 @@ def main() -> None:
         ljhfiles[ljh.channum] = ljh
     del ljhfiles[0]
 
-    try:
-        run_recipe_loop(ljhfiles, parquet_file_prefix, args)
-    except KeyboardInterrupt:
-        return
+    run_recipe_loop(ljhfiles, parquet_file_prefix, args)
+    # try:
+    # except KeyboardInterrupt:
+    #     return
 
 
 ENCODING = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -137,6 +140,9 @@ def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str
             parquet_counter += 1
             print(f"...written to {parquet_file}\n")
         else:
+            if args.archival:
+                print("No remaining archival data")
+                return
             print("...waiting for new data")
             time.sleep(5.0)
 
