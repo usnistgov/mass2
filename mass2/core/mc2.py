@@ -102,11 +102,20 @@ def encode_counter(j: int, nchar: int = 4) -> str:
     return "".join(c)
 
 
+def last_good_expr(ch: mass2.Channel) -> pl.Expr:
+    "Use the `good_expr` from the last step that has one, or literal True if none do."
+    for step in reversed(ch.steps):
+        try:
+            return step.good_expr
+        except AttributeError:
+            continue
+    return pl.lit(True)
+
+
 def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str, args : argparse.Namespace) -> None:
 
     recipefile = args.recipefile[0]
     analysis_period = args.analysis_period
-    print(f"Analysis period: {analysis_period} seconds")
     # verbose = args.verbose
     parquet_counter = 0
     processed_counter = {ch_num: 0 for ch_num in ljhfiles.keys()}
@@ -125,7 +134,8 @@ def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str
             if len(ch.df) < args.minpulses:
                 continue
             # processed.add(ch_num)
-            chdf = ch.df.drop("pulse").with_columns(channel=pl.lit(ch_num))
+            good_expr = last_good_expr(ch)
+            chdf = ch.df.drop("pulse").with_columns(good_expr.alias("good"), pl.lit(ch_num).alias("channel"))
             processed_counter[ch_num] += len(chdf)
             print(f"Channel {ch_num:3d} processed {len(chdf):5d} pulses.")
             dframes.append(chdf)
