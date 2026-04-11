@@ -113,15 +113,12 @@ class TimeDriftCorrectStep(RecipeStep):
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         """Apply the drift correction to the input DataFrame and return a new DataFrame with results."""
         time_col, uncorrected_col = self.inputs
-        time_s = df[time_col]
-        time_s2 = time_s - time_s[0]
-        time_float_s = time_s2.dt.total_seconds(fractional=True)
-        tnorm = self.correction["normalize"](time_float_s)
+        time_s = df[time_col].dt.epoch("ms").to_numpy() / 1e3
+        tnorm = self.correction["normalize"](time_s)
         model = self.correction["model"]
         corrected_gain = 1 + model(tnorm)
 
-        df2 = df.select(
-            (pl.col(uncorrected_col) * corrected_gain).alias(self.output[0])).with_columns(df)
+        df2 = df.select((pl.col(uncorrected_col) * corrected_gain).alias(self.output[0])).with_columns(df)
         return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
@@ -140,25 +137,19 @@ class TimeDriftCorrectStep(RecipeStep):
 
     @classmethod
     def learn(
-        cls, ch: "Channel", time_col: str, uncorrected_col: str,
-        corrected_col: str | None, use_expr: pl.Expr, **kwargs: Any
+        cls, ch: "Channel", time_col: str, uncorrected_col: str, corrected_col: str | None, use_expr: pl.Expr, **kwargs: Any
     ) -> "TimeDriftCorrectStep":
         """Create a DriftCorrectStep by learning the correction from data in the given Channel."""
         if corrected_col is None:
             corrected_col = uncorrected_col + "_dc"
 
         time_s, uncorrected_s = ch.good_serieses([time_col, uncorrected_col], use_expr)
-        time_s2 = time_s - time_s[0]
-        time_float_s = time_s2.dt.total_seconds(fractional=True)
-        pk = np.median(uncorrected_s.to_numpy())
-        w = max(pk / 3000., 1.0)
+        time_float_s = time_s.dt.epoch("ms") / 1e3
+        pk = np.median(uncorrected_s)
+        w = max(pk / 3000.0, 1.0)
 
         correction = mass2.core.analysis_algorithms.time_drift_correct(
-            time=time_float_s.to_numpy(),
-            uncorrected=uncorrected_s.to_numpy(),
-            w=w,
-            limit=(0.5*pk, 1.5*pk),
-            **kwargs
+            time=time_float_s.to_numpy(), uncorrected=uncorrected_s.to_numpy(), w=w, **kwargs
         )
         step = cls(
             inputs=[time_col, uncorrected_col],
