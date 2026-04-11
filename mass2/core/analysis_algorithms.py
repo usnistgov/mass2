@@ -507,10 +507,10 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("Using %2d degrees for %6d photons (after %d downsample)", ndeg, N, downsample)
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
-    def model1(pi: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
+    def model1(param_i: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
         "The model function, with one parameter pi varied, others fixed."
         pcopy = np.array(param)
-        pcopy[i] = pi
+        pcopy[i] = param_i
         return 1 + np.dot(basis.T, pcopy)
 
     def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
@@ -544,8 +544,15 @@ def time_drift_correct(  # noqa: PLR0914
     elif H3 <= 0 or H3 - H2 > 0.00001:
         model = model2
 
+    def safe_model(x: NDArray):
+        "Return the TDC model, but enforcing no adjustment for times outside the range we learned on"
+        y = model(x)
+        y[x < -1] = 0
+        y[x > +1] = 0
+        return y
+
     info["entropies"] = (H1, H2, H3)
-    info["model"] = model
+    info["model"] = safe_model
     return info
 
 
