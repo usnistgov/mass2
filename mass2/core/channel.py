@@ -1326,6 +1326,21 @@ class Channel:
         return channel
 
     @classmethod
+    def from_open_ljh(
+        cls,
+        ljh: mass2.LJHFile,
+        keep_posix_usec: bool = False,
+        transform_raw: Callable | None = None,
+    ) -> "Channel":
+        """Load a Channel from an open LJHFile object."""
+        df, header_df = ljh.to_polars(keep_posix_usec)
+        header = ChannelHeader.from_ljh_header_df(header_df)
+        channel = cls(
+            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=None, transform_raw=transform_raw
+        )
+        return channel
+
+    @classmethod
     def from_off(cls, off: OffFile) -> "Channel":
         """Load a Channel from an OFF file."""
         assert off._mmap is not None
