@@ -135,7 +135,11 @@ def run_recipe_loop(ljhfiles: dict[int, mass2.LJHFile], parquet_file_prefix: str
                 continue
             # processed.add(ch_num)
             good_expr = last_good_expr(ch)
-            chdf = ch.df.drop("pulse").with_columns(good_expr.alias("good"), pl.lit(ch_num).alias("channel"))
+            chdf = (ch.df
+                    .drop("pulse")
+                    .with_row_index(name="pulseindex")
+                    .with_columns(good_expr.alias("good"), pl.lit(ch_num).alias("channel"))
+                    )
             processed_counter[ch_num] += len(chdf)
             print(f"Channel {ch_num:3d} processed {len(chdf):5d} pulses.")
             dframes.append(chdf)
