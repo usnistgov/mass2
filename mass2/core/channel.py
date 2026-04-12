@@ -27,14 +27,15 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .analysis_algorithms import add_external_trigger, ExtTriggerControl
-from .offfiles import OffFile
+from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
+from .filter_steps import OptimalFilterStep
+from .ljhfiles import LJHFile
 from .misc import alwaysTrue, plot_zoomable
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
-from .filter_steps import OptimalFilterStep
-from .optimal_filtering import FilterMaker
-from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
+from .offfiles import OffFile
+from .optimal_filtering import FilterMaker
+from .recipe import Recipe, RecipeStep, SummarizeStep
 
 _local_timezone_name = tzlocal.get_localzone_name()
 
@@ -1298,7 +1299,7 @@ class Channel:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass2.LJHFile.open(path, first_pulse=first_pulse, last_pulse=last_pulse)
+        ljh = LJHFile.open(path, first_pulse=first_pulse, last_pulse=last_pulse)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
@@ -1309,7 +1310,7 @@ class Channel:
     @classmethod
     def from_open_ljh(
         cls,
-        ljh: mass2.LJHFile,
+        ljh: LJHFile,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
     ) -> "Channel":
