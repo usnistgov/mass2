@@ -1386,21 +1386,24 @@ dependencies = [
     { name = "xraydb" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "flake8" },
-    { name = "interrogate" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "tox" },
-]
+[package.optional-dependencies]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-matplotlib" },
     { name = "mkdocstrings", extra = ["python"] },
     { name = "mktestdocs" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "flake8" },
+    { name = "interrogate" },
+    { name = "mktestdocs" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "tox" },
 ]
 
 [package.metadata]
@@ -1414,6 +1417,10 @@ requires-dist = [
     { name = "lmfit", specifier = ">=0.9.11" },
     { name = "marimo" },
     { name = "matplotlib", specifier = ">1.5" },
+    { name = "mkdocs", marker = "extra == 'docs'" },
+    { name = "mkdocs-matplotlib", marker = "extra == 'docs'" },
+    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.18" },
+    { name = "mktestdocs", marker = "extra == 'docs'" },
     { name = "numba" },
     { name = "numpy", specifier = ">=2.0,<=2.3" },
     { name = "packaging" },
@@ -1429,22 +1436,18 @@ requires-dist = [
     { name = "uncertainties" },
     { name = "xraydb" },
 ]
+provides-extras = ["docs"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "flake8" },
     { name = "interrogate" },
+    { name = "mktestdocs" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "tox" },
-]
-docs = [
-    { name = "mkdocs" },
-    { name = "mkdocs-matplotlib" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.18" },
-    { name = "mktestdocs" },
 ]
 
 [[package]]
