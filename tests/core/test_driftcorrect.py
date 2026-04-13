@@ -18,7 +18,7 @@ def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
     assert dc.offset == pytest.approx(b0, abs=1e-2)
 
 
-def test_TDC():
+def test_time_drift_correct():
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
             ch.summarize_pulses()
@@ -28,6 +28,7 @@ def test_TDC():
             .time_drift_correct("timestamp", "5lagy_dc", "5lagy_tdc")
         )
 
+    # Make sure we can run a time drift correct
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, exclude_ch_nums=[4102])
     data = data.map(_do_steps)
