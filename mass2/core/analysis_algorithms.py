@@ -513,7 +513,7 @@ def time_drift_correct(  # noqa: PLR0914
     uncorrected = np.asarray(uncorrected)
     if limit is None:
         pct99 = np.percentile(uncorrected, 99)
-        limit = (0, 1.25 * pct99)
+        limit = (0.0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])
     time = np.asarray(time[use])
@@ -588,7 +588,7 @@ def time_drift_correct(  # noqa: PLR0914
     elif H3 <= 0 or H3 - H2 > 0.00001:
         model = model2
 
-    def safe_model(x: NDArray):
+    def safe_model(x: NDArray) -> NDArray:
         "Return the TDC model, but enforcing no adjustment for times outside the range we learned on"
         y = model(x)
         y[x < -1] = 0

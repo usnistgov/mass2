@@ -405,7 +405,7 @@ def test_steps():
             .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
             .filter5lag(f_3db=10000)
             .with_column_map_step("pretrig_rms", "pointless_pretrig_meansq", squareme)
-            .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=True)
+            .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=pl.lit(True))
             .with_column_map_step("postpeak_deriv", "pointless_otherthing", squareme)
         )
 
