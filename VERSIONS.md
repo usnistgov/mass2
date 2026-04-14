@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.0.5** April 14, 2026-
+* Add script `mc2` = Mass2 Continuous Computations for online analysis (issue 136).
+
 **2.0.4** April 14, 2026
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
 * Some improvements to plotting:
@@ -12,7 +15,6 @@
 * Make a recipe step to use the time-drift-correct algorithm (PR 127, issues 125+131).
 * Make `Channel.filter1lag()` method to use single-lag optimal filters more easily (issue 124).
 * Add options to the external-trigger reader, letting user pick what quantities to keep (issue 128).
-* Add script `mc2` = Mass2 Continuous Computations for online analysis.
 
 **2.0.3** March 13, 2026
 * Add some convenient plotting features like `Channel.plot_pulses()`.
@@ -24,7 +26,6 @@
 * Let `Channel.filter5lag()` user can elect Fourier-based filters for very long records (PR 117).
 * Check on `Channel` creation that raw pulses (if any) match the header's `n_samples` (issue 118).
 * This is the last release fully reviewed by project Co-Director (now Emeritus) Galen O'Neil.
-
 
 **2.0.2** February 24, 2026
 * Adapt to change in the `numpy.linalg.svd` API (issue 97).
