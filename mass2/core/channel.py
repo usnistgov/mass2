@@ -1074,6 +1074,89 @@ class Channel:
         )
         return self.with_step(step)
 
+    def filter1lag(  # noqa: PLR0917
+        self,
+        pulse_col: str = "pulse",
+        peak_y_col: str = "1lagy",
+        peak_x_col: str = "1lagx",
+        f_3db: float = 25e3,
+        use_expr: pl.Expr = pl.lit(True),
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
+        cut_pre: int = 0,
+        cut_post: int = 0,
+    ) -> "Channel":
+        """Compute a 1-lag optimal filter and apply it.
+
+        Parameters
+        ----------
+        pulse_col : str, optional
+            Which column contains raw data, by default "pulse"
+        peak_y_col : str, optional
+            Column to contain the optimal filter results, by default "1lagy"
+        peak_x_col : str, optional
+            Column to contain the 5-lag filter's estimate of arrival-time/phase, by default "1lagx"
+        f_3db : float, optional
+            A low-pass filter 3 dB point to apply to the computed filter, by default 25e3
+        use_expr : pl.Expr, optional
+            An expression to select pulses for averaging, by default pl.lit(True)
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Channel
+            This channel with a Filter5LagStep added to the recipe.
+        """
+        assert self.noise
+        shortening_1lag = 0  # 1-lag filters do not shorten the pulse records
+        n_samples_1lag = self.n_samples - shortening_1lag
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert n_samples_1lag <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_1lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_1lag}; {suggest}"
+
+        avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
+        filter_maker = FilterMaker(
+            signal_model=avg_pulse,
+            n_pretrigger=self.n_presamples,
+            noise_psd=noiseresult.psd,
+            noise_autocorr=noiseresult.autocorr_vec,
+            sample_time_sec=self.frametime_s,
+        )
+
+        if fourier:
+            filter1lag = filter_maker.compute_fourier(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+        else:
+            filter1lag = filter_maker.compute_1lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+        step = OptimalFilterStep(
+            inputs=["pulse"],
+            output=[peak_x_col, peak_y_col],
+            good_expr=self.good_expr,
+            use_expr=use_expr,
+            filter=filter1lag,
+            spectrum=noiseresult,
+            filter_maker=filter_maker,
+            transform_raw=self.transform_raw,
+        )
+        return self.with_step(step)
+
     def compute_ats_model(self, pulse_col: str, use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> tuple[NDArray, NDArray]:
         """Compute the average pulse and arrival-time model for an ATS filter.
         We use the first `limit` pulses that pass `good_expr` and `use_expr`.
@@ -1227,8 +1310,9 @@ class Channel:
         """Correct for gain drifing slowly with time."""
         # by defining a seperate learn method that takes ch as an argument,
         # we can move all the code for the step outside of Channel
-        step = TimeDriftCorrectStep.learn(ch=self, time_col=time_col, uncorrected_col=uncorrected_col,
-                                          corrected_col=corrected_col, use_expr=use_expr)
+        step = TimeDriftCorrectStep.learn(
+            ch=self, time_col=time_col, uncorrected_col=uncorrected_col, corrected_col=corrected_col, use_expr=use_expr
+        )
         return self.with_step(step)
 
     def linefit(  # noqa: PLR0917
@@ -1317,9 +1401,7 @@ class Channel:
         """Load a Channel from an open LJHFile object."""
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=None, transform_raw=transform_raw
-        )
+        channel = cls(df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=None, transform_raw=transform_raw)
         return channel
 
     @classmethod

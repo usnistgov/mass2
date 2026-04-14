@@ -58,7 +58,7 @@ dev = [
     "pre-commit",
     "tox",
     "interrogate",
-    "mktestdocs"
+    "mktestdocs",
 ]
 
 [project.urls]

@@ -296,8 +296,8 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
 
 @dataclass(frozen=True)
 class ExtTriggerControl:
-    """Parameters to control what columns are added when we incorporate external trigger timing info
-    """
+    """Parameters to control what columns are added when we incorporate external trigger timing info"""
+
     ms_nearest_trig: bool = True
     ms_last_trig: bool = False
     ms_next_trig: bool = False
@@ -314,8 +314,9 @@ class ExtTriggerControl:
         return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
 
 
-def add_external_trigger(df: pl.DataFrame, df_ext: pl.DataFrame, output_control: ExtTriggerControl,
-                         subframediv: int, frametime_s: float) -> pl.DataFrame:
+def add_external_trigger(
+    df: pl.DataFrame, df_ext: pl.DataFrame, output_control: ExtTriggerControl, subframediv: int, frametime_s: float
+) -> pl.DataFrame:
     """Add external trigger info to a pulse dataframe, with columns of user's choice.
 
     Args:
@@ -329,17 +330,15 @@ def add_external_trigger(df: pl.DataFrame, df_ext: pl.DataFrame, output_control:
         pl.DataFrame: The input frame `df` enhanced with new columns
     """
     assert output_control.require_last or output_control.require_next
-    subframe_time_ms = frametime_s * 1000. / subframediv
+    subframe_time_ms = frametime_s * 1000.0 / subframediv
 
     df_subframe = df.select("subframecount")
     if output_control.require_last:
-        df_subframe = df_subframe.join_asof(
-            df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
+        df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
         delta = pl.col("subframecount").cast(pl.Int64) - pl.col("subframecount_prev_ext_trig")
         df_subframe = df_subframe.with_columns(dsf_last_ext_trig=delta)
     if output_control.require_next:
-        df_subframe = df_subframe.join_asof(
-            df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
+        df_subframe = df_subframe.join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
         delta = pl.col("subframecount_next_ext_trig") - pl.col("subframecount").cast(pl.Int64)
         df_subframe = df_subframe.with_columns(dsf_next_ext_trig=delta)
 
@@ -350,10 +349,10 @@ def add_external_trigger(df: pl.DataFrame, df_ext: pl.DataFrame, output_control:
     if output_control.ms_nearest_trig:
         df_subframe = df_subframe.with_columns(
             pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
-                        .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
-                        .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
-                    .alias("ms_nearest_ext_trig")
-                    )
+            .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
+            .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
+            .alias("ms_nearest_ext_trig")
+        )
 
     # Drop columns that the user doesn't want
     if not output_control.absolute_sfs:
@@ -544,7 +543,7 @@ def time_drift_correct(  # noqa: PLR0914
     uncorrected = np.asarray(uncorrected)
     if limit is None:
         pct99 = np.percentile(uncorrected, 99)
-        limit = (0, 1.25 * pct99)
+        limit = (0.0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])
     time = np.asarray(time[use])
