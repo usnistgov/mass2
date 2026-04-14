@@ -23,7 +23,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import mass2
-from .channel import Channel, ChannelHeader, BadChannel
+from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
@@ -560,9 +560,37 @@ class Channels:
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
-    def with_external_trigger_by_path(self, path: str | pathlib.Path | None = None) -> "Channels":
+    def with_external_trigger_by_path(
+            self,
+            path: str | None,
+            output_control: ExtTriggerControl = ExtTriggerControl(),
+            ) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
-        from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented)."""
+        from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented).
+
+        Parameters
+        ----------
+        path : str | Path | None, optional
+            load external trigger info from the given path or (if None) infer the path from an LJH file, by default None
+        output_control: ExtTriggerControl
+            Control which columns are added to the channels' dataframes:
+            ms_nearest_trig : bool, optional
+                whether to generate a column by this name, giving milliseconds since the last trigger (as + value) or
+                ms until the next one (as - value), whichever is nearer, by default True.
+            ms_last_trig : bool, optional
+                whether to generate a column by this name, giving ms since the last trigger, by default False
+            ms_next_trig : bool, optional
+                whether to generate a column by this name, giving ms until the next trigger, by default False
+            sf_last_trig : bool, optional
+                whether to generate a column by this name, giving subframes since the last trigger, by default False
+            sf_next_trig : bool, optional
+                whether to generate a column by this name, giving subframes until the next trigger, by default False
+
+        Returns
+        -------
+        Channels
+            An enhanced copy of self, with experiment state information added to each channel.
+        """
         if path is None:
             raise NotImplementedError("cannot infer external trigger path yet")
         with open(path, "rb") as _f:
@@ -571,15 +599,15 @@ class Channels:
         df_ext = pl.DataFrame({
             "subframecount": external_trigger_subframe_count,
         })
-        return self.with_external_trigger_df(df_ext)
+        return self.with_external_trigger_df(df_ext, output_control)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channels":
+    def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channels":
         """Return a copy of this Channels object with external trigger information added to each Channel,
-        found from the given DataFrame."""
+        found from the given DataFrame. `output_columns` controls what columns to store."""
 
         def with_etrig_df(channel: Channel) -> Channel:
             """Return a copy of one Channel object with external trigger information added to it"""
-            return channel.with_external_trigger_df(df_ext)
+            return channel.with_external_trigger_df(df_ext, output_control)
 
         return self.map(with_etrig_df)
 

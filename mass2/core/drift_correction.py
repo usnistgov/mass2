@@ -157,7 +157,7 @@ class TimeDriftCorrectStep(RecipeStep):
             time=time_float_s.to_numpy(),
             uncorrected=uncorrected_s.to_numpy(),
             w=w,
-            limit=(0.5*pk, 1.5*pk),
+            limit=(0.5 * pk, 1.5 * pk),
             **kwargs
         )
         step = cls(
