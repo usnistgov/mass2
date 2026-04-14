@@ -9,7 +9,7 @@
   * Set most mass plots to call `plot_zoomable`, which turns on mouse zooming (same as typing 'O' in window).
   * Fix bugs: failing to plot channel histograms on existing axes.
 * Make the parameters `cut_pre` and `cut_post` work with Fourier-domain filters.
-* Make a recipe step to use the time-drift-correct algorithm (issue 125).
+* Make a recipe step to use the time-drift-correct algorithm (PR 127, issue 131).
 * Make `Channel.filter1lag()` method to use single-lag optimal filters more easily (issue 124).
 * Add options to the external-trigger reader, letting user pick what quantities to keep (issue 128).
 
