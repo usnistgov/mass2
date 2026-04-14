@@ -23,18 +23,24 @@ def test_external_trigger_experiment_state():
     # Now load and check external trigger file
     dir = os.path.dirname(off_paths[0])
     trigfile = os.path.join(dir, "20240723_run0000_external_trigger.bin")
-    data = data.with_external_trigger_by_path(trigfile)
+    output_columns = mass2.core.ExtTriggerControl(absolute_sfs=True, sf_last_trig=True, sf_next_trig=True)
+    data = data.with_external_trigger_by_path(trigfile, output_control=output_columns)
     ch = data.channels[3]
 
     sprev = ch.df["subframecount_prev_ext_trig"]
     sthis = ch.df["subframecount"]
     snext = ch.df["subframecount_next_ext_trig"]
+    dsprev = ch.df["dsf_last_ext_trig"]
+    dsnext = ch.df["dsf_next_ext_trig"]
 
     assert (sprev <= sthis).all()
     assert (sthis <= snext).all()
     assert sprev.unique().count() == 48750
     assert sthis.unique().count() == 92090
     assert snext.unique().count() == 48751
+    assert dsprev.min() == 0
+    assert dsnext.min() == 0
+    assert dsnext.median() == 1156504.0
 
 
 def test_external_trigger_LJH_issue101():

@@ -326,7 +326,7 @@ class LJHFile(ABC):
             pl.from_epoch("posix_usec", time_unit="us").dt.convert_time_zone(_local_timezone_name).alias("timestamp")
         ).with_columns(df)
         if not keep_posix_usec:
-            df = df.select(pl.exclude("posix_usec"))
+            df = df.drop("posix_usec")
         continuous = self.is_continuous or force_continuous
         header_df = pl.DataFrame(self.header).with_columns(continuous=continuous)
         return df, header_df
