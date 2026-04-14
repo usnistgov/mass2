@@ -292,50 +292,6 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
 
 
 @njit
-def nearest_arrivals(reference_times: ArrayLike, other_times: ArrayLike) -> tuple[NDArray, NDArray]:
-    """Find the external trigger time immediately before and after each pulse timestamp
-
-    Args:
-        pulse_timestamps - 1d array of pulse timestamps whose nearest neighbors
-            need to be found.
-        external_trigger_timestamps - 1d array of possible nearest neighbors.
-
-    Returns:
-        (before_times, after_times)
-
-    before_times is an ndarray of the same size as pulse_timestamps.
-    before_times[i] contains the difference between the closest lesser time
-    contained in external_trigger_timestamps and pulse_timestamps[i]  or inf if there was no
-    earlier time in other_times Note that before_times is always a positive
-    number even though the time difference it represents is negative.
-
-    after_times is an ndarray of the same size as pulse_timestamps.
-    after_times[i] contains the difference between pulse_timestamps[i] and the
-    closest greater time contained in other_times or a inf number if there was
-    no later time in external_trigger_timestamps.
-    """
-    other_times = np.asarray(other_times)
-    nearest_after_index = np.searchsorted(other_times, reference_times)
-    # because both sets of arrival times should be sorted, there are faster algorithms than searchsorted
-    # for example: https://github.com/kwgoodman/bottleneck/issues/47
-    # we could use one if performance becomes an issue
-    last_index = np.searchsorted(nearest_after_index, other_times.size, side="left")
-    first_index = np.searchsorted(nearest_after_index, 1)
-
-    nearest_before_index = np.copy(nearest_after_index)
-    nearest_before_index[:first_index] = 1
-    nearest_before_index -= 1
-    before_times = reference_times - other_times[nearest_before_index]
-    before_times[:first_index] = np.inf
-
-    nearest_after_index[last_index:] = other_times.size - 1
-    after_times = other_times[nearest_after_index] - reference_times
-    after_times[last_index:] = np.inf
-
-    return before_times, after_times
-
-
-@njit
 def filter_signal_lowpass(sig: NDArray, fs: float, fcut: float) -> NDArray:
     """Tophat lowpass filter using an FFT
 

@@ -163,7 +163,7 @@ def test_constrained_filtering():  # noqa: PLR0914
 def test_no_concrete_baseFilter():
     "Make sure that mass2.core.Filter is an abstract base class, can't be instantiated directly."
     with pytest.raises(TypeError):
-        _ = Filter(np.zeros(100), 100.0, 100.0, 100.0)
+        _ = Filter(np.zeros(100), 100.0, 100.0, 100.0, 100.0, 0, None, None)  # type: ignore
 
 
 class TestWhitener:
@@ -172,7 +172,7 @@ class TestWhitener:
     @staticmethod
     def test_trivial():
         """Be sure that the trivial whitener does nothing."""
-        w = ToeplitzWhitener([1.0], [1.0])  # the trivial whitener
+        w = ToeplitzWhitener(np.array([1.0]), np.array([1.0]))  # the trivial whitener
         r = np.random.default_rng().standard_normal(100)
         assert np.allclose(r, w(r))
         assert np.allclose(r, w.solveW(r))

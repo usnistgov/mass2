@@ -355,10 +355,12 @@ def test_filtering_steps():
     signal[t < 0] = 0
     ch = dummy_channel(npulses=100, signal=signal)
     ch = ch.filter5lag(f_3db=20000)
+    ch = ch.filter1lag(f_3db=20000)
     ch = ch.summarize_pulses()
     ch = ch.filterATS(f_3db=20000)
-    for field in ("5lagy", "5lagx", "ats_x", "ats_y"):
+    for field in ("5lagy", "5lagx", "1lagy", "ats_x", "ats_y"):
         assert not (np.allclose(ch.df[field].to_numpy().mean(), 0))
+    assert np.allclose(ch.df["1lagx"].to_numpy().mean(), 0)
 
 
 def test_categorize_step():
