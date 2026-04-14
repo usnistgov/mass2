@@ -120,8 +120,7 @@ class TimeDriftCorrectStep(RecipeStep):
         model = self.correction["model"]
         corrected_gain = 1 + model(tnorm)
 
-        df2 = df.select(
-            (pl.col(uncorrected_col) * corrected_gain).alias(self.output[0])).with_columns(df)
+        df2 = df.select((pl.col(uncorrected_col) * corrected_gain).alias(self.output[0])).with_columns(df)
         return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
@@ -140,8 +139,7 @@ class TimeDriftCorrectStep(RecipeStep):
 
     @classmethod
     def learn(
-        cls, ch: "Channel", time_col: str, uncorrected_col: str,
-        corrected_col: str | None, use_expr: pl.Expr, **kwargs: Any
+        cls, ch: "Channel", time_col: str, uncorrected_col: str, corrected_col: str | None, use_expr: pl.Expr, **kwargs: Any
     ) -> "TimeDriftCorrectStep":
         """Create a DriftCorrectStep by learning the correction from data in the given Channel."""
         if corrected_col is None:
@@ -151,14 +149,10 @@ class TimeDriftCorrectStep(RecipeStep):
         time_s2 = time_s - time_s[0]
         time_float_s = time_s2.dt.total_seconds(fractional=True)
         pk = np.median(uncorrected_s.to_numpy())
-        w = max(pk / 3000., 1.0)
+        w = max(pk / 3000.0, 1.0)
 
         correction = mass2.core.analysis_algorithms.time_drift_correct(
-            time=time_float_s.to_numpy(),
-            uncorrected=uncorrected_s.to_numpy(),
-            w=w,
-            limit=(0.5 * pk, 1.5 * pk),
-            **kwargs
+            time=time_float_s.to_numpy(), uncorrected=uncorrected_s.to_numpy(), w=w, limit=(0.5 * pk, 1.5 * pk), **kwargs
         )
         step = cls(
             inputs=[time_col, uncorrected_col],
