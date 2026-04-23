@@ -294,7 +294,7 @@ data = data.map(summarize_and_cut)
 # Plot a distribution
 ch = data.ch0
 prms = ch.df["pulse_rms"]
-hist_range = range = np.percentile(prms, [0.5, 99.5])
+hist_range = np.percentile(prms, [0.5, 99.5])
 bin_edges = np.linspace(hist_range[0], hist_range[1], 1000)
 ch.plot_hist("pulse_rms", bin_edges)
 plt.xlabel("Pulse rms (arbs)")
