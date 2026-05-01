@@ -52,7 +52,7 @@ def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwa
     y[1:-1:2] = data
     y[2:-1:2] = data
     axis.plot(x, y, **kwargs)
-    axis.set_xlim([x[0], x[-1]])
+    axis.set_xlim(x[0], x[-1])
 
 
 def plot_stepped_hist_poisson_errors(
