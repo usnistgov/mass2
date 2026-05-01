@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.0.5** April 23, 2026-
+* Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
+
 **2.0.4** April 14, 2026
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
 * Some improvements to plotting:
