@@ -65,9 +65,9 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
     first_delta = 0.0
 
     for iter in range(ncol):
+        # Tentatively choose to eliminate column p, the one with the biggest (f/g) ratio.
+        # "Tentative" because we still have to check for numerical problems.
         p = (f / g).argmax()
-        assert p not in chosen
-
         delta = AtA[:, p].copy()
         gamma = BtA[:, p].copy()
         if iter == 0:
@@ -77,8 +77,10 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
             gamma -= omega[k, p] * v[k]
 
         # Test whether update rule is starting to fail: delta[p] should not be negative,
-        # but in practice it gets so close as to cause numerical problems.
-        if delta[p] <= first_delta * 1e-15:
+        # but in practice it gets so close as to cause numerical problems. Similarly, no surviving f should go negative.
+        numerical_problems = (delta[p] <= first_delta * 1e-15) or np.any((f < 0) & np.isfinite(g))
+        assert (p not in chosen) or numerical_problems
+        if numerical_problems:
             # Now that it is failing, we have to call gcss recursively with the chosen columns fully eliminated from
             # the source matrix and projected out of the data matrix. This might be inefficient, but I have no
             # better ideas on how to select further columns.
@@ -113,7 +115,6 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
         f -= 2 * omega[iter] * Htv
         f += (v[iter] @ v[iter]) * omega[iter] ** 2
         g -= omega[iter] ** 2
-        f[chosen] = 0
 
     return np.sort(chosen)
 
