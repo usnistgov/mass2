@@ -20,7 +20,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 
-def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:
+def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
     """Greedy generalized column subset selection (GCSS).
 
     Find the size-`ncol` subset of columns of `A`, such that a projection of `B` onto the span of the selected
@@ -62,18 +62,46 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:
     chosen: list[int] = []
     omega = np.zeros((ncol, n), dtype=float)
     v = np.zeros((ncol, r), dtype=float)
+    first_delta = 0.0
 
     for iter in range(ncol):
         p = (f / g).argmax()
+        assert p not in chosen
+
+        delta = AtA[:, p].copy()
+        gamma = BtA[:, p].copy()
+        if iter == 0:
+            first_delta = delta[p]
+        for k in range(iter):
+            delta -= omega[k, p] * omega[k]
+            gamma -= omega[k, p] * v[k]
+
+        # Test whether update rule is starting to fail: delta[p] should not be negative,
+        # but in practice it gets so close as to cause numerical problems.
+        if delta[p] <= first_delta * 1e-15:
+            # Now that it is failing, we have to call gcss recursively with the chosen columns fully eliminated from
+            # the source matrix and projected out of the data matrix. This might be inefficient, but I have no
+            # better ideas on how to select further columns.
+            retained = np.ones(n, dtype=bool)
+            for c in chosen:
+                retained[c] = False
+
+            newA = A[:, retained]
+            selected_col = A[:, ~retained]
+            newB = B - selected_col @ (np.linalg.pinv(selected_col) @ B)
+            subresult = gcss(newA, newB, ncol=ncol - len(chosen))
+
+            # subresult numbers columns from the reduced set found in newA. We have to renumber
+            # them according to the previous indices, which we compute in `idx_retained`.
+            idx_retained = np.array([i for i in range(n) if retained[i]])
+            sub_chosen = idx_retained[subresult]
+            assert np.all([s not in chosen for s in sub_chosen])
+            return np.sort(np.hstack((chosen, sub_chosen)))
+
         chosen.append(p)
         # Avoid divide-by-zero problems on next iteration, or accidentally choosing the same column twice.
         g[p] = np.inf
 
-        delta = AtA[:, p].copy()
-        gamma = BtA[:, p].copy()
-        for k in range(iter):
-            delta -= omega[k, p] * omega[k]
-            gamma -= omega[k, p] * v[k]
         rescaling = delta[p] ** -0.5
         omega[iter] = delta * rescaling
         v[iter] = gamma * rescaling
