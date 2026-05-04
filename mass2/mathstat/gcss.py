@@ -88,7 +88,8 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
 
             newA = A[:, retained]
             selected_col = A[:, ~retained]
-            newB = B - selected_col @ (np.linalg.pinv(selected_col) @ B)
+            coef = np.linalg.lstsq(selected_col, B)[0]
+            newB = B - selected_col @ coef
             subresult = gcss(newA, newB, ncol=ncol - len(chosen))
 
             # subresult numbers columns from the reduced set found in newA. We have to renumber
@@ -106,12 +107,13 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
         omega[iter] = delta * rescaling
         v[iter] = gamma * rescaling
 
-        Htv = BtA.T.dot(v[iter])
+        Htv = v[iter] @ BtA
         for rr in range(iter):
-            Htv -= v[rr].dot(v[iter]) * omega[rr]
+            Htv -= (v[rr] @ v[iter]) * omega[rr]
         f -= 2 * omega[iter] * Htv
-        f += (v[iter] ** 2).sum() * omega[iter] ** 2
+        f += (v[iter] @ v[iter]) * omega[iter] ** 2
         g -= omega[iter] ** 2
+        f[chosen] = 0
 
     return np.sort(chosen)
 
