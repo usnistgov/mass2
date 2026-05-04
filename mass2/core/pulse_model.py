@@ -6,8 +6,8 @@ from numpy.typing import NDArray
 import pylab as plt
 import numpy as np
 import h5py
-import mass2
 from mass2.common import tostr
+from mass2.mathstat.utilities import find_range_randomly
 
 
 class PulseModel:
@@ -161,10 +161,10 @@ class PulseModel:
         mpc = np.matmul(projectors, pulses_for_svd)  # modeled pulse coefs
         mp = np.matmul(basis, mpc)  # modeled pulse
         residuals = pulses_for_svd - mp
-        Q = mass2.mathstat.utilities.find_range_randomly(residuals, n_basis - n_existing)
+        Q = find_range_randomly(residuals, n_basis - n_existing)
 
         projectors2 = np.linalg.pinv(Q)  # = Q.T, perhaps??
-        projectors2 -= projectors2.dot(basis).dot(projectors)
+        projectors2 -= (projectors2 @ basis) @ projectors
 
         basis = np.hstack([basis, Q])
         projectors = np.vstack([projectors, projectors2])

@@ -93,10 +93,10 @@ class ToeplitzSolver:
         N = len(x)
         assert N == self.n
         y = np.zeros_like(x)
-        y[0] = np.dot(self.T, x)
+        y[0] = self.T @ x
         for i in range(1, N):
-            y[i] = np.dot(self.T[:-i], x[i:])
-            y[i] += np.dot(self.T[1 : 1 + i], x[i - 1 :: -1])
+            y[i] = self.T[:-i] @ x[i:]
+            y[i] += self.T[1 : 1 + i] @ x[i - 1 :: -1]
         return y
 
     def __call__(self, y: ArrayLike) -> np.ndarray:

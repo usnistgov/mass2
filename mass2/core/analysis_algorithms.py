@@ -511,7 +511,7 @@ def time_drift_correct(  # noqa: PLR0914
         "The model function, with one parameter pi varied, others fixed."
         pcopy = np.array(param)
         pcopy[i] = param_i
-        return 1 + np.dot(basis.T, pcopy)
+        return 1 + pcopy @ basis
 
     def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
         "The cost function (spectral entropy), with one parameter pi varied, others fixed."

@@ -150,7 +150,7 @@ class ToeplitzWhitener:
         y[N - 1] /= self.phi[0]
         for i in range(N - 2, -1, -1):
             f = min(self.p + 1, N - i)
-            y[i] -= np.dot(y[i + 1 : i + f], self.phi[1:f])
+            y[i] -= y[i + 1 : i + f] @ self.phi[1:f]
             y[i] /= self.phi[0]
         return np.correlate(y, self.theta, "full")[self.q :]
 
@@ -170,7 +170,7 @@ class ToeplitzWhitener:
         y[N - 1] /= self.theta[0]
         for i in range(N - 2, -1, -1):
             f = min(self.q + 1, N - i)
-            y[i] -= np.dot(y[i + 1 : i + f], self.theta[1:f])
+            y[i] -= y[i + 1 : i + f] @ self.theta[1:f]
             y[i] /= self.theta[0]
         return np.correlate(y, self.phi, "full")[self.p :]
 
@@ -389,14 +389,14 @@ class Filter5Lag(Filter):
         nrec = x.shape[0]
         conv = np.zeros((nlags, nrec), dtype=float)
         for i in range(nlags - 1):
-            conv[i, :] = np.dot(x[:, i : i + 1 - nlags], self.values)
-        conv[nlags - 1, :] = np.dot(x[:, nlags - 1 :], self.values)
+            conv[i, :] = x[:, i : i + 1 - nlags] @ self.values
+        conv[nlags - 1, :] = x[:, nlags - 1 :] @ self.values
 
         # Least-squares fit of 5 values to a parabola.
         # Order is row 0 = constant ... row 2 = quadratic coefficients.
         if nlags != 5:
             raise NotImplementedError("Currently require 5 lags to estimate peak x, y")
-        param = np.dot(self.FIVELAG_FITTER, conv)
+        param = self.FIVELAG_FITTER @ conv
         peak_x = -0.5 * param[1, :] / param[2, :]
         peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
         return peak_y, peak_x
@@ -450,7 +450,7 @@ class Filter1Lag(Filter):
             x = x.reshape((1, len(x)))
         _, nsamp = x.shape
         assert nsamp == len(self.values)
-        dotproduct = np.dot(x, self.values)
+        dotproduct = x @ self.values
 
         peak_x = np.zeros_like(x)
         peak_y = dotproduct
@@ -514,8 +514,8 @@ class FilterATS(Filter):
 def _filter_records_ats(x: NDArray, values: NDArray, dt_values: NDArray) -> tuple[np.ndarray, np.ndarray]:
     "A numba-JIT speedup of the core computation"
     x = x.astype(values.dtype)
-    conv0 = np.dot(x, values)
-    conv1 = np.dot(x, dt_values)
+    conv0 = x @ values
+    conv1 = x @ dt_values
     arrival_time = conv1 / conv0
     return conv0, arrival_time
 
@@ -643,7 +643,7 @@ class FilterMaker:
         noise_corr = noise_autocorr[:n]
         TS = ToeplitzSolver(noise_corr, symmetric=True)
         Rinv_model = np.vstack([TS(r) for r in pulse_model])
-        A = pulse_model.dot(Rinv_model.T)
+        A = pulse_model @ (Rinv_model.T)
         all_filters = np.linalg.solve(A, Rinv_model)
         filt_noconst = all_filters[0]
 
@@ -768,7 +768,7 @@ class FilterMaker:
         noise_corr = noise_autocorr[:n]
         TS = ToeplitzSolver(noise_corr, symmetric=True)
         Rinv_model = np.vstack([TS(r) for r in pulse_model])
-        A = pulse_model.dot(Rinv_model.T)
+        A = pulse_model @ (Rinv_model.T)
         all_filters = np.linalg.solve(A, Rinv_model)
         filt_noconst = all_filters[0]
 
@@ -1018,10 +1018,10 @@ class FilterMaker:
 
         if self.whitener is not None:
             WM = self.whitener(MT.T)
-            A = np.dot(WM.T, WM)
+            A = WM.T @ WM
             Ainv = np.linalg.inv(A)
             WtWM = self.whitener.applyWT(WM)
-            filt = np.dot(Ainv, WtWM.T)
+            filt = Ainv @ (WtWM.T)
 
         else:
             assert len(noise_autocorr) >= ns
@@ -1029,9 +1029,9 @@ class FilterMaker:
             TS = ToeplitzSolver(noise_corr, symmetric=True)
 
             RinvM = np.vstack([TS(r) for r in MT]).T
-            A = np.dot(MT, RinvM)
+            A = MT @ RinvM
             Ainv = np.linalg.inv(A)
-            filt = np.dot(Ainv, RinvM.T)
+            filt = Ainv @ (RinvM.T)
 
         band_limit(filt.T, self.sample_time_sec, fmax, f_3db)
 
@@ -1155,7 +1155,7 @@ class FilterMaker:
         assert len(f) <= len(avg_signal) - 4
         conv = np.zeros(5, dtype=float)
         for i in range(5):
-            conv[i] = np.dot(f, avg_signal[i : i + len(f)])
+            conv[i] = f @ avg_signal[i : i + len(f)]
         x = np.linspace(-2, 2, 5)
         fit = np.polyfit(x, conv, 2)
         fit_ctr = -0.5 * fit[1] / fit[0]
@@ -1174,7 +1174,7 @@ class FilterMaker:
             The signal to which filter `f` should give unit response
         """
         assert len(f) == len(avg_signal)
-        f *= 1 / np.dot(f, avg_signal)
+        f *= 1 / (f @ avg_signal)
 
 
 def bracketR(q: NDArray, noise: NDArray) -> float:
@@ -1192,5 +1192,5 @@ def bracketR(q: NDArray, noise: NDArray) -> float:
     r[n - 1 :: -1] = noise[:n]
     dot = 0.0
     for i in range(n):
-        dot += q[i] * r[n - i - 1 : 2 * n - i - 1].dot(q)
+        dot += q[i] * r[n - i - 1 : 2 * n - i - 1] @ q
     return dot

@@ -32,7 +32,7 @@ class TestToeplitzSolverSmallSymmetric:
         for i in range(self.n):
             x_in = np.zeros(self.n, dtype=float)
             x_in[i] = 1.0
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-12)
@@ -40,7 +40,7 @@ class TestToeplitzSolverSmallSymmetric:
     def test_arb_vectors(self):
         for _i in range(self.n):
             x_in = 5 * rng.standard_normal(self.n)
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-12)
@@ -59,7 +59,7 @@ class TestToeplitzSolverSmallAsymmetric:
         for i in range(self.n):
             x_in = np.zeros(self.n, dtype=float)
             x_in[i] = 1.0
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-12)
@@ -67,7 +67,7 @@ class TestToeplitzSolverSmallAsymmetric:
     def test_arb_vectors(self):
         for _i in range(self.n):
             x_in = 5 * rng.standard_normal(self.n)
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-12)
@@ -92,7 +92,7 @@ class TestToeplitzSolver_32:
         for i in range(self.n):
             x_in = np.zeros(self.n, dtype=float)
             x_in[i] = 1.0
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-10), f"Unit vector trial i={i:2d} gives x_out={x_out}"
@@ -113,7 +113,7 @@ class TestToeplitzSolver_512:
         for i in (0, 20, 128, 256, 500, 512 - 1):
             x_in = np.zeros(self.n, dtype=float)
             x_in[i] = 1.0
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-10), f"Unit vector trial i={i:2d} gives x_out={x_out}"
@@ -121,7 +121,7 @@ class TestToeplitzSolver_512:
     def test_arb_vectors(self):
         for _i in range(5):
             x_in = 5 * rng.standard_normal(self.n)
-            y = np.dot(self.R, x_in)
+            y = self.R @ x_in
             x_out = self.solver(y)
             big_dif = np.abs(x_out - x_in).max()
             assert 0 == pytest.approx(big_dif, abs=1e-10), f"Random vector trial gives rms diff={(x_out - x_in).std()}"
@@ -172,7 +172,7 @@ class toeplitzSpeed:
 
             # dt[2] = R * vector time
             t0 = time.time()
-            v2 = np.dot(R, x)
+            v2 = R @ x
             dt.append(time.time() - t0)
 
             # dt[3] = solve(R,v) time
