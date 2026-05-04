@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from mass2.mathstat.gcss import gcss, css
 
-rng = np.random.default_rng(seed=1432)
+rng = np.random.default_rng(seed=1431)
 
 
 def test_gcss():
