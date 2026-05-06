@@ -326,8 +326,8 @@ def _(data3, mass2, np, pl):
             "white_filt5lag": white_5lagy,
             "white_filt5lag_dc": white_5lagy_dc,
             "pulse_average390": pulses[:, npre:390].mean(axis=1) - pulses[:, :npre].mean(axis=1),
-            "fit_white": pulses.dot(filter2),
-            "fit_white_dpdt": pulses.dot(filter3),
+            "fit_white": (pulses @ filter2),
+            "fit_white_dpdt": (pulses @ filter3),
         })
         return ch.with_columns(new_df)
 

@@ -126,10 +126,10 @@ def _(
 def _(ch2, moss, np, pl):
     pulses = ch2.df["pulse"].to_numpy()
     avg_pulse = ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
-    template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
+    template = avg_pulse / np.linalg.norm(avg_pulse)
 
     def residual_rms(pulse, template):
-        dot = np.dot(pulse, template)
+        dot = pulse @ template
         pulse2 = dot * template
         residual = pulse2 - pulse
         return moss.misc.root_mean_squared(residual)

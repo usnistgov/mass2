@@ -117,7 +117,7 @@ def _(avg_pulse, np):
         unit_vec = avg_pulse / norm
 
         def get_residual_rms(pulse):
-            height = np.dot(pulse, unit_vec)
+            height = pulse @ unit_vec
             residuals = pulse - (height * unit_vec)
             return np.sqrt(np.mean(residuals**2))
 
