@@ -283,18 +283,19 @@ class GPRSpline(CubicSpline):
         Ky = K + np.diag(self.err**2)
         L = np.linalg.cholesky(Ky)
         LH = np.linalg.solve(L, H.T)
-        A = LH.T.dot(LH)
+        A = LH.T @ LH
         KinvHT = np.linalg.solve(L.T, LH)
         self.L = L
         self.A = A
         self.KinvHT = KinvHT
-        beta = np.linalg.solve(A, KinvHT.T).dot(self.y)
+        beta = np.linalg.solve(A, KinvHT.T) @ self.y
 
         # Compute at test points = self.x
         # We know that these are the knots of a natural cubic spline
-        R = H - KinvHT.T.dot(K)
-        fbar = np.linalg.solve(L.T, np.linalg.solve(L, K)).T.dot(y)
-        gbar = fbar + R.T.dot(beta)
+        R = H - KinvHT.T @ K
+        KyinvK = np.linalg.solve(L.T, np.linalg.solve(L, K))
+        fbar = self.y @ KyinvK
+        gbar = fbar + R.T @ beta
         CubicSpline.__init__(self, self.x, gbar)
 
     def best_sigmaf(self) -> float:
@@ -329,12 +330,13 @@ class GPRSpline(CubicSpline):
         Ky = K + np.diag(self.err**2)
         L = np.linalg.cholesky(Ky)
         LH = np.linalg.solve(L, H.T)
-        A = LH.T.dot(LH)
+        A = LH.T @ LH
         KinvHT = np.linalg.solve(L.T, LH)
-        C = KinvHT.dot(np.linalg.solve(A, KinvHT.T))
-        yCy = self.y.dot(C.dot(self.y))
+        result1 = np.linalg.solve(A, KinvHT.T)
+        C = KinvHT @ result1
+        yCy = self.y @ (C @ self.y)
         Linvy = np.linalg.solve(L, self.y)
-        yKinvy = Linvy.dot(Linvy)
+        yKinvy = Linvy @ Linvy
         return -0.5 * ((self.Nk - 2) * np.log(2 * np.pi) + np.linalg.slogdet(A)[1] + np.linalg.slogdet(Ky)[1] - yCy + yKinvy)
 
     def variance(self, xtest: ArrayLike) -> NDArray:
@@ -348,8 +350,9 @@ class GPRSpline(CubicSpline):
             Ktest = self.sigmaf**2 * k_spline(x, self.x)
             LinvKtest = np.linalg.solve(self.L, Ktest)
             cov_ftest = self.sigmaf**2 * k_spline(x, x) - (LinvKtest**2).sum()
-            R = np.array((1, x)) - self.KinvHT.T.dot(Ktest)
-            v.append(cov_ftest + R.dot(np.linalg.solve(self.A, R)))
+            R = np.array((1, x)) - self.KinvHT.T @ Ktest
+            result1 = np.linalg.solve(self.A, R)
+            v.append(cov_ftest + R @ result1)
         if np.isscalar(xtest):
             return v[0]
         return np.array(v)
@@ -363,10 +366,11 @@ class GPRSpline(CubicSpline):
         Ktest = self.sigmaf**2 * np.vstack([k_spline(x, self.x) for x in xtest]).T
         LinvKtest = np.linalg.solve(self.L, Ktest)
         cov_ftest = self.sigmaf**2 * np.vstack([k_spline(x, xtest) for x in xtest])
-        cov_ftest -= LinvKtest.T.dot(LinvKtest)
+        cov_ftest -= LinvKtest.T @ LinvKtest
         R = np.vstack((np.ones(len(xtest)), xtest))
-        R -= self.KinvHT.T.dot(Ktest)
-        return cov_ftest + R.T.dot(np.linalg.solve(self.A, R))
+        R -= self.KinvHT.T @ Ktest
+        result1 = np.linalg.solve(self.A, R)
+        return cov_ftest + R.T @ result1
 
 
 class NaturalBsplineBasis:
@@ -542,8 +546,8 @@ class SmoothingSpline:
 
         Dinv = self.err ** (-2)  # Vector but stands for diagonals of a diagonal matrix.
         NTDinv = self.N0.T * Dinv
-        lhs = np.dot(NTDinv, self.N0)
-        rhs = np.dot(self.N0.T, Dinv * self.y)
+        lhs = NTDinv @ self.N0
+        rhs = self.N0.T @ (Dinv * self.y)
 
         def best_params(p: NDArray) -> NDArray:
             """Return the best-fit parameters for a given curvature penalty p."""
@@ -558,7 +562,7 @@ class SmoothingSpline:
                 beta = best_params(p)
             except np.linalg.LinAlgError:
                 return 1e99
-            ys = np.dot(self.N0, beta)
+            ys = self.N0 @ beta
             chisq = np.sum(((self.y - ys) / self.err) ** 2)
             return chisq - target_chisq
 
@@ -566,7 +570,7 @@ class SmoothingSpline:
         pbest = sp.optimize.brentq(chisq_difference, mincurvature, 1, args=(chisq,))
         beta = best_params(pbest)
         self.coeff = self.basis.expand_coeff(beta)
-        ys = np.dot(self.N0, beta)
+        ys = self.N0 @ beta
         self.actualchisq = np.sum(((self.y - ys) / self.err) ** 2)
 
         # Store the linear extrapolation outside the knotted region.

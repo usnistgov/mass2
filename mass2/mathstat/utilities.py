@@ -106,10 +106,9 @@ def find_range_randomly(A: ArrayLike, nl: int, q: int = 1) -> NDArray:
     A = np.asarray(A)
     _m, n = A.shape
     Omega = rng.standard_normal((n, nl))
-    Y = np.dot(A, Omega)
+    Y = A @ Omega
     for _ in range(q):
-        Y = np.dot(A.T, Y)
-        Y = np.dot(A, Y)
+        Y = A @ (A.T @ Y)
     Q, _R = np.linalg.qr(Y)
     return Q
 
@@ -124,7 +123,7 @@ def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArr
     """
     A = np.asarray(A)
     Q = find_range_randomly(A, nl, q=q)
-    B = np.dot(Q.T, A)
+    B = Q.T @ A
     SVD_B = np.linalg.svd(B, full_matrices=False)
-    u = np.dot(Q, SVD_B.U)
+    u = Q @ SVD_B.U
     return SVD_B._replace(U=u)

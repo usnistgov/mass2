@@ -157,7 +157,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     f_constrained = maker.compute_constrained_5lag(constraints)
     for i, vec in enumerate(constraints):
         msg2 = f"compute_constrained_5lag filter values are not orthogonal to constraint # {i}"
-        assert np.abs(f_constrained.values.dot(vec)) < 1e-9, msg2
+        assert np.abs(f_constrained.values @ vec) < 1e-9, msg2
 
 
 def test_no_concrete_baseFilter():
