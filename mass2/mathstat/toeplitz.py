@@ -8,6 +8,7 @@ Created on Nov 7, 2011
 
 import numpy as np
 from scipy.signal import fftconvolve, correlate
+from scipy import linalg
 from numpy.typing import ArrayLike
 from dataclasses import dataclass
 
@@ -17,12 +18,13 @@ __all__ = ["ToeplitzSolver", "LowerTriangularToeplitz", "UpperTriangularToeplitz
 
 @dataclass(frozen=True)
 class LowerTriangularToeplitz:
-    """Represent a lower triangular Toeplitz matrix"""
+    """Represent a lower triangular Toeplitz matrix. Use FFT methods to multiply it by vectors or matrices."""
 
     firstcol: np.ndarray
 
     @classmethod
     def fromLastRow(cls, lastrow: ArrayLike) -> "LowerTriangularToeplitz":
+        """Generate an `LowerTriangularToeplitz` from its last row, rather than the default (first column)"""
         vec = np.array(lastrow)[::-1]
         return cls(vec)
 
@@ -53,15 +55,26 @@ class LowerTriangularToeplitz:
             result[:, i] = self.vecmul(other[:, i])
         return result
 
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
+
+        Returns
+        -------
+        np.ndarray
+            The NxN lower triangular Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz(self.firstcol, [self.firstcol[0]] + (self.N - 1) * [0])
+
 
 @dataclass(frozen=True)
 class UpperTriangularToeplitz:
-    """Represent an upper triangular Toeplitz matrix"""
+    """Represent an upper triangular Toeplitz matrix. Use FFT methods to multiply it by vectors or matrices."""
 
     toprow: np.ndarray
 
     @classmethod
     def fromLastCol(cls, lastcol: ArrayLike) -> "UpperTriangularToeplitz":
+        """Generate an `UpperTriangularToeplitz` from its last column, rather than the default (top row)"""
         vec = np.array(lastcol)[::-1]
         return cls(vec)
 
@@ -91,6 +104,16 @@ class UpperTriangularToeplitz:
         for i in range(shape[1]):
             result[:, i] = self.vecmul(other[:, i])
         return result
+
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
+
+        Returns
+        -------
+        np.ndarray
+            The NxN upper triangular Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz([self.toprow[0]] + (self.N - 1) * [0], self.toprow)
 
 
 class ToeplitzSolver:

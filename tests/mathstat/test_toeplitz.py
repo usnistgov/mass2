@@ -215,7 +215,13 @@ def test_triangular_toeplitz():
     assert not L.isupper
     assert L.islower
 
-    Lexact = linalg.toeplitz(vec, [vec[0]] + (N - 1) * [0])
+    Lexact = L.tomatrix()
+    for i in range(N):
+        for j in range(N):
+            if j <= i:
+                assert Lexact[i, j] == L.firstcol[i - j]
+            else:
+                assert Lexact[i, j] == 0
     L2 = LowerTriangularToeplitz.fromLastRow(Lexact[-1, :])
 
     testv = rng.standard_normal(N)
@@ -230,8 +236,6 @@ def test_triangular_toeplitz():
     assert N == U.N
     assert U.isupper
     assert not U.islower
-    Uexact = linalg.toeplitz([vec[0]] + (N - 1) * [0], vec)
-    # print(Uexact[:6, :4])
-    print(Uexact @ testv)
-    print(U @ testv)
+    Uexact = U.tomatrix()
     assert np.all(np.isclose(Uexact @ testv, U @ testv))
+    assert np.all(np.isclose(Uexact @ testm, U @ testm))
