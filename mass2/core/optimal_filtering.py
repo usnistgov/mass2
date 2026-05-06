@@ -1192,5 +1192,6 @@ def bracketR(q: NDArray, noise: NDArray) -> float:
     r[n - 1 :: -1] = noise[:n]
     dot = 0.0
     for i in range(n):
-        dot += q[i] * r[n - i - 1 : 2 * n - i - 1] @ q
+        row_i = r[n - i - 1 : 2 * n - i - 1]
+        dot += q[i] * (row_i @ q)
     return dot
