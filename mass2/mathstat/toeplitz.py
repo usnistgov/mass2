@@ -7,10 +7,90 @@ Created on Nov 7, 2011
 """
 
 import numpy as np
+from scipy.signal import fftconvolve, correlate
 from numpy.typing import ArrayLike
+from dataclasses import dataclass
 
 
-__all__ = ["ToeplitzSolver"]
+__all__ = ["ToeplitzSolver", "LowerTriangularToeplitz", "UpperTriangularToeplitz"]
+
+
+@dataclass(frozen=True)
+class LowerTriangularToeplitz:
+    """Represent a lower triangular Toeplitz matrix"""
+
+    firstcol: np.ndarray
+
+    @classmethod
+    def fromLastRow(cls, lastrow: ArrayLike) -> "LowerTriangularToeplitz":
+        vec = np.array(lastrow)[::-1]
+        return cls(vec)
+
+    @property
+    def N(self) -> int:
+        return len(self.firstcol)
+
+    @property
+    def isupper(self) -> bool:
+        return False
+
+    @property
+    def islower(self) -> bool:
+        return True
+
+    def vecmul(self, vec: np.ndarray) -> np.ndarray:
+        assert len(vec) == self.N
+        return fftconvolve(self.firstcol, vec)[: self.N]
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        other = np.asarray(other)
+        shape = other.shape
+        assert len(shape) in {1, 2}
+        if len(shape) == 1:
+            return self.vecmul(other)
+        result = np.zeros_like(other)
+        for i in range(shape[1]):
+            result[:, i] = self.vecmul(other[:, i])
+        return result
+
+
+@dataclass(frozen=True)
+class UpperTriangularToeplitz:
+    """Represent an upper triangular Toeplitz matrix"""
+
+    toprow: np.ndarray
+
+    @classmethod
+    def fromLastCol(cls, lastcol: ArrayLike) -> "UpperTriangularToeplitz":
+        vec = np.array(lastcol)[::-1]
+        return cls(vec)
+
+    @property
+    def N(self) -> int:
+        return len(self.toprow)
+
+    @property
+    def isupper(self) -> bool:
+        return True
+
+    @property
+    def islower(self) -> bool:
+        return False
+
+    def vecmul(self, vec: np.ndarray) -> np.ndarray:
+        assert len(vec) == self.N
+        return correlate(vec, self.toprow, mode="full", method="fft")[self.N - 1 :]
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        other = np.asarray(other)
+        shape = other.shape
+        assert len(shape) in {1, 2}
+        if len(shape) == 1:
+            return self.vecmul(other)
+        result = np.zeros_like(other)
+        for i in range(shape[1]):
+            result[:, i] = self.vecmul(other[:, i])
+        return result
 
 
 class ToeplitzSolver:

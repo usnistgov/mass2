@@ -10,7 +10,7 @@ March 30, 2011
 """
 
 import pytest
-from mass2.mathstat.toeplitz import ToeplitzSolver
+from mass2.mathstat.toeplitz import ToeplitzSolver, LowerTriangularToeplitz, UpperTriangularToeplitz
 import numpy as np
 from scipy import linalg
 import time
@@ -203,3 +203,35 @@ class toeplitzSpeed:
         plt.ylabel("Time (sec)")
         plt.grid()
         plt.loglog()
+
+
+def test_triangular_toeplitz():
+    N = 40
+    nvec = 10
+    vec = rng.standard_normal(N)
+
+    L = LowerTriangularToeplitz(vec)
+    assert N == L.N
+    assert not L.isupper
+    assert L.islower
+
+    Lexact = linalg.toeplitz(vec, [vec[0]] + (N - 1) * [0])
+    L2 = LowerTriangularToeplitz.fromLastRow(Lexact[-1, :])
+
+    testv = rng.standard_normal(N)
+    assert np.all(np.isclose(Lexact @ testv, L @ testv))
+    assert np.all(np.isclose(Lexact @ testv, L2 @ testv))
+    assert np.all(np.isclose(L2.firstcol, L.firstcol))
+
+    testm = rng.standard_cauchy((N, nvec))
+    assert np.all(np.isclose(Lexact @ testm, L @ testm))
+
+    U = UpperTriangularToeplitz(vec)
+    assert N == U.N
+    assert U.isupper
+    assert not U.islower
+    Uexact = linalg.toeplitz([vec[0]] + (N - 1) * [0], vec)
+    # print(Uexact[:6, :4])
+    print(Uexact @ testv)
+    print(U @ testv)
+    assert np.all(np.isclose(Uexact @ testv, U @ testv))
