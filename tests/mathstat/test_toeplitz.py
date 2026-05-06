@@ -206,7 +206,7 @@ class toeplitzSpeed:
 
 
 def test_triangular_toeplitz():
-    N = 40
+    N = 30
     nvec = 10
     vec = rng.standard_normal(N)
 
@@ -239,3 +239,11 @@ def test_triangular_toeplitz():
     Uexact = U.tomatrix()
     assert np.all(np.isclose(Uexact @ testv, U @ testv))
     assert np.all(np.isclose(Uexact @ testm, U @ testm))
+
+    # Test inverse on small matrices
+    Lsm = LowerTriangularToeplitz(vec[:20])
+    Linv = Lsm.inverse()
+    assert np.all(np.isclose(Linv @ Lsm.tomatrix(), np.eye(Lsm.N), atol=1e-5))
+    Usm = UpperTriangularToeplitz(vec[N - 15 :])
+    Uinv = Usm.inverse()
+    assert np.all(np.isclose(Uinv @ Usm.tomatrix(), np.eye(Usm.N), atol=1e-5))

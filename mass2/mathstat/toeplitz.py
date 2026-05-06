@@ -45,6 +45,7 @@ class LowerTriangularToeplitz:
         return fftconvolve(self.firstcol, vec)[: self.N]
 
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
         other = np.asarray(other)
         shape = other.shape
         assert len(shape) in {1, 2}
@@ -64,6 +65,24 @@ class LowerTriangularToeplitz:
             The NxN lower triangular Toeplitz matrix with `self.firstcol` as its first column.
         """
         return linalg.toeplitz(self.firstcol, [self.firstcol[0]] + (self.N - 1) * [0])
+
+    def inverse(self) -> "LowerTriangularToeplitz":
+        """Return the inverse of self.
+
+        Returns
+        -------
+        LowerTriangularToeplitz
+            A matrix representing the inverse of self
+        """
+        b = np.zeros(self.N, dtype=float)
+        b[0] = 1.0 / self.firstcol[0]
+        for i in range(1, self.N):
+            b[i] = -b[0] * np.sum(self.firstcol[1 : i + 1] * b[i - 1 :: -1])
+        return LowerTriangularToeplitz(b)
+
+    @property
+    def T(self) -> "UpperTriangularToeplitz":
+        return UpperTriangularToeplitz(self.firstcol)
 
 
 @dataclass(frozen=True)
@@ -95,6 +114,7 @@ class UpperTriangularToeplitz:
         return correlate(vec, self.toprow, mode="full", method="fft")[self.N - 1 :]
 
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
         other = np.asarray(other)
         shape = other.shape
         assert len(shape) in {1, 2}
@@ -114,6 +134,24 @@ class UpperTriangularToeplitz:
             The NxN upper triangular Toeplitz matrix with `self.firstcol` as its first column.
         """
         return linalg.toeplitz([self.toprow[0]] + (self.N - 1) * [0], self.toprow)
+
+    def inverse(self) -> "UpperTriangularToeplitz":
+        """Return the inverse of self.
+
+        Returns
+        -------
+        UpperTriangularToeplitz
+            A matrix representing the inverse of self
+        """
+        b = np.zeros(self.N, dtype=float)
+        b[0] = 1.0 / self.toprow[0]
+        for i in range(1, self.N):
+            b[i] = -b[0] * np.sum(self.toprow[1 : i + 1] * b[i - 1 :: -1])
+        return UpperTriangularToeplitz(b)
+
+    @property
+    def T(self) -> LowerTriangularToeplitz:
+        return LowerTriangularToeplitz(self.toprow)
 
 
 class ToeplitzSolver:
