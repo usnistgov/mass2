@@ -293,7 +293,8 @@ class GPRSpline(CubicSpline):
         # Compute at test points = self.x
         # We know that these are the knots of a natural cubic spline
         R = H - KinvHT.T @ K
-        fbar = np.dot(y, np.linalg.solve(L.T, np.linalg.solve(L, K)))
+        KyinvK = np.linalg.solve(L.T, np.linalg.solve(L, K))
+        fbar = self.y @ KyinvK
         gbar = fbar + R.T @ beta
         CubicSpline.__init__(self, self.x, gbar)
 
@@ -331,7 +332,8 @@ class GPRSpline(CubicSpline):
         LH = np.linalg.solve(L, H.T)
         A = LH.T @ LH
         KinvHT = np.linalg.solve(L.T, LH)
-        C = KinvHT.dot(np.linalg.solve(A, KinvHT.T))
+        result1 = np.linalg.solve(A, KinvHT.T)
+        C = KinvHT @ result1
         yCy = self.y @ (C @ self.y)
         Linvy = np.linalg.solve(L, self.y)
         yKinvy = Linvy @ Linvy
@@ -349,7 +351,8 @@ class GPRSpline(CubicSpline):
             LinvKtest = np.linalg.solve(self.L, Ktest)
             cov_ftest = self.sigmaf**2 * k_spline(x, x) - (LinvKtest**2).sum()
             R = np.array((1, x)) - self.KinvHT.T @ Ktest
-            v.append(cov_ftest + R.dot(np.linalg.solve(self.A, R)))
+            result1 = np.linalg.solve(self.A, R)
+            v.append(cov_ftest + R @ result1)
         if np.isscalar(xtest):
             return v[0]
         return np.array(v)
@@ -366,7 +369,8 @@ class GPRSpline(CubicSpline):
         cov_ftest -= LinvKtest.T @ LinvKtest
         R = np.vstack((np.ones(len(xtest)), xtest))
         R -= self.KinvHT.T @ Ktest
-        return cov_ftest + R.T.dot(np.linalg.solve(self.A, R))
+        result1 = np.linalg.solve(self.A, R)
+        return cov_ftest + R.T @ result1
 
 
 class NaturalBsplineBasis:
