@@ -12,7 +12,7 @@ from mass2.mathstat.utilities import find_range_randomly
 
 class PulseModel:
     """Object to hold a "pulse model", meaning a low-dimensional linear basis to express "all" pulses,
-    along with a projector such that projector.dot(basis) is the identity matrix.
+    along with a projector such that (projector @ basis) is the identity matrix.
 
     Also has the capacity to store to and restore from HDF5, and the ability to compute additional
     basis elements and corresponding projectors with method _additional_projectors_tsvd"""
@@ -140,7 +140,7 @@ class PulseModel:
         """
         Given an existing basis with projectors, compute a basis with n_basis elements
         by randomized SVD of the residual elements of the training data in pulses_for_svd.
-        It should be the case that projectors.dot(basis) is approximately the identity matrix.
+        It should be the case that (projectors @ basis) is approximately the identity matrix.
 
         It is assumed that the projectors will have been computed from the basis in some
         noise-optimal way, say, from optimal filtering. However, the additional basis elements
