@@ -220,12 +220,25 @@ def levinson_durbin(r: ArrayLike, generate_whitener: bool = False) -> np.ndarray
 
 @dataclass(frozen=True)
 class SymmetricToeplitz:
+    """Represent a Symmetric Toeplitz matrix.
+
+    Create using one of the class methods:
+    >>> cfirst = np.array([10, 5, 3, 1])
+    >>> clast = cfirst[::-1]
+    >>> S = SymmetricToeplitz.fromFirstCol(cfirst)
+    >>> S = SymmetricToeplitz.fromLastCol(clast)
+
+    When created in this way, the "forward" and "backward" vectors (the first and last columns of the inverse
+    of this matrix) will be computed. This one-time startup cost makes solving this matrix very fast.
+    """
+
     firstcol: np.ndarray
     fvec: np.ndarray
     bvec: np.ndarray
 
     @classmethod
     def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
+        """Generate a `SymmetricToeplitz` from its first column."""
         # Run the Levinson-Durbin, so we can store the last fw and bw vectors
         firstcol = np.asarray(firstcol)
         fvec = levinson_durbin(firstcol, generate_whitener=False)
@@ -233,7 +246,7 @@ class SymmetricToeplitz:
 
     @classmethod
     def fromLastCol(cls, lastcol: ArrayLike) -> "SymmetricToeplitz":
-        """Generate an `SymmetricToeplitz` from its last column, rather than the default (top row)"""
+        """Generate a `SymmetricToeplitz` from its last column."""
         firstcol = np.array(lastcol)[::-1]
         return cls.fromFirstCol(firstcol)
 
@@ -245,11 +258,37 @@ class SymmetricToeplitz:
     def T(self) -> "SymmetricToeplitz":
         return self
 
-    # TODO: copy matrix multiply from ToeplitzSolver
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
 
-    # def __matmul__(self, other: ArrayLike) -> np.ndarray:
-    #     other = np.asarray(other)
-    #     return other
+        Returns
+        -------
+        np.ndarray
+            The NxN symmetric Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz(self.firstcol)
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
+        other = np.asarray(other)
+        shape = other.shape
+        assert len(shape) in {1, 2}
+        if len(shape) == 1:
+            return self._multbyvec(other)
+        result = np.zeros_like(other)
+        for i in range(shape[1]):
+            result[:, i] = self._multbyvec(other[:, i])
+        return result
+
+    def _multbyvec(self, x: np.ndarray) -> np.ndarray:
+        N = len(x)
+        assert N == self.N
+        y = np.zeros_like(x)
+        y[0] = self.firstcol @ x
+        for i in range(1, N):
+            y[i] = self.firstcol[:-i] @ x[i:]
+            y[i] += self.firstcol[1 : 1 + i] @ x[i - 1 :: -1]
+        return y
 
     # def solve(self, other: ArrayLike) -> np.ndarray:
     #     other = np.asarray(other)
