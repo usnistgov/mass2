@@ -154,6 +154,45 @@ class UpperTriangularToeplitz:
         return LowerTriangularToeplitz(self.toprow)
 
 
+@dataclass(frozen=True)
+class SymmetricToeplitz:
+    firstcol: np.ndarray
+
+    # @classmethod
+    # def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
+    #     Run the Levinson-Durbin, so we can store the last fw and bw vectors
+    #     pass
+
+    @classmethod
+    def fromLastCol(cls, lastcol: ArrayLike) -> "SymmetricToeplitz":
+        """Generate an `SymmetricToeplitz` from its last column, rather than the default (top row)"""
+        vec = np.array(lastcol)[::-1]
+        return cls(vec)
+
+    @property
+    def N(self) -> int:
+        return len(self.firstcol)
+
+    @property
+    def T(self) -> "SymmetricToeplitz":
+        return self
+
+    # TODO: figure out what to compute at construction time.
+    # TODO: copy matrix multiply from ToeplitzSolver
+
+    # def __matmul__(self, other: ArrayLike) -> np.ndarray:
+    #     other = np.asarray(other)
+    #     return other
+
+    # def solve(self, other: ArrayLike) -> np.ndarray:
+    #     other = np.asarray(other)
+    #     return other
+
+    # def whitener(self) -> np.ndarray:
+    #     run the Levinson-Durbin, keeping full W matrix.
+    #     This could be a class method? A factory function?
+
+
 class ToeplitzSolver:
     """Solve a Toeplitz matrix for one or more vectors.
 
