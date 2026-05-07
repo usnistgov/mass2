@@ -154,6 +154,58 @@ class UpperTriangularToeplitz:
         return LowerTriangularToeplitz(self.toprow)
 
 
+def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Run the Levinson-Durbin recursion for a symmetric Toeplitz matrix R with the given first column. Find the
+    final "backward vector" `b` such that Rb = [0, 0, .... 1]. That backward vector is the last column of inv(R).
+    Its reverse (called the "forward vector") `f` satisfies Rb=[1, 0, 0....0], so it is the first column of inv(R).
+
+    Optionally also return the whitening transformation, a square matrix that obeys W @ R @ (W.T) = I. While this
+    matrix is implicitly computed as part of the Levinson-Durbin algorithm, storing it explicitly requires O(n^2)
+    memory (for input vector `r` having length n). It is best not to compute it fully unless you need it.
+
+    Parameters
+    ----------
+    r : np.ndarray
+        First column and first row of the symmetric Toeplitz matrix being analyzed, of length `n`
+    generate_whitener : bool, optional
+        Whether to compute and return the exact whitening transformation (an `n`x`n` matrix), by default False.
+        The whitener uses `n^2` space, so it should not be created and returned unless the user actually wants it
+
+    Returns
+    -------
+    np.ndarray | tuple[np.ndarray, np.ndarray]
+        Either the final backward vector `b`, or (if `generate_whitener` is True) the
+        tuple `(b, W)` where `W` is the `n`x`n` exact whitening matrix.
+    """
+    n = len(r)
+    f = np.zeros(n, dtype=float)
+    b = np.zeros(n, dtype=float)
+
+    # TODO: test this function
+    if generate_whitener:
+        W = np.zeros((n, n), dtype=float)
+        W[0, 0] = r[0] ** -0.5
+
+    f[0] = b[0] = 1.0 / r[0]
+    for iter in range(1, n):
+        error_fw = f[:iter] @ r[iter:0:-1]
+        error_bw = b[:iter] @ r[1 : iter + 1]
+        scale = 1.0 / (1.0 - error_bw * error_fw)
+        bprevious = b[:iter].copy()
+        b[1 : iter + 1] = bprevious
+        b[0] = 0
+        b[:iter] -= error_bw * f[:iter]
+        f[1 : iter + 1] -= error_fw * bprevious
+        f[: iter + 1] *= scale
+        b[: iter + 1] *= scale
+        if generate_whitener:
+            W[iter, : iter + 1] = b[: iter + 1] / np.sqrt(b[iter])
+
+    if generate_whitener:
+        return (b, W)
+    return b
+
+
 @dataclass(frozen=True)
 class SymmetricToeplitz:
     firstcol: np.ndarray
