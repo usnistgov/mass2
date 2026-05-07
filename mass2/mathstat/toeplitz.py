@@ -9,7 +9,7 @@ Created on Nov 7, 2011
 import numpy as np
 from scipy.signal import fftconvolve, correlate
 from scipy import linalg
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from typing import overload, Literal
 
@@ -161,16 +161,16 @@ class UpperTriangularToeplitz:
 
 
 @overload
-def levinson_durbin(r: ArrayLike, generate_whitener: Literal[False]) -> np.ndarray:
+def levinson_durbin(r: NDArray, generate_whitener: Literal[False]) -> np.ndarray:
     pass
 
 
 @overload
-def levinson_durbin(r: ArrayLike, generate_whitener: Literal[True]) -> tuple[np.ndarray, np.ndarray]:
+def levinson_durbin(r: NDArray, generate_whitener: Literal[True]) -> tuple[np.ndarray, np.ndarray]:
     pass
 
 
-def levinson_durbin(r: ArrayLike, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+def levinson_durbin(r: NDArray, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Run the Levinson-Durbin recursion for a symmetric Toeplitz matrix R with the given first column. Find the
     final "forward vector" `f` such that Rf=[1, 0, 0....0]. That forward vector is the first column of inv(R).
     Its reverse (called the "backward vector") `b` satisfies Rb = [0, 0, .... 1], so it is the last column of inv(R).
@@ -193,7 +193,6 @@ def levinson_durbin(r: ArrayLike, generate_whitener: bool = False) -> np.ndarray
         Either the final forward vector `f`, or (if `generate_whitener` is True) the
         tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix.
     """
-    r = np.asarray(r)
     n = len(r)
     f = np.zeros(n, dtype=float)
     b = np.zeros(n, dtype=float)
@@ -330,7 +329,7 @@ class SymmetricToeplitz:
 
     @staticmethod
     def Whitener(firstcol: ArrayLike) -> np.ndarray:
-        _, W = levinson_durbin(firstcol, generate_whitener=True)
+        _, W = levinson_durbin(np.asarray(firstcol), generate_whitener=True)
         return W
 
 
