@@ -276,15 +276,33 @@ def test_levinson_durbin():
 
 
 def test_symmetric_toep():
-    N = 40
+    N = 30
+
+    # Generate a positive-definite size-N SymmetricToeplitz matrix
     r = generate_autocorrelation(N)
     S = SymmetricToeplitz.fromFirstCol(r)
-    W = S.whitener()
     R = S.tomatrix()
+    assert np.allclose(R, linalg.toeplitz(r))
+
+    # Test we can form SymmetricToeplitz from the last column, as well as the first.
     S2 = SymmetricToeplitz.fromLastCol(r[::-1])
     assert np.allclose(R, S2.tomatrix())
 
+    # Check S@x == R@x for any x. Use a matrix, B
+    nvecs = 5
+    B = rng.standard_normal((N, nvecs))
+    assert np.allclose(S @ B, R @ B)
+
     # Verify that whitener does what it promises
+    W = S.whitener()
     WRWt = W @ R @ (W.T)
-    print(WRWt)
     assert np.allclose(WRWt, np.eye(N))
+
+    # Check for solving Sx=b. Verify that solution obeys _both_ Sx=b and Rx=b.
+    # This is testing the Gohberg-Semencul formula.
+    b = rng.standard_normal(N)
+    x = S.solve(b)
+    assert np.allclose(b, R @ x)
+
+    X = S.solve(B)
+    assert np.allclose(B, S @ X)

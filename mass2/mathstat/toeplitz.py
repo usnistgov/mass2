@@ -251,8 +251,8 @@ class SymmetricToeplitz:
         # Run the Levinson-Durbin, so we can store the last fw and bw vectors
         fvec = levinson_durbin(firstcol, generate_whitener=False)
         bvec = fvec[::-1]
-        l1column = np.asarray(bvec)
-        l2column = np.hstack(([0], l1column[:0:-1]))
+        l1column = np.asarray(fvec) / fvec[0] ** 0.5
+        l2column = np.hstack(([0], bvec[:-1])) / fvec[0] ** 0.5
         L1 = LowerTriangularToeplitz(l1column)
         L2 = LowerTriangularToeplitz(l2column)
         return cls(firstcol, fvec, bvec, L1, L2)
@@ -284,18 +284,20 @@ class SymmetricToeplitz:
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
         other = np.asarray(other)
-        shape = other.shape
-        assert len(shape) in {1, 2}
-        if len(shape) == 1:
+        assert other.ndim in {1, 2}
+        if other.ndim == 1:
             return self._multbyvec(other)
         result = np.zeros_like(other)
-        for i in range(shape[1]):
+        for i in range(other.shape[1]):
             result[:, i] = self._multbyvec(other[:, i])
         return result
 
     def _multbyvec(self, x: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a single vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
         N = len(x)
-        assert N == self.N
         y = np.zeros_like(x)
         y[0] = self.firstcol @ x
         for i in range(1, N):
@@ -303,9 +305,25 @@ class SymmetricToeplitz:
             y[i] += self.firstcol[1 : 1 + i] @ x[i - 1 :: -1]
         return y
 
-    # def solve(self, other: ArrayLike) -> np.ndarray:
-    #     other = np.asarray(other)
-    #     return other
+    def solve(self, other: ArrayLike) -> np.ndarray:
+        other = np.asarray(other)
+        assert other.ndim in {1, 2}
+        if other.ndim == 1:
+            return self._solvevec(other)
+        result = np.zeros_like(other)
+        for i in range(other.shape[1]):
+            result[:, i] = self._solvevec(other[:, i])
+        return result
+
+    def _solvevec(self, x: np.ndarray) -> np.ndarray:
+        """Implement the `inv(self) @ other` or solving self * y = x, for a single right-hand-side vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
+        assert x.ndim == 1
+        y = self.L1 @ (self.L1.T @ x)
+        y -= self.L2 @ (self.L2.T @ x)
+        return y
 
     def whitener(self) -> np.ndarray:
         _, W = levinson_durbin(self.firstcol, generate_whitener=True)
