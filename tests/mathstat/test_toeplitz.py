@@ -11,7 +11,7 @@ March 30, 2011
 
 import pytest
 from mass2.mathstat.toeplitz import ToeplitzSolver, LowerTriangularToeplitz, UpperTriangularToeplitz
-from mass2.mathstat.toeplitz import levinson_durbin
+from mass2.mathstat.toeplitz import levinson_durbin, SymmetricToeplitz
 import numpy as np
 from scipy import linalg
 import time
@@ -250,11 +250,15 @@ def test_triangular_toeplitz():
     assert np.allclose(Uinv @ Usm.tomatrix(), np.eye(Usm.N), atol=1e-5, rtol=0.001)
 
 
-def test_levinson_durbin():
-    N = 50
+def generate_autocorrelation(N=50):
     # Use autocorrelation to ensure we have a positive-definite test matrix
     x = rng.standard_normal(N)
-    r = np.correlate(x, x, mode="full")[N - 1 :]
+    return np.correlate(x, x, mode="full")[N - 1 :]
+
+
+def test_levinson_durbin():
+    N = 50
+    r = generate_autocorrelation(N)
     R = linalg.toeplitz(r)
     fw1 = levinson_durbin(r, generate_whitener=False)
     fw, W = levinson_durbin(r, generate_whitener=True)
@@ -264,6 +268,21 @@ def test_levinson_durbin():
     # Verify that forward and backward vectors are first and last column of inverse
     assert np.allclose(R @ bw, [0] * (N - 1) + [1])
     assert np.allclose(R @ fw, [1] + [0] * (N - 1))
+
+    # Verify that whitener does what it promises
+    WRWt = W @ R @ (W.T)
+    print(WRWt)
+    assert np.allclose(WRWt, np.eye(N))
+
+
+def test_symmetric_toep():
+    N = 40
+    r = generate_autocorrelation(N)
+    S = SymmetricToeplitz.fromFirstCol(r)
+    W = S.whitener()
+    R = S.tomatrix()
+    S2 = SymmetricToeplitz.fromLastCol(r[::-1])
+    assert np.allclose(R, S2.tomatrix())
 
     # Verify that whitener does what it promises
     WRWt = W @ R @ (W.T)
