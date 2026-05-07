@@ -11,6 +11,7 @@ from scipy.signal import fftconvolve, correlate
 from scipy import linalg
 from numpy.typing import ArrayLike
 from dataclasses import dataclass
+from typing import overload, Literal
 
 
 __all__ = ["ToeplitzSolver", "LowerTriangularToeplitz", "UpperTriangularToeplitz"]
@@ -154,7 +155,17 @@ class UpperTriangularToeplitz:
         return LowerTriangularToeplitz(self.toprow)
 
 
-def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+@overload
+def levinson_durbin(r: ArrayLike, generate_whitener: Literal[False]) -> np.ndarray:
+    pass
+
+
+@overload
+def levinson_durbin(r: ArrayLike, generate_whitener: Literal[True]) -> tuple[np.ndarray, np.ndarray]:
+    pass
+
+
+def levinson_durbin(r: ArrayLike, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Run the Levinson-Durbin recursion for a symmetric Toeplitz matrix R with the given first column. Find the
     final "forward vector" `f` such that Rf=[1, 0, 0....0]. That forward vector is the first column of inv(R).
     Its reverse (called the "backward vector") `b` satisfies Rb = [0, 0, .... 1], so it is the last column of inv(R).
@@ -177,6 +188,7 @@ def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarra
         Either the final forward vector `f`, or (if `generate_whitener` is True) the
         tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix.
     """
+    r = np.asarray(r)
     n = len(r)
     f = np.zeros(n, dtype=float)
     b = np.zeros(n, dtype=float)
@@ -209,17 +221,21 @@ def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarra
 @dataclass(frozen=True)
 class SymmetricToeplitz:
     firstcol: np.ndarray
+    fvec: np.ndarray
+    bvec: np.ndarray
 
-    # @classmethod
-    # def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
-    #     Run the Levinson-Durbin, so we can store the last fw and bw vectors
-    #     pass
+    @classmethod
+    def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
+        # Run the Levinson-Durbin, so we can store the last fw and bw vectors
+        firstcol = np.asarray(firstcol)
+        fvec = levinson_durbin(firstcol, generate_whitener=False)
+        return cls(firstcol, fvec, fvec[::-1])
 
     @classmethod
     def fromLastCol(cls, lastcol: ArrayLike) -> "SymmetricToeplitz":
         """Generate an `SymmetricToeplitz` from its last column, rather than the default (top row)"""
-        vec = np.array(lastcol)[::-1]
-        return cls(vec)
+        firstcol = np.array(lastcol)[::-1]
+        return cls.fromFirstCol(firstcol)
 
     @property
     def N(self) -> int:
@@ -229,7 +245,6 @@ class SymmetricToeplitz:
     def T(self) -> "SymmetricToeplitz":
         return self
 
-    # TODO: figure out what to compute at construction time.
     # TODO: copy matrix multiply from ToeplitzSolver
 
     # def __matmul__(self, other: ArrayLike) -> np.ndarray:
@@ -240,9 +255,14 @@ class SymmetricToeplitz:
     #     other = np.asarray(other)
     #     return other
 
-    # def whitener(self) -> np.ndarray:
-    #     run the Levinson-Durbin, keeping full W matrix.
-    #     This could be a class method? A factory function?
+    def whitener(self) -> np.ndarray:
+        _, W = levinson_durbin(self.firstcol, generate_whitener=True)
+        return W
+
+    @staticmethod
+    def Whitener(firstcol: ArrayLike) -> np.ndarray:
+        _, W = levinson_durbin(firstcol, generate_whitener=True)
+        return W
 
 
 class ToeplitzSolver:
