@@ -198,7 +198,6 @@ def levinson_durbin(r: ArrayLike, generate_whitener: bool = False) -> np.ndarray
     f = np.zeros(n, dtype=float)
     b = np.zeros(n, dtype=float)
 
-    # TODO: test this function
     if generate_whitener:
         W = np.zeros((n, n), dtype=float)
         W[0, 0] = r[0] ** -0.5
