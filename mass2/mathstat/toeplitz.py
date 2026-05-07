@@ -14,7 +14,12 @@ from dataclasses import dataclass
 from typing import overload, Literal
 
 
-__all__ = ["ToeplitzSolver", "LowerTriangularToeplitz", "UpperTriangularToeplitz"]
+__all__ = [
+    "ToeplitzSolver",
+    "LowerTriangularToeplitz",
+    "UpperTriangularToeplitz",
+    "SymmetricToeplitz",
+]
 
 
 @dataclass(frozen=True)
@@ -235,14 +240,22 @@ class SymmetricToeplitz:
     firstcol: np.ndarray
     fvec: np.ndarray
     bvec: np.ndarray
+    L1: LowerTriangularToeplitz
+    L2: LowerTriangularToeplitz
 
     @classmethod
     def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
         """Generate a `SymmetricToeplitz` from its first column."""
-        # Run the Levinson-Durbin, so we can store the last fw and bw vectors
         firstcol = np.asarray(firstcol)
+
+        # Run the Levinson-Durbin, so we can store the last fw and bw vectors
         fvec = levinson_durbin(firstcol, generate_whitener=False)
-        return cls(firstcol, fvec, fvec[::-1])
+        bvec = fvec[::-1]
+        l1column = np.asarray(bvec)
+        l2column = np.hstack(([0], l1column[:0:-1]))
+        L1 = LowerTriangularToeplitz(l1column)
+        L2 = LowerTriangularToeplitz(l2column)
+        return cls(firstcol, fvec, bvec, L1, L2)
 
     @classmethod
     def fromLastCol(cls, lastcol: ArrayLike) -> "SymmetricToeplitz":
