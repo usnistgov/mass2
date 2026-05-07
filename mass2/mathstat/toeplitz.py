@@ -156,8 +156,8 @@ class UpperTriangularToeplitz:
 
 def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Run the Levinson-Durbin recursion for a symmetric Toeplitz matrix R with the given first column. Find the
-    final "backward vector" `b` such that Rb = [0, 0, .... 1]. That backward vector is the last column of inv(R).
-    Its reverse (called the "forward vector") `f` satisfies Rb=[1, 0, 0....0], so it is the first column of inv(R).
+    final "forward vector" `f` such that Rf=[1, 0, 0....0]. That forward vector is the first column of inv(R).
+    Its reverse (called the "backward vector") `b` satisfies Rb = [0, 0, .... 1], so it is the last column of inv(R).
 
     Optionally also return the whitening transformation, a square matrix that obeys W @ R @ (W.T) = I. While this
     matrix is implicitly computed as part of the Levinson-Durbin algorithm, storing it explicitly requires O(n^2)
@@ -174,8 +174,8 @@ def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarra
     Returns
     -------
     np.ndarray | tuple[np.ndarray, np.ndarray]
-        Either the final backward vector `b`, or (if `generate_whitener` is True) the
-        tuple `(b, W)` where `W` is the `n`x`n` exact whitening matrix.
+        Either the final forward vector `f`, or (if `generate_whitener` is True) the
+        tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix.
     """
     n = len(r)
     f = np.zeros(n, dtype=float)
@@ -202,8 +202,8 @@ def levinson_durbin(r: np.ndarray, generate_whitener: bool = False) -> np.ndarra
             W[iter, : iter + 1] = b[: iter + 1] / np.sqrt(b[iter])
 
     if generate_whitener:
-        return (b, W)
-    return b
+        return (f, W)
+    return f
 
 
 @dataclass(frozen=True)
