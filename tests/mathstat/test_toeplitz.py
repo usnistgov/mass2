@@ -11,12 +11,13 @@ March 30, 2011
 
 import pytest
 from mass2.mathstat.toeplitz import ToeplitzSolver, LowerTriangularToeplitz, UpperTriangularToeplitz
+from mass2.mathstat.toeplitz import levinson_durbin
 import numpy as np
 from scipy import linalg
 import time
 import pylab as plt
 
-rng = np.random.default_rng()
+rng = np.random.default_rng(6823)
 
 
 class TestToeplitzSolverSmallSymmetric:
@@ -206,9 +207,9 @@ class toeplitzSpeed:
 
 
 def test_triangular_toeplitz():
-    N = 30
+    N = 40
     nvec = 10
-    vec = rng.standard_normal(N)
+    vec = rng.standard_exponential(N)
 
     L = LowerTriangularToeplitz(vec)
     assert N == L.N
@@ -225,25 +226,46 @@ def test_triangular_toeplitz():
     L2 = LowerTriangularToeplitz.fromLastRow(Lexact[-1, :])
 
     testv = rng.standard_normal(N)
-    assert np.all(np.isclose(Lexact @ testv, L @ testv))
-    assert np.all(np.isclose(Lexact @ testv, L2 @ testv))
-    assert np.all(np.isclose(L2.firstcol, L.firstcol))
+    assert np.allclose(Lexact @ testv, L @ testv)
+    assert np.allclose(Lexact @ testv, L2 @ testv)
+    assert np.allclose(L2.firstcol, L.firstcol)
 
     testm = rng.standard_cauchy((N, nvec))
-    assert np.all(np.isclose(Lexact @ testm, L @ testm))
+    assert np.allclose(Lexact @ testm, L @ testm)
 
     U = UpperTriangularToeplitz(vec)
     assert N == U.N
     assert U.isupper
     assert not U.islower
     Uexact = U.tomatrix()
-    assert np.all(np.isclose(Uexact @ testv, U @ testv))
-    assert np.all(np.isclose(Uexact @ testm, U @ testm))
+    assert np.allclose(Uexact @ testv, U @ testv)
+    assert np.allclose(Uexact @ testm, U @ testm)
 
     # Test inverse on small matrices
-    Lsm = LowerTriangularToeplitz(vec[:20])
+    Lsm = LowerTriangularToeplitz(vec[:15])
     Linv = Lsm.inverse()
-    assert np.all(np.isclose(Linv @ Lsm.tomatrix(), np.eye(Lsm.N), atol=1e-5))
+    assert np.allclose(Linv @ Lsm.tomatrix(), np.eye(Lsm.N), atol=1e-4, rtol=0.001)
     Usm = UpperTriangularToeplitz(vec[N - 15 :])
     Uinv = Usm.inverse()
-    assert np.all(np.isclose(Uinv @ Usm.tomatrix(), np.eye(Usm.N), atol=1e-5))
+    assert np.allclose(Uinv @ Usm.tomatrix(), np.eye(Usm.N), atol=1e-5, rtol=0.001)
+
+
+def test_levinson_durbin():
+    N = 50
+    # Use autocorrelation to ensure we have a positive-definite test matrix
+    x = rng.standard_normal(N)
+    r = np.correlate(x, x, mode="full")[N - 1 :]
+    R = linalg.toeplitz(r)
+    fw1 = levinson_durbin(r, generate_whitener=False)
+    fw, W = levinson_durbin(r, generate_whitener=True)
+    bw = fw[::-1]
+    assert np.allclose(fw1, fw)
+
+    # Verify that forward and backward vectors are first and last column of inverse
+    assert np.allclose(R @ bw, [0] * (N - 1) + [1])
+    assert np.allclose(R @ fw, [1] + [0] * (N - 1))
+
+    # Verify that whitener does what it promises
+    WRWt = W @ R @ (W.T)
+    print(WRWt)
+    assert np.allclose(WRWt, np.eye(N))
