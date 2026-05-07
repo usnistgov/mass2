@@ -57,10 +57,7 @@ class LowerTriangularToeplitz:
         assert len(shape) in {1, 2}
         if len(shape) == 1:
             return self.vecmul(other)
-        result = np.zeros_like(other)
-        for i in range(shape[1]):
-            result[:, i] = self.vecmul(other[:, i])
-        return result
+        return np.column_stack([self.vecmul(col) for col in other.T])
 
     def tomatrix(self) -> np.ndarray:
         """Generate a concrete copy of the matrix represented by self
@@ -126,10 +123,7 @@ class UpperTriangularToeplitz:
         assert len(shape) in {1, 2}
         if len(shape) == 1:
             return self.vecmul(other)
-        result = np.zeros_like(other)
-        for i in range(shape[1]):
-            result[:, i] = self.vecmul(other[:, i])
-        return result
+        return np.column_stack([self.vecmul(col) for col in other.T])
 
     def tomatrix(self) -> np.ndarray:
         """Generate a concrete copy of the matrix represented by self
@@ -202,19 +196,14 @@ def levinson_durbin(r: NDArray, generate_whitener: bool = False) -> np.ndarray |
         W[0, 0] = r[0] ** -0.5
 
     f[0] = b[0] = 1.0 / r[0]
-    for iter in range(1, n):
-        error_fw = f[:iter] @ r[iter:0:-1]
-        error_bw = b[:iter] @ r[1 : iter + 1]
-        scale = 1.0 / (1.0 - error_bw * error_fw)
-        bprevious = b[:iter].copy()
-        b[1 : iter + 1] = bprevious
-        b[0] = 0
-        b[:iter] -= error_bw * f[:iter]
-        f[1 : iter + 1] -= error_fw * bprevious
-        f[: iter + 1] *= scale
-        b[: iter + 1] *= scale
+    for k in range(1, n):
+        error_k = b[:k] @ r[1 : k + 1]
+        scale = 1.0 / (1.0 - error_k**2)
+        f[1 : k + 1] -= error_k * b[:k]
+        f[: k + 1] *= scale
+        b[: k + 1] = f[k::-1]
         if generate_whitener:
-            W[iter, : iter + 1] = b[: iter + 1] / np.sqrt(b[iter])
+            W[k, : k + 1] = b[: k + 1] / np.sqrt(b[k])
 
     if generate_whitener:
         return (f, W)
