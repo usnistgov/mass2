@@ -26,7 +26,8 @@ dependencies = [
     # Numpy 2.4 is not currently compatible with numba
     "numpy>=2.0,<=2.3",
     "packaging",
-    "polars",
+    # A test_truebq_bin.py error came up with polars 1.40. Forbid for now.
+    "polars<1.40",
     "progress",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
     "pyqt5",

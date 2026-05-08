@@ -271,7 +271,7 @@ class TrueBqBin:
     frametime_s: float
     voltage_scale: float
     data: np.ndarray
-    # the bin file is a continuous data aqusition, untriggered
+    # the bin file is a continuous data aquisition, untriggered
 
     @classmethod
     def load(cls, bin_path: str | Path) -> "TrueBqBin":
