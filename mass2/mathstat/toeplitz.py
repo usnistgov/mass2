@@ -51,7 +51,14 @@ class LowerTriangularToeplitz:
         return fftconvolve(self.firstcol, vec)[: self.N]
 
     def _matmul(self, other: np.ndarray) -> np.ndarray:
+        # Here are two implementations that both work. I thought that directly controlling the FFT
+        # would be faster, but it absolutely was not. So use the simpler one.
         return np.column_stack([self._vecmul(col) for col in other.T])
+        # nfft = 2 * self.N
+        # k_fft = np.fft.rfft(self.firstcol, n=nfft)
+        # other_fft = np.fft.rfft(other.T, n=nfft, axis=1)
+        # conv = np.fft.irfft(other_fft * k_fft, n=nfft, axis=1).T
+        # return conv[: self.N]
 
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
@@ -114,18 +121,27 @@ class UpperTriangularToeplitz:
     def islower(self) -> bool:
         return False
 
-    def vecmul(self, vec: np.ndarray) -> np.ndarray:
+    def _vecmul(self, vec: np.ndarray) -> np.ndarray:
         assert len(vec) == self.N
         return correlate(vec, self.toprow, mode="full", method="fft")[self.N - 1 :]
+
+    def _matmul(self, other: np.ndarray) -> np.ndarray:
+        # Here are two implementations that both work. I thought that directly controlling the FFT
+        # would be faster, but it absolutely was not. So use the simpler one.
+        return np.column_stack([self._vecmul(col) for col in other.T])
+        # nfft = 2 * self.N
+        # k_fft = np.fft.rfft(self.toprow, n=nfft)
+        # other_fft = np.fft.rfft(other.T, n=nfft, axis=1)
+        # corr = np.fft.irfft(other_fft * np.conj(k_fft), n=nfft, axis=1).T
+        # return corr[: self.N]
 
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
         other = np.asarray(other)
-        shape = other.shape
-        assert len(shape) in {1, 2}
-        if len(shape) == 1:
-            return self.vecmul(other)
-        return np.column_stack([self.vecmul(col) for col in other.T])
+        assert other.ndim in {1, 2}, "LowerTriangularToeplitz @ x requires x to be of dimension 1 or 2"
+        if other.ndim == 1:
+            return self._vecmul(other)
+        return self._matmul(other)
 
     def tomatrix(self) -> np.ndarray:
         """Generate a concrete copy of the matrix represented by self
