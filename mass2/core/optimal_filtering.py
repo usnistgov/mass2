@@ -11,7 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from mass2.mathstat.toeplitz import ToeplitzSolver
+from mass2.mathstat.toeplitz import SymmetricToeplitz
 from mass2.core.misc import plot_zoomable
 
 
@@ -641,10 +641,10 @@ class FilterMaker:
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        TS = ToeplitzSolver(noise_corr, symmetric=True)
-        Rinv_model = np.vstack([TS(r) for r in pulse_model])
-        A = pulse_model @ (Rinv_model.T)
-        all_filters = np.linalg.solve(A, Rinv_model)
+        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+        Rinv_model = NoiseR.solve(pulse_model.T)
+        A = pulse_model @ Rinv_model
+        all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
@@ -766,10 +766,10 @@ class FilterMaker:
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        TS = ToeplitzSolver(noise_corr, symmetric=True)
-        Rinv_model = np.vstack([TS(r) for r in pulse_model])
-        A = pulse_model @ (Rinv_model.T)
-        all_filters = np.linalg.solve(A, Rinv_model)
+        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+        Rinv_model = NoiseR.solve(pulse_model.T)
+        A = pulse_model @ Rinv_model
+        all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
@@ -1026,12 +1026,10 @@ class FilterMaker:
         else:
             assert len(noise_autocorr) >= ns
             noise_corr = noise_autocorr[:ns]
-            TS = ToeplitzSolver(noise_corr, symmetric=True)
-
-            RinvM = np.vstack([TS(r) for r in MT]).T
-            A = MT @ RinvM
-            Ainv = np.linalg.inv(A)
-            filt = Ainv @ (RinvM.T)
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(MT.T)
+            A = MT @ Rinv_model
+            filt = np.linalg.solve(A, Rinv_model.T)
 
         band_limit(filt.T, self.sample_time_sec, fmax, f_3db)
 
