@@ -17,7 +17,8 @@ from scipy import linalg
 from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from typing import overload, Literal
-import warnings
+import deprecation
+from .. import __version__
 
 
 __all__ = [
@@ -469,7 +470,7 @@ with
 """
 
 
-@warnings.deprecated(deprecation_msg_TS)
+@deprecation.deprecated(deprecated_in="2.0.5", removed_in="2.0.8", current_version=__version__, details=deprecation_msg_TS)
 class ToeplitzSolver:
     """Solve a Toeplitz matrix for one or more vectors.
 
