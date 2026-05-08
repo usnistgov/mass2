@@ -46,18 +46,20 @@ class LowerTriangularToeplitz:
     def islower(self) -> bool:
         return True
 
-    def vecmul(self, vec: np.ndarray) -> np.ndarray:
+    def _vecmul(self, vec: np.ndarray) -> np.ndarray:
         assert len(vec) == self.N
         return fftconvolve(self.firstcol, vec)[: self.N]
+
+    def _matmul(self, other: np.ndarray) -> np.ndarray:
+        return np.column_stack([self._vecmul(col) for col in other.T])
 
     def __matmul__(self, other: ArrayLike) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
         other = np.asarray(other)
-        shape = other.shape
-        assert len(shape) in {1, 2}
-        if len(shape) == 1:
-            return self.vecmul(other)
-        return np.column_stack([self.vecmul(col) for col in other.T])
+        assert other.ndim in {1, 2}, "LowerTriangularToeplitz @ x requires x to be of dimension 1 or 2"
+        if other.ndim == 1:
+            return self._vecmul(other)
+        return self._matmul(other)
 
     def tomatrix(self) -> np.ndarray:
         """Generate a concrete copy of the matrix represented by self
