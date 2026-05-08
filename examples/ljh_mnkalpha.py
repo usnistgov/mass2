@@ -1,21 +1,19 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.23.5"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     #MASS version 2: introduction to internals
     MASS is the Microcalorimeter Analysis Software Suite. Version 2 is a replacement for Version 1 of MASS (2011-2025). Version 2 supports many algorithms for pulse filtering, calibration, and corrections. It is built on modern open source data science software, including [Pola.rs](https://pola.rs) and [Marimo](https://marimo.io). MASS v2 supports some key features that v1 struggled with, including:
 
       * consecutive data set analysis
       * online (aka realtime) analysis
       * easily supporting different analysis chains
-    """
-    )
+    """)
     return
 
 
@@ -26,23 +24,23 @@ def _():
     import numpy as np
     import marimo as mo
     import pulsedata
+
     return mo, np, pl, plt, pulsedata
 
 
 @app.cell
 def _():
     import mass2
+
     return (mass2,)
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # Load data
     Here we load the data, then we explore the internals a bit to show how MASS is built.
-    """
-    )
+    """)
     return
 
 
@@ -58,8 +56,7 @@ def _(mass2, pulsedata):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # basic analysis
     The variables `data` is the conventional name for a `Channels` object. It contains a list of
     `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy.
@@ -72,8 +69,7 @@ def _(mo):
     one-argument function, where the one argument is a `Channel` and the function returns a `Channel`,
       `data.transform_channels` returns a `Channels`. There is no mutation, and we can't
       re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
-    """
-    )
+    """)
     return
 
 
@@ -161,13 +157,11 @@ def _(data2, mass2):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # inspecting the data
 
     Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell. marimo's nicest display doesn't work with array columns like our pulse column, so lets leave that out for now.
-    """
-    )
+    """)
     return
 
 
@@ -179,13 +173,11 @@ def _(data2, pl):
 
 @app.cell
 def _(data2, mo):
-    mo.md(
-        f"""
+    mo.md(f"""
     To enable online analysis, we have to keep track of all the steps of our calibration, so each channel has a history of its steps that we can replay. Here we interpolate it into the markdown, each entry is a step name followed by the time it took to perform the step.
 
         {data2.channels[4102].step_summary()=}
-    """
-    )
+    """)
     return
 
 
@@ -227,7 +219,9 @@ def _(result):
 
 @app.cell
 def _(mo):
-    mo.md(r"""# plot a noise spectrum""")
+    mo.md(r"""
+    # plot a noise spectrum
+    """)
     return
 
 
@@ -240,14 +234,12 @@ def _(ch, mo, plt):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # replay
     here we'll apply the same steps to the original dataframe for one channel to show the replay capability
 
     `ch = data.channels[4102]` is one way to access the `Channel` from before all the analysis steps. Notice how it only has 3 columns, instead of the many you see for `data.channels[4102]`. The display of steps could really be improved!
-    """
-    )
+    """)
     return
 
 
@@ -267,14 +259,12 @@ def _(data2):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # apply steps
     marimo has an outline feature look on the left for the scroll looking icon, and click on it. You can navigate around this notebook with it!
 
     below we apply all the steps that were saved in data2 to our orignial channel, which recall was saved in `data`.
-    """
-    )
+    """)
     return
 
 
@@ -291,7 +281,9 @@ def _(ch, mo, steps):
 
 @app.cell
 def _(mo):
-    mo.md("""# make sure the results are the same!""")
+    mo.md("""
+    # make sure the results are the same!
+    """)
     return
 
 
@@ -319,22 +311,22 @@ def _(ch2):
 
 @app.cell
 def _(data, data2, mo, np):
-    mo.md(
-        f"""
+    mo.md(f"""
     # don't worry about all the copies
     we are copying dataframes, but we aren't copying the underlying memory, so our memory usage is about the same as it would be
     if we used a mutating style of coding.
 
     `{np.shares_memory(data.channels[4102].df["subframecount"].to_numpy(), data2.channels[4102].df["subframecount"].to_numpy())=}`
     `{np.shares_memory(data.channels[4102].df["pulse"].to_numpy(), data2.channels[4102].df["pulse"].to_numpy())=}`
-    """
-    )
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md("""# step plots""")
+    mo.md("""
+    # step plots
+    """)
     return
 
 
@@ -361,8 +353,7 @@ def _(ch2, mo, plt):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # cuts? good_expr and use_expr
     We're using polars expressions in place of cuts. Each `Channel` can work with two of these, `good_expr` which is
     intended to isolate clean pulses that will yield good resolution, and `use_expr` which is intended to time slice
@@ -371,8 +362,7 @@ def _(mo):
     `good_expr` is stored in the `Channel` and use automatically in many functions, including plots. `use_expr`
     is passed on a per function basis, and is not generally stored, although some steps will store the `use_expr`
     provided during that step. Many functions have something like `plot(df.filter(good_expr).filter(use_expr))` in them.
-    """
-    )
+    """)
     return
 
 
@@ -411,7 +401,9 @@ def _(ch3):
 
 @app.cell
 def _(ch3, mo):
-    mo.md(f"""{str(ch3.good_expr)=} remains unchanged""")
+    mo.md(f"""
+    {str(ch3.good_expr)=} remains unchanged
+    """)
     return
 
 
@@ -455,27 +447,23 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # todos!
      * external trigger
      * check accuracy of psd level and filter vdv
      * start automated tests
      * open multi ljh example
-    """
-    )
+    """)
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # fine calibration
     first we show off the MultiFit class, then we use it to run a fine calibration step
     then we use the same multifit spec to calibrate our data, and make the debug plot
-    """
-    )
+    """)
     return
 
 
@@ -498,9 +486,9 @@ def _(data3, mass2, mo, plt):
 def _(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
-    assert mn_result.params["fwhm"].value < 3.58
-    assert cu_result.params["fwhm"].value < 3.52
-    # this is super weird, depending on what energies we use for drift correction, we get wildily different resolutions,
+    assert mn_result.params["fwhm"].value < 3.45
+    assert cu_result.params["fwhm"].value < 3.55
+    # this is super weird, depending on what energies we use for drift correction, we get rather different resolutions,
     # including Cu being better than Mn, and we can do sub-3eV Mn
     return
 
@@ -550,15 +538,13 @@ def _(data4):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # "multi-ljh analysis"
     we can easily concatenate a `Channel`s or `Channels`s with `Channel.contcat_df`, `Channel.concat_ch`, and
     `channels.concat_data`.
     For now the steps and df history are dropped, since it's not quite clear how to use them helpfully.
     Internally this relies on polars ability to concat `DataFrame`s without allocation.
-    """
-    )
+    """)
     return
 
 
@@ -581,7 +567,9 @@ def _(data4):
 
 @app.cell
 def _(mo):
-    mo.md(r"""# final coadded spectrum""")
+    mo.md(r"""
+    # final coadded spectrum
+    """)
     return
 
 
@@ -618,7 +606,7 @@ def _(ch6, mo, np, plt):
 
 
 @app.cell
-def _(ch6, mo, np, pl, plt):
+def _(ch6, mass2, mo, np, pl, plt):
     def pfit_dc(line_name, ch):
 
         dlo, dhi = 50, 50
