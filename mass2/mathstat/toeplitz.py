@@ -17,6 +17,7 @@ from scipy import linalg
 from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from typing import overload, Literal
+import warnings
 
 
 __all__ = [
@@ -451,11 +452,24 @@ class SymmetricToeplitz:
         return W
 
 
-# We should probably deprecate or remove ToeplitzSolver. Consider this.
-# Alternatively, keep the class with a constructor that raises and error explaining
-# how to replace it with `SymmetricToeplitz`?
+deprecation_msg_TS = """
+The mass ToeplitzSolver is deprecated. A much faster way to solve symmetric
+Toeplitz matrices is now avaible (roughly 2x faster for the first solution, and 10x
+to 1000x faster for each additional, depending on the matrix size).
+
+To use it, replace
+
+>>> TS = ToeplitzSolver(noise)
+>>> x = TS(vec)
+
+with
+
+>>> ST = SymmetricToeplitz(noise)
+>>> x = ST.solve(vec)
+"""
 
 
+@warnings.deprecated(deprecation_msg_TS)
 class ToeplitzSolver:
     """Solve a Toeplitz matrix for one or more vectors.
 
