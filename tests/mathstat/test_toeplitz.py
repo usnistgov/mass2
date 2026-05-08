@@ -18,6 +18,7 @@ from scipy import linalg
 rng = np.random.default_rng(6823)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestToeplitzSolverSmallSymmetric:
     """Test ToeplitzSolver on a 5x5 symmetric matrix."""
 
@@ -45,6 +46,7 @@ class TestToeplitzSolverSmallSymmetric:
             assert 0 == pytest.approx(big_dif, abs=1e-12)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestToeplitzSolverSmallAsymmetric:
     """Test ToeplitzSolver on a 5x5 non-symmetric matrix."""
 
@@ -72,6 +74,7 @@ class TestToeplitzSolverSmallAsymmetric:
             assert 0 == pytest.approx(big_dif, abs=1e-12)
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestToeplitzSolver_32:
     """Test ToeplitzSolver on a 32x32 symmetric matrix."""
 
@@ -97,6 +100,7 @@ class TestToeplitzSolver_32:
             assert 0 == pytest.approx(big_dif, abs=1e-10), f"Unit vector trial i={i:2d} gives x_out={x_out}"
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestToeplitzSolver_512:
     """Test ToeplitzSolver on a 512x512 symmetric matrix."""
 
