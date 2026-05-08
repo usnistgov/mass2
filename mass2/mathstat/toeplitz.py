@@ -315,10 +315,7 @@ class SymmetricToeplitz:
         assert other.ndim in {1, 2}
         if other.ndim == 1:
             return self._solvevec(other)
-        result = np.zeros_like(other)
-        for i in range(other.shape[1]):
-            result[:, i] = self._solvevec(other[:, i])
-        return result
+        return np.column_stack([self._solvevec(col) for col in other.T])
 
     def _solvevec(self, x: np.ndarray) -> np.ndarray:
         """Implement the `inv(self) @ other` or solving self * y = x, for a single right-hand-side vector `x`.
@@ -331,8 +328,7 @@ class SymmetricToeplitz:
         return y
 
     def whitener(self) -> np.ndarray:
-        _, W = levinson_durbin(self.firstcol, generate_whitener=True)
-        return W
+        return self.Whitener(self.firstcol)
 
     @staticmethod
     def Whitener(firstcol: ArrayLike) -> np.ndarray:
