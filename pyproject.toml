@@ -52,6 +52,7 @@ docs = [
 # Use `uv sync --dev` to get the development packages
 dev = [
     "pytest",
+    "pytest-benchmark",
     "ruff",
     "mypy",
     "flake8",
