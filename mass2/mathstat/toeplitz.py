@@ -331,10 +331,7 @@ class SymmetricToeplitz:
         assert other.ndim in {1, 2}
         if other.ndim == 1:
             return self._multbyvec(other)
-        result = np.zeros_like(other)
-        for i in range(other.shape[1]):
-            result[:, i] = self._multbyvec(other[:, i])
-        return result
+        return np.column_stack([self._multbyvec(col) for col in other.T])
 
     def _multbyvec(self, x: np.ndarray) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with a single vector `x`.
