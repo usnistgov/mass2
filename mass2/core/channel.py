@@ -1617,10 +1617,18 @@ class Channel:
         df = self.df.drop(*args)
         return self.with_replacement_df(df)
 
-    def with_columns(self, df2: pl.DataFrame) -> "Channel":
-        """Append columns from df2 to the existing dataframe, keeping all other attributes the same."""
-        df3 = self.df.with_columns(df2)
-        return self.with_replacement_df(df3)
+    def with_columns(self, *exprs: pl.Expr | Iterable[pl.Expr] | pl.DataFrame, **named_exprs: pl.Expr) -> "Channel":
+        """Append expressions from *exprs or **named_exprs to the existing dataframe, preserving all other attributes.
+
+        Possible uses include:
+        1. ch.with_columns(pl.col("oldcolumn").sqrt().alias("newsqrt"), ... )
+        2. ch.with_columns(newsqrt=pl.col("oldcolumn").sqrt())
+        3. Two steps: construct a pl.DataFrame from a dict first
+            df = {"newsqrt": pl.col("oldcolumn").sqrt()}
+            ch.with_columns(df)
+        """
+        enhanced_df = self.df.with_columns(*exprs, **named_exprs)
+        return self.with_replacement_df(enhanced_df)
 
     def multifit_quadratic_gain_cal(
         self,
@@ -1742,8 +1750,10 @@ class Channel:
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
-        df = df.with_columns(((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"))
-        df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
+        df = df.with_columns(
+            ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
+            (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
+        )
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")
