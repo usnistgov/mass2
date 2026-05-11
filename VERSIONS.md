@@ -7,6 +7,7 @@
 * Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products (issue 139).
 * Add Generalized Column Subset Selection (issue 140).
 * Add fast solver for `SymmetricToeplitz` matrices (issue 143).
+* Add Ge and Nb K-alpha and K-beta line models (issue 145).
 
 **2.0.4** April 14, 2026
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
