@@ -411,7 +411,7 @@ class SymmetricToeplitz:
         LowerTriangularToeplitz
             _description_
         """
-        return LowerTriangularToeplitz(self.bvec / self.bvec[0] ** 0.5)
+        return LowerTriangularToeplitz(self.fvec / self.fvec[0] ** 0.5)
 
     def whitener(self) -> np.ndarray:
         """Create an exact whitening transformation (a matrix) from self.
