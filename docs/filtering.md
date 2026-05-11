@@ -86,7 +86,7 @@ def test_mass_5lag_filters(Maxsignal=100.0, sigma_noise=1.0, n=500):
 
     # Check filter's normalization
     f = filt_5lag.values
-    verify_close(Maxsignal, f.dot(truncated_signal), rtol=1e-5, topic="Filter normalization")
+    verify_close(Maxsignal, (f @ truncated_signal), rtol=1e-5, topic="Filter normalization")
 
     # Check filter's variance
     expected_dV = sigma_noise / n**0.5 * signal.max() / truncated_signal.std()

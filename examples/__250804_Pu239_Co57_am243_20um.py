@@ -218,14 +218,14 @@ def _(ch2, mass2, max_residual_rms, mo, np, npre, phi0_dac_units, pl):
             ch2.good_series("pulse", use_expr=True).limit(1000).to_numpy().mean(axis=0)
         )
         avg_pulse = avg_pulse - np.mean(avg_pulse)
-        template = avg_pulse / np.sqrt(np.dot(avg_pulse, avg_pulse))
+        template = avg_pulse / np.linalg.norm(avg_pulse)
         return template
 
     template = make_template()
 
     def residual_rms(pulse):
         pulse = pulse - np.mean(pulse)
-        dot = np.dot(pulse, template)
+        dot = pulse @ template
         pulse2 = dot * template
         residual = pulse2 - pulse
         return mass2.misc.root_mean_squared(residual)

@@ -4,6 +4,9 @@
 
 **2.0.5** April 14, 2026-
 * Add script `mc2` = Mass2 Continuous Computations for online analysis (issue 136).
+* Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
+* Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products (issue 139).
+* Add Generalized Column Subset Selection (issue 140).
 
 **2.0.4** April 14, 2026
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
