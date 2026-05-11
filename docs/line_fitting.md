@@ -76,8 +76,8 @@ resultA = model.fit(sim, params, bin_centers=e)
 # This will not work for nearly monochromatic lines, however, as the resolution (fwhm) and scale (dph_de) are exactly degenerate.
 # In practice, most fits are done with dph_de fixed.
 params = resultA.params.copy()
-resultB = model.fit(sim, params, bin_centers=e, dph_de=1)
 params["dph_de"].set(1.0, vary=False)
+resultB = model.fit(sim, params, bin_centers=e, dph_de=1)
 
 # There are two plotting methods. The first is an LMfit built-in; the other ("mass-style") puts the
 # fit parameters on the plot.
