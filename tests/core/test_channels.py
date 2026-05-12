@@ -43,6 +43,60 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     return ch
 
 
+def test_with_columns():
+    """Verify 3 different syntax choices for adding columns in `mass2.Channel.with_columns()`.
+    See issue #139 for more context. Use
+    1. Named arguments, either pl.Expr or numpy array-like
+    2. Arguments as a sequence of pl.Series
+    3. A full pl.DataFrame
+    """
+    ch = dummy_channel().summarize_pulses()
+    rt = ch.df["pulse_rms"].to_numpy() ** 0.5
+    df = pl.DataFrame({"F": pl.Series(rt), "G": pl.Series(rt)})
+    ch = (
+        ch.with_columns(A=pl.col("pulse_rms").sqrt(), B=pl.col("pulse_rms") ** 0.5, C=rt)
+        .with_columns(pl.col("pulse_rms").sqrt().alias("D"), pl.col("pulse_rms").sqrt().alias("E"))
+        .with_columns(df)
+    )
+    for columnname in "ABCDEFG":
+        assert np.allclose(ch.df[columnname].to_numpy(), rt)
+
+
+def test_combine_channels():
+    # Check Channel.combine_channels()
+    N1, N2 = 70, 30
+    ch1 = dummy_channel(npulses=N1)
+    ch2 = dummy_channel(npulses=N2)
+    d1 = {
+        "set1": ch1,
+        "set2": ch2,
+    }
+    ch = mass2.Channel.combine_channels("sourcenumber", d1)
+    assert len(ch1.df) == N1
+    assert len(ch2.df) == N2
+    assert len(ch.df) == N1 + N2
+    assert "sourcenumber" not in ch2.df.columns
+    assert "sourcenumber" in ch.df.columns
+    assert len(ch.df.filter(pl.col("sourcenumber") == "set1")) == N1
+    assert len(ch.df.filter(pl.col("sourcenumber") == "set2")) == N2
+
+    # Check Channels.combine_channels()
+    data1 = mass2.Channels.from_oneChannel(ch1)
+    data2 = mass2.Channels.from_oneChannel(ch2)
+    d2 = {
+        "sampleA": data1,
+        "sampleB": data2,
+    }
+    data = mass2.Channels.combine_channels("samplecode", d2)
+    assert data1.ch0.npulses == N1
+    assert data2.ch0.npulses == N2
+    assert data.ch0.npulses == N1 + N2
+    assert "samplecode" not in data1.ch0.df.columns
+    assert "samplecode" in data.ch0.df.columns
+    assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleA")) == N1
+    assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleB")) == N2
+
+
 def test_ljh_fractional_record(tmp_path):
     "Verify that it's allowed to open an LJH file with an non-integer # of binary records"
     # It should not be an error to open an LJH file with a non-integer number of records.
@@ -308,7 +362,7 @@ def test_col_map_step():
 def test_pretrig_mean_jump_fix_step():
     ch = dummy_channel()
     pretrig_mean = np.arange(len(ch.df)) % 50 + 725
-    ch = ch.with_columns(pl.DataFrame({"pretrig_mean": pretrig_mean}))
+    ch = ch.with_columns(pretrig_mean=pretrig_mean)
     ch2 = ch.correct_pretrig_mean_jumps(period=50)
     assert "pulse" in ch2.df.columns
     assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
@@ -332,7 +386,8 @@ def test_extract_column_names_from_polars_expr():
 
 def test_select_step():
     ch = dummy_channel()
-    ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
+    n = len(ch.df)
+    ch = ch.with_columns(a=np.arange(n), b=(2 * np.arange(n)))
     ch2 = ch.with_select_step({"a*5": pl.col("a") * 5, "a+b": pl.col("a") + pl.col("b")})
     assert "pulse" in ch2.df.columns
     assert all(ch2.df["a*5"].to_numpy() == ch.df["a"].to_numpy() * 5)
@@ -365,7 +420,8 @@ def test_filtering_steps():
 
 def test_categorize_step():
     ch = dummy_channel(npulses=10)
-    ch = ch.with_columns(pl.DataFrame({"a": np.arange(len(ch.df)), "b": np.arange(len(ch.df)) * 2}))
+    n = len(ch.df)
+    ch = ch.with_columns(a=np.arange(n), b=(2 * np.arange(n)))
     category_condition_dict = {
         "alessthan5": pl.col("a") < 5,
         "b10": pl.col("b") == 10,

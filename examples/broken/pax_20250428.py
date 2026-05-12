@@ -63,7 +63,7 @@ def _(data, mass2, np, pl):
         )
         ptm1 = ch.df["pretrig_mean"].to_numpy()
         ptm2 = np.unwrap(ptm1 % 4096, period=4096)
-        ch = ch.with_columns(pl.DataFrame({"ptm2": ptm2}))
+        ch = ch.with_columns(ptm2=ptm2)
         return ch
 
     data2 = data.map(_do_analysis)

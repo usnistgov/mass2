@@ -1,18 +1,476 @@
 """
-toeplitz - General-purpose solver of Toeplitz matrices
+toeplitz - General-purpose solver of Symmetric Toeplitz matrices
+
+Replaced the `ToeplitzSolver` with `SymmetricToeplitz` in 2026. A non-symmetric Toeplitz
+solver would be possible, if we implemented the non-symmetric version of the Levinson-Durbin
+recursion. I don't see any need for this in the context of microcalorimeter analysis, so
+I will skip this extra work.
 
 Created on Nov 7, 2011
 
-@author: fowlerj
+Author: Joe Fowler
 """
 
 import numpy as np
-from numpy.typing import ArrayLike
+from scipy.signal import fftconvolve, correlate
+from scipy import linalg
+from numpy.typing import ArrayLike, NDArray
+from dataclasses import dataclass
+from typing import overload, Literal
+import deprecation
+from .. import __version__
 
 
-__all__ = ["ToeplitzSolver"]
+__all__ = [
+    "LowerTriangularToeplitz",
+    "UpperTriangularToeplitz",
+    "SymmetricToeplitz",
+    "ToeplitzSolver",
+]
 
 
+@dataclass(frozen=True)
+class LowerTriangularToeplitz:
+    """Represent a lower triangular Toeplitz matrix. Use FFT methods to multiply it by vectors or matrices."""
+
+    firstcol: np.ndarray
+
+    @classmethod
+    def fromLastRow(cls, lastrow: ArrayLike) -> "LowerTriangularToeplitz":
+        """Generate an `LowerTriangularToeplitz` from its last row, rather than the default (first column)"""
+        vec = np.array(lastrow)[::-1]
+        return cls(vec)
+
+    @property
+    def N(self) -> int:
+        """The size of this square matrix"""
+        return len(self.firstcol)
+
+    @property
+    def isupper(self) -> bool:
+        return False
+
+    @property
+    def islower(self) -> bool:
+        return True
+
+    def _vecmul(self, vec: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a single vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
+        assert len(vec) == self.N
+        return fftconvolve(self.firstcol, vec)[: self.N]
+
+    def _matmul(self, other: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a matrix `other`.
+
+        Not for API use, as it assumes `xother` is already checked for being 2-dimensional and is a np.ndarray.
+        """
+        # Here are two implementations that both work. I thought that directly controlling the FFT
+        # would be faster, but it absolutely was not. So use the simpler one.
+        return np.column_stack([self._vecmul(col) for col in other.T])
+        # nfft = 2 * self.N
+        # k_fft = np.fft.rfft(self.firstcol, n=nfft)
+        # other_fft = np.fft.rfft(other.T, n=nfft, axis=1)
+        # conv = np.fft.irfft(other_fft * k_fft, n=nfft, axis=1).T
+        # return conv[: self.N]
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
+        other = np.asarray(other)
+        assert other.ndim in {1, 2}, "LowerTriangularToeplitz @ x requires x to be of dimension 1 or 2"
+        if other.ndim == 1:
+            return self._vecmul(other)
+        return self._matmul(other)
+
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
+
+        Returns
+        -------
+        np.ndarray
+            The NxN lower triangular Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz(self.firstcol, [self.firstcol[0]] + (self.N - 1) * [0])
+
+    def inverse(self) -> "LowerTriangularToeplitz":
+        """Return the inverse of self.
+
+        Returns
+        -------
+        LowerTriangularToeplitz
+            A matrix representing the inverse of self
+        """
+        b = np.zeros(self.N, dtype=float)
+        b[0] = 1.0 / self.firstcol[0]
+        for i in range(1, self.N):
+            b[i] = -b[0] * np.sum(self.firstcol[1 : i + 1] * b[i - 1 :: -1])
+        return LowerTriangularToeplitz(b)
+
+    @property
+    def T(self) -> "UpperTriangularToeplitz":
+        """Return the transpose of self
+
+        Returns
+        -------
+        UpperTriangularToeplitz
+            A matrix representing the transpose of self
+        """
+        return UpperTriangularToeplitz(self.firstcol)
+
+
+@dataclass(frozen=True)
+class UpperTriangularToeplitz:
+    """Represent an upper triangular Toeplitz matrix. Use FFT methods to multiply it by vectors or matrices."""
+
+    toprow: np.ndarray
+
+    @classmethod
+    def fromLastCol(cls, lastcol: ArrayLike) -> "UpperTriangularToeplitz":
+        """Generate an `UpperTriangularToeplitz` from its last column, rather than the default (top row)"""
+        vec = np.array(lastcol)[::-1]
+        return cls(vec)
+
+    @property
+    def N(self) -> int:
+        """The size of this square matrix"""
+        return len(self.toprow)
+
+    @property
+    def isupper(self) -> bool:
+        return True
+
+    @property
+    def islower(self) -> bool:
+        return False
+
+    def _vecmul(self, vec: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a single vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
+        assert len(vec) == self.N
+        return correlate(vec, self.toprow, mode="full", method="fft")[self.N - 1 :]
+
+    def _matmul(self, other: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a matrix `other`.
+
+        Not for API use, as it assumes `xother` is already checked for being 2-dimensional and is a np.ndarray.
+        """
+        # Here are two implementations that both work. I thought that directly controlling the FFT
+        # would be faster, but it absolutely was not. So use the simpler one.
+        return np.column_stack([self._vecmul(col) for col in other.T])
+        # nfft = 2 * self.N
+        # k_fft = np.fft.rfft(self.toprow, n=nfft)
+        # other_fft = np.fft.rfft(other.T, n=nfft, axis=1)
+        # corr = np.fft.irfft(other_fft * np.conj(k_fft), n=nfft, axis=1).T
+        # return corr[: self.N]
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)"""
+        other = np.asarray(other)
+        assert other.ndim in {1, 2}, "LowerTriangularToeplitz @ x requires x to be of dimension 1 or 2"
+        if other.ndim == 1:
+            return self._vecmul(other)
+        return self._matmul(other)
+
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
+
+        Returns
+        -------
+        np.ndarray
+            The NxN upper triangular Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz([self.toprow[0]] + (self.N - 1) * [0], self.toprow)
+
+    def inverse(self) -> "UpperTriangularToeplitz":
+        """Return the inverse of self.
+
+        Returns
+        -------
+        UpperTriangularToeplitz
+            A matrix representing the inverse of self
+        """
+        b = np.zeros(self.N, dtype=float)
+        b[0] = 1.0 / self.toprow[0]
+        for i in range(1, self.N):
+            b[i] = -b[0] * np.sum(self.toprow[1 : i + 1] * b[i - 1 :: -1])
+        return UpperTriangularToeplitz(b)
+
+    @property
+    def T(self) -> LowerTriangularToeplitz:
+        """Return the transpose of self
+
+        Returns
+        -------
+        LowerTriangularToeplitz
+            A matrix representing the transpose of self
+        """
+        return LowerTriangularToeplitz(self.toprow)
+
+
+@overload
+def levinson_durbin(r: NDArray, generate_whitener: Literal[False]) -> np.ndarray:
+    pass
+
+
+@overload
+def levinson_durbin(r: NDArray, generate_whitener: Literal[True]) -> tuple[np.ndarray, np.ndarray]:
+    pass
+
+
+def levinson_durbin(r: NDArray, generate_whitener: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    """Run the Levinson-Durbin recursion for a symmetric Toeplitz matrix R with the given first column. Find the
+    final "forward vector" `f` such that Rf=[1, 0, 0....0]. That forward vector is the first column of inv(R).
+    Its reverse (called the "backward vector") `b` satisfies Rb = [0, 0, .... 1], so it is the last column of inv(R).
+
+    Optionally also return the whitening transformation, a square matrix that obeys W @ R @ (W.T) = I. While this
+    matrix is implicitly computed as part of the Levinson-Durbin algorithm, storing it explicitly requires O(n^2)
+    memory (for input vector `r` having length n). It is best not to compute it fully unless you need it.
+
+    Parameters
+    ----------
+    r : np.ndarray
+        First column and first row of the symmetric Toeplitz matrix being analyzed, of length `n`
+    generate_whitener : bool, optional
+        Whether to compute and return the exact whitening transformation (an `n`x`n` matrix), by default False.
+        The whitener uses `n^2` space, so it should not be created and returned unless the user actually wants it
+
+    Returns
+    -------
+    np.ndarray | tuple[np.ndarray, np.ndarray]
+        Either the final forward vector `f`, or (if `generate_whitener` is True) the
+        tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix.
+    """
+    n = len(r)
+    f = np.zeros(n, dtype=float)
+    b = np.zeros(n, dtype=float)
+
+    if generate_whitener:
+        W = np.zeros((n, n), dtype=float)
+        W[0, 0] = r[0] ** -0.5
+
+    f[0] = b[0] = 1.0 / r[0]
+    for k in range(1, n):
+        error_k = b[:k] @ r[1 : k + 1]
+        scale = 1.0 / (1.0 - error_k**2)
+        f[1 : k + 1] -= error_k * b[:k]
+        f[: k + 1] *= scale
+        b[: k + 1] = f[k::-1]
+        if generate_whitener:
+            W[k, : k + 1] = b[: k + 1] / np.sqrt(b[k])
+
+    if generate_whitener:
+        return (f, W)
+    return f
+
+
+@dataclass(frozen=True)
+class SymmetricToeplitz:
+    """Represent a Symmetric Toeplitz matrix.
+
+    Create using one of the class methods:
+    >>> cfirst = np.array([10, 5, 3, 1])
+    >>> clast = cfirst[::-1]
+    >>> S = SymmetricToeplitz.fromFirstCol(cfirst)
+    >>> S = SymmetricToeplitz.fromLastCol(clast)
+
+    When created in this way, the "forward" and "backward" vectors (the first and last columns of the inverse
+    of this matrix) will be computed. This one-time startup cost makes solving this matrix very fast.
+    """
+
+    firstcol: np.ndarray
+    fvec: np.ndarray
+    bvec: np.ndarray
+    L1: LowerTriangularToeplitz
+    L2: LowerTriangularToeplitz
+
+    @classmethod
+    def fromFirstCol(cls, firstcol: ArrayLike) -> "SymmetricToeplitz":
+        """Generate a `SymmetricToeplitz` from its first column."""
+        firstcol = np.asarray(firstcol)
+
+        # Run the Levinson-Durbin, so we can store the last fw and bw vectors
+        fvec = levinson_durbin(firstcol, generate_whitener=False)
+        bvec = fvec[::-1]
+        l1column = np.asarray(fvec) / fvec[0] ** 0.5
+        l2column = np.hstack(([0], bvec[:-1])) / fvec[0] ** 0.5
+        L1 = LowerTriangularToeplitz(l1column)
+        L2 = LowerTriangularToeplitz(l2column)
+        return cls(firstcol, fvec, bvec, L1, L2)
+
+    @classmethod
+    def fromLastCol(cls, lastcol: ArrayLike) -> "SymmetricToeplitz":
+        """Generate a `SymmetricToeplitz` from its last column."""
+        firstcol = np.array(lastcol)[::-1]
+        return cls.fromFirstCol(firstcol)
+
+    @property
+    def N(self) -> int:
+        """The size of this square matrix"""
+        return len(self.firstcol)
+
+    @property
+    def T(self) -> "SymmetricToeplitz":
+        """The transpose of self, which is identically self."""
+        return self
+
+    def tomatrix(self) -> np.ndarray:
+        """Generate a concrete copy of the matrix represented by self
+
+        Returns
+        -------
+        np.ndarray
+            The NxN symmetric Toeplitz matrix with `self.firstcol` as its first column.
+        """
+        return linalg.toeplitz(self.firstcol)
+
+    def __matmul__(self, other: ArrayLike) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with other (a matrix or vector)."""
+        other = np.asarray(other)
+        assert other.ndim in {1, 2}
+        if other.ndim == 1:
+            return self._multbyvec(other)
+        return np.column_stack([self._multbyvec(col) for col in other.T])
+
+    def _multbyvec(self, x: np.ndarray) -> np.ndarray:
+        """Implement the `self @ other` syntax, taking the dot product of self with a single vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
+        N = len(x)
+        y = np.zeros_like(x)
+        y[0] = self.firstcol @ x
+        for i in range(1, N):
+            y[i] = self.firstcol[:-i] @ x[i:]
+            y[i] += self.firstcol[1 : 1 + i] @ x[i - 1 :: -1]
+        return y
+
+    def solve(self, other: ArrayLike) -> np.ndarray:
+        """Solve thematrix problem self @ X = other for either a vector or a 2d matrix `other`.
+
+        The algorithm to perform the solution involves the Gohberg-Semencul formula that expresses
+        the matrix inverse of a symmetric Toeplitz matrix as the difference of products with triangular
+        Toeplitz matrices. This means the solution involves discrete convolutions and correlations and
+        can be performd using the FFT (specifically, four FFTs and inverses). Thus for an input of size
+        `(n, m)`, the solution requires O(mn log n) computation.
+
+        NB: some speed-ups might be possible. One would remove 2 FFTs and 2 inverse FFTs by remaining in
+        Fourier space to compute L @ L.T @ x for each of the two lower-triangular matrices that make up
+        inverse(self). That is, compute (L @ L.T) @ x instead of the curent L @ (L.T @ x). The bookkeeping
+        sounds terrifying to me right now, but it might work.
+
+        Another that I know would work is to notice that the raw data matrix gets its FFT computed twice,
+        and remove the redundancy. This change would require bypassing the nice features of the
+        `UpperTriangularToeplitz` object, however.
+
+        Parameters
+        ----------
+        other : ArrayLike
+            A one- or two-dimensional array (require other.shape[0] to equal self.N) which will be
+            multiplied (from the left) by the inverse of this matrix. Equivalently, solve this matrix
+            for `other` as the right-hand side.
+
+        Returns
+        -------
+        np.ndarray
+            The solution. Will have the same dimensions and shape as `other`
+        """
+        other = np.asarray(other)
+        assert other.ndim in {1, 2}
+        if other.ndim == 1:
+            return self._solvevec(other)
+        return np.column_stack([self._solvevec(col) for col in other.T])
+
+    def _solvevec(self, x: np.ndarray) -> np.ndarray:
+        """Implement the `inv(self) @ other` or solving self * y = x, for a single right-hand-side vector `x`.
+
+        Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
+        """
+        assert x.ndim == 1
+        y = self.L1 @ (self.L1.T @ x)
+        y -= self.L2 @ (self.L2.T @ x)
+        return y
+
+    def approximate_whitener(self) -> LowerTriangularToeplitz:
+        """Create an approximate whitening transformation (a matrix) which approximately
+        whitens the noise described by the autocorrelation matrix `self`.
+
+        The returned matrix W has exact Toeplitz symmetry and is a lower triangular matrix.
+        It will approximately obey W @ R @ W.T = I, though we cannot provide any guarantees
+        about how good the approximation is. (The last row and last column will be exact.)
+        It is our experience that with microcalorimeter noise, this approximation to W will
+        be adequate for many or all purposes.
+
+        This operation requires O(self.N) computation and storage.
+
+        Returns
+        -------
+        LowerTriangularToeplitz
+            _description_
+        """
+        return LowerTriangularToeplitz(self.fvec / self.fvec[0] ** 0.5)
+
+    def whitener(self) -> np.ndarray:
+        """Create an exact whitening transformation (a matrix) from self.
+
+        WARNING: This step requires re-running the Levinson-Durbin recursion that was run when
+        creating self. This is an O(n^2) operation. If you don't need to create the
+        `SymmetricToeplitz` object but only need the whitener, prefer the static method
+        `SymmetricToeplitz.Whitener(v)`
+
+        If you need both, then file an issue to add a new class method that will create
+        both the whitener and the `SymmetricToeplitz` with one L-D run instead of two.
+        """
+        return self.Whitener(self.firstcol)
+
+    @staticmethod
+    def Whitener(firstcol: ArrayLike) -> np.ndarray:
+        """Create an exact whitening transformation (a matrix) from a noise covariance.
+
+        The returned matrix W will obey W @ R @ W.T=I where R is the symmetric Toeplitz matrix
+        generated by the input (which gives the values of its first column).
+
+        This operation requires O(n^2) computation and storage for inputs of length n,
+        as the returned matrix is dense and n x n.
+
+        This is a static method of `SymmetricToeplitz` because it is intimately tied to the
+        that class, but it does not necessarily start from an existing object of the class.
+
+        Parameters
+        ----------
+        firstcol : ArrayLike
+            The noise autocorrelation function, starting with lag 0.
+
+        Returns
+        -------
+        np.ndarray
+            A dense, lower-triangular matrix of size (n,n) where n is the length of the input.
+        """
+        _, W = levinson_durbin(np.asarray(firstcol), generate_whitener=True)
+        return W
+
+
+deprecation_msg_TS = """
+The mass ToeplitzSolver is deprecated. A much faster way to solve symmetric
+Toeplitz matrices is now avaible (roughly 2x faster for the first solution, and 10x
+to 1000x faster for each additional, depending on the matrix size).
+
+To use it, replace
+
+>>> TS = ToeplitzSolver(noise)
+>>> x = TS(vec)
+
+with
+
+>>> ST = SymmetricToeplitz(noise)
+>>> x = ST.solve(vec)
+"""
+
+
+@deprecation.deprecated(deprecated_in="2.0.5", removed_in="2.0.8", current_version=__version__, details=deprecation_msg_TS)
 class ToeplitzSolver:
     """Solve a Toeplitz matrix for one or more vectors.
 
