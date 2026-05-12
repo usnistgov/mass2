@@ -561,10 +561,10 @@ class Channels:
         return self.with_experiment_state_df(df_es)
 
     def with_external_trigger_by_path(
-            self,
-            path: str | None,
-            output_control: ExtTriggerControl = ExtTriggerControl(),
-            ) -> "Channels":
+        self,
+        path: str | None,
+        output_control: ExtTriggerControl = ExtTriggerControl(),
+    ) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
         from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented).
 
@@ -688,6 +688,34 @@ class Channels:
     def from_oneChannel(cls, ch: Channel) -> "Channels":
         "Create a Channels object from a single Channel object"
         return Channels({ch.ch_num: ch}, ch.header.description)
+
+    @classmethod
+    def combine_channels(cls, sourcename: str, constituents: dict[str, "Channels"]) -> "Channels":
+        """Combine 2 or more compatible `mass2.Channels` objects into one. See `mass2.Channel.combine_channels()`
+        for more info about what "compatible" might mean. Certainly all `Channel` objects should have equal
+        `n_samples`, `n_presamples`, and `frametime_s`.
+
+        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
+        That's a memory-intensive request. Use for small files only!
+
+        Parameters
+        ----------
+        sourcename : str
+            Each `Channel` object will get a new column in its dataframe with this name.
+        constituents : dict[str, mass2.Channels]
+            The keys in this dictionary will become values in the `sourcename` data frame.
+
+        Returns
+        -------
+        Channels
+            An object combining the named values in the `constitutents` input.
+        """
+        base = next(iter(constituents.values()))
+        chdict: dict[int, mass2.Channel] = {}
+        for chnum in base.channels.keys():
+            d = {k: v.channels[chnum] for (k, v) in constituents.items()}
+            chdict[chnum] = mass2.Channel.combine_channels(sourcename=sourcename, constituents=d)
+        return Channels(chdict, base.description)
 
     @classmethod
     def from_df(

@@ -4,10 +4,13 @@
 
 **2.0.5** April 23, 2026-
 * Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
-* Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products (issue 139).
+* Several small quality-of-life changes (issue 139):
+  * Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products.
+  * Use an API for `Channel.with_columns()` like that of `pl.DataFrame` to match user expectations.
+  * Add method `combine_channels(sourcename, dict)` to `Channel` and `Channels`.
 * Add Generalized Column Subset Selection (issue 140).
 * Add fast solver for `SymmetricToeplitz` matrices (issue 143).
-* Add Ge and Nb K-alpha and K-beta line models (issue 145).
+* Add Kα and Kβ line models for Ge and Nb based on Zschornack book (issue 145).
 
 **2.0.4** April 14, 2026
 * Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
@@ -406,7 +409,7 @@
 
 **0.4.4** August 2016
 
-* Young changed the version number, but I (JF) do not know why.
+* Young changed the revision number, but I (JF) do not know why.
 
 **0.4.3** May 2016
 
