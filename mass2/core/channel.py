@@ -144,7 +144,7 @@ class Channel:
         return replace(self, df=df, npulses=len(df))
 
     def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
-        "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        "Return a new Channel, using only a random selection of `n` pulse records."
         df = self.df.sample(n=n, fraction=fraction, with_replacement=False)
         return replace(self, df=df, npulses=len(df))
 
@@ -1529,6 +1529,61 @@ class Channel:
         header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
         return cls(pulse_df, header, npulses, noise=nch)
 
+    @classmethod
+    def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":
+        """Combine 2 or more channels into 1 (they presumably correspond to one microcalorimeter used
+        under different, discrete conditions). Add a new column to the combined channel's dataframe that
+        tracks their names (i.e, their keys in the dictionary `constituents`). The constituents must have
+        equal `n_samples`, `n_presamples`, and `frametime_s`. Any other incompatibility is used at your own
+        risk.
+
+        The first entry in `constituents` will govern the good expression and history of steps. For this reason,
+        it is best to combine channel objects before any receipe steps are performed.
+
+        Example:
+        ----------
+        >>> constituents = {
+        ...     "Be": mass2.Channel.from_ljh(pathBe),
+        ...     "Fe": mass2.Channel.from_ljh(pathFe),
+        ...     "Ge": mass2.Channel.from_ljh(pathGe),
+        ...     "Se": mass2.Channel.from_ljh(pathSe),
+        ...     "Xe": mass2.Channel.from_ljh(pathXe),
+        ... }
+        >>> composite = mass2.Channel.combine_channels(sourcename="element", constituents=constituents)
+
+        This will create 5 mass2.Channel objects from 5 separate LJH files, perhaps corresponding to measurements of
+        x rays from distinct elemental samples. The `combine_channels` call will generate a new `mass2.Channel`
+        holding the data from all 5 objects, plus a new column named "element", which will be one of
+        {"Be", "Fe", "Ge", "Se", "Xe"}, according to which LJH file it came from.
+
+        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
+        That's a memory-intensive request. Use for small files only, or for `Channel` objects that are
+        no longer connected directly to raw pulse files!
+
+        Parameters
+        ----------
+        sourcename : str
+            The name of the new dataframe column that will indicate the separate source of the original data.
+        constituents : dict[str, mass2.Channel]
+            A dictionary of named `mass2.Channel` objects. Their keys in this dictionary will be the string value
+            of the new `sourcename` column in the dataframe of the resulting `Channel`.
+
+        Returns
+        -------
+        Channel
+            A channel formed by combining the dataframes of the values of `constituents`, and assuming the header
+            info of the first entry in that dictionary applies to all other entries.
+        """
+        # We'll copy the header and other non-dataframe stuff from the first constituent.
+        combined_chan = next(iter(constituents.values()))
+        df = pl.DataFrame()
+        for k, ch in constituents.items():
+            assert ch.frametime_s == combined_chan.frametime_s
+            assert ch.n_presamples == combined_chan.n_presamples
+            assert ch.n_samples == combined_chan.n_samples
+            df = df.vstack(ch.df.with_columns(pl.lit(k).alias(sourcename)))
+        return replace(combined_chan, df=df, npulses=len(df))
+
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
 
@@ -1617,10 +1672,18 @@ class Channel:
         df = self.df.drop(*args)
         return self.with_replacement_df(df)
 
-    def with_columns(self, df2: pl.DataFrame) -> "Channel":
-        """Append columns from df2 to the existing dataframe, keeping all other attributes the same."""
-        df3 = self.df.with_columns(df2)
-        return self.with_replacement_df(df3)
+    def with_columns(self, *exprs: pl.Expr | Iterable[pl.Expr] | pl.DataFrame, **named_exprs: pl.Expr) -> "Channel":
+        """Append expressions from *exprs or **named_exprs to the existing dataframe, preserving all other attributes.
+
+        Possible uses include:
+        1. ch.with_columns(pl.col("oldcolumn").sqrt().alias("newsqrt"), ... )
+        2. ch.with_columns(newsqrt=pl.col("oldcolumn").sqrt())
+        3. Two steps: construct a pl.DataFrame from a dict first
+            df = {"newsqrt": pl.col("oldcolumn").sqrt()}
+            ch.with_columns(df)
+        """
+        enhanced_df = self.df.with_columns(*exprs, **named_exprs)
+        return self.with_replacement_df(enhanced_df)
 
     def multifit_quadratic_gain_cal(
         self,
@@ -1742,8 +1805,10 @@ class Channel:
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
-        df = df.with_columns(((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"))
-        df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
+        df = df.with_columns(
+            ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
+            (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
+        )
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")

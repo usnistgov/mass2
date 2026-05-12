@@ -1,7 +1,7 @@
 """
 common.py
 
-Stand-along functions that can be used throughout MASS.
+Stand-alone functions that can be used throughout MASS.
 """
 
 import six
