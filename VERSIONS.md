@@ -9,6 +9,7 @@
   * Use an API for `Channel.with_columns()` like that of `pl.DataFrame` to match user expectations.
   * Add method `combine_channels(sourcename, dict)` to `Channel` and `Channels`.
 * Add Generalized Column Subset Selection (issue 140).
+* Add fast solver for `SymmetricToeplitz` matrices (issue 143).
 * Add Kα and Kβ line models for Ge and Nb based on Zschornack book (issue 145).
 
 **2.0.4** April 14, 2026

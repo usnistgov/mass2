@@ -3,6 +3,14 @@ import pytest
 
 from mass2.core import Filter, FilterMaker, ToeplitzWhitener
 
+rng = np.random.default_rng()
+
+
+def generate_autocorrelation(N=50):
+    # Use autocorrelation to ensure we have a positive-definite test matrix
+    x = rng.standard_normal(N)
+    return np.correlate(x, x, mode="full")[N - 1 :]
+
 
 def ATSF(pulse, npre, noise, sample_time_sec, peak=0.0, f_3db=None, cut_pre=0, cut_post=0):
     assert pulse.shape[1] == 2
@@ -21,9 +29,7 @@ def test_ATSF():
     deriv_like = np.append(np.zeros(nPresamples), -np.ones(nPost))
     pulse = np.vstack((pulse_like, deriv_like)).T
 
-    rng = np.random.default_rng(1492)
-    fake_noise = rng.standard_normal(nSamples)
-    fake_noise[0] = 10.0
+    fake_noise_autocorr = generate_autocorrelation(nSamples)
     dt = 6.72e-6
     autocorr = np.zeros(nSamples)
     autocorr[0] = 1.0
@@ -34,12 +40,14 @@ def test_ATSF():
     fPSD = np.linspace(0, 0.5, nPSD)
     PSD = 1 + 10 / (1 + (fPSD / 0.1) ** 2)
 
-    maker_no_psd = FilterMaker(pulse_like, nPresamples, fake_noise, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like))
+    maker_no_psd = FilterMaker(
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like)
+    )
     with pytest.raises(ValueError):
         maker_no_psd.compute_fourier()  # impossible with no PSD
 
     maker = FilterMaker(
-        pulse_like, nPresamples, fake_noise, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
     )
 
     for computer in (maker.compute_ats, maker.compute_fourier):
@@ -52,7 +60,6 @@ def test_ATSF():
         assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/ f_3db"
 
 
-@pytest.mark.filterwarnings("ignore:invalid value encountered")
 def test_dc_insensitive():
     """When f_3db or fmax applied, filter should not become DC-sensitive.
     Tests for issue #176."""
@@ -64,20 +71,21 @@ def test_dc_insensitive():
     pulse_like = np.append(np.zeros(nPresamples), np.linspace(nPost - 1, 0, nPost))
     deriv_like = np.append(np.zeros(nPresamples), -np.ones(nPost))
 
-    fake_noise = np.random.default_rng().standard_normal(nSamples)
-    fake_noise[0] = 10.0
+    fake_noise_autocorr = generate_autocorrelation(nSamples)
     dt = 6.72e-6
 
     nPSD = 1 + (nSamples // 2)
     fPSD = np.linspace(0, 0.5, nPSD)
     PSD = 1 + 10 / (1 + (fPSD / 0.1) ** 2)
 
-    maker_no_psd = FilterMaker(pulse_like, nPresamples, fake_noise, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like))
+    maker_no_psd = FilterMaker(
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like)
+    )
     with pytest.raises(ValueError):
         maker_no_psd.compute_fourier()  # impossible with no PSD
 
     maker = FilterMaker(
-        pulse_like, nPresamples, fake_noise, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
     )
 
     def compute_5lag_noexp(f_3db=None, fmax=None):
@@ -110,21 +118,21 @@ def test_constrained_filtering():  # noqa: PLR0914
     pulse_like = np.append(np.zeros(nPresamples), np.linspace(nPost - 1, 0, nPost))
     deriv_like = np.append(np.zeros(nPresamples), -np.ones(nPost))
 
-    rng = np.random.default_rng(1492)
-    fake_noise = rng.standard_normal(nSamples)
-    fake_noise[0] = 10.0
+    fake_noise_autocorr = generate_autocorrelation(nSamples)
     dt = 6.72e-6
 
     nPSD = 1 + (nSamples // 2)
     fPSD = np.linspace(0, 0.5, nPSD)
     PSD = 1 + 10 / (1 + (fPSD / 0.1) ** 2)
 
-    maker_no_psd = FilterMaker(pulse_like, nPresamples, fake_noise, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like))
+    maker_no_psd = FilterMaker(
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, sample_time_sec=dt, peak=np.max(pulse_like)
+    )
     with pytest.raises(ValueError):
         maker_no_psd.compute_fourier()  # impossible with no PSD
 
     maker = FilterMaker(
-        pulse_like, nPresamples, fake_noise, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
+        pulse_like, nPresamples, fake_noise_autocorr, dt_model=deriv_like, noise_psd=PSD, sample_time_sec=dt, peak=np.max(pulse_like)
     )
 
     # Make a data vector with decaying exponental exp(-t/tau) and filters orthogonal to that
@@ -182,7 +190,7 @@ class TestWhitener:
     @staticmethod
     def test_reversible():
         """Use a nontrivial whitener, and make sure that inverse operations are inverses."""
-        w = ToeplitzWhitener([1.0, -1.7, 0.72], [1.0, 0.95])
+        w = ToeplitzWhitener(np.array([1.0, -1.7, 0.72]), np.array([1.0, 0.95]))
         r = np.random.default_rng().standard_normal(100)
         assert np.allclose(r, w.solveW(w(r)))
         assert np.allclose(r, w(w.solveW(r)))
@@ -205,7 +213,7 @@ class TestWhitener:
     def test_causal():
         """Make sure that the whitener and its inverse are causal,
         and that WT and its inverse anti-causal."""
-        w = ToeplitzWhitener([1.0, -1.7, 0.72], [1.0, 0.95])
+        w = ToeplitzWhitener(np.array([1.0, -1.7, 0.72]), np.array([1.0, 0.95]))
         Nzero = 100
         z = np.zeros(Nzero, dtype=float)
         r = np.hstack([z, np.random.default_rng().standard_normal(100), z])
