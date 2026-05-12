@@ -134,7 +134,7 @@ def _(mo):
         r"""
     # Overview of data
 
-    Here we plot `pretrig_mean` and `5lagy` vs `timestamp` so we can see that the data is basically steady in time. If it is not, then the analysis is much harder and great efforts should be put into the data aquisition system to fix the instability.
+    Here we plot `pretrig_mean` and `5lagy` vs `timestamp` so we can see that the data is basically steady in time. If it is not, then the analysis is much harder and great efforts should be put into the data acquisition system to fix the instability.
 
     Then we plot the uncalibrated spectrum of `5lagy` to get a sense of how many lines are in the data, and we can use the width of those lines to set the `BLAH` parameter for `rough_calibration`.
     """

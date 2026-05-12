@@ -23,7 +23,7 @@ header_dtype = np.dtype([
     ("sample_rate_hz", np.float64),
     ("data_reduction_factor", np.int16),
     ("voltage_scale", np.float64),
-    ("aquisition_flags", np.uint16),
+    ("acquisition_flags", np.uint16),
     ("start_time", np.uint64, 2),
     ("stop_time", np.uint64, 2),  # often wrong, written at end of run
     ("number_of_samples", np.uint64),  # often wrong, written at end of run
@@ -271,7 +271,7 @@ class TrueBqBin:
     frametime_s: float
     voltage_scale: float
     data: np.ndarray
-    # the bin file is a continuous data aquisition, untriggered
+    # the bin file is a continuous data acquisition, untriggered
 
     @classmethod
     def load(cls, bin_path: str | Path) -> "TrueBqBin":
