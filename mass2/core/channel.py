@@ -1556,6 +1556,10 @@ class Channel:
         holding the data from all 5 objects, plus a new column named "element", which will be one of
         {"Be", "Fe", "Ge", "Se", "Xe"}, according to which LJH file it came from.
 
+        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
+        That's a memory-intensive request. Use for small files only, or for `Channel` objects that are
+        no longer connected directly to raw pulse files!
+
         Parameters
         ----------
         sourcename : str
