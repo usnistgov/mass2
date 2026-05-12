@@ -62,6 +62,41 @@ def test_with_columns():
         assert np.allclose(ch.df[columnname].to_numpy(), rt)
 
 
+def test_combine_channels():
+    # Check Channel.combine_channels()
+    N1, N2 = 70, 30
+    ch1 = dummy_channel(npulses=N1)
+    ch2 = dummy_channel(npulses=N2)
+    d1 = {
+        "set1": ch1,
+        "set2": ch2,
+    }
+    ch = mass2.Channel.combine_channels("sourcenumber", d1)
+    assert len(ch1.df) == N1
+    assert len(ch2.df) == N2
+    assert len(ch.df) == N1 + N2
+    assert "sourcenumber" not in ch2.df.columns
+    assert "sourcenumber" in ch.df.columns
+    assert len(ch.df.filter(pl.col("sourcenumber") == "set1")) == N1
+    assert len(ch.df.filter(pl.col("sourcenumber") == "set2")) == N2
+
+    # Check Channels.combine_channels()
+    data1 = mass2.Channels.from_oneChannel(ch1)
+    data2 = mass2.Channels.from_oneChannel(ch2)
+    d2 = {
+        "sampleA": data1,
+        "sampleB": data2,
+    }
+    data = mass2.Channels.combine_channels("samplecode", d2)
+    assert data1.ch0.npulses == N1
+    assert data2.ch0.npulses == N2
+    assert data.ch0.npulses == N1 + N2
+    assert "samplecode" not in data1.ch0.df.columns
+    assert "samplecode" in data.ch0.df.columns
+    assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleA")) == N1
+    assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleB")) == N2
+
+
 def test_ljh_fractional_record(tmp_path):
     "Verify that it's allowed to open an LJH file with an non-integer # of binary records"
     # It should not be an error to open an LJH file with a non-integer number of records.
