@@ -4,7 +4,7 @@ import pytest
 
 from mass2.core import Filter, FilterMaker, ToeplitzWhitener
 
-rng = np.random.default_rng()
+rng = np.random.default_rng(6847)
 
 
 def generate_autocorrelation(N=50):
@@ -269,3 +269,29 @@ def test_VoverdV():
     peaks1 = filter1 @ noise + filter1 @ (pulse * 1000 + 5000)
     assert np.abs(peaks1.mean() - 1000) < 0.5
     assert (np.var(peaks1, ddof=1) / predictedvar - 1) < 0.05
+
+
+def test_VoverdV_marcel():
+    """Verify that we get roughly the same answer found in Marcel VandenBerg's memo
+    "Optimal filtering in IGOR, version 3.0" dated 11 January 2005. He found V/dV = 4422 in IGOR.
+    We require at least 4000 and no more than 4500, to be sure we aren't off by factors of
+    2 or sqrt(8ln2) or some other large factor.
+    """
+    dt = 500e-9
+    peak = 10
+    Nsamp = 4096
+    Npre = 255
+    whitenoise = 0.01
+    t = np.arange(-Npre, Nsamp - Npre) * dt
+    pulse = peak * (np.exp(-t / 1e-4) - np.exp(-t / 1e-6))
+    pulse[t < 0] = 0
+    # pulse *= peak / pulse.max()
+    autocorr = np.zeros_like(pulse)
+    autocorr[0] = whitenoise**2
+    fm = FilterMaker(pulse, Npre, autocorr, peak=peak, sample_time_sec=dt)
+    filter1 = fm.compute_1lag()
+    filter5 = fm.compute_5lag()
+    filter5a = fm.compute_5lag(f_3db=10000.0)
+    for f in (filter1, filter5, filter5a):
+        vdv = f.predicted_v_over_dv
+        assert vdv > 4000 and vdv < 4500
