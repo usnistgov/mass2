@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import pytest
 
 from mass2.core import Filter, FilterMaker, ToeplitzWhitener
@@ -235,3 +236,36 @@ class TestWhitener:
         assert np.all(wtir[-Nzero:] == 0)
         assert not np.all(wtr[:-Nzero] == 0)
         assert not np.all(wtir[:-Nzero] == 0)
+
+
+def test_VoverdV():
+    Nsamp = 500
+    Npulses = 2000
+    white = rng.standard_normal((Nsamp, Npulses))
+    t = np.arange(Nsamp)
+    acorr = 10 * np.exp(-t / 50)
+    acorr[0] *= 3
+    R = sp.linalg.toeplitz(acorr)
+    L = sp.linalg.cholesky(R, lower=True)
+    noise = L @ white
+
+    pulse = np.exp(-t[: Nsamp // 2] / 200) - np.exp(-t[: Nsamp // 2] / 20)
+    pulse /= pulse.max()
+    pulse = np.hstack((np.zeros(Nsamp - len(pulse)), pulse))
+
+    # Filter using mass2 FilterMaker
+    fm = FilterMaker(pulse, Nsamp // 2, acorr, None, peak=1000)
+    filter5lag = fm.compute_5lag()
+    assert np.abs(filter5lag.values.sum()) < 1e-12
+    assert np.abs((filter5lag.values @ (1000 * pulse[2:-2])) - 1000) < 0.2
+    noise_filt, phase = filter5lag.filter_records(noise.T + 1000 * pulse)
+    predictedvar = filter5lag.variance
+    assert (np.var(noise_filt, ddof=1) / predictedvar - 1) < 0.05
+
+    # Filter outside the mass2 FilterMaker framework
+    M = np.column_stack([pulse, np.ones_like(pulse)])
+    Mtilde = np.linalg.lstsq(L, M)[0]
+    filter1 = (np.linalg.pinv(Mtilde) @ np.linalg.inv(L))[0]
+    peaks1 = filter1 @ noise + filter1 @ (pulse * 1000 + 5000)
+    assert np.abs(peaks1.mean() - 1000) < 0.5
+    assert (np.var(peaks1, ddof=1) / predictedvar - 1) < 0.05
