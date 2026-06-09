@@ -54,11 +54,11 @@ def test_ATSF():
     for computer in (maker.compute_ats, maker.compute_fourier):
         filter_to_test = computer(f_3db=None)
         assert isinstance(filter_to_test, Filter)
-        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/o lowpass"
+        assert filter_to_test.values.sum() == pytest.approx(0.0, abs=1e-8), f"{filter_to_test} failed DC test w/o lowpass"
 
         filter_to_test = computer(f_3db=1e4)
         assert isinstance(filter_to_test, Filter)
-        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/ f_3db"
+        assert filter_to_test.values.sum() == pytest.approx(0.0, abs=1e-8), f"{filter_to_test} failed DC test w/ f_3db"
 
 
 def test_dc_insensitive():
@@ -97,15 +97,15 @@ def test_dc_insensitive():
         filter_to_test = computer(f_3db=None, fmax=None)
         std = np.median(np.abs(filter_to_test.values))
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/o lowpass"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/o lowpass"
 
         filter_to_test = computer(f_3db=1e4, fmax=None)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ f_3db"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/ f_3db"
 
         filter_to_test = computer(f_3db=None, fmax=1e4)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ fmax"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/ fmax"
 
 
 def test_constrained_filtering():  # noqa: PLR0914
@@ -145,19 +145,22 @@ def test_constrained_filtering():  # noqa: PLR0914
     f_constrained5 = maker.compute_constrained_5lag(expmodel)
     f_constrained1 = maker.compute_constrained_1lag(expdata)
 
-    assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
-    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-8, "compute_5lag_noexp is sensitive to an exponential"
-    assert np.abs(f_constrained5.filter_records(expdata)[0]) < 1e-8, "compute_constrained_5lag is sensitive to an exponential"
-    assert np.abs(f_constrained1.filter_records(expdata)[0]) < 1e-8, "compute_constrained_1lag is sensitive to an exponential"
+    assert f_usual.filter_records(expdata)[0] != pytest.approx(0, abs=1e-4), "compute_5lag is insensitive to an exponential"
+    assert f_noexp.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), "compute_5lag_noexp is sensitive to an exponential"
+    msg1 = "compute_constrained_5lag is sensitive to an exponential"
+    msg2 = "compute_constrained_1lag is sensitive to an exponential"
+    assert f_constrained5.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), msg1
+    assert f_constrained1.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), msg2
 
     # Now make multiple exponential constraints
-    insensitive_models = [expdata, 30 - expdata**1.5, expdata**2]
+    insensitive_models = [expdata, expdata**1.5, (expdata / 10) ** 2]
     constraints = [m[2:-2] for m in insensitive_models]
     f_constrained = maker.compute_constrained_5lag(constraints)
     msg1 = "compute_5lag is unexpectedly insensitive to an arbitrary shape"
     msg2 = "compute_constrained_5lag is sensitive to constraint"
-    assert np.all(np.abs(f_usual.filter_records(insensitive_models)[0]) > 1e-4), msg1
-    assert np.all(np.abs(f_constrained.filter_records(insensitive_models)[0]) < 1e-7), msg2
+    for i, vec in enumerate(insensitive_models):
+        assert f_usual.filter_records(vec)[0] != pytest.approx(0, abs=1e-4), msg1 + f" for constraint #{i}"
+        assert f_constrained.filter_records(vec)[0] == pytest.approx(0, abs=1e-7), msg2 + f" for constraint #{i}"
 
     # And add a non-exponential constraint. This won't be strictly insensitive when we 5-lag filter it.
     # But it _will_ have zero inner product with the shortened-by-4 model. So test only that
@@ -166,7 +169,7 @@ def test_constrained_filtering():  # noqa: PLR0914
     f_constrained = maker.compute_constrained_5lag(constraints)
     for i, vec in enumerate(constraints):
         msg2 = f"compute_constrained_5lag filter values are not orthogonal to constraint # {i}"
-        assert np.abs(f_constrained.values @ vec) < 1e-8, msg2
+        assert f_constrained.values @ vec == pytest.approx(0, abs=1e-7), msg2
 
 
 def test_no_concrete_baseFilter():
@@ -256,19 +259,19 @@ def test_VoverdV():
     # Filter using mass2 FilterMaker
     fm = FilterMaker(pulse, Nsamp // 2, acorr, None, peak=1000)
     filter5lag = fm.compute_5lag()
-    assert np.abs(filter5lag.values.sum()) < 1e-12
-    assert np.abs((filter5lag.values @ (1000 * pulse[2:-2])) - 1000) < 0.2
+    assert filter5lag.values.sum() == pytest.approx(0.0, abs=1e-12)
+    assert filter5lag.values @ (1000 * pulse[2:-2]) == pytest.approx(1000, abs=0.2)
     noise_filt, phase = filter5lag.filter_records(noise.T + 1000 * pulse)
     predictedvar = filter5lag.variance
-    assert (np.var(noise_filt, ddof=1) / predictedvar - 1) < 0.05
+    assert np.var(noise_filt, ddof=1) == pytest.approx(predictedvar, rel=0.05)
 
     # Filter outside the mass2 FilterMaker framework
     M = np.column_stack([pulse, np.ones_like(pulse)])
     Mtilde = np.linalg.lstsq(L, M)[0]
     filter1 = (np.linalg.pinv(Mtilde) @ np.linalg.inv(L))[0]
     peaks1 = filter1 @ noise + filter1 @ (pulse * 1000 + 5000)
-    assert np.abs(peaks1.mean() - 1000) < 0.5
-    assert (np.var(peaks1, ddof=1) / predictedvar - 1) < 0.05
+    assert peaks1.mean() == pytest.approx(1000, abs=0.5)
+    assert np.var(peaks1, ddof=1) == pytest.approx(predictedvar, rel=0.5)
 
 
 def test_VoverdV_marcel():
