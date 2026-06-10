@@ -241,7 +241,7 @@ class TestWhitener:
         assert not np.all(wtir[:-Nzero] == 0)
 
 
-def test_VoverdV():
+def test_VoverdV():  # noqa: PLR0914
     Nsamp = 500
     Npulses = 2000
     white = rng.standard_normal((Nsamp, Npulses))
@@ -255,15 +255,21 @@ def test_VoverdV():
     pulse = np.exp(-t[: Nsamp // 2] / 200) - np.exp(-t[: Nsamp // 2] / 20)
     pulse /= pulse.max()
     pulse = np.hstack((np.zeros(Nsamp - len(pulse)), pulse))
+    peak = 1000
 
     # Filter using mass2 FilterMaker
-    fm = FilterMaker(pulse, Nsamp // 2, acorr, None, peak=1000)
+    fm = FilterMaker(pulse, Nsamp // 2, acorr, None, peak=peak)
     filter5lag = fm.compute_5lag()
     assert filter5lag.values.sum() == pytest.approx(0.0, abs=1e-12)
-    assert filter5lag.values @ (1000 * pulse[2:-2]) == pytest.approx(1000, abs=0.2)
-    noise_filt, phase = filter5lag.filter_records(noise.T + 1000 * pulse)
+    assert filter5lag.values @ (1000 * pulse[2:-2]) == pytest.approx(peak, abs=0.2)
+    noise_filt, phase = filter5lag.filter_records(noise.T + peak * pulse)
+    assert noise_filt.mean() == pytest.approx(peak, rel=0.01)
     predictedvar = filter5lag.variance
+    dV = np.sqrt(8 * np.log(2) * predictedvar)
+    assert filter5lag.predicted_v_over_dv == pytest.approx(peak / dV, rel=0.02)
+    actualdV = (8 * np.log(2) * np.var(noise_filt, ddof=1)) ** 0.5
     assert np.var(noise_filt, ddof=1) == pytest.approx(predictedvar, rel=0.05)
+    assert noise_filt.mean() / actualdV == pytest.approx(filter5lag.predicted_v_over_dv, rel=0.02)
 
     # Filter outside the mass2 FilterMaker framework
     M = np.column_stack([pulse, np.ones_like(pulse)])
@@ -271,7 +277,7 @@ def test_VoverdV():
     filter1 = (np.linalg.pinv(Mtilde) @ np.linalg.inv(L))[0]
     peaks1 = filter1 @ noise + filter1 @ (pulse * 1000 + 5000)
     assert peaks1.mean() == pytest.approx(1000, abs=0.5)
-    assert np.var(peaks1, ddof=1) == pytest.approx(predictedvar, rel=0.5)
+    assert np.var(peaks1, ddof=1) == pytest.approx(predictedvar, rel=0.05)
 
 
 def test_VoverdV_marcel():
