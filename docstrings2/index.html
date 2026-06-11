@@ -5934,13 +5934,13 @@ print E["MnKAlpha"], E["MnKA"], E["MnKA1"], E["MnKL3"]</p>
 Intended to replicate plots in the literature giving spectral lineshapes.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/calibration/fluorescence_lines.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1632</span>
-<span class="normal">1633</span>
-<span class="normal">1634</span>
-<span class="normal">1635</span>
-<span class="normal">1636</span>
-<span class="normal">1637</span>
-<span class="normal">1638</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_all_spectra</span><span class="p">(</span><span class="n">maxplots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1690</span>
+<span class="normal">1691</span>
+<span class="normal">1692</span>
+<span class="normal">1693</span>
+<span class="normal">1694</span>
+<span class="normal">1695</span>
+<span class="normal">1696</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">plot_all_spectra</span><span class="p">(</span><span class="n">maxplots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Makes plots showing the line shape and component parts for some lines.</span>
 <span class="sd">    Intended to replicate plots in the literature giving spectral lineshapes."""</span>
     <span class="n">keys</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">spectra</span><span class="o">.</span><span class="n">keys</span><span class="p">())[:</span><span class="n">maxplots</span><span class="p">]</span>
@@ -9739,7 +9739,7 @@ Paul Szypryt</p>
     <span class="n">widths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">widths</span><span class="p">)</span>
     <span class="n">ratios</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ratios</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">nominal_peak_energy</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">nominal_peak_energy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">energies</span><span class="p">,</span> <span class="n">ratios</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ratios</span><span class="p">)</span>
+        <span class="n">nominal_peak_energy</span> <span class="o">=</span> <span class="p">(</span><span class="n">energies</span> <span class="o">@</span> <span class="n">ratios</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ratios</span><span class="p">)</span>
     <span class="n">linetype</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">spectr_ch</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">line_identifier</span><span class="si">}</span><span class="s2">"</span>
 
     <span class="n">spectrum_class</span> <span class="o">=</span> <span class="n">fluorescence_lines</span><span class="o">.</span><span class="n">addline</span><span class="p">(</span>
@@ -15757,7 +15757,11 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 <span class="normal">366</span>
 <span class="normal">367</span>
 <span class="normal">368</span>
-<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GPRSpline</span><span class="p">(</span><span class="n">CubicSpline</span><span class="p">):</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GPRSpline</span><span class="p">(</span><span class="n">CubicSpline</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A callable object that performs a smoothing cubic spline operation</span>
 
 <span class="sd">    The smoothing spline is the cubic spline minimizing the "curvature</span>
@@ -15831,18 +15835,19 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
         <span class="n">Ky</span> <span class="o">=</span> <span class="n">K</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">L</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">Ky</span><span class="p">)</span>
         <span class="n">LH</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">H</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-        <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LH</span><span class="p">)</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">LH</span>
         <span class="n">KinvHT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">LH</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="n">L</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="n">A</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span> <span class="o">=</span> <span class="n">KinvHT</span>
-        <span class="n">beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">)</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span>
 
         <span class="c1"># Compute at test points = self.x</span>
         <span class="c1"># We know that these are the knots of a natural cubic spline</span>
-        <span class="n">R</span> <span class="o">=</span> <span class="n">H</span> <span class="o">-</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">K</span><span class="p">)</span>
-        <span class="n">fbar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">K</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
-        <span class="n">gbar</span> <span class="o">=</span> <span class="n">fbar</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">H</span> <span class="o">-</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">K</span>
+        <span class="n">KyinvK</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">K</span><span class="p">))</span>
+        <span class="n">fbar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">@</span> <span class="n">KyinvK</span>
+        <span class="n">gbar</span> <span class="o">=</span> <span class="n">fbar</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">beta</span>
         <span class="n">CubicSpline</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">gbar</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">best_sigmaf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -15877,12 +15882,13 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
         <span class="n">Ky</span> <span class="o">=</span> <span class="n">K</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">L</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">Ky</span><span class="p">)</span>
         <span class="n">LH</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">H</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-        <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LH</span><span class="p">)</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">LH</span>
         <span class="n">KinvHT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">LH</span><span class="p">)</span>
-        <span class="n">C</span> <span class="o">=</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
-        <span class="n">yCy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">C</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">))</span>
+        <span class="n">result1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="n">C</span> <span class="o">=</span> <span class="n">KinvHT</span> <span class="o">@</span> <span class="n">result1</span>
+        <span class="n">yCy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">@</span> <span class="p">(</span><span class="n">C</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
         <span class="n">Linvy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
-        <span class="n">yKinvy</span> <span class="o">=</span> <span class="n">Linvy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Linvy</span><span class="p">)</span>
+        <span class="n">yKinvy</span> <span class="o">=</span> <span class="n">Linvy</span> <span class="o">@</span> <span class="n">Linvy</span>
         <span class="k">return</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">Nk</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">A</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">slogdet</span><span class="p">(</span><span class="n">Ky</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">yCy</span> <span class="o">+</span> <span class="n">yKinvy</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">variance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xtest</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
@@ -15896,8 +15902,9 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
             <span class="n">Ktest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
             <span class="n">LinvKtest</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="n">Ktest</span><span class="p">)</span>
             <span class="n">cov_ftest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">LinvKtest</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-            <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Ktest</span><span class="p">)</span>
-            <span class="n">v</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)))</span>
+            <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">Ktest</span>
+            <span class="n">result1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span> <span class="o">@</span> <span class="n">result1</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">xtest</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
@@ -15911,10 +15918,11 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
         <span class="n">Ktest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xtest</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
         <span class="n">LinvKtest</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="n">Ktest</span><span class="p">)</span>
         <span class="n">cov_ftest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xtest</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xtest</span><span class="p">])</span>
-        <span class="n">cov_ftest</span> <span class="o">-=</span> <span class="n">LinvKtest</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LinvKtest</span><span class="p">)</span>
+        <span class="n">cov_ftest</span> <span class="o">-=</span> <span class="n">LinvKtest</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">LinvKtest</span>
         <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xtest</span><span class="p">)),</span> <span class="n">xtest</span><span class="p">))</span>
-        <span class="n">R</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Ktest</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">))</span>
+        <span class="n">R</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">Ktest</span>
+        <span class="n">result1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">result1</span>
 </code></pre></div></td></tr></table></div>
 </details>
 <div class="doc doc-children">
@@ -16045,7 +16053,8 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sigmaf</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">298</span>
+<span class="normal">299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sigmaf</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Set up the Gaussian Process Regression spline.</span>
 
 <span class="sd">    Parameters</span>
@@ -16093,18 +16102,19 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
     <span class="n">Ky</span> <span class="o">=</span> <span class="n">K</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
     <span class="n">L</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">Ky</span><span class="p">)</span>
     <span class="n">LH</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">H</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-    <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LH</span><span class="p">)</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="n">LH</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">LH</span>
     <span class="n">KinvHT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">LH</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="n">L</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="n">A</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span> <span class="o">=</span> <span class="n">KinvHT</span>
-    <span class="n">beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="p">)</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span>
 
     <span class="c1"># Compute at test points = self.x</span>
     <span class="c1"># We know that these are the knots of a natural cubic spline</span>
-    <span class="n">R</span> <span class="o">=</span> <span class="n">H</span> <span class="o">-</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">K</span><span class="p">)</span>
-    <span class="n">fbar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">K</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
-    <span class="n">gbar</span> <span class="o">=</span> <span class="n">fbar</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="n">H</span> <span class="o">-</span> <span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">K</span>
+    <span class="n">KyinvK</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">L</span><span class="p">,</span> <span class="n">K</span><span class="p">))</span>
+    <span class="n">fbar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">@</span> <span class="n">KyinvK</span>
+    <span class="n">gbar</span> <span class="o">=</span> <span class="n">fbar</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">beta</span>
     <span class="n">CubicSpline</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">gbar</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
 </details>
@@ -16118,14 +16128,14 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 <p>Return the sigmaf value that maximizes the marginal Bayesian likelihood.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">300</span>
-<span class="normal">301</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
 <span class="normal">305</span>
 <span class="normal">306</span>
-<span class="normal">307</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">best_sigmaf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="normal">307</span>
+<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">best_sigmaf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the sigmaf value that maximizes the marginal Bayesian likelihood."""</span>
     <span class="n">guess</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">err</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">minimize_scalar</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">_marginal_like</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="p">[</span><span class="n">guess</span> <span class="o">/</span> <span class="mf">1e4</span><span class="p">,</span> <span class="n">guess</span> <span class="o">*</span> <span class="mf">1e4</span><span class="p">])</span>
@@ -16145,10 +16155,7 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 <p>Returns the covariance between function evaluations at the test points <code>xtest</code>.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">360</span>
 <span class="normal">361</span>
 <span class="normal">362</span>
 <span class="normal">363</span>
@@ -16157,7 +16164,11 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 <span class="normal">366</span>
 <span class="normal">367</span>
 <span class="normal">368</span>
-<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">covariance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xtest</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">covariance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xtest</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Returns the covariance between function evaluations at the test points `xtest`."""</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">xtest</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">variance</span><span class="p">(</span><span class="n">xtest</span><span class="p">)</span>
@@ -16166,10 +16177,11 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
     <span class="n">Ktest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xtest</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
     <span class="n">LinvKtest</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="n">Ktest</span><span class="p">)</span>
     <span class="n">cov_ftest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xtest</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">xtest</span><span class="p">])</span>
-    <span class="n">cov_ftest</span> <span class="o">-=</span> <span class="n">LinvKtest</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LinvKtest</span><span class="p">)</span>
+    <span class="n">cov_ftest</span> <span class="o">-=</span> <span class="n">LinvKtest</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">LinvKtest</span>
     <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xtest</span><span class="p">)),</span> <span class="n">xtest</span><span class="p">))</span>
-    <span class="n">R</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Ktest</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">))</span>
+    <span class="n">R</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">Ktest</span>
+    <span class="n">result1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">result1</span>
 </code></pre></div></td></tr></table></div>
 </details>
 </div>
@@ -16184,9 +16196,7 @@ Gaussian Process Regression theory. It improves on <code>SmoothingSpline</code> 
 this method computes only the diagonal and should therefore be faster.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">342</span>
 <span class="normal">343</span>
 <span class="normal">344</span>
 <span class="normal">345</span>
@@ -16199,7 +16209,10 @@ this method computes only the diagonal and should therefore be faster.</p>
 <span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
-<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">variance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xtest</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">variance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xtest</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Returns the variance for function evaluations at the test points `xtest`.</span>
 
 <span class="sd">    This equals the diagonal of `self.covariance(xtest)`, but for large test sets,</span>
@@ -16210,8 +16223,9 @@ this method computes only the diagonal and should therefore be faster.</p>
         <span class="n">Ktest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
         <span class="n">LinvKtest</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">L</span><span class="p">,</span> <span class="n">Ktest</span><span class="p">)</span>
         <span class="n">cov_ftest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigmaf</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k_spline</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">LinvKtest</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-        <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Ktest</span><span class="p">)</span>
-        <span class="n">v</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)))</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">KinvHT</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">Ktest</span>
+        <span class="n">result1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">R</span><span class="p">)</span>
+        <span class="n">v</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cov_ftest</span> <span class="o">+</span> <span class="n">R</span> <span class="o">@</span> <span class="n">result1</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">xtest</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
@@ -16239,11 +16253,7 @@ for id in range(len(knots)):
     plt.plot(x, basis(x, id))</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">376</span>
 <span class="normal">377</span>
 <span class="normal">378</span>
 <span class="normal">379</span>
@@ -16323,7 +16333,11 @@ for id in range(len(knots)):
 <span class="normal">453</span>
 <span class="normal">454</span>
 <span class="normal">455</span>
-<span class="normal">456</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NaturalBsplineBasis</span><span class="p">:</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NaturalBsplineBasis</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Represent a cubic B-spline basis in 1D with natural boundary conditions.</span>
 
 <span class="sd">    That is, f''(x)=0 at the first and last knots. This constraint reduces the</span>
@@ -16504,11 +16518,7 @@ for id in range(len(knots)):
 </table>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">413</span>
-<span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
 <span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
@@ -16534,7 +16544,11 @@ for id in range(len(knots)):
 <span class="normal">440</span>
 <span class="normal">441</span>
 <span class="normal">442</span>
-<span class="normal">443</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the Basis-spline at the points `x` for basis function `id`, or its derivative of degree `der`.</span>
 
 <span class="sd">    Parameters</span>
@@ -16577,11 +16591,7 @@ for id in range(len(knots)):
 <p>Initialization requires only the list of knots.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">391</span>
 <span class="normal">392</span>
 <span class="normal">393</span>
 <span class="normal">394</span>
@@ -16601,7 +16611,11 @@ for id in range(len(knots)):
 <span class="normal">408</span>
 <span class="normal">409</span>
 <span class="normal">410</span>
-<span class="normal">411</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">knots</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">):</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">knots</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Initialization requires only the list of knots."""</span>
     <span class="n">knots</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">knots</span><span class="p">)</span>
     <span class="n">Nk</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">knots</span><span class="p">)</span>
@@ -16639,12 +16653,12 @@ for id in range(len(knots)):
 needed by FITPACK, which are of length Nk+2.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">expand_coeff</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">beta</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">expand_coeff</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">beta</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Given coefficients of this length-Nk basis, return the coefficients</span>
 <span class="sd">    needed by FITPACK, which are of length Nk+2."""</span>
     <span class="n">first</span> <span class="o">=</span> <span class="n">beta</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">coef_b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">coef_b</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
@@ -16663,11 +16677,11 @@ needed by FITPACK, which are of length Nk+2.</p>
 If der&gt;0, then return the derivative of that order instead of the value.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">values_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">values_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return matrix M where M_ij = value at knot i for basis function j.</span>
 <span class="sd">    If der&gt;0, then return the derivative of that order instead of the value."""</span>
     <span class="c1"># Note the array is naturally built by vstack as the Transpose of what we want.</span>
@@ -16695,11 +16709,7 @@ the highest knots.</p>
 Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">463</span>
 <span class="normal">464</span>
 <span class="normal">465</span>
 <span class="normal">466</span>
@@ -16847,7 +16857,11 @@ Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
 <span class="normal">608</span>
 <span class="normal">609</span>
 <span class="normal">610</span>
-<span class="normal">611</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SmoothingSpline</span><span class="p">:</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SmoothingSpline</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A callable object that performs a smoothing cubic spline operation, using</span>
 <span class="sd">    the NaturalBsplineBasis object for the basis representation of splines.</span>
 
@@ -16933,8 +16947,8 @@ Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
 
         <span class="n">Dinv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Vector but stands for diagonals of a diagonal matrix.</span>
         <span class="n">NTDinv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">Dinv</span>
-        <span class="n">lhs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">NTDinv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">)</span>
-        <span class="n">rhs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">Dinv</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">lhs</span> <span class="o">=</span> <span class="n">NTDinv</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span>
+        <span class="n">rhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="p">(</span><span class="n">Dinv</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">best_params</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">            </span><span class="sd">"""Return the best-fit parameters for a given curvature penalty p."""</span>
@@ -16949,7 +16963,7 @@ Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
                 <span class="n">beta</span> <span class="o">=</span> <span class="n">best_params</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
             <span class="k">except</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">:</span>
                 <span class="k">return</span> <span class="mf">1e99</span>
-            <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
+            <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span> <span class="o">@</span> <span class="n">beta</span>
             <span class="n">chisq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(((</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">ys</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">chisq</span> <span class="o">-</span> <span class="n">target_chisq</span>
 
@@ -16957,7 +16971,7 @@ Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
         <span class="n">pbest</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">brentq</span><span class="p">(</span><span class="n">chisq_difference</span><span class="p">,</span> <span class="n">mincurvature</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">chisq</span><span class="p">,))</span>
         <span class="n">beta</span> <span class="o">=</span> <span class="n">best_params</span><span class="p">(</span><span class="n">pbest</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="o">.</span><span class="n">expand_coeff</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>
-        <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
+        <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span> <span class="o">@</span> <span class="n">beta</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">actualchisq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(((</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">ys</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
 
         <span class="c1"># Store the linear extrapolation outside the knotted region.</span>
@@ -17012,10 +17026,10 @@ Numerische Mathematik, 10(3), 177-183. http://doi.org/10.1007/BF02162161</p>
 at data points <code>x</code>.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">608</span>
-<span class="normal">609</span>
-<span class="normal">610</span>
-<span class="normal">611</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the value of (the `der`th derivative of) the smoothing spline</span>
 <span class="sd">    at data points `x`."""</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__eval</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">der</span><span class="o">=</span><span class="n">der</span><span class="p">)</span>
@@ -17032,11 +17046,7 @@ at data points <code>x</code>.</p>
 at data points <code>x</code>.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">579</span>
-<span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span>
-<span class="normal">583</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">583</span>
 <span class="normal">584</span>
 <span class="normal">585</span>
 <span class="normal">586</span>
@@ -17059,7 +17069,11 @@ at data points <code>x</code>.</p>
 <span class="normal">603</span>
 <span class="normal">604</span>
 <span class="normal">605</span>
-<span class="normal">606</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__eval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">allow_extrapolate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__eval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">allow_extrapolate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the value of (the `der`th derivative of) the smoothing spline</span>
 <span class="sd">    at data points `x`."""</span>
     <span class="n">scalar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -17109,11 +17123,7 @@ If not given, this defaults to the number of data values. When a
 constraint, then the actual chi-squared will be less than maxchisq.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">477</span>
 <span class="normal">478</span>
 <span class="normal">479</span>
 <span class="normal">480</span>
@@ -17149,7 +17159,11 @@ constraint, then the actual chi-squared will be less than maxchisq.</p>
 <span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
-<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">maxchisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">maxchisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Smoothing spline for data {x,y} with errors {dy} on the y values</span>
 <span class="sd">    and {dx} on the x values (or zero if not given).</span>
 
@@ -17204,11 +17218,7 @@ smallest possible curvature subject to the constraint that the
 sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
-<span class="normal">539</span>
-<span class="normal">540</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">540</span>
 <span class="normal">541</span>
 <span class="normal">542</span>
 <span class="normal">543</span>
@@ -17245,7 +17255,11 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
-<span class="normal">577</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">smooth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">smooth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Choose the value of the curve at the knots so as to achieve the</span>
 <span class="sd">    smallest possible curvature subject to the constraint that the</span>
 <span class="sd">    sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq"""</span>
@@ -17254,8 +17268,8 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 
     <span class="n">Dinv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Vector but stands for diagonals of a diagonal matrix.</span>
     <span class="n">NTDinv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">Dinv</span>
-    <span class="n">lhs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">NTDinv</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">)</span>
-    <span class="n">rhs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">Dinv</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">lhs</span> <span class="o">=</span> <span class="n">NTDinv</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span>
+    <span class="n">rhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="p">(</span><span class="n">Dinv</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">best_params</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Return the best-fit parameters for a given curvature penalty p."""</span>
@@ -17270,7 +17284,7 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
             <span class="n">beta</span> <span class="o">=</span> <span class="n">best_params</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
         <span class="k">except</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">:</span>
             <span class="k">return</span> <span class="mf">1e99</span>
-        <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
+        <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span> <span class="o">@</span> <span class="n">beta</span>
         <span class="n">chisq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(((</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">ys</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">chisq</span> <span class="o">-</span> <span class="n">target_chisq</span>
 
@@ -17278,7 +17292,7 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
     <span class="n">pbest</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">optimize</span><span class="o">.</span><span class="n">brentq</span><span class="p">(</span><span class="n">chisq_difference</span><span class="p">,</span> <span class="n">mincurvature</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">chisq</span><span class="p">,))</span>
     <span class="n">beta</span> <span class="o">=</span> <span class="n">best_params</span><span class="p">(</span><span class="n">pbest</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">coeff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="o">.</span><span class="n">expand_coeff</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span>
-    <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">N0</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
+    <span class="n">ys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">N0</span> <span class="o">@</span> <span class="n">beta</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">actualchisq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(((</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">ys</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">err</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
 
     <span class="c1"># Store the linear extrapolation outside the knotted region.</span>
@@ -17302,11 +17316,7 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <p>A smoothing spline in log-log space.</p>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">618</span>
 <span class="normal">619</span>
 <span class="normal">620</span>
 <span class="normal">621</span>
@@ -17350,7 +17360,11 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <span class="normal">659</span>
 <span class="normal">660</span>
 <span class="normal">661</span>
-<span class="normal">662</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SmoothingSplineLog</span><span class="p">:</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SmoothingSplineLog</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A smoothing spline in log-log space."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">maxchisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
@@ -17465,11 +17479,7 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 </table>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
-<span class="normal">650</span>
-<span class="normal">651</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">651</span>
 <span class="normal">652</span>
 <span class="normal">653</span>
 <span class="normal">654</span>
@@ -17480,7 +17490,11 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <span class="normal">659</span>
 <span class="normal">660</span>
 <span class="normal">661</span>
-<span class="normal">662</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">der</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NDArray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compute the log-log smoothing spline or its derivative at the points `x`.</span>
 
 <span class="sd">    Parameters</span>
@@ -17589,11 +17603,7 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 </table>
 <details class="quote">
 <summary>Source code in <code>mass2/mathstat/interpolate.py</code></summary>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">621</span>
 <span class="normal">622</span>
 <span class="normal">623</span>
 <span class="normal">624</span>
@@ -17617,7 +17627,11 @@ sum over all {x,y} pairs S = [(y-f(x))/dy]^2 &lt;= chisq</p>
 <span class="normal">642</span>
 <span class="normal">643</span>
 <span class="normal">644</span>
-<span class="normal">645</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">maxchisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span>
+<span class="normal">648</span>
+<span class="normal">649</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dy</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">dx</span><span class="p">:</span> <span class="n">ArrayLike</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">maxchisq</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Set up a smoothing spline in log-log space.</span>
 
 <span class="sd">    Parameters</span>
