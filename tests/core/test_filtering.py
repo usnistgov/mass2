@@ -1,9 +1,10 @@
 import numpy as np
+import scipy as sp
 import pytest
 
 from mass2.core import Filter, FilterMaker, ToeplitzWhitener
 
-rng = np.random.default_rng()
+rng = np.random.default_rng(7384)
 
 
 def generate_autocorrelation(N=50):
@@ -53,11 +54,11 @@ def test_ATSF():
     for computer in (maker.compute_ats, maker.compute_fourier):
         filter_to_test = computer(f_3db=None)
         assert isinstance(filter_to_test, Filter)
-        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/o lowpass"
+        assert filter_to_test.values.sum() == pytest.approx(0.0, abs=1e-8), f"{filter_to_test} failed DC test w/o lowpass"
 
         filter_to_test = computer(f_3db=1e4)
         assert isinstance(filter_to_test, Filter)
-        assert np.isclose(filter_to_test.values.sum(), 0.0), f"{filter_to_test} failed DC test w/ f_3db"
+        assert filter_to_test.values.sum() == pytest.approx(0.0, abs=1e-8), f"{filter_to_test} failed DC test w/ f_3db"
 
 
 def test_dc_insensitive():
@@ -96,15 +97,15 @@ def test_dc_insensitive():
         filter_to_test = computer(f_3db=None, fmax=None)
         std = np.median(np.abs(filter_to_test.values))
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/o lowpass"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/o lowpass"
 
         filter_to_test = computer(f_3db=1e4, fmax=None)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ f_3db"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/ f_3db"
 
         filter_to_test = computer(f_3db=None, fmax=1e4)
         mean = filter_to_test.values.mean()
-        assert np.abs(mean) < 1e-9 * std, f"{filter_to_test} failed DC test w/ fmax"
+        assert mean == pytest.approx(0, abs=1e-9 * std), f"{filter_to_test} failed DC test w/ fmax"
 
 
 def test_constrained_filtering():  # noqa: PLR0914
@@ -137,35 +138,38 @@ def test_constrained_filtering():  # noqa: PLR0914
 
     # Make a data vector with decaying exponental exp(-t/tau) and filters orthogonal to that
     tau = 0.001
-    expdata = np.exp(-np.linspace(0, (nSamples - 1) * dt / tau, nSamples))
+    expdata = 100 * np.exp(-np.linspace(0, (nSamples - 1) * dt / tau, nSamples))
     expmodel = expdata[2:-2]
     f_usual = maker.compute_5lag()
     f_noexp = maker.compute_5lag_noexp(tau)
     f_constrained5 = maker.compute_constrained_5lag(expmodel)
     f_constrained1 = maker.compute_constrained_1lag(expdata)
 
-    assert np.abs(f_usual.filter_records(expdata)[0]) > 1e-4, "compute_5lag is insensitive to an exponential"
-    assert np.abs(f_noexp.filter_records(expdata)[0]) < 1e-9, "compute_5lag_noexp is sensitive to an exponential"
-    assert np.abs(f_constrained5.filter_records(expdata)[0]) < 1e-9, "compute_constrained_5lag is sensitive to an exponential"
-    assert np.abs(f_constrained1.filter_records(expdata)[0]) < 1e-9, "compute_constrained_1lag is sensitive to an exponential"
+    assert f_usual.filter_records(expdata)[0] != pytest.approx(0, abs=1e-4), "compute_5lag is insensitive to an exponential"
+    assert f_noexp.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), "compute_5lag_noexp is sensitive to an exponential"
+    msg1 = "compute_constrained_5lag is sensitive to an exponential"
+    msg2 = "compute_constrained_1lag is sensitive to an exponential"
+    assert f_constrained5.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), msg1
+    assert f_constrained1.filter_records(expdata)[0] == pytest.approx(0, abs=1e-7), msg2
 
     # Now make multiple exponential constraints
-    insensitive_models = [expdata, 1 - expdata**1.5, expdata**3.5]
+    insensitive_models = [expdata, expdata**1.5, (expdata / 10) ** 2]
     constraints = [m[2:-2] for m in insensitive_models]
     f_constrained = maker.compute_constrained_5lag(constraints)
     msg1 = "compute_5lag is unexpectedly insensitive to an arbitrary shape"
     msg2 = "compute_constrained_5lag is sensitive to constraint"
-    assert np.all(np.abs(f_usual.filter_records(insensitive_models)[0]) > 1e-4), msg1
-    assert np.all(np.abs(f_constrained.filter_records(insensitive_models)[0]) < 1e-9), msg2
+    for i, vec in enumerate(insensitive_models):
+        assert f_usual.filter_records(vec)[0] != pytest.approx(0, abs=1e-4), msg1 + f" for constraint #{i}"
+        assert f_constrained.filter_records(vec)[0] == pytest.approx(0, abs=1e-7), msg2 + f" for constraint #{i}"
 
     # And add a non-exponential constraint. This won't be strictly insensitive when we 5-lag filter it.
     # But it _will_ have zero inner product with the shortened-by-4 model. So test only that
-    insensitive_models.append(np.cos(np.linspace(0, 7, nSamples)))
+    insensitive_models.append(200 * np.cos(np.linspace(0, 7, nSamples)))
     constraints.append(insensitive_models[-1][2:-2])
     f_constrained = maker.compute_constrained_5lag(constraints)
     for i, vec in enumerate(constraints):
         msg2 = f"compute_constrained_5lag filter values are not orthogonal to constraint # {i}"
-        assert np.abs(f_constrained.values @ vec) < 1e-9, msg2
+        assert f_constrained.values @ vec == pytest.approx(0, abs=1e-7), msg2
 
 
 def test_no_concrete_baseFilter():
@@ -235,3 +239,68 @@ class TestWhitener:
         assert np.all(wtir[-Nzero:] == 0)
         assert not np.all(wtr[:-Nzero] == 0)
         assert not np.all(wtir[:-Nzero] == 0)
+
+
+def test_VoverdV():  # noqa: PLR0914
+    Nsamp = 500
+    Npulses = 2000
+    white = rng.standard_normal((Nsamp, Npulses))
+    t = np.arange(Nsamp)
+    acorr = 10 * np.exp(-t / 50)
+    acorr[0] *= 3
+    R = sp.linalg.toeplitz(acorr)
+    L = sp.linalg.cholesky(R, lower=True)
+    noise = L @ white
+
+    pulse = np.exp(-t[: Nsamp // 2] / 200) - np.exp(-t[: Nsamp // 2] / 20)
+    pulse /= pulse.max()
+    pulse = np.hstack((np.zeros(Nsamp - len(pulse)), pulse))
+    peak = 1000
+
+    # Filter using mass2 FilterMaker
+    fm = FilterMaker(pulse, Nsamp // 2, acorr, None, peak=peak)
+    filter5lag = fm.compute_5lag()
+    assert filter5lag.values.sum() == pytest.approx(0.0, abs=1e-12)
+    assert filter5lag.values @ (1000 * pulse[2:-2]) == pytest.approx(peak, abs=0.2)
+    noise_filt, phase = filter5lag.filter_records(noise.T + peak * pulse)
+    assert noise_filt.mean() == pytest.approx(peak, rel=0.01)
+    predictedvar = filter5lag.variance
+    dV = np.sqrt(8 * np.log(2) * predictedvar)
+    assert filter5lag.predicted_v_over_dv == pytest.approx(peak / dV, rel=0.02)
+    actualdV = (8 * np.log(2) * np.var(noise_filt, ddof=1)) ** 0.5
+    assert np.var(noise_filt, ddof=1) == pytest.approx(predictedvar, rel=0.05)
+    assert noise_filt.mean() / actualdV == pytest.approx(filter5lag.predicted_v_over_dv, rel=0.02)
+
+    # Filter outside the mass2 FilterMaker framework
+    M = np.column_stack([pulse, np.ones_like(pulse)])
+    Mtilde = np.linalg.lstsq(L, M)[0]
+    filter1 = (np.linalg.pinv(Mtilde) @ np.linalg.inv(L))[0]
+    peaks1 = filter1 @ noise + filter1 @ (pulse * 1000 + 5000)
+    assert peaks1.mean() == pytest.approx(1000, abs=0.5)
+    assert np.var(peaks1, ddof=1) == pytest.approx(predictedvar, rel=0.05)
+
+
+def test_VoverdV_marcel():
+    """Verify that we get roughly the same answer found in Marcel VandenBerg's memo
+    "Optimal filtering in IGOR, version 3.0" dated 11 January 2005. He found V/dV = 4422 in IGOR.
+    We require at least 4000 and no more than 4500, to be sure we aren't off by factors of
+    2 or sqrt(8ln2) or some other large factor.
+    """
+    dt = 500e-9
+    peak = 10
+    Nsamp = 4096
+    Npre = 255
+    whitenoise = 0.01
+    t = np.arange(-Npre, Nsamp - Npre) * dt
+    pulse = peak * (np.exp(-t / 1e-4) - np.exp(-t / 1e-6))
+    pulse[t < 0] = 0
+    # pulse *= peak / pulse.max()
+    autocorr = np.zeros_like(pulse)
+    autocorr[0] = whitenoise**2
+    fm = FilterMaker(pulse, Npre, autocorr, peak=peak, sample_time_sec=dt)
+    filter1 = fm.compute_1lag()
+    filter5 = fm.compute_5lag()
+    filter5a = fm.compute_5lag(f_3db=10000.0)
+    for f in (filter1, filter5, filter5a):
+        vdv = f.predicted_v_over_dv
+        assert vdv > 4000 and vdv < 4500
