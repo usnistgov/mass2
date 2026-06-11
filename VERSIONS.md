@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.0.5** April 23, 2026-
+**2.0.5** June 11, 2026
 * Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
 * Several small quality-of-life changes (issue 139):
   * Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products.
