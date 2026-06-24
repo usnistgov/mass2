@@ -18,6 +18,7 @@ doc_paths = pathlib.Path("docs").glob("**/*.md")
 
 
 @pytest.mark.parametrize("fpath", doc_paths, ids=str)
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 def test_files_good(fpath):
     print(f"Testing {fpath}")
     check_md_file(fpath=fpath, memory=True)

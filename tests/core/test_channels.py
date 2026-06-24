@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import shutil
 import pytest
 import polars as pl
 from polars.testing import assert_frame_equal
@@ -54,7 +55,8 @@ def test_with_columns():
     rt = ch.df["pulse_rms"].to_numpy() ** 0.5
     df = pl.DataFrame({"F": pl.Series(rt), "G": pl.Series(rt)})
     ch = (
-        ch.with_columns(A=pl.col("pulse_rms").sqrt(), B=pl.col("pulse_rms") ** 0.5, C=rt)
+        ch
+        .with_columns(A=pl.col("pulse_rms").sqrt(), B=pl.col("pulse_rms") ** 0.5, C=rt)
         .with_columns(pl.col("pulse_rms").sqrt().alias("D"), pl.col("pulse_rms").sqrt().alias("E"))
         .with_columns(df)
     )
@@ -185,6 +187,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    noiseresult = noise_ch.spectrum()
+    noiseresult.autocorr_vec[:] = 0
+    noiseresult.autocorr_vec[0] = sigma_noise**2
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -196,9 +201,17 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     )
     df = pl.DataFrame({"pulse": pulse_traces})
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
-    ch = ch.filter5lag()
-    step: mass2.core.OptimalFilterStep = ch.steps[-1]
-    assert isinstance(step, mass2.core.OptimalFilterStep)
+    step = mass2.core.filter_steps.OptimalFilterStep(
+        inputs=["pulse"],
+        output=["5lagx", "5lagy"],
+        good_expr=ch.good_expr,
+        use_expr=pl.lit(True),
+        filter=mass_filter,
+        spectrum=noiseresult,
+        filter_maker=maker,
+        transform_raw=ch.transform_raw,
+    )
+    ch = ch.with_step(step)
     filter: mass2.core.Filter = step.filter
     assert filter.predicted_v_over_dv == pytest.approx(mass_filter.predicted_v_over_dv, rel=1e-2)
     # test that the mass normaliztion in place
@@ -214,6 +227,63 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     assert psd is not None
     assert isinstance(psd[1], np.ndarray)
     assert isinstance(ch.last_v_over_dv, float)
+
+
+def test_filter5lag_uses_noise_channel():
+    """Test that filter5lag() correctly extracts the noise spectrum from the NoiseChannel.
+
+    test_follow_mass_filtering_rst verifies the filter math with an exact spectrum.
+    This test exercises the full code path: filter5lag() -> noise_ch.spectrum() ->
+    FilterMaker -> OptimalFilterStep, using enough noise traces (2000) for the
+    empirical covariance estimate to be close to the theoretical white-noise value.
+    """
+    rng = np.random.default_rng(7)
+    n = 504
+    Maxsignal = 1000.0
+    sigma_noise = 1.0
+    tau = [0.05, 0.25]
+    t = np.linspace(-1, 1, n)
+    npre = int((t < 0).sum())
+    signal = np.exp(-t / tau[1]) - np.exp(-t / tau[0])
+    signal[t <= 0] = 0
+    signal *= Maxsignal / signal.max()
+
+    # Theoretical reference filter
+    noise_covar = np.zeros(n)
+    noise_covar[0] = sigma_noise**2
+    theoretical_filter = mass2.core.FilterMaker(signal, npre, noise_covar, peak=Maxsignal).compute_5lag()
+
+    # 2000 noise traces: enough for the empirical autocorrelation to approximate white noise
+    noise_traces = rng.standard_normal((2000, n)) * sigma_noise
+    header_df = pl.DataFrame({"continuous": [True]})
+    frametime_s = 1e-5
+    noise_ch = mass2.NoiseChannel(pl.DataFrame({"pulse": noise_traces}), header_df, frametime_s)
+
+    npulses = 250
+    pulse_traces = np.tile(signal, (npulses, 1)) + rng.standard_normal((npulses, n)) * sigma_noise
+    header = mass2.ChannelHeader(
+        "dummy for noise test",
+        data_source=None,
+        ch_num=0,
+        frametime_s=frametime_s,
+        n_presamples=npre,
+        n_samples=n,
+        df=header_df,
+    )
+    ch = mass2.Channel(pl.DataFrame({"pulse": pulse_traces}), header, npulses=npulses, noise=noise_ch)
+    ch = ch.filter5lag()
+
+    step: mass2.core.OptimalFilterStep = ch.steps[-1]
+    assert isinstance(step, mass2.core.OptimalFilterStep)
+
+    # The empirically-derived filter should be close to the theoretical optimum (10% tolerance)
+    assert step.filter.predicted_v_over_dv == pytest.approx(theoretical_filter.predicted_v_over_dv, rel=0.10)
+
+    # Verify the noise autocorrelation stored on the channel is approximately white
+    autocorr = ch.last_noise_autocorrelation
+    assert isinstance(autocorr, np.ndarray)
+    assert autocorr[0] == pytest.approx(sigma_noise**2, rel=0.10)
+    assert np.mean(np.abs(autocorr[1:])) == pytest.approx(0, abs=0.05 * sigma_noise**2)
 
 
 def test_noise_autocorr():
@@ -459,7 +529,8 @@ def test_steps():
     # Perform 5 offical Recipe: summarize, filter, a pointless "squareme" step, drift correction, and another pointless one.
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
-            ch.summarize_pulses()
+            ch
+            .summarize_pulses()
             .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
             .filter5lag(f_3db=10000)
             .with_column_map_step("pretrig_rms", "pointless_pretrig_meansq", squareme)
@@ -526,7 +597,8 @@ def test_save_analysis(tmpdir):
     savefile = dir / "test_save"
     actual_savefile = savefile.with_suffix(".zip")
     data.save_analysis(savefile)
-    data2 = mass2.Channels.load_analysis(actual_savefile)
+    # load_pulse=False: dummy channel has no LJH backing, so pulse cannot be restored.
+    data2 = mass2.Channels.load_analysis(actual_savefile, load_pulse=False)
 
     # Verify that the good channel's data is restored
     # It's a dummy channel, not ljh-backed, so the pulse data will be gone.
@@ -621,3 +693,341 @@ def test_ch_from_numpy2():
     for i in range(ch.npulses):
         pulse = data.ch0.df["pulse"][i].to_numpy()
         assert np.all(pulse < 5000) and np.all(pulse > -5000)
+
+
+def test_drop_pulse():
+    """Channel.drop_pulse() removes the pulse column and propagates to noise; is idempotent."""
+    ch = dummy_channel().summarize_pulses()  # ensure non-pulse columns exist alongside pulse
+    assert "pulse" in ch.df.columns
+    assert "pulse" in ch.noise.df.columns
+
+    ch_dropped = ch.drop_pulse()
+    assert "pulse" not in ch_dropped.df.columns
+    assert "pulse" not in ch_dropped.noise.df.columns
+    # npulses must reflect row count of the surviving df (has non-pulse columns, so row count preserved)
+    assert ch_dropped.npulses == ch.npulses
+
+    # Calling again must not raise
+    ch_dropped2 = ch_dropped.drop_pulse()
+    assert "pulse" not in ch_dropped2.df.columns
+
+
+def test_noise_channel_drop_pulse():
+    """NoiseChannel.drop_pulse() removes the pulse column and is idempotent."""
+    rng = np.random.default_rng(1)
+    noise_traces = rng.standard_normal((10, 20)).astype(np.float32)
+    noise_ch = mass2.NoiseChannel(pl.DataFrame({"pulse": noise_traces}), pl.DataFrame(), 1e-5)
+    assert "pulse" in noise_ch.df.columns
+
+    dropped = noise_ch.drop_pulse()
+    assert "pulse" not in dropped.df.columns
+    assert "pulse" not in dropped.drop_pulse().df.columns
+
+
+def test_with_replacement_df_updates_npulses():
+    """with_replacement_df() must update npulses to match the new DataFrame length."""
+    ch = dummy_channel(npulses=100)
+    new_df = ch.df.head(40)
+    ch2 = ch.with_replacement_df(new_df)
+    assert ch2.npulses == 40
+    assert len(ch2.df) == 40
+
+
+def test_with_step_drops_pulse_from_history():
+    """with_step() must store the previous df without the pulse column in df_history."""
+    ch = dummy_channel()
+    ch = ch.with_columns(extra_col=np.arange(len(ch.df)))
+    assert ch.df_history == []
+
+    ch2 = ch.summarize_pulses()
+
+    assert len(ch2.df_history) == 1
+    assert "pulse" not in ch2.df_history[0].columns
+    assert "extra_col" in ch2.df_history[0].columns
+    # Current df keeps the pulse column
+    assert "pulse" in ch2.df.columns
+
+
+def test_concat_ch_merges_data_sources():
+    """concat_ch() must merge and deduplicate data_sources in insertion order."""
+    ch1 = dataclasses.replace(dummy_channel(), data_sources=["file_a.ljh"])
+    ch2 = dataclasses.replace(dummy_channel(), data_sources=["file_b.ljh"])
+    ch3 = dataclasses.replace(dummy_channel(), data_sources=["file_a.ljh", "file_c.ljh"])
+
+    combined = ch1.concat_ch(ch2)
+    assert combined.data_sources == ["file_a.ljh", "file_b.ljh"]
+    assert combined.npulses == ch1.npulses + ch2.npulses
+
+    # file_a.ljh appears in both — deduplicated, file_c.ljh appended
+    combined2 = ch1.concat_ch(ch3)
+    assert combined2.data_sources == ["file_a.ljh", "file_c.ljh"]
+
+
+def test_channel_combine_channels_tracks_data_sources():
+    """Channel.combine_channels() must collect data_sources from all constituents."""
+    ch1 = dataclasses.replace(dummy_channel(), data_sources=["file_a.ljh"])
+    ch2 = dataclasses.replace(dummy_channel(), data_sources=["file_b.ljh"])
+
+    combined = mass2.Channel.combine_channels("run", {"run1": ch1, "run2": ch2})
+    assert "file_a.ljh" in combined.data_sources
+    assert "file_b.ljh" in combined.data_sources
+
+
+def test_channels_combine_channels_intersection():
+    """Channels.combine_channels() must only keep channels present in ALL constituents."""
+    ch0 = dummy_channel(ch_num=0)
+    ch1 = dummy_channel(ch_num=1)
+    ch2 = dummy_channel(ch_num=2)
+
+    data_a = mass2.Channels({0: ch0, 1: ch1}, description="a")
+    data_b = mass2.Channels({1: ch1, 2: ch2}, description="b")
+
+    combined = mass2.Channels.combine_channels("run", {"a": data_a, "b": data_b})
+    # Channel 1 is the only one present in both
+    assert set(combined.channels.keys()) == {1}
+
+
+def test_concat_dfs_with_concat_state_categorical():
+    """concat_dfs_with_concat_state must preserve Categorical dtype through the concat."""
+    df1 = pl.DataFrame({
+        "source_file": pl.Series(["a.ljh", "a.ljh"], dtype=pl.Categorical),
+        "val": [1, 2],
+    })
+    df2 = pl.DataFrame({
+        "source_file": pl.Series(["b.ljh", "b.ljh"], dtype=pl.Categorical),
+        "val": [3, 4],
+    })
+
+    result = mass2.core.misc.concat_dfs_with_concat_state(df1, df2)
+
+    assert result.shape == (4, 3)  # source_file, val, concat_state
+    assert result["source_file"].dtype == pl.Categorical
+    assert result["source_file"].cast(pl.String).to_list() == ["a.ljh", "a.ljh", "b.ljh", "b.ljh"]
+
+
+def test_save_analysis_trim_pulse_false(tmpdir):
+    """save_analysis(trim_pulse=False) embeds pulse in the archive so it survives load without LJH files."""
+    ch = dummy_channel(ch_num=0).summarize_pulses()
+    original_pulse = np.array(ch.df["pulse"][0])
+    data = mass2.Channels({0: ch}, description="test")
+
+    savefile = pathlib.Path(tmpdir) / "embedded_pulse"
+    actual_savefile = savefile.with_suffix(".zip")
+    data.save_analysis(savefile, trim_pulse=False)
+
+    data2 = mass2.Channels.load_analysis(actual_savefile)
+    restored_ch = data2.channels[0]
+
+    assert "pulse" in restored_ch.df.columns
+    assert len(restored_ch.df) == len(ch.df)
+    assert np.allclose(np.array(restored_ch.df["pulse"][0]), original_pulse)
+
+
+def test_load_analysis_load_pulse_false(tmpdir):
+    """load_analysis(load_pulse=False) returns channels without pulse when the archive has none."""
+    ch = dummy_channel(ch_num=0).summarize_pulses()
+    data = mass2.Channels({0: ch}, description="test")
+
+    savefile = pathlib.Path(tmpdir) / "no_pulse"
+    actual_savefile = savefile.with_suffix(".zip")
+    data.save_analysis(savefile)  # default trim_pulse=True
+
+    data2 = mass2.Channels.load_analysis(actual_savefile, load_pulse=False)
+    restored_ch = data2.channels[0]
+
+    assert "pulse" not in restored_ch.df.columns
+    assert "pretrig_mean" in restored_ch.df.columns
+
+
+def test_channel_load_pulse_drop_pulse_ljh():
+    """Channel.load_pulse() reconstructs the pulse column from the source LJH file."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = str(p.pulse_folder / "20230626_run0001_chan4109.ljh")
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+
+    ch_full = mass2.Channel.from_ljh(pulse_path, noise_path)
+    assert "pulse" in ch_full.df.columns
+    assert "source_file" in ch_full.df.columns
+
+    ch_no_pulse = mass2.Channel.from_ljh(pulse_path, noise_path, load_pulses=False)
+    assert "pulse" not in ch_no_pulse.df.columns
+    assert "source_file" in ch_no_pulse.df.columns
+    assert "source_id" in ch_no_pulse.df.columns
+    assert ch_no_pulse.npulses == ch_full.npulses
+
+    ch_restored = ch_no_pulse.load_pulse()
+    assert "pulse" in ch_restored.df.columns
+    assert len(ch_restored.df) == len(ch_full.df)
+    assert np.allclose(ch_full.df["pulse"].to_numpy(), ch_restored.df["pulse"].to_numpy())
+
+
+def test_noise_channel_load_pulse_ljh():
+    """NoiseChannel.load_pulse() rehydrates pulse from the source LJH file."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+
+    noise_full = mass2.NoiseChannel.from_ljh(noise_path)
+    assert "pulse" in noise_full.df.columns
+
+    noise_no_pulse = mass2.NoiseChannel.from_ljh(noise_path, load_pulses=False)
+    assert "pulse" not in noise_no_pulse.df.columns
+    assert "source_file" in noise_no_pulse.df.columns
+    assert len(noise_no_pulse.df) == len(noise_full.df)
+
+    noise_restored = noise_no_pulse.load_pulse()
+    assert "pulse" in noise_restored.df.columns
+    assert len(noise_restored.df) == len(noise_full.df)
+
+
+def test_requires_pulse_transparent():
+    """@requires_pulse lets decorated methods give identical results with or without a pre-loaded pulse."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = str(p.pulse_folder / "20230626_run0001_chan4109.ljh")
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+
+    ch_with = mass2.Channel.from_ljh(pulse_path, noise_path)
+    # drop_pulse preserves source_file/source_id so load_pulse() can rehydrate
+    ch_without = ch_with.drop_pulse()
+    assert "pulse" not in ch_without.df.columns
+
+    # summarize_pulses returns a Channel — decorator drops pulse when it was absent
+    ch_sum_with = ch_with.summarize_pulses()
+    ch_sum_without = ch_without.summarize_pulses()
+
+    assert "pulse" not in ch_sum_without.df.columns
+    for col in ("pretrig_mean", "pretrig_rms", "pulse_rms", "postpeak_deriv"):
+        assert col in ch_sum_with.df.columns
+        assert col in ch_sum_without.df.columns
+        assert np.allclose(
+            ch_sum_with.df[col].to_numpy(),
+            ch_sum_without.df[col].to_numpy(),
+        )
+
+    # compute_average_pulse returns NDArray — pulse is NOT stripped from the return value
+    avg_with = ch_with.compute_average_pulse()
+    avg_without = ch_without.compute_average_pulse()
+    assert isinstance(avg_with, np.ndarray)
+    assert isinstance(avg_without, np.ndarray)
+    assert np.allclose(avg_with, avg_without)
+
+
+def test_ipc_cache_generation(tmp_path):
+    """from_ljh(generate_cache=True) writes .ipc files; use_cache=True reads back identical data."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    src = p.pulse_folder / "20230626_run0001_chan4109.ljh"
+    dst = tmp_path / src.name
+    shutil.copy(src, dst)
+
+    ch_ref = mass2.Channel.from_ljh(str(dst), use_cache=False, generate_cache=True)
+    ipc_path = dst.with_suffix(".ipc")
+    header_ipc_path = dst.with_suffix(".header.ipc")
+    assert ipc_path.exists()
+    assert header_ipc_path.exists()
+
+    ch_cached = mass2.Channel.from_ljh(str(dst), use_cache=True, generate_cache=False)
+    assert "pulse" in ch_cached.df.columns
+    assert len(ch_cached.df) == len(ch_ref.df)
+    assert np.allclose(ch_cached.df["pulse"].to_numpy(), ch_ref.df["pulse"].to_numpy())
+
+
+def test_ipc_cache_load_pulses_false(tmp_path):
+    """from_ljh with use_cache=True and load_pulses=False reads from cache but drops pulse."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    src = p.pulse_folder / "20230626_run0001_chan4109.ljh"
+    dst = tmp_path / src.name
+    shutil.copy(src, dst)
+
+    ch_full = mass2.Channel.from_ljh(str(dst), use_cache=False, generate_cache=True)
+
+    ch_no_pulse = mass2.Channel.from_ljh(str(dst), use_cache=True, load_pulses=False)
+    assert "pulse" not in ch_no_pulse.df.columns
+    assert "source_file" in ch_no_pulse.df.columns
+    assert ch_no_pulse.npulses == ch_full.npulses
+
+
+def test_ipc_cache_corrupted_falls_back(tmp_path):
+    """from_ljh falls back to raw LJH and returns correct data when the cache is corrupt."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    src = p.pulse_folder / "20230626_run0001_chan4109.ljh"
+    dst = tmp_path / src.name
+    shutil.copy(src, dst)
+    ch_ref = mass2.Channel.from_ljh(str(dst), use_cache=False)
+
+    ipc_path = dst.with_suffix(".ipc")
+    header_ipc_path = dst.with_suffix(".header.ipc")
+
+    # Write corrupt .ipc files (wrong schema — ChannelHeader construction will fail)
+    pl.DataFrame({"corrupt_col": [1]}).write_ipc(ipc_path)
+    pl.DataFrame({"corrupt_col": [1]}).write_ipc(header_ipc_path)
+    # Make cache appear newer than source so use_cache tries to read it
+    new_mtime = dst.stat().st_mtime + 10
+    os.utime(ipc_path, (new_mtime, new_mtime))
+    os.utime(header_ipc_path, (new_mtime, new_mtime))
+
+    ch = mass2.Channel.from_ljh(str(dst), use_cache=True)
+    assert len(ch.df) == len(ch_ref.df)
+    assert "pulse" in ch.df.columns
+
+
+def test_iter_pulse_batches():
+    """iter_pulse_batches() covers all pulses in order, each batch having pulse loaded."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = str(p.pulse_folder / "20230626_run0001_chan4109.ljh")
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+    ch = mass2.Channel.from_ljh(pulse_path, noise_path, load_pulses=False)
+    chunk_size = 2000
+
+    batches = list(ch.iter_pulse_batches(chunk_size=chunk_size))
+    assert len(batches) > 1
+    for batch in batches:
+        assert "pulse" in batch.df.columns
+        assert len(batch.df) <= chunk_size
+    assert sum(len(b.df) for b in batches) == ch.npulses
+
+
+def test_channels_map_auto_load_pulse():
+    """map(auto_load_pulse=True) retries a failed function with pulse, then drops pulse from result."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = str(p.pulse_folder / "20230626_run0001_chan4109.ljh")
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+
+    ch = mass2.Channel.from_ljh(pulse_path, noise_path, load_pulses=False)
+    data = mass2.Channels({4109: ch}, description="test")
+
+    def needs_pulse_directly(ch):
+        # Accesses pulse column directly — raises ColumnNotFoundError if absent
+        arr = np.vstack(ch.df["pulse"].to_list())
+        return ch.with_columns(peak_val=arr.max(axis=1))
+
+    # auto_load_pulse=True: retried with pulse loaded, result has pulse dropped
+    data_ok = data.map(needs_pulse_directly, auto_load_pulse=True)
+    assert "peak_val" in data_ok.channels[4109].df.columns
+    assert "pulse" not in data_ok.channels[4109].df.columns
+
+    # auto_load_pulse=False: function fails, channel ends up in bad_channels
+    data_bad = data.map(needs_pulse_directly, auto_load_pulse=False, allow_throw=False)
+    assert 4109 in data_bad.bad_channels
+
+
+def test_channels_map_batched():
+    """map(batched=True) processes a pulse-less channel in chunks and recombines correctly."""
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = str(p.pulse_folder / "20230626_run0001_chan4109.ljh")
+    noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
+
+    # Reference: normal processing with pulse present
+    ch_ref = mass2.Channel.from_ljh(pulse_path, noise_path).summarize_pulses()
+
+    # Batched: pulse-less channel — default chunk_size covers all pulses in one batch
+    ch_no_pulse = mass2.Channel.from_ljh(pulse_path, noise_path, load_pulses=False)
+    data = mass2.Channels({4109: ch_no_pulse}, description="test")
+    data_batched = data.map(lambda ch: ch.summarize_pulses(), batched=True)
+    ch_batched = data_batched.channels[4109]
+
+    assert len(ch_batched.df) == len(ch_ref.df)
+    assert "pretrig_mean" in ch_batched.df.columns
+    assert "pulse" not in ch_batched.df.columns
+    assert np.allclose(
+        ch_ref.df["pretrig_mean"].to_numpy(),
+        ch_batched.df["pretrig_mean"].to_numpy(),
+    )

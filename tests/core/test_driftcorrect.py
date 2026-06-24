@@ -21,7 +21,8 @@ def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
 def test_time_drift_correct():
     def _do_steps(ch: mass2.Channel) -> mass2.Channel:
         return (
-            ch.summarize_pulses()
+            ch
+            .summarize_pulses()
             .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
             .filter5lag(f_3db=10000)
             .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=pl.lit(True))
