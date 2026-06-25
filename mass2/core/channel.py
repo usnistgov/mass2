@@ -929,11 +929,16 @@ class Channel:
         return int(np.median(raw.argmax(axis=1)))
 
     @requires_pulse
-    def summarize_pulses(self, col: str = "pulse", pretrigger_ignore_samples: int = 0, peak_index: int | None = None) -> "Channel":
+    def summarize_pulses(
+        self, col: str = "pulse", pretrigger_ignore_samples: int = 0, peak_index: int | None = None, full_summary: bool = False
+    ) -> "Channel":
         """Summarize the pulses, adding columns for pulse height, pretrigger mean, etc."""
         if peak_index is None:
             peak_index = self.typical_peak_ind(col)
-        out_names = mass2.core.pulse_algorithms.result_dtype.names
+        if full_summary:
+            out_names = mass2.core.pulse_algorithms.result_full_dtype.names
+        else:
+            out_names = mass2.core.pulse_algorithms.result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
         outputs = list(out_names)
@@ -948,6 +953,7 @@ class Channel:
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
+            mode="full" if full_summary else "basic",
         )
         return self.with_step(step)
 

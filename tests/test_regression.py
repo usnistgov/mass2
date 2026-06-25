@@ -49,7 +49,9 @@ def store_analysis_regression():
     data = data.map(all_steps)
     frames = []
     for ch_num, ch in data.channels.items():
-        df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False).with_columns(ch_num=pl.lit(ch_num))
+        df = ch.df.drop("pulse", "timestamp", "subframecount", "source_file", "source_id", strict=False).with_columns(
+            ch_num=pl.lit(ch_num)
+        )
         frames.append(df)
     df = pl.concat(frames)
     df.write_parquet("regression_test_data.parquet")

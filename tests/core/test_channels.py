@@ -945,6 +945,7 @@ def test_channels_map_auto_load_pulse():
     noise_path = str(p.noise_folder / "20230626_run0000_chan4109.ljh")
     ch = mass2.Channel.from_ljh(pulse_path, noise_path, load_pulses=False)
     data = mass2.Channels({4109: ch}, description="test")
+
     def needs_pulse_directly(ch):
         arr = np.vstack(ch.df["pulse"].to_list())
         return ch.with_columns(peak_val=arr.max(axis=1))

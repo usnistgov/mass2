@@ -4,7 +4,7 @@ Define RecipeStep and Recipe classes for processing pulse data in a sequence of 
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, Literal, overload
 from collections.abc import Iterable, Callable, Sequence
 import polars as pl
 import numpy as np
@@ -90,27 +90,88 @@ class SummarizeStep(RecipeStep):
     pretrigger_ignore_samples: int
     n_presamples: int
     transform_raw: Callable | None = None
+    mode: Literal["basic", "full"] = "basic"
+    derive: bool = False
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
         summaries = []
+        n_samples = 0
         for df_iter in df.select(self.inputs).iter_slices():
             raw = df_iter[self.pulse_col].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
+            n_samples = raw.shape[-1]
 
-            s = pl.from_numpy(
-                pulse_algorithms.summarize_data_numba(
+            if self.mode == "basic":
+                res_array = pulse_algorithms.summarize_data_numba(
                     raw,
                     self.frametime_s,
                     peak_samplenumber=self.peak_index,
                     pretrigger_ignore_samples=self.pretrigger_ignore_samples,
                     nPresamples=self.n_presamples,
                 )
-            )
-            summaries.append(s)
+            elif self.mode == "full":
+                res_array = pulse_algorithms.summarize_data_numba_full(
+                    raw,
+                    self.frametime_s,
+                    peak_samplenumber=self.peak_index,
+                    pretrigger_ignore_samples=self.pretrigger_ignore_samples,
+                    nPresamples=self.n_presamples,
+                )
+            else:
+                raise ValueError(f"Unknown mode: {self.mode}")
+
+            summaries.append(pl.from_numpy(res_array))
+
+        if not summaries:
+            return df
 
         df2 = pl.concat(summaries).with_columns(df)
+
+        if self.derive:
+            cols = set(df2.columns)
+            derived = []
+
+            # fraction of the total pulse integral contained in the tail region
+            if "tail_area" in cols and "pulse_area" in cols and "tail_fraction" not in cols:
+                derived.append((pl.col("tail_area") / pl.col("pulse_area")).alias("tail_fraction"))
+
+            # number of samples per decay timescale; higher = faster decay relative to trace length
+            if "decay_timescale" in cols and "peak_norm" not in cols and n_samples > 0:
+                derived.append((pl.lit(n_samples) / pl.col("decay_timescale")).alias("peak_norm"))
+
+            # amplitude SNR: max upward or downward excursion from baseline, in units of pretrig noise;
+            # uses max_horizontal so it gives a meaningful value for both positive and negative pulses
+            if (
+                "peak_value" in cols
+                and "pretrig_mean" in cols
+                and "min_value" in cols
+                and "pretrig_rms" in cols
+                and "pulse_fom" not in cols
+            ):
+                below_baseline = pl.col("pretrig_mean") - pl.col("min_value").cast(pl.Float32)
+                derived.append(
+                    (pl.max_horizontal(pl.col("peak_value").cast(pl.Float32), below_baseline) / pl.col("pretrig_rms")).alias(
+                        "pulse_fom"
+                    )
+                )
+
+            # tail mean offset from baseline in units of pretrigger noise; near 0 for a fully decayed pulse
+            if "tail_average" in cols and "pretrig_rms" in cols and "tail_sigma" not in cols:
+                derived.append((pl.col("tail_average") / pl.col("pretrig_rms")).alias("tail_sigma"))
+
+            # ratio of rise time to fall time; < 1 for pulses with fast rise and slow decay
+            if "rise_time" in cols and "fall_time" in cols and "rise_fall_ratio" not in cols:
+                derived.append((pl.col("rise_time") / pl.col("fall_time")).alias("rise_fall_ratio"))
+
+            # total baseline drift over the pretrigger window (pretrig_slope × n_presamples, in ADC counts)
+            if "pretrig_slope" in cols and "pretrig_drift" not in cols:
+                derived.append((pl.col("pretrig_slope") * self.n_presamples).alias("pretrig_drift"))
+
+            if derived:
+                df2 = df2.with_columns(derived)
+
         return df2
 
 
