@@ -4,6 +4,7 @@ Data structures and methods for handling a group of microcalorimeter channels.
 
 from dataclasses import dataclass, field
 import dataclasses
+from functools import cache
 from collections.abc import Callable, Iterable
 from numpy.typing import ArrayLike
 from typing import Any
@@ -11,7 +12,6 @@ import polars as pl
 import pylab as plt
 import matplotlib
 import numpy as np
-import functools
 import joblib
 import traceback
 import lmfit
@@ -66,7 +66,7 @@ class Channels:
         descr = self.description + more.description + "\nWarning! created by with_more_channels()"
         return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
 
-    @functools.cache
+    @cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
         """Return a DataFrame containing good pulses from each channel. Excludes the given columns (default "pulse")."""
         # return a dataframe containing good pulses from each channel,
@@ -346,19 +346,70 @@ class Channels:
         plt.title("Noise autocorrelation")
         plot_zoomable()
 
-    def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
-        """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
+    @staticmethod
+    def _apply_batched(f: Callable, channel: "Channel") -> "Channel":
+        processed_batches = []
+        for batch_chan in channel.iter_pulse_batches():
+            res_batch = f(batch_chan)
+            if not isinstance(res_batch, Channel):
+                raise TypeError(f"map(batched=True) requires f() to return a Channel, got {type(res_batch).__name__}")
+            processed_batches.append(res_batch.drop_pulse())
+        if not processed_batches:
+            return channel
+        combined_df = pl.concat([batch.df for batch in processed_batches])
+        template = processed_batches[0]
+        n_history = len(template.df_history)
+        if n_history > 0 and all(len(b.df_history) == n_history for b in processed_batches):
+            combined_history = [pl.concat([b.df_history[i] for b in processed_batches]) for i in range(n_history)]
+        else:
+            combined_history = []
+        return dataclasses.replace(template, df=combined_df, df_history=combined_history, npulses=len(combined_df))
+
+    def map(self, f: Callable, allow_throw: bool = False, auto_load_pulse: bool = True, batched: bool = False) -> "Channels":
+        """Map function `f` over all channels, returning a new Channels object containing the results.
+
+        Parameters
+        ----------
+        f : Callable
+            A function that takes a Channel and returns a Channel.
+        allow_throw : bool, optional
+            If True, re-raise the first exception rather than collecting failures in bad_channels, by default False.
+        auto_load_pulse : bool, optional
+            If True and a channel lacks the 'pulse' column, automatically load pulse and retry on
+            ColumnNotFoundError / KeyError before marking the channel bad, by default True.
+        batched : bool, optional
+            If True and a channel lacks the 'pulse' column, iterate over the channel in
+            memory-efficient batches via iter_pulse_batches() rather than calling f(channel) once.
+            f() must return a Channel. Ignored when the channel already has pulse loaded, by default False.
+        """
         new_channels = {}
         new_bad_channels = {}
         for key, channel in self.channels.items():
             try:
+                if batched and "pulse" not in channel.df.columns:
+                    new_channels[key] = Channels._apply_batched(f, channel)
+                    continue
                 new_channels[key] = f(channel)
             except KeyboardInterrupt as kint:
                 raise kint
             except Exception as ex:
+                backtrace: str = traceback.format_exc()
+                if (
+                    auto_load_pulse
+                    and not batched
+                    and "pulse" not in channel.df.columns
+                    and isinstance(ex, (pl.exceptions.ColumnNotFoundError, KeyError))
+                ):
+                    try:
+                        temp_chan = channel.load_pulse()
+                        res_chan = f(temp_chan)
+                        new_channels[key] = res_chan.drop_pulse() if isinstance(res_chan, Channel) else res_chan
+                        continue
+                    except Exception as fallback_ex:
+                        ex = fallback_ex
+                        backtrace = traceback.format_exc()
                 error_type: type = type(ex)
                 error_message: str = str(ex)
-                backtrace: str = traceback.format_exc()
                 if allow_throw:
                     raise
                 print(f"{key=} {channel=} failed the step {f}")
@@ -368,6 +419,20 @@ class Channels:
         new_bad_channels = mass2.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
 
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
+
+    def drop_pulse(self) -> "Channels":
+        """Return a new Channels with the heavy 'pulse' column dropped from every channel and its noise."""
+        return dataclasses.replace(
+            self,
+            channels={k: ch.drop_pulse() for k, ch in self.channels.items()},
+        )
+
+    def load_pulse(self, use_cache: bool = True, generate_cache: bool = False) -> "Channels":
+        """Return a new Channels with the 'pulse' column rehydrated in every channel from its source LJH/IPC files."""
+        return dataclasses.replace(
+            self,
+            channels={k: ch.load_pulse(use_cache, generate_cache) for k, ch in self.channels.items()},
+        )
 
     def set_bad(self, ch_num: int, msg: str, require_ch_num_exists: bool = True) -> "Channels":
         """Return a copy of this Channels object with the given channel number marked as bad."""
@@ -406,7 +471,14 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
+    def from_ljh_path_pairs(
+        cls,
+        pulse_noise_pairs: Iterable[tuple[str, str]],
+        description: str,
+        use_cache: bool = True,
+        generate_cache: bool = False,
+        load_pulses: bool = True,
+    ) -> "Channels":
         """
         Create a :class:`Channels` instance from pairs of LJH files.
 
@@ -416,6 +488,14 @@ class Channels:
                 the file path to a pulse LJH file and its corresponding noise LJH file.
             description (str):
                 A human-readable description for the resulting Channels object.
+            use_cache : bool, optional
+                Load from an existing `.ipc` cache file next to the LJH if one is present and up to date,
+                by default True.
+            generate_cache : bool, optional
+                Write a `.ipc` cache file next to the LJH after reading, by default False.
+            load_pulses : bool, optional
+                Whether to load the heavy pulse array for each channel. Set to False for lazy loading,
+                by default True.
 
         Returns:
             Channels:
@@ -441,7 +521,9 @@ class Channels:
         """
         channels: dict[int, Channel] = {}
         for pulse_path, noise_path in pulse_noise_pairs:
-            channel = Channel.from_ljh(pulse_path, noise_path)
+            channel = Channel.from_ljh(
+                pulse_path, noise_path, use_cache=use_cache, generate_cache=generate_cache, load_pulses=load_pulses
+            )
             assert channel.header.ch_num not in channels.keys()
             channels[channel.header.ch_num] = channel
         return cls(channels, description)
@@ -463,8 +545,32 @@ class Channels:
         limit: int | None = None,
         exclude_ch_nums: list[int] | None = None,
         include_ch_nums: list[int] | None = None,
+        use_cache: bool = True,
+        generate_cache: bool = False,
+        load_pulses: bool = True,
     ) -> "Channels":
-        """Create an instance from a directory of LJH files."""
+        """Create an instance from a directory of LJH files.
+
+        Parameters
+        ----------
+        pulse_folder : str | Path
+            Directory containing the pulse LJH files.
+        noise_folder : str | Path | None, optional
+            Directory containing the noise LJH files. If None, channels are loaded without noise, by default None.
+        limit : int | None, optional
+            Maximum number of channel pairs to load, by default None (load all).
+        exclude_ch_nums : list[int] | None, optional
+            Channel numbers to skip, by default None.
+        include_ch_nums : list[int] | None, optional
+            If given, only load these channel numbers, by default None (load all).
+        use_cache : bool, optional
+            Load from an existing `.ipc` cache file next to the LJH if one is present and up to date,
+            by default True.
+        generate_cache : bool, optional
+            Write a `.ipc` cache file next to the LJH after reading, by default False.
+        load_pulses : bool, optional
+            Whether to load the heavy pulse array. Set to False for lazy loading, by default True.
+        """
         assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
         pulse_folder = str(pulse_folder)
         if exclude_ch_nums is None:
@@ -483,7 +589,7 @@ class Channels:
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"{description}")
         print(f"   from_ljh_folder has {len(pairs)} pairs")
-        data = cls.from_ljh_path_pairs(pairs, description)
+        data = cls.from_ljh_path_pairs(pairs, description, use_cache=use_cache, generate_cache=generate_cache, load_pulses=load_pulses)
         print(f"   and the Channels obj has {len(data.channels)} pairs")
         return data
 
@@ -680,7 +786,11 @@ class Channels:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
             combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
-            new_ch = ch.with_replacement_df(combined_df)
+            my_sources = getattr(ch, "data_sources", [str(ch.header.data_source)])
+            other_sources = getattr(other_ch, "data_sources", [str(other_ch.header.data_source)])
+            combined_sources = list(dict.fromkeys(my_sources + other_sources))
+            combined_npulses = len(combined_df)
+            new_ch = dataclasses.replace(ch, df=combined_df, data_sources=combined_sources, npulses=combined_npulses)
             new_channels[ch_num] = new_ch
         return mass2.Channels(new_channels, self.description + other_data.description)
 
@@ -712,7 +822,10 @@ class Channels:
         """
         base = next(iter(constituents.values()))
         chdict: dict[int, mass2.Channel] = {}
-        for chnum in base.channels.keys():
+        common_chnums = set(base.channels.keys())
+        for v in constituents.values():
+            common_chnums.intersection_update(v.channels.keys())
+        for chnum in common_chnums:
             d = {k: v.channels[chnum] for (k, v) in constituents.items()}
             chdict[chnum] = mass2.Channel.combine_channels(sourcename=sourcename, constituents=d)
         return Channels(chdict, base.description)
@@ -748,21 +861,31 @@ class Channels:
         return Channels(channels, description)
 
     def save_analysis(
-        self, zip_path: Path | str, overwrite: bool = False, trim_debug: bool = False, trim_timestamp_and_subframecount: bool = False
+        self,
+        zip_path: Path | str,
+        overwrite: bool = False,
+        trim_debug: bool = False,
+        trim_timestamp_and_subframecount: bool = False,
+        trim_pulse: bool = True,
     ) -> None:
-        """Save an analysis-in-progress completely to a zip file, only tested for ljh backed channels so far
+        """Save an analysis-in-progress completely to a zip file.
 
         Parameters
         ----------
-        path : Path | str
-            Directory to save work in. If it doesn't exist, its parent should.
+        zip_path : Path | str
+            Path to the output zip file. A `.zip` extension is added automatically if absent.
         overwrite : bool, optional
-            If `path` exists, whether to overwrite it, by default False
+            Whether to overwrite an existing file, by default False.
         trim_debug : bool, optional
-            Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
-        trim_timestamp_and_subframecount: bool, optional
-            Whether to make the save file smaller at the cost of reduced information avaialble when the ljh files are
-            not available, eg when loading on another computer.
+            Drop debug-only data from each step to reduce file size, at the cost of breaking some
+            debugging plots, by default False.
+        trim_timestamp_and_subframecount : bool, optional
+            Drop the timestamp and subframecount columns from the saved parquet, by default False.
+            Reduces file size but those columns cannot be recovered on load if the original LJH files
+            are unavailable.
+        trim_pulse : bool, optional
+            Drop the pulse column from the saved parquet, by default True. Set to False to embed
+            pulse data in the archive so the analysis can be loaded without the original LJH files.
         """
         zip_path = pathlib.Path(zip_path)
         if zip_path.suffix != ".zip":
@@ -790,10 +913,11 @@ class Channels:
                 A copy of `ch` amenable to pickling with the dataframe and dataframe history removed and with trimmed steps.
             """
             # Don't store the memmapped LJH pulse info (if present) in the Parquet file
+            df = ch.df
             if trim_timestamp_and_subframecount:
-                df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
-            else:
-                df = ch.df.drop("pulse", strict=False)
+                df = df.drop("timestamp", "subframecount", strict=False)
+            if trim_pulse:
+                df = df.drop("pulse", strict=False)
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
@@ -801,7 +925,8 @@ class Channels:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
-            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            safe_noise = (ch.noise if not trim_pulse else ch.noise.drop_pulse()) if ch.noise else None
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=safe_noise, steps=steps)
 
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
@@ -818,43 +943,52 @@ class Channels:
             zf.writestr(pickle_file, dill.dumps(data))
 
     @staticmethod
-    def load_analysis(path: Path | str) -> "Channels":
+    def load_analysis(path: Path | str, load_pulse: bool = True) -> "Channels":
         """Load an analysis-in-progress from a zipfile
 
         Parameters
         ----------
         path : Path | str
             Zipfile that work was saved in.
+        load_pulse : bool, optional
+            Whether to rehydrate the 'pulse' column from raw LJH/OFF files where possible, by default True.
+            Note: only the pulse column is restored from LJH; archives saved with
+            ``trim_timestamp_and_subframecount=True`` will remain without those columns after loading.
         """
         path = pathlib.Path(path)
         path.exists() and path.is_file()
 
         def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file
-
             Parameters
             ----------
             ch : Channel
                 A channel, loaded from a pickle file, with an empty dataframe
             df : DataFrame
                 A replacement dataframe for the existing one (typically, the existing one is empty)
-
             Returns
             -------
             Channel
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
-            # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-            if ch.header.data_source is not None:
-                ljh_path = ch.header.data_source
-                if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                    ljh_backed_chan = Channel.from_ljh(ljh_path)
-                    df = df.with_columns(ljh_backed_chan.df)
             # df_history is needed for some debug plots to work. This version has strictly more columns than required
             # at each history point. TODO: We could use the steps inputs and outputs to trim the appropriate columns.
             # For getting started, though, it's easier just to let each dataframe in history equal the final dataframe.
-            df_history = [df] * len(ch.steps)
-            return dataclasses.replace(ch, df=df, df_history=df_history)
+            clean_df = df.drop("pulse", strict=False)
+            df_history = [clean_df] * len(ch.steps)
+            if "pulse" in df.columns:
+                # Pulse was explicitly embedded in the archive (trim_pulse=False at save time);
+                # use it directly so the analysis works without the original LJH files.
+                ch = dataclasses.replace(ch, df=df, df_history=df_history)
+            else:
+                ch = dataclasses.replace(ch, df=clean_df, df_history=df_history)
+                if load_pulse:
+                    # Backward compat: archives saved before data_sources was added have
+                    # data_sources=[] but the LJH path is still in header.data_source.
+                    if not ch.data_sources and ch.header.data_source is not None:
+                        ch = dataclasses.replace(ch, data_sources=[str(ch.header.data_source)])
+                    ch = ch.load_pulse()
+            return ch
 
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"

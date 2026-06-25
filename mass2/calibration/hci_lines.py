@@ -11,6 +11,7 @@ Paul Szypryt
 """
 
 import importlib.resources as pkg_resources
+from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike
 import pickle
@@ -70,6 +71,31 @@ class NIST_ASD:
 
         return list(self.NIST_ASD_Dict[element].keys())
 
+    def _get_level_entry(
+        self,
+        iLevel: str,
+        element: str,
+        spectralCharge: int,
+        units: str,
+        getUncertainty: bool,
+        requiredConf: str | None,
+        requiredTerm: str | None,
+        requiredJVal: str | None,
+    ) -> Any | None:
+        """Parse iLevel string and return its value if it matches all filters, else None. Raises ValueError if unparseable."""
+        conf, term, j_str = iLevel.split()
+        JVal = j_str.split("=")[1]
+        if not (
+            (requiredConf is None or conf == requiredConf)
+            and (requiredTerm is None or term == requiredTerm)
+            and (requiredJVal is None or JVal == requiredJVal)
+        ):
+            return None
+        data = self.NIST_ASD_Dict[element][spectralCharge][iLevel]
+        if units == "cm-1":
+            return data if getUncertainty else data[0]
+        return [v * INVCM_TO_EV for v in data] if getUncertainty else INVCM_TO_EV * data[0]
+
     def getAvailableLevels(
         self,
         element: str,
@@ -114,37 +140,18 @@ class NIST_ASD:
         levelsDict: dict = {}
         numLevels = 0
         for iLevel in list(self.NIST_ASD_Dict[element][spectralCharge].keys()):
+            if maxLevels is not None and numLevels == maxLevels:
+                return levelsDict
             try:
-                # Check to see if we reached maximum number of levels to return
-                if maxLevels is not None:
-                    if numLevels == maxLevels:
-                        return levelsDict
-                # If required, check to see if level matches search conf, term, JVal
-                includeTerm = False
-                includeJVal = False
-                conf, term, j_str = iLevel.split()
-                JVal = j_str.split("=")[1]
-                includeConf = (requiredConf is None) or conf == requiredConf
-                includeTerm = (requiredTerm is None) or term == requiredTerm
-                includeJVal = (requiredJVal is None) or JVal == requiredJVal
-
-                # Include levels that match, in either cm-1 or eV
-                if includeConf and includeTerm and includeJVal:
-                    numLevels += 1
-                    if units == "cm-1":
-                        if getUncertainty:
-                            levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel]
-                        else:
-                            levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
-                    elif units == "eV":
-                        if getUncertainty:
-                            levelsDict[iLevel] = [
-                                iValue * INVCM_TO_EV for iValue in self.NIST_ASD_Dict[element][spectralCharge][iLevel]
-                            ]
-                        else:
-                            levelsDict[iLevel] = INVCM_TO_EV * self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
+                value = self._get_level_entry(
+                    iLevel, element, spectralCharge, units, getUncertainty, requiredConf, requiredTerm, requiredJVal
+                )
             except ValueError:
                 f"Warning: cannot parse level: {iLevel}"
+                continue
+            if value is not None:
+                levelsDict[iLevel] = value
+                numLevels += 1
         return levelsDict
 
     def getSingleLevel(

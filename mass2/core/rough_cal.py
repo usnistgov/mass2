@@ -56,7 +56,8 @@ def rank_3peak_assignments(
     df1 = df1.filter((pl.col("e0") < pl.col("e1")).and_(pl.col("ph0") < pl.col("ph1")))
     # 2) the gain slope must be negative
     df1 = (
-        df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
+        df1
+        .with_columns(gain1=pl.col("ph1") / pl.col("e1"))
         .with_columns(gain_slope=(pl.col("gain1") - pl.col("gain0")) / (pl.col("ph1") - pl.col("ph0")))
         .filter(pl.col("gain_slope") < 0)
     )

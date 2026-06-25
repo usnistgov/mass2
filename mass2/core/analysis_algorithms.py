@@ -28,6 +28,31 @@ LOG = logging.getLogger("mass")
 
 
 @njit
+def _estimate_rise_time_inner(
+    pulse_data: NDArray,
+    nPretrig: int,
+    idx_last_pk: int,
+    baseline_value: NDArray,
+    value_at_peak: NDArray,
+    timebase: float,
+    npulses: int,
+) -> NDArray:
+    MINTHRESH, MAXTHRESH = 0.1, 0.9
+    rising_data = (pulse_data[:, nPretrig : idx_last_pk + 1] - baseline_value[:, np.newaxis]) / value_at_peak[:, np.newaxis]
+    last_idx = (rising_data > MAXTHRESH).argmax(axis=1) - 1
+    first_idx = (rising_data > MINTHRESH).argmax(axis=1)
+    last_idx[last_idx < first_idx] = first_idx[last_idx < first_idx] + 1
+    last_idx[last_idx == rising_data.shape[1]] = rising_data.shape[1] - 1
+    pulsenum = np.arange(npulses)
+    y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
+    y_diff[y_diff < timebase] = timebase
+    time_diff = timebase * (last_idx - first_idx)
+    rise_time = time_diff / y_diff
+    rise_time[y_diff <= 0] = -9.9e-6
+    return rise_time
+
+
+@njit
 def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> NDArray:
     """Computes the rise time of timeseries <pulse_data>, where the time steps are <timebase>.
     <pulse_data> can be a 2D array where each row is a different pulse record, in which case
@@ -49,8 +74,6 @@ def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> N
     Returns:
         An ndarray of dimension 1, giving the rise times.
     """
-    MINTHRESH, MAXTHRESH = 0.1, 0.9
-
     # If pulse_data is a 1D array, turn it into 2
     pulse_data = np.asarray(pulse_data)
     ndim = len(pulse_data.shape)
@@ -70,22 +93,7 @@ def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> N
 
     npulses = pulse_data.shape[0]
     try:
-        rising_data = (pulse_data[:, nPretrig : idx_last_pk + 1] - baseline_value[:, np.newaxis]) / value_at_peak[:, np.newaxis]
-        # Find the last and first indices at which the data are in (0.1, 0.9] times the
-        # peak value. Then make sure last is at least 1 past first.
-        last_idx = (rising_data > MAXTHRESH).argmax(axis=1) - 1
-        first_idx = (rising_data > MINTHRESH).argmax(axis=1)
-        last_idx[last_idx < first_idx] = first_idx[last_idx < first_idx] + 1
-        last_idx[last_idx == rising_data.shape[1]] = rising_data.shape[1] - 1
-
-        pulsenum = np.arange(npulses)
-        y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
-        y_diff[y_diff < timebase] = timebase
-        time_diff = timebase * (last_idx - first_idx)
-        rise_time = time_diff / y_diff
-        rise_time[y_diff <= 0] = -9.9e-6
-        return rise_time
-
+        return _estimate_rise_time_inner(pulse_data, nPretrig, idx_last_pk, baseline_value, value_at_peak, timebase, npulses)
     except ValueError:
         return -9.9e-6 + np.zeros(npulses, dtype=float)
 

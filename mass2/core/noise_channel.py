@@ -2,6 +2,8 @@
 Hold a class to represent a channel with noise data only, and to analyze its noise characteristics.
 """
 
+import dataclasses
+import warnings
 from typing import Any
 from numpy.typing import NDArray
 from pathlib import Path
@@ -118,9 +120,111 @@ class NoiseChannel:
         return False
 
     @classmethod
-    def from_ljh(cls, path: str | Path) -> "NoiseChannel":
+    def _load_from_ipc_cache(
+        cls,
+        data_ipc_path: Path,
+        header_ipc_path: Path,
+        path: "str | Path",
+        load_pulses: bool,
+    ) -> "NoiseChannel":
+        if load_pulses:
+            df = pl.read_ipc(data_ipc_path, memory_map=True)
+        else:
+            df = pl.scan_ipc(data_ipc_path).select(pl.exclude("pulse")).collect()
+        header_df = pl.read_ipc(header_ipc_path)
+        if "source_file" not in df.columns:
+            df = df.with_columns(
+                pl.lit(str(path)).alias("source_file").cast(pl.Categorical),
+                pl.int_range(0, len(df), dtype=pl.Int64).alias("source_id"),
+            )
+        elif "source_id" not in df.columns:
+            df = df.with_columns(pl.int_range(0, len(df), dtype=pl.Int64).alias("source_id"))
+        return cls(df, header_df, header_df["Timebase"][0])
+
+    @classmethod
+    def from_ljh(
+        cls,
+        path: str | Path,
+        keep_posix_usec: bool = False,
+        use_cache: bool = True,
+        generate_cache: bool = False,
+        load_pulses: bool = True,
+    ) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given LJH file path."""
+        path_obj = Path(path)
+        data_ipc_path = path_obj.with_suffix(".ipc")
+        header_ipc_path = path_obj.with_suffix(".header.ipc")
+        cache_exists = data_ipc_path.exists() and header_ipc_path.exists()
+        cache_is_valid = False
+        if cache_exists:
+            if path_obj.stat().st_mtime < data_ipc_path.stat().st_mtime:
+                cache_is_valid = True
+            else:
+                print(f"Cache for {path_obj.name} is out of date. Regenerating...")
+        if use_cache and cache_is_valid:
+            try:
+                return cls._load_from_ipc_cache(data_ipc_path, header_ipc_path, path, load_pulses)
+            except Exception as e:
+                print(f"Warning: Corrupted cache detected for {path_obj.name} ({e}). Falling back to raw LJH.")
         ljh = mass2.LJHFile.open(path)
-        df, header_df = ljh.to_polars()
-        noise_channel = cls(df, header_df, header_df["Timebase"][0])
-        return noise_channel
+        df, header_df = ljh.to_polars(keep_posix_usec)
+        if "source_file" not in df.columns:
+            df = df.with_columns(
+                pl.lit(str(path)).alias("source_file").cast(pl.Categorical),
+                pl.int_range(0, len(df), dtype=pl.Int64).alias("source_id"),
+            )
+        elif "source_id" not in df.columns:
+            df = df.with_columns(pl.int_range(0, len(df), dtype=pl.Int64).alias("source_id"))
+        if generate_cache:
+            print(f"Generating IPC cache for {path_obj.name}...")
+            tmp_data_path = Path(str(data_ipc_path) + ".tmp")
+            tmp_header_path = Path(str(header_ipc_path) + ".tmp")
+            df.write_ipc(tmp_data_path, compression="uncompressed")
+            header_df.write_ipc(tmp_header_path, compression="uncompressed")
+            tmp_data_path.replace(data_ipc_path)
+            tmp_header_path.replace(header_ipc_path)
+            if use_cache:
+                del df, header_df
+                if load_pulses:
+                    df = pl.read_ipc(data_ipc_path, memory_map=True)
+                else:
+                    df = pl.scan_ipc(data_ipc_path).select(pl.exclude("pulse")).collect()
+                header_df = pl.read_ipc(header_ipc_path)
+        if not load_pulses and "pulse" in df.columns:
+            df = df.drop("pulse", strict=False)
+        return cls(df, header_df, header_df["Timebase"][0])
+
+    def load_pulse(self, use_cache: bool = True, generate_cache: bool = False) -> "NoiseChannel":
+        """Rehydrate the noise pulse column lazily."""
+        if "pulse" in self.df.columns:
+            return self
+        src = None
+        if "source_file" in self.df.columns and len(self.df) > 0:
+            src = self.df["source_file"][0]
+        elif "Filename" in self.header_df.columns and len(self.header_df) > 0:
+            src = self.header_df["Filename"][0]
+        elif "filename" in self.header_df.columns and len(self.header_df) > 0:
+            src = self.header_df["filename"][0]
+        if src is not None and isinstance(src, str):
+            if src.endswith(".ljh") or src.endswith(".noi"):
+                temp_chan = self.__class__.from_ljh(src, use_cache=use_cache, generate_cache=generate_cache, load_pulses=True)
+                if "source_id" in self.df.columns:
+                    source_ids = self.df["source_id"].to_numpy()
+                    pulse_series = temp_chan.df["pulse"].gather(source_ids)
+                    return dataclasses.replace(self, df=self.df.with_columns(pulse_series))
+                if len(self.df) == len(temp_chan.df):
+                    return dataclasses.replace(self, df=self.df.with_columns(temp_chan.df["pulse"]))
+                warnings.warn(
+                    "NoiseChannel has different length than source file and no source_id; "
+                    "cannot splice pulse column. Returning self without pulse.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                return self
+        return self
+
+    def drop_pulse(self) -> "NoiseChannel":
+        """Drop the heavy pulse array from RAM."""
+        if "pulse" in self.df.columns:
+            return dataclasses.replace(self, df=self.df.drop("pulse", strict=False))
+        return self

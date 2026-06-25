@@ -32,7 +32,7 @@ def test_analysis_regression():
     expected_df = pl.read_parquet("tests/regression_test_data.parquet")
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
-        found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+        found = ch.df.drop("pulse", "timestamp", "subframecount", "source_file", "source_id", strict=False)
         assert np.allclose(expect, found)
 
 

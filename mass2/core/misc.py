@@ -186,16 +186,32 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
 def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state") -> pl.DataFrame:
     """Concatenate two DataFrames vertically, adding a column `concat_state` (or named according to `concat_state_col`)
     to indicate which DataFrame each row came from."""
-    if concat_state_col in df1.columns:
+
+    cat_cols = list(
+        dict.fromkeys(
+            [col for col, dtype in df1.schema.items() if dtype == pl.Categorical]
+            + [col for col, dtype in df2.schema.items() if dtype == pl.Categorical]
+        )
+    )
+    if cat_cols:
+        df1 = df1.with_columns([pl.col(c).cast(pl.String) for c in cat_cols if c in df1.columns])
+        df2 = df2.with_columns([pl.col(c).cast(pl.String) for c in cat_cols if c in df2.columns])
+
+    if concat_state_col in df1.columns and len(df1) > 0:
         # Continue incrementing from the last known concat_state
         max_state = df1[concat_state_col][-1]
         df2 = df2.with_columns(pl.lit(max_state + 1).alias(concat_state_col))
     else:
-        # Fresh concat: label first as 0, second as 1
-        df1 = df1.with_columns(pl.lit(0).alias(concat_state_col))
+        # Fresh concat (or df1 is empty): label first as 0, second as 1
+        if concat_state_col not in df1.columns:
+            df1 = df1.with_columns(pl.lit(0).alias(concat_state_col))
         df2 = df2.with_columns(pl.lit(1).alias(concat_state_col))
 
     df_out = pl.concat([df1, df2], how="vertical")
+
+    if cat_cols:
+        df_out = df_out.with_columns([pl.col(c).cast(pl.Categorical) for c in cat_cols])
+
     return df_out
 
 
