@@ -204,5 +204,7 @@ class MemReader(PulseMaker):
     def pulse(self, id: int, fieldname: str = "data") -> NDArray:
         return self.array[id]
 
-    def pulses(self, ids: slice | range | Iterable, fieldname: str = "data") -> NDArray:
+    def pulses(self, ids: slice | range | Iterable[int], fieldname: str = "data") -> NDArray:
+        if isinstance(ids, (range, Iterable)) and not isinstance(ids, slice):
+            ids = list(ids)
         return self.array[ids]
