@@ -3,6 +3,7 @@ Classes and functions for reading and handling LJH files.
 """
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Any
@@ -280,6 +281,21 @@ class LJHFile(ABC):
         """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
+
+    def read_traces(self, ids: slice | range | Iterable) -> NDArray:
+        """Return multiple pulse records from an LJH file.
+
+        Parameters
+        ----------
+        id : slice | range | Iterable
+            Pulse record numbers (0-indexed)
+
+        Returns
+        -------
+        NDArray
+            A view into the pulse record, or a copy.
+        """
+        return self.pulsereader.pulses(ids)
 
     def to_polars(
         self,
