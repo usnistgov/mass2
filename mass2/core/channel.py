@@ -895,7 +895,7 @@ class Channel:
         raw = self.load_raw(range(0, 100))
         return int(np.median(raw.argmax(axis=1)))
 
-    def load_raw(self, r: range | slice | None = None) -> NDArray:
+    def load_raw(self, r: range | slice | Iterable | None = None) -> NDArray:
         assert self.pulsereader is not None, "Cannot run `Channel.load_raw()` without a pulsereader function"
         if r is None:
             r = range(0, self.npulses)
@@ -975,7 +975,7 @@ class Channel:
         )
         return self.with_step(step)
 
-    def compute_average_pulse(self, pulse_col: str = "pulse", use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> NDArray:
+    def compute_average_pulse(self, use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> NDArray:
         """Compute an average pulse given a use expression.
 
         Parameters
@@ -992,23 +992,14 @@ class Channel:
         NDArray
             _description_
         """
-        avg_pulse = (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(pulse_col)
-            .limit(limit)
-            .collect()
-            .to_series()
-            .to_numpy()
-            .mean(axis=0)
-        )
+        ids_df = self.df.lazy().with_row_index("index").filter(self.good_expr).filter(use_expr).limit(limit).collect()
+        ids = ids_df["index"].to_numpy()
+        avg_pulse = self.load_raw(ids).mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
     def filter5lag(  # noqa: PLR0917
         self,
-        pulse_col: str = "pulse",
         peak_y_col: str = "5lagy",
         peak_x_col: str = "5lagx",
         f_3db: float = 25e3,
@@ -1023,8 +1014,6 @@ class Channel:
 
         Parameters
         ----------
-        pulse_col : str, optional
-            Which column contains raw data, by default "pulse"
         peak_y_col : str, optional
             Column to contain the optimal filter results, by default "5lagy"
         peak_x_col : str, optional
@@ -1067,7 +1056,7 @@ class Channel:
             Nac = len(noiseresult.autocorr_vec)
             assert n_samples_5lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_5lag}; {suggest}"
 
-        avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
+        avg_pulse = self.compute_average_pulse(use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             n_pretrigger=self.n_presamples,
@@ -1089,20 +1078,19 @@ class Channel:
             ets = time_constant_s_of_exp_to_be_orthogonal_to
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
             filter=filter5lag,
             spectrum=noiseresult,
             filter_maker=filter_maker,
-            transform_raw=self.transform_raw,
+            load_raw=self.load_raw,
         )
         return self.with_step(step)
 
     def filter1lag(  # noqa: PLR0917
         self,
-        pulse_col: str = "pulse",
         peak_y_col: str = "1lagy",
         peak_x_col: str = "1lagx",
         f_3db: float = 25e3,
@@ -1116,8 +1104,6 @@ class Channel:
 
         Parameters
         ----------
-        pulse_col : str, optional
-            Which column contains raw data, by default "pulse"
         peak_y_col : str, optional
             Column to contain the optimal filter results, by default "1lagy"
         peak_x_col : str, optional
@@ -1158,7 +1144,7 @@ class Channel:
             Nac = len(noiseresult.autocorr_vec)
             assert n_samples_1lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_1lag}; {suggest}"
 
-        avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
+        avg_pulse = self.compute_average_pulse(use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             n_pretrigger=self.n_presamples,
@@ -1172,25 +1158,23 @@ class Channel:
         else:
             filter1lag = filter_maker.compute_1lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
             filter=filter1lag,
             spectrum=noiseresult,
             filter_maker=filter_maker,
-            transform_raw=self.transform_raw,
+            load_raw=self.load_raw,
         )
         return self.with_step(step)
 
-    def compute_ats_model(self, pulse_col: str, use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> tuple[NDArray, NDArray]:
+    def compute_ats_model(self, use_expr: pl.Expr = pl.lit(True), limit: int = 2000) -> tuple[NDArray, NDArray]:
         """Compute the average pulse and arrival-time model for an ATS filter.
         We use the first `limit` pulses that pass `good_expr` and `use_expr`.
 
         Parameters
         ----------
-        pulse_col : str
-            _description_
         use_expr : pl.Expr, optional
             _description_, by default pl.lit(True)
         limit : int, optional
@@ -1203,10 +1187,11 @@ class Channel:
         """
         df = (
             self.df.lazy()
+            .with_row_index("index")
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .select("pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1224,7 +1209,8 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        pulse = df["pulse"].to_numpy()
+        ids = df["index"].to_numpy()
+        pulse = self.load_raw(ids)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
@@ -1277,14 +1263,14 @@ class Channel:
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
             filter=filter_ats,
             spectrum=noiseresult,
             filter_maker=filter_maker,
-            transform_raw=self.transform_raw,
+            load_raw=self.load_raw,
         )
         return self.with_step(step)
 

@@ -20,15 +20,20 @@ class OptimalFilterStep(RecipeStep):
     filter: Filter
     spectrum: NoiseResult | None
     filter_maker: "FilterMaker"
-    transform_raw: Callable | None = None
+    load_raw: Callable
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         """Apply the optimal filter to the input DataFrame and return a new DataFrame with results."""
         dfs = []
-        for df_iter in df.iter_slices(10000):
-            raw = df_iter[self.inputs[0]].to_numpy()
-            if self.transform_raw is not None:
-                raw = self.transform_raw(raw)
+        slice_size = 1024
+        start = 0
+        N = len(df)
+        while start < N:
+            stop = min(N, start + slice_size)
+            ids = range(start, stop)
+            raw = self.load_raw(ids)
+            start = stop
+
             peak_y, peak_x = self.filter.filter_records(raw)
             dfs.append(pl.DataFrame({"peak_x": peak_x, "peak_y": peak_y}))
         df2 = pl.concat(dfs).with_columns(df)
