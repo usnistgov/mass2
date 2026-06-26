@@ -16,6 +16,8 @@ from abc import ABC, abstractmethod
 
 import tzlocal
 
+from .pulsefiles import PulseReader
+
 _local_timezone_name = tzlocal.get_localzone_name()
 
 
@@ -46,7 +48,7 @@ class LJHFile(ABC):
     header_string: str
     header_size: int
     binary_size: int
-    _mmap: np.memmap
+    pulsereader: PulseReader
     ljh_version: Version
     max_pulses: int | None = None
 
@@ -108,7 +110,7 @@ class LJHFile(ABC):
         npulses = binary_size // pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(filename, dtype, mode="r", offset=header_size, shape=(npulses,))
+        preader = PulseReader.open_by_path(filename, dtype=dtype, offset=header_size)
 
         return concrete_LJHFile_type(
             filename,
@@ -124,7 +126,7 @@ class LJHFile(ABC):
             header_string,
             header_size,
             binary_size,
-            mmap,
+            preader,
             ljh_version,
             max_pulses,
         )
@@ -204,17 +206,13 @@ class LJHFile(ABC):
         npulses = current_binary_size // self.pulse_size_bytes
         if max_pulses is not None:
             npulses = min(max_pulses, npulses)
-        mmap = np.memmap(
-            self.filename,
-            self.dtype,
-            mode="r",
-            offset=self.header_size,
-            shape=(npulses,),
-        )
+        self.pulsereader.close()
+        preader = PulseReader.open_by_path(self.filename, dtype=self.dtype, offset=self.header_size)
+
         return dataclasses.replace(
             self,
             npulses=npulses,
-            _mmap=mmap,
+            pulsereader=preader,
             max_pulses=max_pulses,
             binary_size=current_binary_size,
         )
@@ -263,12 +261,12 @@ class LJHFile(ABC):
         """
         return self.datatimes_raw / 1e6
 
-    def read_trace(self, i: int) -> NDArray:
+    def read_trace(self, id: int) -> NDArray:
         """Return a single pulse record from an LJH file.
 
         Parameters
         ----------
-        i : int
+        id : int
             Pulse record number (0-indexed)
 
         Returns
@@ -276,7 +274,7 @@ class LJHFile(ABC):
         ArrayLike
             A view into the pulse record.
         """
-        return self._mmap["data"][i]
+        return self.pulsereader.pulse(id)
 
     def read_trace_with_timing(self, i: int) -> tuple[int, int, NDArray]:
         """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
@@ -288,6 +286,7 @@ class LJHFile(ABC):
         first_pulse: int = 0,
         keep_posix_usec: bool = False,
         force_continuous: bool = False,
+        pulse_in_df: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
@@ -300,6 +299,10 @@ class LJHFile(ABC):
         force_continuous : bool
             Whether to claim that the data stream is actually continuous (because it cannot be learned from
             data for LJH files before version 2.2.0). Only relevant for noise data files.
+        pulse_in_df : bool
+            Whether to include the raw pulse records in the dataframe. Very expensive in
+            memory usage! Use only for small files, or small numbers of files. Mass2 does not normally
+            require this.
 
         Returns
         -------
@@ -311,16 +314,15 @@ class LJHFile(ABC):
             The polars series "timestamp" will be converted to the time zone name
             returned by tzlocal.get_localzone_name()
         """
-        data = {
-            "pulse": self._mmap["data"][first_pulse:],
-            "posix_usec": self.datatimes_raw[first_pulse:],
-            "subframecount": self.subframecount[first_pulse:],
-        }
-        schema: pl._typing.SchemaDict = {
-            "pulse": pl.Array(pl.UInt16, self.nsamples),
-            "posix_usec": pl.UInt64,
-            "subframecount": pl.UInt64,
-        }
+        data: dict[str, NDArray] = {}
+        schema = pl.Schema()
+        if pulse_in_df:
+            data["pulse"] = self.pulsereader.pulses(slice(first_pulse, None))
+            schema["pulse"] = pl.Array(pl.UInt16, self.nsamples)
+        data["posix_usec"] = self.datatimes_raw[first_pulse:]
+        data["subframecount"] = self.subframecount[first_pulse:]
+        schema["posix_usec"] = pl.UInt64
+        schema["subframecount"] = pl.UInt64
         df = pl.DataFrame(data, schema=schema)
         df = df.select(
             pl.from_epoch("posix_usec", time_unit="us").dt.convert_time_zone(_local_timezone_name).alias("timestamp")
@@ -344,7 +346,7 @@ class LJHFile(ABC):
         npulses = max(npulses, self.npulses)
         with open(filename, "wb") as f:
             f.write(self.header_string.encode("utf-8"))
-            f.write(self._mmap[:npulses].tobytes())
+            f.write(self.pulsereader.pulses(range(0, npulses)).tobytes())
 
     @property
     def is_continuous(self) -> bool:
@@ -378,12 +380,11 @@ class LJHFile_2_2(LJHFile):
             An array of subframecount values for each pulse record.
         """
         subframecount = np.zeros(self.npulses, dtype=np.int64)
-        mmap = self._mmap["subframecount"]
         MAXSEGMENT = 4096
         first = 0
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            subframecount[first:last] = mmap[first:last]
+            subframecount[first:last] = self.pulsereader._records_by_range(range(first, last))["subframecount"]
             first = last
         return subframecount
 
@@ -402,13 +403,12 @@ class LJHFile_2_2(LJHFile):
         """
         usec = np.zeros(self.npulses, dtype=np.int64)
         assert self.dtype.names is not None and "posix_usec" in self.dtype.names
-        mmap = self._mmap["posix_usec"]
 
         MAXSEGMENT = 4096
         first = 0
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] = mmap[first:last]
+            usec[first:last] = self.pulsereader._records_by_range(range(first, last))["posix_usec"]
             first = last
         return usec
 
@@ -427,7 +427,7 @@ class LJHFile_2_2(LJHFile):
         if self.subframediv is None or self.npulses <= 1:
             return False
         expected_subframe_diff = self.nsamples * self.subframediv
-        subframe = self._mmap["subframecount"]
+        subframe = self.subframecount
         return np.max(np.diff(subframe)) <= expected_subframe_diff
 
 
@@ -448,7 +448,6 @@ class LJHFile_2_1(LJHFile):
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
         usec = np.zeros(self.npulses, dtype=np.int64)
-        mmap = self._mmap["internal_ms"]
         scale = 1000
         offset = round(self.header["Timestamp offset (s)"] * 1e6)
 
@@ -456,26 +455,29 @@ class LJHFile_2_1(LJHFile):
         first = 0
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] = mmap[first:last]
+            usec[first:last] = self.pulsereader._records_by_range(range(first, last))["internal_ms"]
             first = last
         usec = usec * scale + offset
 
         # Add the 4 µs units found in LJH version 2.1
         assert self.dtype.names is not None and "internal_us" in self.dtype.names
         first = 0
-        mmap = self._mmap["internal_us"]
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] += mmap[first:last] * 4
+            usec[first:last] += self.pulsereader._records_by_range(range(first, last))["internal_us"] * 4
             first = last
 
         return usec
 
     def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+        self,
+        first_pulse: int = 0,
+        keep_posix_usec: bool = False,
+        force_continuous: bool = False,
+        pulse_in_df: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous, pulse_in_df=pulse_in_df)
         return df.select(pl.exclude("subframecount")), df_header
 
 
@@ -496,7 +498,6 @@ class LJHFile_2_0(LJHFile):
             An array of timestamp values for each pulse record, in microseconds since the epoh (1970).
         """
         usec = np.zeros(self.npulses, dtype=np.int64)
-        mmap = self._mmap["internal_ms"]
         scale = 1000
         offset = round(self.header["Timestamp offset (s)"] * 1e6)
 
@@ -504,15 +505,19 @@ class LJHFile_2_0(LJHFile):
         first = 0
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] = mmap[first:last]
+            usec[first:last] = self.pulsereader._records_by_range(range(first, last))["internal_ms"]
             first = last
         usec = usec * scale + offset
 
         return usec
 
     def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+        self,
+        first_pulse: int = 0,
+        keep_posix_usec: bool = False,
+        force_continuous: bool = False,
+        pulse_in_df: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous, pulse_in_df=pulse_in_df)
         return df.select(pl.exclude("subframecount")), df_header
