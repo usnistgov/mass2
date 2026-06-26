@@ -462,7 +462,7 @@ import tempfile, os
 output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
 print(f"Test output lives in '{output_dir.name}'")
 
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 for ch_num, ch in data.channels.items():
     filename = os.path.join(output_dir.name, f"output_test_chan{ch_num}.parquet")
     df = ch.df.drop(columns_to_drop)
@@ -488,7 +488,7 @@ This is similar, except that we use some new Polars tricks:
 2. `polars.concat()` to join rows from multiple dataframes
 
 ```python
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 all_df = []
 for ch_num, ch in data.channels.items():
     df = ch.df.drop(columns_to_drop).with_columns(ch_num=pl.lit(ch_num))

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.9"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -238,7 +238,7 @@ def _(mo):
     # replay
     here we'll apply the same steps to the original dataframe for one channel to show the replay capability
 
-    `ch = data.channels[4102]` is one way to access the `Channel` from before all the analysis steps. Notice how it only has 3 columns, instead of the many you see for `data.channels[4102]`. The display of steps could really be improved!
+    `ch = data.channels[4102]` is one way to access the `Channel` from before all the analysis steps. Notice how it only has 2 columns, instead of the many you see for `data.channels[4102]`. The display of steps could really be improved!
     """)
     return
 
@@ -317,7 +317,7 @@ def _(data, data2, mo, np):
     if we used a mutating style of coding.
 
     `{np.shares_memory(data.channels[4102].df["subframecount"].to_numpy(), data2.channels[4102].df["subframecount"].to_numpy())=}`
-    `{np.shares_memory(data.channels[4102].df["pulse"].to_numpy(), data2.channels[4102].df["pulse"].to_numpy())=}`
+    `{np.shares_memory(data.channels[4102].load_raw(), data2.channels[4102].load_raw())=}`
     """)
     return
 
