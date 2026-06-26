@@ -22,7 +22,7 @@ class PulseReader:
     offset: int
 
     @property
-    def length(self):
+    def length(self) -> int:
         return (len(self.mv) - self.offset) // self.itemsize
 
     @classmethod

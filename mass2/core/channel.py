@@ -23,17 +23,18 @@ from pathlib import Path
 import tzlocal
 
 import mass2
+from . import misc
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
-from . import misc
-from .offfiles import OffFile
+from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
+from .filter_steps import OptimalFilterStep
 from .misc import alwaysTrue, plot_zoomable
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
-from .filter_steps import OptimalFilterStep
-from .optimal_filtering import FilterMaker
-from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
+from .offfiles import OffFile
+from .optimal_filtering import FilterMaker
+from .pulsefiles import PulseReader
+from .recipe import Recipe, RecipeStep, SummarizeStep
 
 _local_timezone_name = tzlocal.get_localzone_name()
 
@@ -99,6 +100,7 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+    pulsereader: PulseReader | None = None
 
     def __post_init__(self) -> None:
         # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
@@ -888,32 +890,37 @@ class Channel:
         return self.with_good_expr(good_expr, replace)
 
     @functools.cache
-    def typical_peak_ind(self, col: str = "pulse") -> int:
-        """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
-        raw = self.df.limit(100)[col].to_numpy()
-        if self.transform_raw is not None:
-            raw = self.transform_raw(raw)
+    def typical_peak_ind(self) -> int:
+        """Return the typical peak index of the pulses, using the median peak index for the first 100 pulses."""
+        raw = self.load_raw(range(0, 100))
         return int(np.median(raw.argmax(axis=1)))
 
-    def summarize_pulses(self, col: str = "pulse", pretrigger_ignore_samples: int = 0, peak_index: int | None = None) -> "Channel":
+    def load_raw(self, r: range) -> NDArray:
+        assert self.pulsereader is not None, "Cannot summarize_pulses without a pulsereader function"
+        raw = self.pulsereader.pulses(r)
+        if self.transform_raw is None:
+            return raw
+        return self.transform_raw(raw)
+
+    def summarize_pulses(self, pretrigger_ignore_samples: int = 0, peak_index: int | None = None) -> "Channel":
         """Summarize the pulses, adding columns for pulse height, pretrigger mean, etc."""
         if peak_index is None:
-            peak_index = self.typical_peak_ind(col)
+            peak_index = self.typical_peak_ind()
         out_names = mass2.core.pulse_algorithms.result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
         outputs = list(out_names)
+
         step = SummarizeStep(
-            inputs=[col],
+            inputs=[],
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
             frametime_s=self.frametime_s,
             peak_index=peak_index,
-            pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
-            transform_raw=self.transform_raw,
+            load_raw=self.load_raw,
         )
         return self.with_step(step)
 
@@ -1402,7 +1409,13 @@ class Channel:
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+            df,
+            header=header,
+            npulses=ljh.npulses,
+            subframediv=ljh.subframediv,
+            noise=noise_channel,
+            transform_raw=transform_raw,
+            pulsereader=ljh.pulsereader,
         )
         return channel
 

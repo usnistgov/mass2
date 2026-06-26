@@ -86,18 +86,21 @@ class SummarizeStep(RecipeStep):
 
     frametime_s: float
     peak_index: int
-    pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
-    transform_raw: Callable | None = None
+    load_raw: Callable
 
     def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
         summaries = []
-        for df_iter in df.select(self.inputs).iter_slices():
-            raw = df_iter[self.pulse_col].to_numpy()
-            if self.transform_raw is not None:
-                raw = self.transform_raw(raw)
+        slice_size = 1024
+        start = 0
+        N = len(df)
+        while start < N:
+            stop = min(N, start + slice_size)
+            ids = range(start, stop)
+            raw = self.load_raw(ids)
+            start = stop
 
             s = pl.from_numpy(
                 pulse_algorithms.summarize_data_numba(
