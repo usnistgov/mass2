@@ -895,8 +895,10 @@ class Channel:
         raw = self.load_raw(range(0, 100))
         return int(np.median(raw.argmax(axis=1)))
 
-    def load_raw(self, r: range) -> NDArray:
-        assert self.pulsereader is not None, "Cannot summarize_pulses without a pulsereader function"
+    def load_raw(self, r: range | slice | None = None) -> NDArray:
+        assert self.pulsereader is not None, "Cannot run `Channel.load_raw()` without a pulsereader function"
+        if r is None:
+            r = range(0, self.npulses)
         raw = self.pulsereader.pulses(r)
         if self.transform_raw is None:
             return raw

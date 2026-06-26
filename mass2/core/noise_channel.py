@@ -10,6 +10,7 @@ import polars as pl
 import numpy as np
 import mass2
 from .noise_algorithms import NoiseResult
+from .pulsefiles import PulseReader
 
 
 @dataclass(frozen=True)
@@ -19,18 +20,27 @@ class NoiseChannel:
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
+    pulsereader: PulseReader | None = None
+
+    @property
+    def npulses(self) -> int:
+        return len(self.df)
+
+    def load_raw(self, r: range | slice | None = None) -> NDArray:
+        assert self.pulsereader is not None, "Cannot run `NoiseChannel.load_raw()` without a pulsereader function"
+        if r is None:
+            r = range(0, self.npulses)
+        return self.pulsereader.pulses(r)
 
     # @functools.cache
-    def calc_max_excursion(
-        self, trace_col_name: str = "pulse", n_limit: int = 10000, excursion_nsigma: float = 5
-    ) -> tuple[pl.DataFrame, float]:
+    def calc_max_excursion(self, n_limit: int = 10000, excursion_nsigma: float = 5) -> tuple[pl.DataFrame, float]:
         """Compute the maximum excursion from the median for each noise record, and store in dataframe."""
 
         def excursion2d(noise_trace: NDArray) -> float:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
-        noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
+        noise_traces = self.load_raw(slice(n_limit))
         excursion = excursion2d(noise_traces)
         max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
@@ -38,7 +48,6 @@ class NoiseChannel:
 
     def get_records_2d(
         self,
-        trace_col_name: str = "pulse",
         n_limit: int = 10000,
         excursion_nsigma: float = 5,
         trunc_front: int = 0,
@@ -52,8 +61,6 @@ class NoiseChannel:
 
         Parameters:
         ----------
-        trace_col_name : str, optional
-            Name of the column containing trace data. Default is "pulse".
         n_limit : int, optional
             Maximum number of traces to analyze. Default is 10000.
         excursion_nsigma : float, optional
@@ -70,8 +77,9 @@ class NoiseChannel:
 
             Shape: (n_pulses, len(pulse))
         """
-        df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"].to_numpy()
+        df_noise2, max_excursion = self.calc_max_excursion(n_limit, excursion_nsigma)
+        noise_trace_is_clean = df_noise2.with_row_index("index").filter(pl.col("excursion") <= max_excursion)["index"].to_numpy()
+        noise_traces_clean = self.load_raw()[noise_trace_is_clean]
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -84,7 +92,6 @@ class NoiseChannel:
     # @functools.cache
     def spectrum(
         self,
-        trace_col_name: str = "pulse",
         n_limit: int = 10000,
         excursion_nsigma: float = 5,
         trunc_front: int = 0,
@@ -92,7 +99,7 @@ class NoiseChannel:
         skip_autocorr_if_length_over: int = 100_000,
     ) -> NoiseResult:
         """Compute and return the noise result from the noise traces."""
-        records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        records = self.get_records_2d(n_limit, excursion_nsigma, trunc_front, trunc_back)
         continuous = self.is_continuous and trunc_front == 0 and trunc_back == 0
         spectrum = mass2.core.noise_algorithms.calc_noise_result(
             records, continuous=continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
@@ -122,5 +129,5 @@ class NoiseChannel:
         """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
-        noise_channel = cls(df, header_df, header_df["Timebase"][0])
+        noise_channel = cls(df, header_df, header_df["Timebase"][0], pulsereader=ljh.pulsereader)
         return noise_channel
