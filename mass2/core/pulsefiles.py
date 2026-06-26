@@ -6,7 +6,7 @@ to pulse records.
 from collections.abc import Iterable
 from dataclasses import dataclass
 from numpy.typing import NDArray
-from typing import BinaryIO
+from typing import BinaryIO, Any
 import numpy as np
 import mmap
 from abc import ABC, abstractmethod
@@ -165,6 +165,14 @@ class PulseReader(PulseMaker):
         self.mv.release()
         self.mm.close()
         self.fd.close()
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap and file handle)."""
+        state = self.__dict__.copy()
+        del state["mv"]
+        del state["mm"]
+        del state["fd"]
+        return state
 
 
 @dataclass(frozen=True)
