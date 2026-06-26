@@ -21,6 +21,10 @@ class PulseReader:
     itemsize: int
     offset: int
 
+    @property
+    def length(self):
+        return (len(self.mv) - self.offset) // self.itemsize
+
     @classmethod
     def open_by_path(cls, file_path: str, dtype: np.dtype, offset: int) -> "PulseReader":
         fd = open(file_path, "rb")
@@ -73,10 +77,15 @@ class PulseReader:
         # we have to build a new array and copy in the pulse data.
         if type(ids) is slice:
             if ids.step is None or ids.step == 1:
-                range_ids = range(ids.start, ids.stop)
+                start = ids.start
+                if start is None:
+                    start = 0
+                stop = ids.stop
+                if stop is None:
+                    stop = self.length
+                range_ids = range(start, stop)
                 return self._records_by_range(range_ids)
-            length = (len(self.mv) - self.offset) // self.itemsize
-            ids = list(range(*ids.indices(length)))
+            ids = list(range(*ids.indices(self.length)))
         elif type(ids) is range:
             if ids.step == 1:
                 return self._records_by_range(ids)
