@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.15.2"
+__generated_with = "0.23.9"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -11,19 +11,20 @@ def _():
     import numpy as np
     import marimo as mo
     import pulsedata
+
     return mo, np, pl, plt, pulsedata
 
 
 @app.cell
 def _():
     import mass2
+
     return (mass2,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # Load data
     Here we load the data from two ljh representing pulse data taken with a TES array looking at a Gd-153 gamma ray source.
 
@@ -35,8 +36,7 @@ def _(mo):
     *	All energy resolutions are at the 97 keV line.
 
     We use the `pulsedata` package to get the file names for the pulse data and noise data files. The `pulsedata` package contains a few small (< 100 MB) files needed for the example notebooks to work, so it only includes two channels of this dataset.
-    """
-    )
+    """)
     return
 
 
@@ -53,10 +53,9 @@ def _(mass2, mo, pulsedata):
 
 @app.cell
 def _(data, mo):
-    mo.vstack([mo.md("""# View the raw data for one channel\nThe data is represented as a polars `DataFrame` with one row per pulse. The ljh files have yielded 3 columns, so that we have 3 values representing each pulse. These are:
+    mo.vstack([mo.md("""# View the raw data for one channel\nThe data is represented as a polars `DataFrame` with one row per pulse. The ljh files have yielded 2 columns, so that we have 2 values of meta-data for each pulse. These are:
 
     * `timestamp` - wall clock time based on the clock on the PC taking the data, often innacurate by many milliseconds, but convenient for comparison to other parts of an experiment that change on times scales greater than 50 ms
-    * `pulse` - unsigned int 16 values representing the current vs time of the pulses, each pulse is caused by a gamma ray and our goal is to determine the energy of each pulse. Since this is umux data, 4096 units corresponds to 1 phi0. The value of zero current, and the current gain are both not recorded in an ljh file.
     * `subframecount` - a timestamp based on the data aqusition system clock. May be used for microsecond level timing with external events when using the "external trigger" feature.
 
     Next we will plot the first few pulses using the `data.ch0` property to access the lowest channel number in `data`. And we plot the noise spectrum for one channel"""),data.ch0.df])
@@ -66,7 +65,7 @@ def _(data, mo):
 @app.cell
 def _(data, mass2, plt):
     plt.figure()
-    _pulses = data.ch0.df["pulse"].limit(20).to_numpy().T
+    _pulses = data.ch0.load_raw(range(0, 20)).T
     _pulses2 = _pulses - _pulses[:150].mean(axis=0)
     plt.plot(_pulses2)
     plt.ylabel("signal (arb)")
@@ -85,8 +84,7 @@ def _(data, mass2):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # Analysis Step 1: summary quantities and `good_expr`
     The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
@@ -101,8 +99,7 @@ def _(mo):
     We call `with_good_expr_nsigma_range_outlier_resistant` to exclude pulses with very large `pretrig_mean` excursions.
 
     Then we call `filter5lag` which learns and applies an optimal filter using the 5lag method. This creates the columns `5lagy` (the pulse height) and `5lagyx` the arrival time of the pulse measured at a subsample level. The quality of this filter depends on the extend to which the `good_expr` selects clean pulses, but it's somewhat forgiving.
-    """
-    )
+    """)
     return
 
 
@@ -111,7 +108,7 @@ def _(data, mass2):
     def analysis_step1(ch: mass2.Channel) -> mass2.Channel: # type annotation helps autocompletions later
         return (ch.summarize_pulses()
                 .with_good_expr_pretrig_rms_and_postpeak_deriv()
-            .with_good_expr_nsigma_range_outlier_resistant(col_nsigma_pairs=[("pretrig_mean",100)])
+                .with_good_expr_nsigma_range_outlier_resistant(col_nsigma_pairs=[("pretrig_mean",100)])
                .filter5lag()
                )
     data2 = data.map(analysis_step1)
@@ -130,15 +127,13 @@ def _(data2, mass2, mo):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # Overview of data
 
     Here we plot `pretrig_mean` and `5lagy` vs `timestamp` so we can see that the data is basically steady in time. If it is not, then the analysis is much harder and great efforts should be put into the data acquisition system to fix the instability.
 
     Then we plot the uncalibrated spectrum of `5lagy` to get a sense of how many lines are in the data, and we can use the width of those lines to set the `BLAH` parameter for `rough_calibration`.
-    """
-    )
+    """)
     return
 
 
@@ -165,15 +160,13 @@ def _(data2, mass2, np):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # Analysis Step 2: Calibration and Corrections
 
     Here we call `driftcorrect` which attempts to remove correlation between `pretrig_mean` and `5lagy`. Then we call `rough_cal_combinatoric` which identifies peaks and assigns them to lines. In this dataset the strongest two lines by far are 97 keV and 103 keV, so it will be easy for the algorithm to assign them. Then we do a second drift correct, this time trying to remove the correlation between sub-sample arrival time of the pulse and energy. We use the same algorithm as for the `pretrig_mean` correlation removal, but different columns as arguments.
 
     Then we plot a calibrated histogram of the whole dataset, and some more debug plots. One checks for correlation between `5lagx` and `energy_5lagy_dc`. The others are auto generated by each analysis step we've done. We have a GUI to view some debug plots that are auto generated.
-    """
-    )
+    """)
     return
 
 
@@ -241,13 +234,11 @@ def _(data3, dropdown_ch, mass2, plt):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # Fits to determine energy resolution
 
     We find 58 eV for Ch 2 and 72 eV for Ch5, pretty close to Dan B.'s results his email from Nov 11, 2024 says he got 56 and 71 eV).
-    """
-    )
+    """)
     return
 
 
@@ -272,8 +263,7 @@ def _(data3, mass2, np):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ## Advanced analysis
 
     Below here are some explorations that you would _not_ normally do. We are taking the opportunity of having these analyzed pulses to explore a question that we often ask, or at least _should_ ask:
@@ -292,8 +282,7 @@ def _(mo):
     8. Optimal filter + drift correction + arrival-time correction
 
     In each case, we need to account for the nonlinearity of the TESs. This requires an energy calibration that anchors the energy scale at the 97.421 and 103.180 keV peaks.
-    """
-    )
+    """)
     return
 
 
@@ -308,7 +297,7 @@ def _(data3, mass2, np, pl):
         M3 = np.vstack((M2, np.hstack((0, np.diff(sig_model)))))
         filter2 = np.linalg.pinv(M2.T)[1]
         filter3 = np.linalg.pinv(M3.T)[1]
-        pulses = ch.df["pulse"].to_numpy()
+        pulses = ch.load_raw(range(0, ch.npulses))
 
         fake_autocorr = ch.steps[1].filter_maker.noise_autocorr.copy()
         fake_autocorr[1:] = 0
