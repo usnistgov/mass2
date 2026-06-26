@@ -78,7 +78,9 @@ class NoiseChannel:
             Shape: (n_pulses, len(pulse))
         """
         df_noise2, max_excursion = self.calc_max_excursion(n_limit, excursion_nsigma)
-        noise_trace_is_clean = df_noise2.with_row_index("index").filter(pl.col("excursion") <= max_excursion)["index"].to_numpy()
+        noise_trace_is_clean = (
+            df_noise2.with_row_index("pulse_idx").filter(pl.col("excursion") <= max_excursion)["pulse_idx"].to_numpy()
+        )
         noise_traces_clean = self.load_raw()[noise_trace_is_clean]
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]

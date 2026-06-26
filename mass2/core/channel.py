@@ -33,7 +33,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .noise_channel import NoiseChannel
 from .offfiles import OffFile
 from .optimal_filtering import FilterMaker
-from .pulsefiles import PulseMaker
+from .pulsefiles import PulseMaker, MemReader
 from .recipe import Recipe, RecipeStep, SummarizeStep
 
 _local_timezone_name = tzlocal.get_localzone_name()
@@ -992,8 +992,8 @@ class Channel:
         NDArray
             _description_
         """
-        ids_df = self.df.lazy().with_row_index("index").filter(self.good_expr).filter(use_expr).limit(limit).collect()
-        ids = ids_df["index"].to_numpy()
+        ids_df = self.df.lazy().with_row_index("pulse_idx").filter(self.good_expr).filter(use_expr).limit(limit).collect()
+        ids = ids_df["pulse_idx"].to_numpy()
         avg_pulse = self.load_raw(ids).mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
@@ -1187,11 +1187,11 @@ class Channel:
         """
         df = (
             self.df.lazy()
-            .with_row_index("index")
+            .with_row_index("pulse_idx")
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select("index", "pulse_rms", "promptness", "pretrig_mean")
+            .select("pulse_idx", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1209,7 +1209,7 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        ids = df["index"].to_numpy()
+        ids = df["pulse_idx"].to_numpy()
         pulse = self.load_raw(ids)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
@@ -1473,7 +1473,7 @@ class Channel:
         timestamps : bool, optional
             Whether to generate timestamp guesses, based on file creation time, by default True
         row_index: bool, optional
-            Whether to generate a column "index" counting [0...n-1], by default False
+            Whether to generate a column "pulse_idx" counting [0...n-1], by default False
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
 
@@ -1498,7 +1498,7 @@ class Channel:
         datadict = {"pulse": pdata.T}
         pulse_df = pl.DataFrame(datadict)
         if row_index:
-            pulse_df = pulse_df.with_row_index()
+            pulse_df = pulse_df.with_row_index("index")
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and
@@ -1523,11 +1523,13 @@ class Channel:
                 "Presamples": npresamples,
             }
             noise_header = pl.DataFrame(nh)
-            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+            nr = MemReader(ndata.T)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulsereader=nr)
 
         source = os.path.basename(pulse_fname)
         header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
-        return cls(pulse_df, header, npulses, noise=nch)
+        pr = MemReader(pdata.T)
+        return cls(pulse_df, header, npulses, noise=nch, pulsereader=pr)
 
     @classmethod
     def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":
