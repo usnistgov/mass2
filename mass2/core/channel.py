@@ -33,7 +33,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .noise_channel import NoiseChannel
 from .offfiles import OffFile
 from .optimal_filtering import FilterMaker
-from .pulsefiles import PulseReader
+from .pulsefiles import PulseMaker
 from .recipe import Recipe, RecipeStep, SummarizeStep
 
 _local_timezone_name = tzlocal.get_localzone_name()
@@ -100,7 +100,7 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
-    pulsereader: PulseReader | None = None
+    pulsereader: PulseMaker | None = None
 
     def __post_init__(self) -> None:
         # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
@@ -1191,7 +1191,7 @@ class Channel:
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select("pulse_rms", "promptness", "pretrig_mean")
+            .select("index", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1221,7 +1221,6 @@ class Channel:
 
     def filterATS(
         self,
-        pulse_col: str = "pulse",
         peak_y_col: str = "ats_y",
         peak_x_col: str = "ats_x",
         f_3db: float = 25e3,
@@ -1251,7 +1250,7 @@ class Channel:
         mprms = self.good_series("pulse_rms", use_expr).median()
         use = use_expr.and_(np.abs(pl.col("pulse_rms") / mprms - 1.0) < 0.3)
         limit = 4000
-        avg_pulse, dt_model = self.compute_ats_model(pulse_col, use, limit)
+        avg_pulse, dt_model = self.compute_ats_model(use, limit)
         noiseresult = self.noise.spectrum()
         filter_maker = FilterMaker(
             signal_model=avg_pulse,

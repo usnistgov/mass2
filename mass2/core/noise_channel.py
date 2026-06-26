@@ -10,7 +10,7 @@ import polars as pl
 import numpy as np
 import mass2
 from .noise_algorithms import NoiseResult
-from .pulsefiles import PulseReader
+from .pulsefiles import PulseMaker
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,7 @@ class NoiseChannel:
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
-    pulsereader: PulseReader | None = None
+    pulsereader: PulseMaker | None = None
 
     @property
     def npulses(self) -> int:
@@ -36,7 +36,7 @@ class NoiseChannel:
     def calc_max_excursion(self, n_limit: int = 10000, excursion_nsigma: float = 5) -> tuple[pl.DataFrame, float]:
         """Compute the maximum excursion from the median for each noise record, and store in dataframe."""
 
-        def excursion2d(noise_trace: NDArray) -> float:
+        def excursion2d(noise_trace: NDArray) -> NDArray:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 

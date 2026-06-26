@@ -801,7 +801,7 @@ class Channels:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
-            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulsereader=None)
 
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
@@ -809,9 +809,11 @@ class Channels:
             for ch_num, ch in self.channels.items():
                 parquet_path = f"data_chan{ch_num:04d}.parquet"
                 channels[ch_num] = store_dataframe_to_parquet_and_return_pickleable_channel(ch, zf, parquet_path)
+                assert channels[ch_num].pulsereader is None
             for ch_num, badch in self.bad_channels.items():
                 parquet_path = f"data_bad_chan{ch_num:04d}.parquet"
                 ch = store_dataframe_to_parquet_and_return_pickleable_channel(badch.ch, zf, parquet_path)
+                assert ch.pulsereader is None
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
@@ -827,7 +829,7 @@ class Channels:
             Zipfile that work was saved in.
         """
         path = pathlib.Path(path)
-        path.exists() and path.is_file()
+        assert path.exists() and path.is_file()
 
         def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file

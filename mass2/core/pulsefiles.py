@@ -9,13 +9,30 @@ from numpy.typing import NDArray
 from typing import BinaryIO
 import numpy as np
 import mmap
+from abc import ABC, abstractmethod
+
+
+class PulseMaker(ABC):
+    """An abstract base class that knows how to return one or many pulse records.
+
+    Real data will use implementation PulseReader. Simulated data for testing may use MemReader."""
+
+    @abstractmethod
+    def pulse(self, id: int, fieldname: str = "data") -> NDArray:
+        raise NotImplementedError("illegal: this is an abstract base class")
+
+    @abstractmethod
+    def pulses(self, ids: slice | range | Iterable, fieldname: str = "data") -> NDArray:
+        raise NotImplementedError("illegal: this is an abstract base class")
 
 
 @dataclass(frozen=True)
-class PulseReader:
+class PulseReader(PulseMaker):
+    """A class to implement PulseMaker and read raw pulses from a memory map, for efficiency."""
+
     file_path: str
-    fd: BinaryIO | None
-    mm: mmap.mmap | None
+    fd: BinaryIO
+    mm: mmap.mmap
     mv: memoryview
     dtype: np.dtype
     itemsize: int
@@ -146,7 +163,22 @@ class PulseReader:
 
     def close(self) -> None:
         self.mv.release()
-        if self.mm is not None:
-            self.mm.close()
-        if self.fd is not None:
-            self.fd.close()
+        self.mm.close()
+        self.fd.close()
+
+
+@dataclass(frozen=True)
+class MemReader(PulseMaker):
+    """A class to implement PulseMaker and store raw pulses in memory, for simplifying tests."""
+
+    array: NDArray
+
+    @classmethod
+    def from_array(cls, data: NDArray) -> "MemReader":
+        return cls(data)
+
+    def pulse(self, id: int, fieldname: str = "data") -> NDArray:
+        return self.array[id]
+
+    def pulses(self, ids: slice | range | Iterable, fieldname: str = "data") -> NDArray:
+        return self.array[ids]

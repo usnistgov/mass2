@@ -2,7 +2,7 @@ import numpy as np
 import mass2
 import polars as pl
 from numpy.typing import NDArray
-from mass2.core.pulsefiles import PulseReader
+from mass2.core.pulsefiles import MemReader
 
 # set seed to control shuffle in the function and random errors in make_truth_ph
 rng = np.random.default_rng(1)
@@ -143,7 +143,8 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    nr = MemReader(noise_traces)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, pulsereader=nr)
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -154,7 +155,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    pr = PulseReader.from_array_in_memory(pulse_traces)
+    pr = MemReader(pulse_traces)
     ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulsereader=pr)
     return ch
 
