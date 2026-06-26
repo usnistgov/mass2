@@ -14,8 +14,8 @@ import mmap
 @dataclass(frozen=True)
 class PulseReader:
     file_path: str
-    fd: BinaryIO
-    mm: mmap.mmap
+    fd: BinaryIO | None
+    mm: mmap.mmap | None
     mv: memoryview
     dtype: np.dtype
     itemsize: int
@@ -38,6 +38,13 @@ class PulseReader:
         mm = mmap.mmap(fd.fileno(), 0, access=mmap.ACCESS_READ)
         mv = memoryview(mm)
         return cls(file_path, fd, mm, mv, dtype, dtype.itemsize, offset)
+
+    @classmethod
+    def from_array_in_memory(cls, data: NDArray) -> "PulseReader":
+        mv = memoryview(data)
+        nsamples = data.shape[1]
+        dtype = np.dtype([("data", np.uint16, nsamples)])
+        return cls("", None, None, mv, dtype, dtype.itemsize, offset=0)
 
     def record(self, id: int) -> NDArray:
         """Return a single raw pulse record with timing data, selected by pulse id number.
@@ -139,5 +146,7 @@ class PulseReader:
 
     def close(self) -> None:
         self.mv.release()
-        self.mm.close()
-        self.fd.close()
+        if self.mm is not None:
+            self.mm.close()
+        if self.fd is not None:
+            self.fd.close()
