@@ -183,7 +183,7 @@ class EnergyCalibrationMaker:
             energy = float(energy)
         except ValueError:
             try:
-                if type(energy) is str:
+                if isinstance(energy, str):
                     name = energy
                 else:
                     name = str(energy)

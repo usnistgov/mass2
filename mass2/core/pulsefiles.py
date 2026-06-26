@@ -56,13 +56,6 @@ class PulseReader(PulseMaker):
         mv = memoryview(mm)
         return cls(file_path, fd, mm, mv, dtype, dtype.itemsize, offset)
 
-    @classmethod
-    def from_array_in_memory(cls, data: NDArray) -> "PulseReader":
-        mv = memoryview(data)
-        nsamples = data.shape[1]
-        dtype = np.dtype([("data", np.uint16, nsamples)])
-        return cls("", None, None, mv, dtype, dtype.itemsize, offset=0)
-
     def record(self, id: int) -> NDArray:
         """Return a single raw pulse record with timing data, selected by pulse id number.
 
@@ -99,7 +92,7 @@ class PulseReader(PulseMaker):
         # If asked for a range or slice with step=1, use the more efficient self._records_by_range
         # to return a memory-mapped array. But if step > 1 or `ids` is a generate Iterable,
         # we have to build a new array and copy in the pulse data.
-        if type(ids) is slice:
+        if isinstance(ids, slice):
             if ids.step is None or ids.step == 1:
                 start = ids.start
                 if start is None:
@@ -110,7 +103,7 @@ class PulseReader(PulseMaker):
                 range_ids = range(start, stop)
                 return self._records_by_range(range_ids)
             ids = list(range(*ids.indices(self.length)))
-        elif type(ids) is range:
+        elif isinstance(ids, range):
             if ids.step == 1:
                 return self._records_by_range(ids)
             ids = list(ids)
@@ -162,9 +155,12 @@ class PulseReader(PulseMaker):
         return self.records(ids)[fieldname].squeeze()
 
     def close(self) -> None:
-        self.mv.release()
-        self.mm.close()
-        self.fd.close()
+        if self.mv is not None:
+            self.mv.release()
+        if self.mm is not None:
+            self.mm.close()
+        if self.fd is not None:
+            self.fd.close()
 
     def __getstate__(self) -> dict[str, Any]:
         """Define what gets pickled (ignore the live mmap and file handle)."""
@@ -173,6 +169,26 @@ class PulseReader(PulseMaker):
         del state["mm"]
         del state["fd"]
         return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
+        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
+        if "file_path" in state:
+            for field in ("file_path", "dtype", "itemsize", "offset"):
+                object.__setattr__(self, field, state[field])
+            fd = open(self.file_path, "rb")
+            mm = mmap.mmap(fd.fileno(), 0, access=mmap.ACCESS_READ)
+            object.__setattr__(self, "fd", fd)
+            object.__setattr__(self, "mm", mm)
+            object.__setattr__(self, "mv", memoryview(mm))
+
+    # __enter__ and __exit__ let you use a context manager with this type.
+
+    def __enter__(self) -> "PulseReader":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
 
 
 @dataclass(frozen=True)
