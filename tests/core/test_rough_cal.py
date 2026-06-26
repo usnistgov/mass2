@@ -1,6 +1,8 @@
 import numpy as np
 import mass2
 import polars as pl
+from numpy.typing import NDArray
+from mass2.core.pulsefiles import PulseReader
 
 # set seed to control shuffle in the function and random errors in make_truth_ph
 rng = np.random.default_rng(1)
@@ -11,7 +13,7 @@ def make_truth_ph(
     e_spurious,
     e_err_scale,
     pfit_gain_truth=np.polynomial.Polynomial([6, -1e-6, -1e-10]),
-) -> None:
+) -> tuple[NDArray, NDArray]:
     # return peak heights by inverting a quadratic gain curve and adding energy errors
     cba_truth = pfit_gain_truth.convert().coef
     assert len(cba_truth) == 3
@@ -152,7 +154,8 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    pr = PulseReader.from_array_in_memory(pulse_traces)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulsereader=pr)
     return ch
 
 
@@ -174,16 +177,17 @@ def test_two_peak_rough_cal_combinatoric() -> None:
     """When two peaks happen to have a gain that grows with energy, you will get an energy assignment
     that extrapolates to zero gain for negative-size pulses. This is fine, but it is NOT fine to
     cut pulses that exceed that value (as ALL pulses will exceed it). Tests for issue #95."""
+    sizes = rng.standard_normal(size=1000) * 5 + 1000
+    sizes[500:] *= 3
+    df = pl.DataFrame({"arb_pulse_size": sizes})
+
     signal = np.zeros(50, dtype=np.int16)
     signal[25:] = 1000
     chA = dummy_channel(signal=signal)
-    chB = dummy_channel(signal=signal * 2)
-    df = pl.concat([chA.df, chB.df])
-
     ch = mass2.Channel(df, chA.header, npulses=len(df), noise=chA.noise)
-    ch = ch.summarize_pulses()
     # Try to calibrate with 2 peaks, like with ^153Gd data
-    ch = ch.rough_cal_combinatoric([100, 180], "pulse_average", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
+    ch = ch.rough_cal_combinatoric([100, 200], "arb_pulse_size", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
+    print("Bopb: ", ch.steps[-1])
     assignment = ch.steps[-1].assignment_result
     assert assignment.phzerogain() < 0
     df_good = ch.df.filter(ch.good_expr)
