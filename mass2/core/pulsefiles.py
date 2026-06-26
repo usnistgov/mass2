@@ -135,7 +135,7 @@ class PulseReader:
         NDArray
             A 2-dimensional array of raw data, of size `(npulses, pulse_length)`.
         """
-        return self.records(ids)[fieldname]
+        return self.records(ids)[fieldname].squeeze()
 
     def close(self) -> None:
         self.mv.release()
