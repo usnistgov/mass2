@@ -801,7 +801,7 @@ class Channels:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
-            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
@@ -809,9 +809,11 @@ class Channels:
             for ch_num, ch in self.channels.items():
                 parquet_path = f"data_chan{ch_num:04d}.parquet"
                 channels[ch_num] = store_dataframe_to_parquet_and_return_pickleable_channel(ch, zf, parquet_path)
+                assert channels[ch_num].pulseframer is None
             for ch_num, badch in self.bad_channels.items():
                 parquet_path = f"data_bad_chan{ch_num:04d}.parquet"
                 ch = store_dataframe_to_parquet_and_return_pickleable_channel(badch.ch, zf, parquet_path)
+                assert ch.pulseframer is None
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"

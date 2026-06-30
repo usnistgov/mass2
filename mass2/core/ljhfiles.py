@@ -6,21 +6,23 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Any
+from collections.abc import Iterable
 from numpy.typing import NDArray
 import os
 import numpy as np
 import polars as pl
 from packaging.version import Version
-from abc import ABC, abstractmethod
-
+from abc import abstractmethod
 
 import tzlocal
+
+from .channel import PulseDataFramer
 
 _local_timezone_name = tzlocal.get_localzone_name()
 
 
 @dataclass(frozen=True)
-class LJHFile(ABC):
+class LJHFile(PulseDataFramer):
     """Represents the header and binary information of a single LJH file.
 
     Includes the complete ASCII header stored both as a dictionary and a string, and
@@ -79,7 +81,7 @@ class LJHFile(ABC):
             dtype = np.dtype([
                 ("internal_unused", np.uint16),
                 ("internal_ms", np.uint32),
-                ("data", np.uint16, nsamples),
+                ("pulse", np.uint16, nsamples),
             ])
             concrete_LJHFile_type: type[LJHFile] = LJHFile_2_0
         elif ljh_version < Version("2.2.0"):
@@ -87,14 +89,14 @@ class LJHFile(ABC):
                 ("internal_us", np.uint8),
                 ("internal_unused", np.uint8),
                 ("internal_ms", np.uint32),
-                ("data", np.uint16, nsamples),
+                ("pulse", np.uint16, nsamples),
             ])
             concrete_LJHFile_type = LJHFile_2_1
         else:
             dtype = np.dtype([
                 ("subframecount", np.int64),
                 ("posix_usec", np.int64),
-                ("data", np.uint16, nsamples),
+                ("pulse", np.uint16, nsamples),
             ])
             concrete_LJHFile_type = LJHFile_2_2
         pulse_size_bytes = dtype.itemsize
@@ -276,12 +278,28 @@ class LJHFile(ABC):
         ArrayLike
             A view into the pulse record.
         """
-        return self._mmap["data"][i]
+        return self._mmap["pulse"][i]
 
     def read_trace_with_timing(self, i: int) -> tuple[int, int, NDArray]:
         """Return a single data trace as (subframecount, posix_usec, pulse_record)."""
         pulse_record = self.read_trace(i)
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        s = slice(start, stop, step)
+        return self._load_raw(s)
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return self._load_raw([id])
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return self._load_raw(list(ids))
+
+    def _load_raw(self, selection: slice | int | list[int]) -> pl.DataFrame:
+        data = {"pulse": self._mmap["pulse"][selection]}
+        schema = pl.Schema({"pulse": pl.Array(pl.UInt16, self.nsamples)})
+        df = pl.DataFrame(data, schema=schema)
+        return df
 
     def to_polars(
         self,
@@ -312,15 +330,15 @@ class LJHFile(ABC):
             returned by tzlocal.get_localzone_name()
         """
         data = {
-            "pulse": self._mmap["data"][first_pulse:],
+            "pulse": self._mmap["pulse"][first_pulse:],
             "posix_usec": self.datatimes_raw[first_pulse:],
             "subframecount": self.subframecount[first_pulse:],
         }
-        schema: pl._typing.SchemaDict = {
+        schema: pl.Schema = pl.Schema({
             "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
             "subframecount": pl.UInt64,
-        }
+        })
         df = pl.DataFrame(data, schema=schema)
         df = df.select(
             pl.from_epoch("posix_usec", time_unit="us").dt.convert_time_zone(_local_timezone_name).alias("timestamp")

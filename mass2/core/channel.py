@@ -19,6 +19,7 @@ import functools
 import numpy as np
 import time
 from pathlib import Path
+from abc import ABC, abstractmethod
 
 import tzlocal
 
@@ -56,6 +57,23 @@ class ExtTriggerControl:
     @property
     def require_next(self) -> bool:
         return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
+
+
+class PulseDataFramer(ABC):
+    """Classes that inherit from this can provide specified chunks of raw pulses, or specific pulses, as
+    polars DataFrame objects."""
+
+    @abstractmethod
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
 
 
 @dataclass(frozen=True)
@@ -99,6 +117,7 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+    pulseframer: PulseDataFramer | None = None
 
     def __post_init__(self) -> None:
         # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
@@ -571,6 +590,7 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
+
         pulse_type = self.df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
@@ -1402,7 +1422,13 @@ class Channel:
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+            df,
+            header=header,
+            npulses=ljh.npulses,
+            subframediv=ljh.subframediv,
+            noise=noise_channel,
+            transform_raw=transform_raw,
+            pulseframer=ljh,
         )
         return channel
 
