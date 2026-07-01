@@ -196,7 +196,8 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    pulseframer = PulseDataFromNumpy(pulse_traces)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=pulseframer)
     ch = ch.filter5lag()
     step: mass2.core.OptimalFilterStep = ch.steps[-1]
     assert isinstance(step, mass2.core.OptimalFilterStep)

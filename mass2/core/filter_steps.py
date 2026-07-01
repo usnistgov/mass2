@@ -25,9 +25,14 @@ class OptimalFilterStep(RecipeStep):
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the optimal filter to the input DataFrame and return a new DataFrame with results."""
+        assert pulseframer is not None
+        rawcol = self.inputs[0]
         dfs = []
-        for df_iter in df.iter_slices(10000):
-            raw = df_iter[self.inputs[0]].to_numpy()
+        n = len(df)
+        chunksize = 4096
+        for start in range(0, n, chunksize):
+            stop = min(start + chunksize, n)
+            raw = pulseframer.load_raw_chunk(start, stop)[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
             peak_y, peak_x = self.filter.filter_records(raw)

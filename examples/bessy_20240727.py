@@ -205,9 +205,13 @@ def _(data3, dropdown_ch, mass2):
 
 @app.cell
 def _(data3, dropdown_ch, mass2, plt):
-    plt.plot(data3.channels[dropdown_ch.value].noise.df["pulse"][:10].to_numpy().T)
-    plt.plot(data3.channels[dropdown_ch.value].df["pulse"][:10].to_numpy().T)
-    plt.title("first 10 noise traces and first 10 pulse traces")
+    _ch = data3.channels[dropdown_ch.value]
+    plt.figure()
+    ax = plt.subplot(121)
+    _ch.plot_pulses(length=10, axis=ax)
+    plt.subplot(122, sharey=ax)
+    plt.plot(_ch.noise.df["pulse"][:10].to_numpy().T)
+    plt.suptitle("first 10 pulse traces and first 10 noise traces")
     mass2.show()
     return
 

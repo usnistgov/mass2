@@ -102,7 +102,7 @@ class SummarizeStep(RecipeStep):
         n = len(df)
         chunksize = 1024
         for start in range(0, n, chunksize):
-            stop = min(n, start + chunksize)
+            stop = min(start + chunksize, n)
             raw = pulseframer.load_raw_chunk(start, stop)[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
