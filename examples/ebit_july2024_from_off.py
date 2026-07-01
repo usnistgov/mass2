@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.2"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
@@ -50,6 +50,9 @@ def _(off_paths, pl):
     )
     timing_df = timing_df.select(
         "calibration_status", timestamp=pl.from_epoch("timestamp", time_unit="s")
+    ).with_columns(
+        # data were recorded as UTC times
+        pl.col("timestamp").dt.replace_time_zone("UTC")
     )
     timing_df
     return Path, timing_df
@@ -78,8 +81,13 @@ def _(Path, mo, np, off_paths, plt):
 @app.cell
 def _(data, pl, timing_df):
     def with_timing_df(ch):
-        # load the ebit calibration source timing file from csv
-        df2 = ch.df.join_asof(timing_df, left_on="timestamp", right_on="timestamp")
+        # We loaded the ebit calibration source timing file from csv and asserted EDT time zone.
+        # But have to convert to use the same time zone as ch.df if we want to join.
+        tz = ch.df["timestamp"].dtype.time_zone
+        timing_df2 = timing_df.with_columns(
+            pl.col("timestamp").dt.convert_time_zone(tz)
+        )
+        df2 = ch.df.join_asof(timing_df2, left_on="timestamp", right_on="timestamp")
         s = df2.select(
             state_label2=pl.concat_str(
                 ["state_label", "calibration_status"], ignore_nulls=True, separator="_"
