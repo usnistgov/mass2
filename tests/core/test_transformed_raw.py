@@ -29,7 +29,6 @@ def test_inverted_data():
 
     ds1 = mass2.Channel.from_ljh(src_name)
     ds2 = mass2.Channel.from_ljh(src_name, transform_raw=invert)
-    print(ds1)
 
     # Use only a limited # of rows for this test
     nmax = 400

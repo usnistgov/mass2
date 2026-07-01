@@ -32,10 +32,11 @@ class NoiseChannel:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
-        noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
-        excursion = excursion2d(noise_traces)
+        assert self.pulseframer is not None
+        noise_traces = self.pulseframer.load_raw_chunk(0, n_limit)[trace_col_name]
+        excursion = excursion2d(noise_traces.to_numpy())
         max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
-        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
+        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion).with_columns(noise_traces)
         return df_noise2, max_excursion
 
     def get_records_2d(
@@ -72,8 +73,9 @@ class NoiseChannel:
 
             Shape: (n_pulses, len(pulse))
         """
+        assert self.pulseframer is not None
         df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"].to_numpy()
+        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)[trace_col_name].to_numpy()
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:

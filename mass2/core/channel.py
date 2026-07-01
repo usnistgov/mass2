@@ -1523,13 +1523,12 @@ class Channel:
             nch = None
         else:
             ndata = load(noise_fname)
-            noise_df = pl.DataFrame({"pulse": ndata.T})
-            nh = {
+            noise_df = pl.DataFrame({"index": range(len(ndata))})
+            noise_header = pl.DataFrame({
                 "filename": noise_fname,
                 "continuous": True,
                 "Presamples": npresamples,
-            }
-            noise_header = pl.DataFrame(nh)
+            })
             framer = PulseDataFromNumpy(ndata.T)
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 
