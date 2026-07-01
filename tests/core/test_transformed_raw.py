@@ -17,8 +17,10 @@ def test_inverted_data():
 
     ds1 = mass2.Channel.from_ljh(src_name)
     ds2 = mass2.Channel.from_ljh(src_name, transform_raw=invert)
-    raw1 = ds1.df["pulse"].to_numpy()
-    raw2 = ds2.df["pulse"].to_numpy()
+    assert ds1.pulseframer is not None
+    assert ds2.pulseframer is not None
+    raw1 = ds1.pulseframer.load_raw_chunk(0, ds1.npulses)["pulse"].to_numpy()
+    raw2 = ds2.pulseframer.load_raw_chunk(0, ds2.npulses)["pulse"].to_numpy()
     assert ds2.transform_raw is not None
     tr2 = ds2.transform_raw(raw2)
 
@@ -36,14 +38,17 @@ def test_inverted_data():
     ds2 = ds2.with_replacement_df(ds2.df.limit(nmax))
 
     # Now replace ds2's raw data with a bitwise inverse of it
-    inverted = invert(ds2.df["pulse"].to_numpy())
-    df2 = ds2.df.drop("pulse").with_columns(pl.Series(inverted).alias("pulse"))
+    assert ds2.pulseframer is not None
+    raw2 = ds2.pulseframer.load_raw_chunk(0, nmax)["pulse"].to_numpy()
+    inverted = invert(raw2)
+    df2 = ds2.df.drop("pulse", strict=False).with_columns(pl.Series(inverted).alias("pulse"))
     ds2 = ds2.with_replacement_df(df2)
     framer = mass2.misc.PulseDataFromNumpy(inverted)
     ds2 = replace(ds2, pulseframer=framer)
 
     # Make sure the pulse data are indeed inverted
-    raw1 = ds1.df["pulse"].to_numpy()
+    assert ds1.pulseframer is not None
+    raw1 = ds1.pulseframer.load_raw_chunk(0, nmax)["pulse"].to_numpy()
     raw2 = ds2.df["pulse"].to_numpy()
     assert ds2.transform_raw is not None
     tr2 = ds2.transform_raw(raw2)
@@ -53,7 +58,7 @@ def test_inverted_data():
     # Now remove the raw pulse column and compare all other columns in the data frame
     ds1 = ds1.summarize_pulses()
     ds2 = ds2.summarize_pulses()
-    df1 = ds1.df.drop("pulse")
+    df1 = ds1.df
     df2 = ds2.df.drop("pulse")
     print(df1.limit(5))
     print(df2.limit(5))

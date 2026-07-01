@@ -452,7 +452,7 @@ Analysis "steps" have been mentioned before. The big idea is that each channel i
 
 Sometimes you run an analysis that you consider "final"; you want to keep the results only, and you expect (hope?) never to look at the raw LJH files again. We are still working out a standard system for caching computed data: how to name the files, how to combine them, etc. Here are two approaches that employ Parquet files. One stores a file per channel, and the other stores all data in a single file.
 
-**Approach A: one file per channel** Here we store each channel's dataframe in a separate file. Notice that we want to drop the column representing the raw pulse data, because the output would otherwise be far too large (and redundant). Probably it's fine to drop the subframe count, too, so we do that here.
+**Approach A: one file per channel** Here we store each channel's dataframe in a separate file. It's fine to drop the subframe count, too, so we do that here as a demonstration of the syntax.
 
 ```python
 # mkdocs: render
@@ -462,7 +462,7 @@ import tempfile, os
 output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
 print(f"Test output lives in '{output_dir.name}'")
 
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 for ch_num, ch in data.channels.items():
     filename = os.path.join(output_dir.name, f"output_test_chan{ch_num}.parquet")
     df = ch.df.drop(columns_to_drop)
@@ -488,7 +488,7 @@ This is similar, except that we use some new Polars tricks:
 2. `polars.concat()` to join rows from multiple dataframes
 
 ```python
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 all_df = []
 for ch_num, ch in data.channels.items():
     df = ch.df.drop(columns_to_drop).with_columns(ch_num=pl.lit(ch_num))

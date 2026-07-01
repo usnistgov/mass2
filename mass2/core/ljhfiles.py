@@ -307,6 +307,7 @@ class LJHFile(PulseDataFramer):
         first_pulse: int = 0,
         keep_posix_usec: bool = False,
         force_continuous: bool = False,
+        keep_raw_pulses: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Convert this LJH file to two Polars dataframes: one for the binary data, one for the header.
 
@@ -319,6 +320,10 @@ class LJHFile(PulseDataFramer):
         force_continuous : bool
             Whether to claim that the data stream is actually continuous (because it cannot be learned from
             data for LJH files before version 2.2.0). Only relevant for noise data files.
+        keep_raw_pulses : bool
+            Whether to have raw pulse data as column "pulse" in the DataFrame, by default False.
+            Keeping them can be convenient for small files,  but for large analysis with many channels,
+            you MUST set this to False, or memory consumption by the data frames can exceed your RAM.
 
         Returns
         -------
@@ -340,6 +345,9 @@ class LJHFile(PulseDataFramer):
             "posix_usec": pl.UInt64,
             "subframecount": pl.UInt64,
         }
+        if not keep_raw_pulses:
+            del data["pulse"]
+            del schema_map["pulse"]
         schema = pl.Schema(schema_map)
         df = pl.DataFrame(data, schema=schema)
         df = df.select(
@@ -492,10 +500,16 @@ class LJHFile_2_1(LJHFile):
         return usec
 
     def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+        self,
+        first_pulse: int = 0,
+        keep_posix_usec: bool = False,
+        force_continuous: bool = False,
+        keep_raw_pulses: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        df, df_header = super().to_polars(
+            first_pulse, keep_posix_usec, force_continuous=force_continuous, keep_raw_pulses=keep_raw_pulses
+        )
         return df.select(pl.exclude("subframecount")), df_header
 
 
@@ -531,10 +545,16 @@ class LJHFile_2_0(LJHFile):
         return usec
 
     def to_polars(
-        self, first_pulse: int = 0, keep_posix_usec: bool = False, force_continuous: bool = False
+        self,
+        first_pulse: int = 0,
+        keep_posix_usec: bool = False,
+        force_continuous: bool = False,
+        keep_raw_pulses: bool = False,
     ) -> tuple[pl.DataFrame, pl.DataFrame]:
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
-        df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
+        df, df_header = super().to_polars(
+            first_pulse, keep_posix_usec, force_continuous=force_continuous, keep_raw_pulses=keep_raw_pulses
+        )
         return df.select(pl.exclude("subframecount")), df_header
 
     def __getstate__(self) -> dict[str, Any]:
