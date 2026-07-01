@@ -99,7 +99,7 @@ def _(data2):
 
 
 @app.cell
-def _(data2, mass2, pl):
+def _(data2, mass2, pl, plt):
     line_names = ["OKAlpha", "FeLAlpha", "NiLAlpha", "CKAlpha", "NKAlpha", "CuLAlpha"]
 
     def _do_analysis(ch: mass2.Channel) -> mass2.Channel:
@@ -124,6 +124,9 @@ def _(data2, mass2, pl):
         )
 
     data3 = data2.map(_do_analysis)
+    data3.plot_avg_pulses()
+    plt.gcf()
+
     return (data3,)
 
 

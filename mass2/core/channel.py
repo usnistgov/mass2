@@ -986,17 +986,10 @@ class Channel:
         NDArray
             _description_
         """
-        avg_pulse = (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(pulse_col)
-            .limit(limit)
-            .collect()
-            .to_series()
-            .to_numpy()
-            .mean(axis=0)
-        )
+        assert self.pulseframer is not None
+        idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
+        avg_pulse = pulses.mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
