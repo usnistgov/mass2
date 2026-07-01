@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -57,7 +57,7 @@ def _(mass2, pulsedata):
 @app.cell
 def _(mo):
     mo.md("""
-    # basic analysis
+    # Basic analysis
     The variables `data` is the conventional name for a `Channels` object. It contains a list of
     `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy.
     One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.

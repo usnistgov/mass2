@@ -572,7 +572,7 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
-
+        assert self.pulseframer is not None
         pulse_type = self.df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
@@ -636,11 +636,11 @@ class Channel:
         upper_axis.set_xlabel("Time after trigger (ms)")
         plt.xlabel("Samples after trigger")
 
-        plot_columns = (pulse_field, "pretrig_mean")
-        df = lf.select(plot_columns).collect()
-        N = len(df)
-        pulses = df[pulse_field]
+        df = lf.select(("Record #", "pretrig_mean")).collect()
+        idx = df["Record #"]
         ptmean = df["pretrig_mean"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field]
+        N = len(idx)
         for i in range(N):
             pulse = pulses[i].to_numpy()
             color = cmap(i / N)
@@ -1852,7 +1852,8 @@ class Channel:
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
-        pulse = self.df[col][index].to_numpy()
+        assert self.pulseframer is not None
+        pulse = self.pulseframer.load_raw_pulse(index)[col].to_numpy()
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
