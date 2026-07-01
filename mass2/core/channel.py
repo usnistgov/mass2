@@ -19,7 +19,6 @@ import functools
 import numpy as np
 import time
 from pathlib import Path
-from abc import ABC, abstractmethod
 
 import tzlocal
 
@@ -28,7 +27,7 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .offfiles import OffFile
-from .misc import alwaysTrue, plot_zoomable
+from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
@@ -57,23 +56,6 @@ class ExtTriggerControl:
     @property
     def require_next(self) -> bool:
         return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
-
-
-class PulseDataFramer(ABC):
-    """Classes that inherit from this can provide specified chunks of raw pulses, or specific pulses, as
-    polars DataFrame objects."""
-
-    @abstractmethod
-    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
-
-    @abstractmethod
-    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
-
-    @abstractmethod
-    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
 
 
 @dataclass(frozen=True)
@@ -820,7 +802,7 @@ class Channel:
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
         t_start = time.time()
-        df2 = step.calc_from_df(self.df)
+        df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
@@ -922,15 +904,15 @@ class Channel:
         out_names = mass2.core.pulse_algorithms.result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
+        assert self.pulseframer is not None
         outputs = list(out_names)
         step = SummarizeStep(
-            inputs=[col],
+            inputs=[],
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
             frametime_s=self.frametime_s,
             peak_index=peak_index,
-            pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
@@ -1549,11 +1531,13 @@ class Channel:
                 "Presamples": npresamples,
             }
             noise_header = pl.DataFrame(nh)
-            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+            framer = PulseDataFromNumpy(ndata.T)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 
         source = os.path.basename(pulse_fname)
         header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
-        return cls(pulse_df, header, npulses, noise=nch)
+        framer = PulseDataFromNumpy(pdata.T)
+        return cls(pulse_df, header, npulses, noise=nch, pulseframer=framer)
 
     @classmethod
     def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":
@@ -1873,6 +1857,12 @@ class Channel:
             print(f"pulse index={index}")
             print(result.fit_report())
         return result
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("pulseframer", None)
+        return state
 
 
 @dataclass(frozen=True)

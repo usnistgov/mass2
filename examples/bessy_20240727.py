@@ -223,7 +223,7 @@ def _(data3, dropdown_ch):
     _ch = data3.channels[dropdown_ch.value]
     _df = _ch.noise.df
     for step in _ch.steps:
-        _df = step.calc_from_df(_df)
+        _df = step.calc_from_df(_df, _ch.pulseframer)
     df_baseline = _df
     df_baseline
     return (df_baseline,)

@@ -286,6 +286,7 @@ class LJHFile(PulseDataFramer):
         return (self.subframecount[i], self.datatimes_raw[i], pulse_record)
 
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        stop = min(stop, self.npulses)
         s = slice(start, stop, step)
         return self._load_raw(s)
 
@@ -334,11 +335,12 @@ class LJHFile(PulseDataFramer):
             "posix_usec": self.datatimes_raw[first_pulse:],
             "subframecount": self.subframecount[first_pulse:],
         }
-        schema: pl.Schema = pl.Schema({
+        schema_map: dict[str, pl.DataType | type[pl.DataType]] = {
             "pulse": pl.Array(pl.UInt16, self.nsamples),
             "posix_usec": pl.UInt64,
             "subframecount": pl.UInt64,
-        })
+        }
+        schema = pl.Schema(schema_map)
         df = pl.DataFrame(data, schema=schema)
         df = df.select(
             pl.from_epoch("posix_usec", time_unit="us").dt.convert_time_zone(_local_timezone_name).alias("timestamp")
@@ -534,3 +536,14 @@ class LJHFile_2_0(LJHFile):
         """Generate two Polars dataframes from this LJH file: one for the binary data, one for the header."""
         df, df_header = super().to_polars(first_pulse, keep_posix_usec, force_continuous=force_continuous)
         return df.select(pl.exclude("subframecount")), df_header
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("_mmap", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
+        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
+        pass

@@ -8,11 +8,15 @@ from pathlib import Path
 import numpy as np
 import pylab as plt
 import polars as pl
+import dill
+import mmap
+import pathlib
 import subprocess
 import sys
-import pathlib
-import dill
 import marimo as mo
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from dataclasses import dataclass
 
 
 def plot_zoomable() -> None:
@@ -80,14 +84,14 @@ def sigma_mad(x: ArrayLike) -> float:
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
     """Return the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
-    mid = np.median(x)
+    mid = float(np.median(x))
     return mid + nsigma * sigma_mad(x)
 
 
 def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
     """Return the values that are `nsigma` median absolute deviations (MADs) below and above the median of the input"""
     x = np.asarray(x)
-    mid = np.median(x)
+    mid = float(np.median(x))
     smad = sigma_mad(x)
     return mid - nsigma * smad, mid + nsigma * smad
 
@@ -225,3 +229,80 @@ def alwaysTrue() -> pl.Expr:
         Literal True
     """
     return pl.lit(True)
+
+
+class PulseDataFramer(ABC):
+    """Classes that inherit from this can provide specified chunks of raw pulses, or specific pulses, as
+    polars DataFrame objects."""
+
+    @abstractmethod
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
+
+    @abstractmethod
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        pass
+
+
+@dataclass(frozen=True)
+class PulseDataFromNumpy(PulseDataFramer):
+    pulses: NDArray
+
+    @property
+    def npulses(self) -> int:
+        return self.pulses.shape[0]
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        s = slice(start, stop, step)
+        return pl.DataFrame({"pulse": self.pulses[s]})
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return pl.DataFrame({"pulse": self.pulses[id]})
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return pl.DataFrame({"pulse": self.pulses[list(ids)]})
+
+
+def hunt_for_mmap(obj: Any, path: str = "root_object", visited: set[Any] | None = None) -> None:
+    """A function to search recursively for an object to contain an unpicklable mmap."""
+    if visited is None:
+        visited = set()
+
+    # Prevent infinite loops from circular references
+    obj_id = id(obj)
+    if obj_id in visited:
+        return
+    visited.add(obj_id)
+
+    # Base Case 1: Found the raw mmap
+    if isinstance(obj, mmap.mmap):
+        print(f"🚨 FOUND RAW MMAP AT: {path}")
+        return
+
+    # Base Case 2: Found a NumPy memmap (which contains an mmap)
+    if isinstance(obj, np.memmap):
+        print(f"🚨 FOUND NUMPY MEMMAP AT: {path}")
+        return
+
+    # Recursive Step 1: Check dictionaries
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            hunt_for_mmap(value, f"{path}['{key}']", visited)
+
+    # Recursive Step 2: Check lists and tuples
+    elif isinstance(obj, (list, tuple)):
+        for index, item in enumerate(obj):
+            hunt_for_mmap(item, f"{path}[{index}]", visited)
+
+    # Recursive Step 3: Check custom objects / dataclasses
+    elif hasattr(obj, "__dict__"):
+        for key, value in obj.__dict__.items():
+            hunt_for_mmap(value, f"{path}.{key}", visited)
+
+
+# Run the hunter
+# hunt_for_mmap(my_failing_dataclass)

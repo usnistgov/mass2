@@ -10,6 +10,7 @@ import mass2
 import pulsedata
 import tempfile
 import pathlib
+from mass2.core.misc import PulseDataFromNumpy
 
 
 def test_ljh_to_polars():
@@ -28,7 +29,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, pulseframer=PulseDataFromNumpy(noise_traces))
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -39,7 +40,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=PulseDataFromNumpy(pulse_traces + noise_traces))
     return ch
 
 
@@ -184,7 +185,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     header_df = pl.DataFrame({"continuous": [True]})
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -224,7 +225,7 @@ def test_noise_autocorr():
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
     noise_traces = rng.standard_normal((250, 500))
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     assert len(noise_ch.df) == 250
     assert len(noise_ch.df["pulse"][0]) == 500
     noise_autocorr_mass = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
@@ -256,7 +257,9 @@ def test_noise_psd():
     # PSD = 1/Hz
     noise_traces = rng.standard_normal((1000, 500))
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
@@ -290,7 +293,9 @@ def test_get_pulses_2d():
     # 1000 pulses of length 500
     noise_traces = rng.standard_normal((10, 5))
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     pulses = noise_ch.get_records_2d()
     assert pulses.shape[0] == 10  # npulses
     assert pulses.shape[1] == 5  # length of pulses
@@ -312,7 +317,9 @@ def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     assert np.allclose(noise_traces[0, :], np.arange(10))
     assert np.allclose(noise_traces.shape, np.array([5, 10]))
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses

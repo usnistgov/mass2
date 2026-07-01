@@ -829,7 +829,7 @@ class Channels:
             Zipfile that work was saved in.
         """
         path = pathlib.Path(path)
-        path.exists() and path.is_file()
+        assert path.exists() and path.is_file()
 
         def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file

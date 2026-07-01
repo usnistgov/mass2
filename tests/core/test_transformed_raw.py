@@ -1,6 +1,7 @@
 import numpy as np
 import polars as pl
 from polars.testing import assert_frame_equal
+from dataclasses import replace
 import pulsedata
 import mass2
 
@@ -18,6 +19,7 @@ def test_inverted_data():
     ds2 = mass2.Channel.from_ljh(src_name, transform_raw=invert)
     raw1 = ds1.df["pulse"].to_numpy()
     raw2 = ds2.df["pulse"].to_numpy()
+    assert ds2.transform_raw is not None
     tr2 = ds2.transform_raw(raw2)
 
     assert np.all(raw1 == raw2)
@@ -27,6 +29,7 @@ def test_inverted_data():
 
     ds1 = mass2.Channel.from_ljh(src_name)
     ds2 = mass2.Channel.from_ljh(src_name, transform_raw=invert)
+    print(ds1)
 
     # Use only a limited # of rows for this test
     nmax = 400
@@ -37,10 +40,13 @@ def test_inverted_data():
     inverted = invert(ds2.df["pulse"].to_numpy())
     df2 = ds2.df.drop("pulse").with_columns(pl.Series(inverted).alias("pulse"))
     ds2 = ds2.with_replacement_df(df2)
+    framer = mass2.misc.PulseDataFromNumpy(inverted)
+    ds2 = replace(ds2, pulseframer=framer)
 
     # Make sure the pulse data are indeed inverted
     raw1 = ds1.df["pulse"].to_numpy()
     raw2 = ds2.df["pulse"].to_numpy()
+    assert ds2.transform_raw is not None
     tr2 = ds2.transform_raw(raw2)
     assert np.all(raw1 == ~raw2)
     assert np.all(raw1 == tr2)

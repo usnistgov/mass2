@@ -12,7 +12,6 @@ import pylab as plt  # type: ignore
 import polars as pl
 from matplotlib.axes._axes import Axes
 from numpy import float32, ndarray
-from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult  # type: ignore
 import scipy as sp
@@ -21,7 +20,7 @@ import itertools
 import mass2
 from .channel import Channel
 from .recipe import RecipeStep
-from .misc import alwaysTrue
+from .misc import alwaysTrue, PulseDataFramer
 
 # from . import rough_cal
 from mass2.calibration.algorithms import line_names_and_energies
@@ -755,7 +754,7 @@ class RoughCalibrationStep(RecipeStep):
     ph2energy: Callable
     success: bool
 
-    def calc_from_df(self, df: DataFrame) -> DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the rough calibration to a dataframe."""
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
@@ -775,7 +774,7 @@ class RoughCalibrationStep(RecipeStep):
         else:
             self.dbg_plot_failure(df_after, **kwargs)
 
-    def dbg_plot_success(self, df: DataFrame, **kwargs: Any) -> None:
+    def dbg_plot_success(self, df: pl.DataFrame, **kwargs: Any) -> None:
         """Create diagnostic plots of the rough calibration step, if it succeeded."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.assignment_result:
@@ -783,7 +782,7 @@ class RoughCalibrationStep(RecipeStep):
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
 
-    def dbg_plot_failure(self, df: DataFrame, **kwargs: None) -> None:
+    def dbg_plot_failure(self, df: pl.DataFrame, **kwargs: None) -> None:
         """Create diagnostic plots of the rough calibration step, if it failed."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.pfresult:
