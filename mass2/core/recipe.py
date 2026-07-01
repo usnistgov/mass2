@@ -97,12 +97,13 @@ class SummarizeStep(RecipeStep):
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
         assert pulseframer is not None
+        rawcol = self.inputs[0]
         summaries = []
         n = len(df)
         chunksize = 1024
         for start in range(0, n, chunksize):
             stop = min(n, start + chunksize)
-            raw = pulseframer.load_raw_chunk(start, stop)["pulse"].to_numpy()
+            raw = pulseframer.load_raw_chunk(start, stop)[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
 

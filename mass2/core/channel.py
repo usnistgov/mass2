@@ -892,7 +892,8 @@ class Channel:
     @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
         """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
-        raw = self.df.limit(100)[col].to_numpy()
+        assert self.pulseframer is not None
+        raw = self.pulseframer.load_raw_chunk(0, 100)[col].to_numpy()
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
@@ -907,7 +908,7 @@ class Channel:
         assert self.pulseframer is not None
         outputs = list(out_names)
         step = SummarizeStep(
-            inputs=[],
+            inputs=[col],
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
