@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.0.6** June 24, 2026-
+**2.1.0** June 24, 2026-
 * Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
 
 **2.0.5** June 11, 2026

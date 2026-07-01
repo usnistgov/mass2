@@ -126,7 +126,6 @@ def _(data2, mass2, pl, plt):
     data3 = data2.map(_do_analysis)
     data3.plot_avg_pulses()
     plt.gcf()
-
     return (data3,)
 
 
@@ -210,7 +209,7 @@ def _(data3, dropdown_ch, mass2, plt):
     ax = plt.subplot(121)
     _ch.plot_pulses(length=10, axis=ax)
     plt.subplot(122, sharey=ax)
-    plt.plot(_ch.noise.df["pulse"][:10].to_numpy().T)
+    plt.plot(_ch.noise.pulseframer.load_raw_chunk(0, 10)["pulse"])
     plt.suptitle("first 10 pulse traces and first 10 noise traces")
     mass2.show()
     return

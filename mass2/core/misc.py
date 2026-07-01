@@ -257,6 +257,7 @@ class PulseDataFromNumpy(PulseDataFramer):
         return self.pulses.shape[0]
 
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        stop = min(stop, self.npulses)
         s = slice(start, stop, step)
         return pl.DataFrame({"pulse": self.pulses[s]})
 

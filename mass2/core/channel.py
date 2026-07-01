@@ -520,7 +520,7 @@ class Channel:
             plt.legend(title=color_col)
         plot_zoomable()
 
-    def plot_pulses(  # noqa: PLR0917
+    def plot_pulses(  # noqa: PLR0914, PLR0917
         self,
         length: int = 30,
         skip: int = 0,
@@ -573,7 +573,8 @@ class Channel:
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
         assert self.pulseframer is not None
-        pulse_type = self.df[pulse_field].dtype
+        test_df = self.pulseframer.load_raw_pulse(0)
+        pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
         )
@@ -1453,7 +1454,6 @@ class Channel:
         ch_num: int = 0,
         invert_data: bool = False,
         timestamps: bool = True,
-        row_index: bool = False,
         rescale: float = 1.0,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
@@ -1479,8 +1479,6 @@ class Channel:
             Whether to take the negative of the raw data, by default False
         timestamps : bool, optional
             Whether to generate timestamp guesses, based on file creation time, by default True
-        row_index: bool, optional
-            Whether to generate a column "index" counting [0...n-1], by default False
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
 
@@ -1502,10 +1500,7 @@ class Channel:
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
-        datadict = {"pulse": pdata.T}
-        pulse_df = pl.DataFrame(datadict)
-        if row_index:
-            pulse_df = pulse_df.with_row_index()
+        pulse_df = pl.DataFrame({"index": range(npulses)})
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and
@@ -1523,7 +1518,8 @@ class Channel:
             nch = None
         else:
             ndata = load(noise_fname)
-            noise_df = pl.DataFrame({"index": range(len(ndata))})
+            _, nnoise = pdata.shape
+            noise_df = pl.DataFrame({"index": range(nnoise)})
             noise_header = pl.DataFrame({
                 "filename": noise_fname,
                 "continuous": True,
@@ -1533,7 +1529,9 @@ class Channel:
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 
         source = os.path.basename(pulse_fname)
-        header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
+        header = ChannelHeader(
+            description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pl.DataFrame()
+        )
         framer = PulseDataFromNumpy(pdata.T)
         return cls(pulse_df, header, npulses, noise=nch, pulseframer=framer)
 

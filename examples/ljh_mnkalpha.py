@@ -317,7 +317,7 @@ def _(data, data2, mo, np):
     if we used a mutating style of coding.
 
     `{np.shares_memory(data.channels[4102].df["subframecount"].to_numpy(), data2.channels[4102].df["subframecount"].to_numpy())=}`
-    `{np.shares_memory(data.channels[4102].df["pulse"].to_numpy(), data2.channels[4102].df["pulse"].to_numpy())=}`
+
     """)
     return
 
