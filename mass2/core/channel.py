@@ -1188,12 +1188,16 @@ class Channel:
         tuple[NDArray, NDArray]
             _description_
         """
+        assert self.pulseframer is not None
+        # idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        # pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         df = (
             self.df.lazy()
+            .with_row_index("Record #")
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .select("Record #", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1211,7 +1215,8 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        pulse = df["pulse"].to_numpy()
+        idx = df["Record #"]
+        pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
