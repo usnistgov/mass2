@@ -1797,18 +1797,6 @@ class Channel:
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
-        tpi_microsec = (self.typical_peak_ind() - self.n_presamples) * (1e6 * self.frametime_s)
-        plottables = (
-            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
-            ("pulse_average", "Pulse Avg", "purple", None),
-            ("peak_value", "Peak value", "blue", None),
-            ("pretrig_rms", "Pretrig RMS", "green", [0, 4000]),
-            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
-            ("postpeak_deriv", "Max PostPk deriv", "gold", [0, 200]),
-            ("rise_time_µs", "Rise time (µs)", "orange", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-            ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-        )
-
         use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
@@ -1820,6 +1808,19 @@ class Channel:
             ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
             (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
+
+        tpi_microsec = df.filter(self.good_expr).select("peak_time_µs").median().collect()
+        plottables = (
+            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
+            ("pulse_average", "Pulse Avg", "purple", None),
+            ("peak_value", "Peak value", "blue", None),
+            ("pretrig_rms", "Pretrig RMS", "green", (0, 4000)),
+            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
+            ("postpeak_deriv", "Max PostPk deriv", "gold", (0, 200)),
+            ("rise_time_µs", "Rise time (µs)", "orange", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+            ("peak_time_µs", "Peak time (µs)", "red", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+        )
+
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")
