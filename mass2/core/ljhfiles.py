@@ -6,7 +6,7 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Any
-from collections.abc import Iterable
+from collections.abc import Iterable, Generator
 from numpy.typing import NDArray
 import os
 import numpy as np
@@ -301,6 +301,10 @@ class LJHFile(PulseDataFramer):
         schema = pl.Schema({"pulse": pl.Array(pl.UInt16, self.nsamples)})
         df = pl.DataFrame(data, schema=schema)
         return df
+
+    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]:
+        for i in range(0, self.npulses, chunksize):
+            yield self.load_raw_chunk(i, i + chunksize)
 
     def to_polars(
         self,

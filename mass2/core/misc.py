@@ -15,7 +15,7 @@ import subprocess
 import sys
 import marimo as mo
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Generator
 from dataclasses import dataclass
 
 
@@ -236,16 +236,16 @@ class PulseDataFramer(ABC):
     polars DataFrame objects."""
 
     @abstractmethod
-    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame: ...
 
     @abstractmethod
-    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame: ...
 
     @abstractmethod
-    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        pass
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame: ...
+
+    @abstractmethod
+    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]: ...
 
 
 @dataclass(frozen=True)
@@ -266,6 +266,10 @@ class PulseDataFromNumpy(PulseDataFramer):
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
         return pl.DataFrame({"pulse": self.pulses[list(ids)]})
+
+    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]:
+        for i in range(0, self.npulses, chunksize):
+            yield pl.DataFrame({"pulse": self.pulses[i : i + chunksize]})
 
 
 def hunt_for_mmap(obj: Any, path: str = "root_object", visited: set[Any] | None = None) -> None:
