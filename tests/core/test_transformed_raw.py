@@ -29,13 +29,10 @@ def test_inverted_data():
 
     src_name = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"].pulse_folder / "20240727_run0002_chan4219.ljh"
 
-    ds1 = mass2.Channel.from_ljh(src_name)
-    ds2 = mass2.Channel.from_ljh(src_name, transform_raw=invert)
-
     # Use only a limited # of rows for this test
     nmax = 400
-    ds1 = ds1.with_replacement_df(ds1.df.limit(nmax))
-    ds2 = ds2.with_replacement_df(ds2.df.limit(nmax))
+    ds1 = mass2.Channel.from_ljh(src_name, max_pulses=nmax)
+    ds2 = mass2.Channel.from_ljh(src_name, max_pulses=nmax, transform_raw=invert)
 
     # Now replace ds2's raw data with a bitwise inverse of it
     assert ds2.pulseframer is not None

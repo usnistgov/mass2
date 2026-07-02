@@ -1394,13 +1394,14 @@ class Channel:
         noise_path: str | Path | None = None,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
+        max_pulses: int | None = None,
     ) -> "Channel":
         """Load a Channel from an LJH file, optionally with a NoiseChannel from a corresponding noise LJH file."""
         if not noise_path:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass2.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
         channel = cls(
@@ -1668,10 +1669,7 @@ class Channel:
 
     def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
         """Replace the dataframe with a new one, keeping all other attributes the same."""
-        return dataclasses.replace(
-            self,
-            df=df2,
-        )
+        return dataclasses.replace(self, df=df2, npulses=len(df2))
 
     def drop(self, *args: str) -> "Channel":
         "Return a Channel, after dropping one or more columns from the dataframe, by name"
