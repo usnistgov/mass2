@@ -5,6 +5,7 @@ microcalorimeter channel bookkeeping, recipes, fitting, filtering, and more."""
 
 # Don't import the _contents_ of these at the top level
 from . import analysis_algorithms
+from . import apache_files
 from . import optimal_filtering
 from . import pulse_model
 from . import message_logging

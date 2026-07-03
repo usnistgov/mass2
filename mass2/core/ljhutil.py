@@ -15,7 +15,7 @@ from packaging.version import Version
 
 from .ljhfiles import LJHFile
 
-__all__ = ["find_ljh_files", "ljh_truncate"]
+__all__ = ["find_ljh_files", "ljh_truncate", "filename_glob_expand"]
 
 
 def find_folders_with_extension(root_path: str, extensions: list[str]) -> list[str]:
@@ -217,7 +217,7 @@ def ljh_sort_filenames_numerically(fnames: list[str], inclusion_list: list[int] 
 def filename_glob_expand(pattern: str) -> list[str]:
     """Return the result of glob-expansion on the input pattern.
 
-    :param pattern: Aglob pattern and return the glob-result as a list.
+    :param pattern: A glob pattern and return the glob-result as a list.
     :type pattern: str
     :return: filenames; the result is sorted first by str.sort, then by ljh_sort_filenames_numerically()
     :rtype: list
