@@ -30,6 +30,7 @@ dependencies = [
     "polars<1.40",
     "progress",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
+    "pyarrow",
     "pyqt5",
     "pyyaml",
     "scikit-learn",
