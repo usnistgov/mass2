@@ -375,6 +375,7 @@ def correct_flux_jumps(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> N
     Returns:
     Array with values corrected
     """
+    vals = np.asarray(vals, dtype=np.uint16)
     return unwrap_n(vals, flux_quant, mask)
 
 

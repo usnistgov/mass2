@@ -507,6 +507,7 @@ class FilterATS(Filter):
         _, nsamp = x.shape
 
         assert nsamp == len(self.values)
+        assert self.dt_values is not None
         return _filter_records_ats(x, self.values, self.dt_values)
 
 
