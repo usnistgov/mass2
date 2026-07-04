@@ -109,7 +109,9 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
         last_subframe = first_subframe + args.period * subframes_per_sec
         print(first_subframe, last_subframe)
         if args.dry_run:
+            first_subframe = last_subframe
             continue
+
         all_df: list[pl.DataFrame] = []
         for k, v in ljh.items():
             start_idx = np.searchsorted(subframes[k], first_subframe, side="left")
@@ -125,7 +127,13 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
         print(f"Writing {out_name} at {first_subframe / subframes_per_sec:.4f}")
         complete_df = pl.concat(all_df, rechunk=True)
         out_path = str(base / out_name)
-        complete_df.sort("channel_number", "subframecount").write_ipc(out_path)
+
+        # Generate the index map that *would* sort these columns
+        # If the data is already sorted, the index array is identical to its own row count
+        indices = df.select(pl.arg_sort_by(["channel_number", "subframecount"])).to_series()
+        if not indices.is_sorted():
+            complete_df = complete_df.sort("channel_number", "subframecount")
+        complete_df.write_ipc(out_path)
 
         first_subframe = last_subframe
         output_number += 1
