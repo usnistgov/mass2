@@ -248,7 +248,7 @@ def high_median(x: ArrayLike, weights: ArrayLike | None = None, return_index: bo
     else:
         weights = np.asarray(weights, dtype=float)
 
-    ri = int(_high_median(sort_idx, weights, n))
+    ri = _high_median(sort_idx, weights, n)
 
     if return_index:
         return float(x[ri]), ri
@@ -363,7 +363,7 @@ def _high_median(sort_idx: ArrayLike, weights: ArrayLike, n: int) -> int:
             break
         itrial = (imin + imax) // 2
 
-    return sort_idx[itrial]
+    return int(sort_idx[itrial])
 
 
 @njit

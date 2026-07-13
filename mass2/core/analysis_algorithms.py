@@ -375,12 +375,12 @@ def correct_flux_jumps(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> N
     Returns:
     Array with values corrected
     """
-    vals = np.asarray(vals, dtype=np.uint16)
+    vals = np.asarray(vals)
     return unwrap_n(vals, flux_quant, mask)
 
 
 @njit
-def unwrap_n(data: NDArray[np.uint16], period: float, mask: ArrayLike, n: int = 3) -> NDArray:
+def unwrap_n(data: NDArray, period: float, mask: ArrayLike, n: int = 3) -> NDArray:
     """Unwrap data that has been restricted to a given period.
 
     The algorithm iterates through each data point and compares

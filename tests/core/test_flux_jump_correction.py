@@ -38,14 +38,14 @@ class Test_unwrap_n:
 
     def test_lengths(self):
         # Check that an array of size 1 is unaffected
-        data = rng.uniform(size=1) * self.noise_size
+        data = self.data[:1]
         unwrapped = unwrap_n(data, self.noise_size / 10, self.mask, n=5)
         assert np.array_equal(data, unwrapped)
 
         # Check that an array shorter than the averaging length will not
         # break anything. Also, check that a length-3 array is affected
         # only when the chosen period is small enough.
-        data = rng.uniform(size=3) * self.noise_size
+        data = self.data[:3]
         diff1 = abs(data[1] - data[0])
         diff2 = abs(data[2] - (data[0] + data[1]) / 2)
         max_diff = max(diff1, diff2)
