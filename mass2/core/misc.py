@@ -3,13 +3,12 @@ Miscellaneous utility functions used in mass2 for plotting, pickling, statistics
 """
 
 from numpy.typing import ArrayLike, NDArray
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from pathlib import Path
 import numpy as np
 import pylab as plt
 import polars as pl
 import dill
-import mmap
 import pathlib
 import subprocess
 import sys
@@ -235,6 +234,10 @@ class PulseDataFramer(ABC):
     """Classes that inherit from this can provide specified chunks of raw pulses, or specific pulses, as
     polars DataFrame objects."""
 
+    if TYPE_CHECKING:
+        @property
+        def npulses(self) -> int: ...
+
     @abstractmethod
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame: ...
 
@@ -244,8 +247,101 @@ class PulseDataFramer(ABC):
     @abstractmethod
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame: ...
 
-    @abstractmethod
-    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]: ...
+    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]:
+        """Yield successive chunks of `chunksize` raw pulses each, covering the whole source in order."""
+        for i in range(0, self.npulses, chunksize):
+            yield self.load_raw_chunk(i, i + chunksize, extra_fields=extra_fields)
+
+    def select_rows(self, indices: ArrayLike) -> "PulseDataFramer":
+        """Return a new PulseDataFramer serving rows `indices[0], indices[1], ...` of this one, in that
+        order (repeats allowed). Used to keep a Channel's `pulseframer` in sync with its dataframe after
+        row-reordering operations such as `head`, `tail`, or `sample`."""
+        return ReindexedPulseDataFramer(self, np.asarray(indices, dtype=np.int64))
+
+
+@dataclass(frozen=True)
+class ReindexedPulseDataFramer(PulseDataFramer):
+    """Wraps another PulseDataFramer, remapping virtual row `i` to `base` row `indices[i]`."""
+
+    base: PulseDataFramer
+    indices: NDArray
+
+    @property
+    def npulses(self) -> int:
+        return len(self.indices)
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        stop = min(stop, self.npulses)
+        return self.base.load_raw_pulses(self.indices[start:stop:step], extra_fields=extra_fields)
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return self.base.load_raw_pulse(int(self.indices[id]), extra_fields=extra_fields)
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        ids = np.asarray(list(ids), dtype=np.int64)
+        return self.base.load_raw_pulses(self.indices[ids], extra_fields=extra_fields)
+
+
+@dataclass(frozen=True)
+class ConcatPulseDataFramer(PulseDataFramer):
+    """Wraps a sequence of PulseDataFramers end-to-end, presenting them as one contiguous source, so that
+    concatenated or combined Channels (e.g. via `concat_ch`, `combine_channels`) can still fetch raw
+    pulses correctly from each of their constituent source files."""
+
+    parts: tuple[PulseDataFramer, ...]
+
+    def __post_init__(self) -> None:
+        assert len(self.parts) > 0, "ConcatPulseDataFramer needs at least one part"
+
+    @property
+    def _part_lengths(self) -> NDArray:
+        return np.array([p.npulses for p in self.parts], dtype=np.int64)
+
+    @property
+    def _offsets(self) -> NDArray:
+        """Cumulative pulse count before each part; `_offsets[i]` is the first virtual row index of `parts[i]`."""
+        return np.concatenate(([0], np.cumsum(self._part_lengths)))
+
+    @property
+    def npulses(self) -> int:
+        return int(self._part_lengths.sum())
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        offsets = self._offsets
+        part_i = int(np.searchsorted(offsets, id, side="right") - 1)
+        local_id = int(id - offsets[part_i])
+        return self.parts[part_i].load_raw_pulse(local_id, extra_fields=extra_fields)
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        ids_arr = np.asarray(list(ids), dtype=np.int64)
+        if len(ids_arr) == 0:
+            return self.parts[0].load_raw_pulses([], extra_fields=extra_fields)
+        offsets = self._offsets
+        part_idx = np.searchsorted(offsets, ids_arr, side="right") - 1
+        dfs = []
+        positions = []
+        for p in np.unique(part_idx):
+            mask = part_idx == p
+            local_ids = ids_arr[mask] - offsets[p]
+            dfs.append(self.parts[int(p)].load_raw_pulses(local_ids, extra_fields=extra_fields))
+            positions.append(np.nonzero(mask)[0])
+        combined = pl.concat(dfs, how="vertical")
+        order = np.concatenate(positions)
+        if np.array_equal(order, np.arange(len(order))):
+            return combined
+        return combined.with_columns(pl.Series("__concat_order__", order)).sort("__concat_order__").drop("__concat_order__")
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        stop = min(stop, self.npulses)
+        if step == 1 and stop > start:
+            offsets = self._offsets
+            start_part = int(np.searchsorted(offsets, start, side="right") - 1)
+            stop_part = int(np.searchsorted(offsets, stop - 1, side="right") - 1)
+            if start_part == stop_part:
+                local_start = int(start - offsets[start_part])
+                local_stop = int(stop - offsets[start_part])
+                return self.parts[start_part].load_raw_chunk(local_start, local_stop, extra_fields=extra_fields)
+        return self.load_raw_pulses(range(start, stop, step), extra_fields=extra_fields)
 
 
 @dataclass(frozen=True)
@@ -267,47 +363,13 @@ class PulseDataFromNumpy(PulseDataFramer):
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
         return pl.DataFrame({"pulse": self.pulses[list(ids)]})
 
-    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]:
-        for i in range(0, self.npulses, chunksize):
-            yield pl.DataFrame({"pulse": self.pulses[i : i + chunksize]})
 
-
-def hunt_for_mmap(obj: Any, path: str = "root_object", visited: set[Any] | None = None) -> None:
-    """A function to search recursively for an object to contain an unpicklable mmap."""
-    if visited is None:
-        visited = set()
-
-    # Prevent infinite loops from circular references
-    obj_id = id(obj)
-    if obj_id in visited:
-        return
-    visited.add(obj_id)
-
-    # Base Case 1: Found the raw mmap
-    if isinstance(obj, mmap.mmap):
-        print(f"🚨 FOUND RAW MMAP AT: {path}")
-        return
-
-    # Base Case 2: Found a NumPy memmap (which contains an mmap)
-    if isinstance(obj, np.memmap):
-        print(f"🚨 FOUND NUMPY MEMMAP AT: {path}")
-        return
-
-    # Recursive Step 1: Check dictionaries
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            hunt_for_mmap(value, f"{path}['{key}']", visited)
-
-    # Recursive Step 2: Check lists and tuples
-    elif isinstance(obj, (list, tuple)):
-        for index, item in enumerate(obj):
-            hunt_for_mmap(item, f"{path}[{index}]", visited)
-
-    # Recursive Step 3: Check custom objects / dataclasses
-    elif hasattr(obj, "__dict__"):
-        for key, value in obj.__dict__.items():
-            hunt_for_mmap(value, f"{path}.{key}", visited)
-
-
-# Run the hunter
-# hunt_for_mmap(my_failing_dataclass)
+def concat_pulseframers(framers: Iterable["PulseDataFramer | None"]) -> "PulseDataFramer | None":
+    """Combine a sequence of per-source PulseDataFramers into one that serves their raw pulses end-to-end,
+    in order. Returns None if any input is None, since raw pulses for that part would then be unavailable."""
+    parts = list(framers)
+    if any(p is None for p in parts):
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    return ConcatPulseDataFramer(tuple(parts))  # type: ignore[arg-type]

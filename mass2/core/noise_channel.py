@@ -20,7 +20,7 @@ class NoiseChannel:
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
-    pulseframer: PulseDataFramer | None
+    pulseframer: PulseDataFramer | None = None
 
     # @functools.cache
     def calc_max_excursion(
