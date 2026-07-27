@@ -38,3 +38,4 @@ from .truebq_bin import TrueBqBin
 from .channels import Channels
 from .rough_cal import RoughCalibrationStep
 from . import phase_correct_steps
+from . import compat

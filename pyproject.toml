@@ -48,6 +48,9 @@ docs = [
     "mkdocstrings[python]>=0.18",
     "mktestdocs",
 ]
+mass = [
+    "mass @ git+https://github.com/usnistgov/mass#egg=mass",
+]
 
 [dependency-groups]
 # Use `uv sync --dev` to get the development packages
