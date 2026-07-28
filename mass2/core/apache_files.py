@@ -10,6 +10,15 @@ from pathlib import Path
 from .ljhutil import filename_glob_expand
 from .ljhfiles import LJHFile
 
+"""
+Functions to translate NIST LJH file format into a new format based on:
+- Apache Parquet (for compression and long-term archiving)
+- Apache Arrow (for hot analysis of new pulse data)
+- Apache Avro (for online streaming of low-rate data)
+
+See especially the script `ljh2apache`
+"""
+
 
 def translate_external_trigger(args: argparse.Namespace) -> None:
     base = Path(args.base_dir)
@@ -81,7 +90,8 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
             ch = matches.groups()[0]
             ch_num = int(ch)
             ljh[ch_num] = LJHFile.open(in_fname)
-            print(f"I see LJH chan {ch_num:4d} in file {in_fname}")
+    print(f"There are {len(ljh)} LJH files to read:")
+    print(f"Channels: {ljh.keys()}")
     out_path = str(base / "channel_metadata.parquet")
     print(f"Writing {out_path}")
     if not args.dry_run:
@@ -107,7 +117,9 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
     output_number = 0
     while first_subframe < final_subframe:
         last_subframe = first_subframe + args.period * subframes_per_sec
-        print(first_subframe, last_subframe)
+        out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrow"
+        duration = (last_subframe - first_subframe) / subframes_per_sec
+        print(f"Writing {out_name} with subframes {first_subframe}-{last_subframe} over {duration:.4f} s")
         if args.dry_run:
             first_subframe = last_subframe
             continue
@@ -123,8 +135,6 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
                 channel_number=pl.lit(k),
             ).with_columns(pl.from_epoch("timestamp", time_unit="us"))
             all_df.append(df)
-        out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrow"
-        print(f"Writing {out_name} at {first_subframe / subframes_per_sec:.4f}")
         complete_df = pl.concat(all_df, rechunk=True)
         out_path = str(base / out_name)
 
@@ -137,7 +147,6 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
 
         first_subframe = last_subframe
         output_number += 1
-        break
 
 
 def main_ljh2apache() -> None:
