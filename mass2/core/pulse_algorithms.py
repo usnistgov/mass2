@@ -39,13 +39,13 @@ result_dtype = np.dtype([
     ("tail_rms", np.float32),  # RMS around baseline
     ("tail_slope", np.float32),  # linear slope (ADC/sample)
     # unprefixed: general parameters over the entire trace
-    ("area", np.float32),  # baseline-subtracted sum (ADC*samples)
     ("centroid", np.float32),  # time-weighted centroid of the baseline-subtracted signal (sample index)
     ("clipped", np.bool_),  # True if max >= adc_max or min <= adc_min (ADC saturation)
     ("decay_timescale", np.float32),  # pulse_area / peak_above_baseline: effective exponential decay time (samples)
     ("delta_max", np.uint16),  # max absolute diff between consecutive samples
     ("delta_rms", np.float32),  # RMS of consecutive differences
     ("fall_time", np.float32),  # 90% to 10% fall time on the trailing edge (seconds)
+    ("mean", np.float32),  # mean baseline-subtracted ADC value
     ("min_index", np.uint16),  # sample index of the minimum ADC value
     ("min_value", np.uint16),  # minimum raw ADC value
     ("peak_index", np.uint16),  # sample index of the maximum ADC value
@@ -58,6 +58,7 @@ result_dtype = np.dtype([
     ("range", np.float32),  # peak-to-peak spread (max - min)
     ("rise_time", np.float32),  # 10% to 90% rise time on the leading edge (seconds)
     ("rise_timescale", np.float32),  # missing area between the rising edge and a step to peak, over peak_above_baseline: effective rise time (samples)
+    ("rms", np.float32),  # RMS of the baseline-subtracted signal
     ("shift1", np.uint16),  # 1 if the prompt window was shifted 1 sample earlier due to early pulse onset
     ("slope", np.float32),  # linear slope (ADC/sample)
     ("traceless", np.bool_),  # True if the trace is empty (nSamples == 0)
@@ -141,6 +142,7 @@ def summarize_data_numba(  # noqa: PLR0914, PLR0917
 
         # ---- extra accumulators ----
         sum_y_full = 0.0
+        sum_y2_full = 0.0
         sum_xy_full = 0.0
         sum_xy_pre = 0.0
 
@@ -189,6 +191,7 @@ def summarize_data_numba(  # noqa: PLR0914, PLR0917
                 min_idx = k
 
             sum_y_full += signal
+            sum_y2_full += signal**2
             sum_xy_full += k * signal
 
             # ---- pretrigger region ----
@@ -413,7 +416,9 @@ def summarize_data_numba(  # noqa: PLR0914, PLR0917
             results["delta_rms"][j] = np.sqrt(pulse_diffsq_sum / (n_full - 1))
 
         trace_area_val = sum_y_full - n_full * ptm
-        results["area"][j] = trace_area_val
+        trace_mean_val = trace_area_val / n_full
+        results["mean"][j] = trace_mean_val
+        results["rms"][j] = np.sqrt(sum_y2_full / n_full - ptm * trace_mean_val * 2 - ptm**2)
         results["centroid"][j] = (
             (sum_xy_full - ptm * sum_x_full) / trace_area_val if trace_area_val != 0 else 0.0
         )
