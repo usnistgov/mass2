@@ -360,40 +360,40 @@ def summarize_data_numba(  # noqa: PLR0914, PLR0917
         results["peaks"][j] = peaks
 
         # ---- postpeak_deriv ----
-        # The following is quite confusing, but it appears to be equivalent to
+        # The following is quite confusing, but it is equivalent to
         # slope = -2 * pulse[peak_samplenumber:-4]
         # slope -= pulse[peak_samplenumber+1:-3]
         # slope += pulse[peak_samplenumber+3:-1]
         # slope += 2*pulse[peak_samplenumber+4:]
         # slope = np.minimum(slope[2:], slope[:-2])
         # results["postpeak_deriv"][j] = 0.1 * np.max(slope)
-        # TODO: consider replacing, if the above is not slower?
 
-        f0, f1, f3, f4 = 2, 1, -1, -2
-        s0, s1, s2, s3 = (
-            pulse[peak_samplenumber],
-            pulse[peak_samplenumber + 1],
-            pulse[peak_samplenumber + 2],
-            pulse[peak_samplenumber + 3],
-        )
-        s4 = pulse[peak_samplenumber + 4]
-        t0 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
-        s0, s1, s2, s3 = s1, s2, s3, s4
-        s4 = pulse[peak_samplenumber + 5]
-        t1 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
-        t_max_deriv = np.iinfo(np.int32).min
-
-        for k in range(peak_samplenumber + 6, nSamples):
+        if peak_samplenumber >= 0 and nSamples > peak_samplenumber + 6:
+            f0, f1, f3, f4 = 2, 1, -1, -2
+            s0, s1, s2, s3 = (
+                pulse[peak_samplenumber],
+                pulse[peak_samplenumber + 1],
+                pulse[peak_samplenumber + 2],
+                pulse[peak_samplenumber + 3],
+            )
+            s4 = pulse[peak_samplenumber + 4]
+            t0 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
             s0, s1, s2, s3 = s1, s2, s3, s4
-            s4 = pulse[k]
-            t2 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
+            s4 = pulse[peak_samplenumber + 5]
+            t1 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
+            t_max_deriv = np.iinfo(np.int32).min
 
-            t3 = min(t2, t0)
-            t_max_deriv = max(t_max_deriv, t3)
+            for k in range(peak_samplenumber + 6, nSamples):
+                s0, s1, s2, s3 = s1, s2, s3, s4
+                s4 = pulse[k]
+                t2 = f4 * s0 + f3 * s1 + f1 * s3 + f0 * s4
 
-            t0, t1 = t1, t2
+                t3 = min(t2, t0)
+                t_max_deriv = max(t_max_deriv, t3)
 
-        results["postpeak_deriv"][j] = 0.1 * t_max_deriv
+                t0, t1 = t1, t2
+
+            results["postpeak_deriv"][j] = 0.1 * t_max_deriv
 
         # ============================================================
         # extended fields
