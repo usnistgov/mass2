@@ -14,13 +14,13 @@ import polars as pl
 import mass2
 
 
-def load_ljh(directory: str, limit: int | None, exclude_ch_nums: int | None) -> mass2.core.Channels:
+def load_ljh(directory: str, limit: int | None, exclude_ch_nums: list[int] | None) -> mass2.core.Channels:
     """Load LJH files from the given directory, excluding any channels in exclude_ch_nums and including no more than `limit`."""
     data = mass2.core.Channels.from_ljh_folder(directory, limit=limit, exclude_ch_nums=exclude_ch_nums)
     return data
 
 
-def main():
+def main() -> None:
     """Parse command-line arguments, load LJH files, and start an iPython session."""
     parser = argparse.ArgumentParser(
         description="Start a mass2 ipython session by loading a set of LJH files",

@@ -127,8 +127,8 @@ def trimean(x: ArrayLike) -> float:
     """
     x = np.asarray(x)
     q1, q2, q3 = [np.percentile(x, per) for per in (25, 50, 75)]
-    trimean = 0.25 * (q1 + q3) + 0.5 * q2
-    return float(trimean)
+    trimean = float(0.25 * (q1 + q3) + 0.5 * q2)
+    return trimean
 
 
 def median_abs_dev(x: ArrayLike, normalize: bool = False) -> float:
@@ -327,7 +327,7 @@ def Qscale(x: ArrayLike, sort_inplace: bool = False) -> float:
 
 
 @njit
-def _high_median(sort_idx: ArrayLike, weights: ArrayLike, n: int) -> int:
+def _high_median(sort_idx: NDArray, weights: ArrayLike, n: int) -> int:
     """Compute the weighted high median of data set with weights <weights>.
 
     Instead of sending the data set x, send the order statistics <sort_idx> over
@@ -336,18 +336,17 @@ def _high_median(sort_idx: ArrayLike, weights: ArrayLike, n: int) -> int:
     It returns the smallest j such that the sum of all weights for data
     with x[i] <= x[j] is strictly greater than half the total weight.
     """
-    sort_idx = np.asarray(sort_idx)
     weights = np.asarray(weights)
     total_weight = weights[:n].sum()
     half_weight = 0.5 * total_weight
 
     imin, imax = 0, n  # The possible range of j will always be the half-open interval [imin,imax)
-    left_weight = right_weight = 0  # Total weight in (...,imin) and in [imax,...)
+    left_weight = right_weight = 0.0  # Total weight in (...,imin) and in [imax,...)
     itrial = n // 2
 
     while imax - imin > 1:
-        trial_left_weight = 0
-        trial_right_weight = 0
+        trial_left_weight = 0.0
+        trial_right_weight = 0.0
         for i in range(imin, itrial):
             trial_left_weight += weights[sort_idx[i]]
         for i in range(itrial + 1, imax):

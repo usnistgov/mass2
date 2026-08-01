@@ -15,7 +15,6 @@ import pylab as plt
 from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
 import marimo as mo
-import functools
 import numpy as np
 import time
 from pathlib import Path
@@ -69,6 +68,14 @@ class ChannelHeader:
     n_presamples: int
     n_samples: int
     df: pl.DataFrame = field(repr=False)
+    pulse_data_sources: tuple[str | None, ...] | None = field(default=None, repr=False)
+    noise_data_source: str | None = field(default=None, repr=False)
+
+    def leaf_data_sources(self) -> tuple[str | None, ...]:
+        """Leaf file paths behind this header's raw data, or `(data_source,)` if not itself a concatenation."""
+        if self.pulse_data_sources is not None:
+            return self.pulse_data_sources
+        return (self.data_source,)
 
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
@@ -137,17 +144,25 @@ class Channel:
     def head(self, n: int) -> "Channel":
         "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
         df = self.df.head(n)
-        return replace(self, df=df, npulses=len(df))
+        framer = self.pulseframer.select_rows(np.arange(len(df))) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def tail(self, n: int) -> "Channel":
         "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        orig_len = len(self.df)
         df = self.df.tail(n)
-        return replace(self, df=df, npulses=len(df))
+        start = orig_len - len(df)
+        framer = self.pulseframer.select_rows(np.arange(start, orig_len)) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
         "Return a new Channel, using only a random selection of `n` pulse records."
-        df = self.df.sample(n=n, fraction=fraction, with_replacement=False)
-        return replace(self, df=df, npulses=len(df))
+        df_indexed = self.df.with_row_index("__sample_idx__")
+        sampled = df_indexed.sample(n=n, fraction=fraction, with_replacement=False)
+        row_indices = sampled["__sample_idx__"].to_numpy()
+        df = sampled.drop("__sample_idx__")
+        framer = self.pulseframer.select_rows(row_indices) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
@@ -890,7 +905,6 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
         """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
         assert self.pulseframer is not None
@@ -1374,17 +1388,10 @@ class Channel:
 
     def __hash__(self) -> int:
         """Return a hash based on the object's id."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: object) -> bool:
         """Return True if the other object is the same object (by id)."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
-        # only checks if the ids match, does not try to be equal if all contents are equal
         return id(self) == id(other)
 
     @classmethod
@@ -1404,6 +1411,8 @@ class Channel:
         ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
+        if noise_path:
+            header = dataclasses.replace(header, noise_data_source=str(noise_path))
         channel = cls(
             df,
             header=header,
@@ -1519,7 +1528,7 @@ class Channel:
             nch = None
         else:
             ndata = load(noise_fname)
-            _, nnoise = pdata.shape
+            _, nnoise = ndata.shape
             noise_df = pl.DataFrame({"index": range(nnoise)})
             noise_header = pl.DataFrame({
                 "filename": noise_fname,
@@ -1563,10 +1572,6 @@ class Channel:
         holding the data from all 5 objects, plus a new column named "element", which will be one of
         {"Be", "Fe", "Ge", "Se", "Xe"}, according to which LJH file it came from.
 
-        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
-        That's a memory-intensive request. Use for small files only, or for `Channel` objects that are
-        no longer connected directly to raw pulse files!
-
         Parameters
         ----------
         sourcename : str
@@ -1584,12 +1589,18 @@ class Channel:
         # We'll copy the header and other non-dataframe stuff from the first constituent.
         combined_chan = next(iter(constituents.values()))
         df = pl.DataFrame()
+        framers: list[PulseDataFramer | None] = []
+        sources: list[str | None] = []
         for k, ch in constituents.items():
             assert ch.frametime_s == combined_chan.frametime_s
             assert ch.n_presamples == combined_chan.n_presamples
             assert ch.n_samples == combined_chan.n_samples
             df = df.vstack(ch.df.with_columns(pl.lit(k).alias(sourcename)))
-        return replace(combined_chan, df=df, npulses=len(df))
+            framers.append(ch.pulseframer)
+            sources.extend(ch.header.leaf_data_sources())
+        combined_pulseframer = mass2.core.misc.concat_pulseframers(framers)
+        header = replace(combined_chan.header, data_source=None, pulse_data_sources=tuple(sources))
+        return replace(combined_chan, header=header, df=df, npulses=len(df), pulseframer=combined_pulseframer)
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
@@ -1723,25 +1734,43 @@ class Channel:
         )
         return self.with_step(step)
 
-    def concat_df(self, df: pl.DataFrame) -> "Channel":
+    def concat_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> "Channel":
         """Concat the given dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new frame `df` has a history and/or steps, those will be lost"""
+        If the new frame `df` has a history and/or steps, those will be lost.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Rows to append after this channel's existing rows.
+        pulseframer : PulseDataFramer | None, optional
+            A source of raw pulses for the rows of `df`, by default None. When given (and this channel
+            already has a `pulseframer`), the result's `pulseframer` serves raw pulses from both sources,
+            in order. If omitted, the result's `pulseframer` is None, since raw pulses for the appended
+            rows would otherwise be unavailable.
+        """
+        combined_df = mass2.core.misc.concat_dfs_with_concat_state(self.df, df)
+        combined_pulseframer = mass2.core.misc.concat_pulseframers([self.pulseframer, pulseframer])
+        sources = self.header.leaf_data_sources() + (None,)
+        header = replace(self.header, data_source=None, pulse_data_sources=sources)
         ch2 = Channel(
-            mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
-            self.header,
-            self.npulses,
+            combined_df,
+            header,
+            len(combined_df),
             subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
+            pulseframer=combined_pulseframer,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
     def concat_ch(self, ch: "Channel") -> "Channel":
-        """Concat the given channel's dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new channel `ch` has a history and/or steps, those will be lost"""
-        ch2 = self.concat_df(ch.df)
-        return ch2
+        """Concat the given channel's dataframe (and raw-pulse source) to this one's, keeping all other
+        attributes the same. If the new channel `ch` has a history and/or steps, those will be lost"""
+        result = self.concat_df(ch.df, pulseframer=ch.pulseframer)
+        sources = self.header.leaf_data_sources() + ch.header.leaf_data_sources()
+        header = replace(result.header, data_source=None, pulse_data_sources=sources)
+        return replace(result, header=header)
 
     def phase_correct_mass_specific_lines(
         self,
@@ -1802,7 +1831,7 @@ class Channel:
             (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
 
-        tpi_microsec = df.filter(self.good_expr).select("peak_time_µs").median().collect()
+        tpi_microsec = df.filter(self.good_expr).select("peak_time_µs").median().collect().item()
         plottables = (
             ("pulse_rms", "Pulse RMS", "#dd00ff", None),
             ("pulse_average", "Pulse Avg", "purple", None),

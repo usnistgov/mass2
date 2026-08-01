@@ -294,6 +294,7 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
+        assert isinstance(axis, plt.Axes)
         t = np.arange(len(self.values)) - self.n_pretrigger
         axis.plot(t, self.values, label="mass 5lag filter", **kwargs)
         axis.grid()

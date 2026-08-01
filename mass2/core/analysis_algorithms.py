@@ -272,7 +272,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     indicator -= ptm_offset
 
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
+        pct99 = float(np.percentile(uncorrected, 99))
         limit = 1.25 * pct99
 
     smoother = HistogramSmoother(0.5, [0, limit])
@@ -469,7 +469,7 @@ def time_drift_correct(  # noqa: PLR0914
     time = np.asarray(time)
     uncorrected = np.asarray(uncorrected)
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
+        pct99 = float(np.percentile(uncorrected, 99))
         limit = (0.0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])
