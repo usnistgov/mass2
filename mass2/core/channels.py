@@ -11,7 +11,6 @@ import polars as pl
 import pylab as plt
 import matplotlib
 import numpy as np
-import functools
 import joblib
 import traceback
 import lmfit
@@ -66,7 +65,6 @@ class Channels:
         descr = self.description + more.description + "\nWarning! created by with_more_channels()"
         return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
 
-    @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
         """Return a DataFrame containing good pulses from each channel. Excludes the given columns (default "pulse")."""
         # return a dataframe containing good pulses from each channel,
@@ -396,9 +394,6 @@ class Channels:
 
     def __hash__(self) -> int:
         """Hash based on the object's id (identity)."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: Any) -> bool:
@@ -680,7 +675,12 @@ class Channels:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
             combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
-            new_ch = ch.with_replacement_df(combined_df)
+            combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
+            sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
+            header = dataclasses.replace(ch.header, data_source=None, pulse_data_sources=sources)
+            new_ch = dataclasses.replace(
+                ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer
+            )
             new_channels[ch_num] = new_ch
         return mass2.Channels(new_channels, self.description + other_data.description)
 
@@ -694,9 +694,6 @@ class Channels:
         """Combine 2 or more compatible `mass2.Channels` objects into one. See `mass2.Channel.combine_channels()`
         for more info about what "compatible" might mean. Certainly all `Channel` objects should have equal
         `n_samples`, `n_presamples`, and `frametime_s`.
-
-        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
-        That's a memory-intensive request. Use for small files only!
 
         Parameters
         ----------
@@ -801,7 +798,7 @@ class Channels:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
-            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
@@ -809,9 +806,11 @@ class Channels:
             for ch_num, ch in self.channels.items():
                 parquet_path = f"data_chan{ch_num:04d}.parquet"
                 channels[ch_num] = store_dataframe_to_parquet_and_return_pickleable_channel(ch, zf, parquet_path)
+                assert channels[ch_num].pulseframer is None
             for ch_num, badch in self.bad_channels.items():
                 parquet_path = f"data_bad_chan{ch_num:04d}.parquet"
                 ch = store_dataframe_to_parquet_and_return_pickleable_channel(badch.ch, zf, parquet_path)
+                assert ch.pulseframer is None
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
@@ -827,7 +826,7 @@ class Channels:
             Zipfile that work was saved in.
         """
         path = pathlib.Path(path)
-        path.exists() and path.is_file()
+        assert path.exists() and path.is_file()
 
         def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file
@@ -844,17 +843,31 @@ class Channels:
             Channel
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
-            # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-            if ch.header.data_source is not None:
-                ljh_path = ch.header.data_source
-                if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                    ljh_backed_chan = Channel.from_ljh(ljh_path)
+            def _reload_leaf_chan(data_source: str | None) -> Channel | None:
+                """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
+                if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):
+                    return Channel.from_ljh(data_source)
+                return None
+
+            pulseframer = None
+            sources = ch.header.pulse_data_sources
+            if sources is not None:
+                restored_parts = [_reload_leaf_chan(src) for src in sources]
+                found_parts = [part for part in restored_parts if part is not None]
+                if restored_parts and len(found_parts) == len(restored_parts):
+                    raw_df = pl.concat([part.df for part in found_parts], how="vertical")
+                    df = df.with_columns(raw_df)
+                    pulseframer = mass2.core.misc.concat_pulseframers([part.pulseframer for part in found_parts])
+            else:
+                ljh_backed_chan = _reload_leaf_chan(ch.header.data_source)
+                if ljh_backed_chan is not None:
                     df = df.with_columns(ljh_backed_chan.df)
-            # df_history is needed for some debug plots to work. This version has strictly more columns than required
-            # at each history point. TODO: We could use the steps inputs and outputs to trim the appropriate columns.
-            # For getting started, though, it's easier just to let each dataframe in history equal the final dataframe.
+                    pulseframer = ljh_backed_chan.pulseframer
             df_history = [df] * len(ch.steps)
-            return dataclasses.replace(ch, df=df, df_history=df_history)
+            noise = None
+            if ch.header.noise_data_source is not None:
+                noise = mass2.NoiseChannel.from_ljh(ch.header.noise_data_source)
+            return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer, noise=noise)
 
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"

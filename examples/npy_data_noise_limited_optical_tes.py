@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.21.1"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium")
 
 
@@ -36,7 +36,6 @@ def _(mass2, pulsedata):
         noise_fname=noisepath,
         description="from npy arrays",
         invert_data=True,
-        row_index=True,
         rescale=1e4
     )
     return (ch,)
@@ -45,7 +44,8 @@ def _(mass2, pulsedata):
 @app.cell
 def _(ch, plt):
     plt.figure()
-    plt.plot(ch.df.limit(20)["pulse"].to_numpy().T)
+    _pulses = ch.pulseframer.load_raw_chunk(0, 20)["pulse"].to_numpy().T
+    plt.plot(_pulses)
     return
 
 
@@ -83,7 +83,7 @@ def _(ch3, np, plt):
 
 @app.cell
 def _(ch3):
-    ch4 = ch3
+    ch4 = ch3.with_columns(ch3.pulseframer.load_raw_chunk(0, ch3.npulses))
     # here we would do calibration, but the mass2 gain based calibration fails from learning from points at energy=0 currently,
     # since gains=ph/e = inf when e=0
     return (ch4,)

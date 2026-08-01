@@ -124,6 +124,7 @@ class TriggerResult:
             df,
             header_df=self.data_source.header_df,
             frametime_s=self.data_source.frametime_s,
+            pulseframer=misc.PulseDataFromNumpy(pulses),
         )
         return noise
 

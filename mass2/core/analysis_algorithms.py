@@ -272,7 +272,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     indicator -= ptm_offset
 
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
+        pct99 = float(np.percentile(uncorrected, 99))
         limit = 1.25 * pct99
 
     smoother = HistogramSmoother(0.5, [0, limit])
@@ -375,11 +375,12 @@ def correct_flux_jumps(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> N
     Returns:
     Array with values corrected
     """
+    vals = np.asarray(vals)
     return unwrap_n(vals, flux_quant, mask)
 
 
 @njit
-def unwrap_n(data: NDArray[np.uint16], period: float, mask: ArrayLike, n: int = 3) -> NDArray:
+def unwrap_n(data: NDArray, period: float, mask: ArrayLike, n: int = 3) -> NDArray:
     """Unwrap data that has been restricted to a given period.
 
     The algorithm iterates through each data point and compares
@@ -468,7 +469,7 @@ def time_drift_correct(  # noqa: PLR0914
     time = np.asarray(time)
     uncorrected = np.asarray(uncorrected)
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
+        pct99 = float(np.percentile(uncorrected, 99))
         limit = (0.0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])

@@ -74,7 +74,7 @@ def test_ljh_all_versions(tmp_path):  # noqa: PLR0914
             assert np.all(file.read_trace(i) == pulses[i, :])
 
         # Check that the dataframe values are also correct
-        df, _ = file.to_polars(keep_posix_usec=True)
+        df, _ = file.to_polars(keep_posix_usec=True, keep_raw_pulses=True)
         print(df.columns)
         assert np.all(df["pulse"].to_numpy() == pulses)
         if version == v220:

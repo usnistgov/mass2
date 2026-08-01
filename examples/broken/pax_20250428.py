@@ -282,7 +282,7 @@ def _(ch_num, data3, mass2, np, plt):
     _ch = data3.channels[ch_num]
     _df = _ch.noise.df
     for step in _ch.steps:
-        _df = step.calc_from_df(_df)
+        _df = step.calc_from_df(_df, _ch.pulseframer)
     df_baseline = _df
     df_baseline
     _energy_col = "energy_5lagy_dc"

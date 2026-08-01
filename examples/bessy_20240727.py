@@ -1,21 +1,19 @@
 import marimo
 
-__generated_with = "0.15.2"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     #MASS version 2: introduction to internals
     MASS is the Microcalorimeter Analysis Software Suite. Version 2 is a replacement for Version 1 of MASS (2011-2025). Version 2 supports many algorithms for pulse filtering, calibration, and corrections. It is built on modern open source data science software, including [Pola.rs](https://pola.rs) and [Marimo](https://marimo.io). MASS v2 supports some key features that v1 struggled with, including:
 
       * consecutive data set analysis
       * online (aka realtime) analysis
       * easily supporting different analysis chains
-    """
-    )
+    """)
     return
 
 
@@ -26,23 +24,23 @@ def _():
     import numpy as np
     import marimo as mo
     import pulsedata
+
     return mo, np, pl, plt, pulsedata
 
 
 @app.cell
 def _():
     import mass2
+
     return (mass2,)
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
+    mo.md("""
     # Load data
     Here we load the data, then we explore the internals a bit to show how MASS version 2 is built.
-    """
-    )
+    """)
     return
 
 
@@ -58,16 +56,14 @@ def _(mass2, pulsedata):
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-    # basic analysis
+    mo.md("""
+    # Basic analysis
     The variables `data` is the conventional name for a `Channels` object. It contains a list of `Channel` objects, conventinally assigned to a variable `ch` when accessed individualy. One `Channel` represents a single pixel, whiles a `Channels` is a collection of pixels, like a whole array.
 
     The data tends to consist of pulse shapes (arrays of length 100 to 1000 in general) and per pulse quantities, such as the pretrigger mean. These data are stored internally as pola.rs `DataFrame` objects.
 
     The next cell shows a basic analysis on multiple channels. The function `data.transform_channels` takes a one argument function, where the one argument is a `Channel` and the function returns a `Channel`, `data.transform_channels` returns a `Channels`. There is no mutation, and we can't re-use variable names in a reactive notebook, so we store the result in a new variable `data2`.
-    """
-    )
+    """)
     return
 
 
@@ -81,6 +77,21 @@ def _(data, mass2):
     return (data2,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Plots some pulses
+    """)
+    return
+
+
+@app.cell
+def _(data2, plt):
+    data2.ch0.plot_pulses(length=30, random=True, summarize=True)
+    plt.gcf()
+    return
+
+
 @app.cell
 def _(data2):
     data2.ch0.df.columns
@@ -88,7 +99,7 @@ def _(data2):
 
 
 @app.cell
-def _(data2, mass2, pl):
+def _(data2, mass2, pl, plt):
     line_names = ["OKAlpha", "FeLAlpha", "NiLAlpha", "CKAlpha", "NKAlpha", "CuLAlpha"]
 
     def _do_analysis(ch: mass2.Channel) -> mass2.Channel:
@@ -113,6 +124,8 @@ def _(data2, mass2, pl):
         )
 
     data3 = data2.map(_do_analysis)
+    data3.plot_avg_pulses()
+    plt.gcf()
     return (data3,)
 
 
@@ -191,9 +204,13 @@ def _(data3, dropdown_ch, mass2):
 
 @app.cell
 def _(data3, dropdown_ch, mass2, plt):
-    plt.plot(data3.channels[dropdown_ch.value].noise.df["pulse"][:10].to_numpy().T)
-    plt.plot(data3.channels[dropdown_ch.value].df["pulse"][:10].to_numpy().T)
-    plt.title("first 10 noise traces and first 10 pulse traces")
+    _ch = data3.channels[dropdown_ch.value]
+    plt.figure()
+    ax = plt.subplot(121)
+    _ch.plot_pulses(length=10, axis=ax)
+    plt.subplot(122, sharey=ax)
+    plt.plot(_ch.noise.pulseframer.load_raw_chunk(0, 10)["pulse"])
+    plt.suptitle("first 10 pulse traces and first 10 noise traces")
     mass2.show()
     return
 
@@ -223,7 +240,7 @@ def _(data3, dropdown_ch):
     _ch = data3.channels[dropdown_ch.value]
     _df = _ch.noise.df
     for step in _ch.steps:
-        _df = step.calc_from_df(_df)
+        _df = step.calc_from_df(_df, _ch.noise.pulseframer)
     df_baseline = _df
     df_baseline
     return (df_baseline,)

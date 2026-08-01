@@ -19,7 +19,7 @@ from ..calibration.energy_calibration import Curvetypes, EnergyCalibration, Ener
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import RecipeStep
-from .misc import alwaysTrue
+from .misc import alwaysTrue, PulseDataFramer
 
 if TYPE_CHECKING:
     from .channel import Channel
@@ -251,7 +251,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
     multifit: MultiFit | None
     rms_residual_energy: float
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calibrate energy and return a new DataFrame with results."""
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
@@ -329,7 +329,7 @@ class MultiFitMassCalibrationStep(RecipeStep):
     cal: EnergyCalibration
     multifit: MultiFit | None
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calibrate energy and return a new DataFrame with results."""
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping

@@ -8,9 +8,10 @@ import dataclasses
 from collections.abc import Callable
 from typing import Any
 import pylab as plt
-from mass2.core.recipe import RecipeStep
-from mass2.core.noise_algorithms import NoiseResult
-from mass2.core.optimal_filtering import Filter, FilterMaker
+from .misc import PulseDataFramer
+from .noise_algorithms import NoiseResult
+from .optimal_filtering import Filter, FilterMaker
+from .recipe import RecipeStep
 
 
 @dataclass(frozen=True)
@@ -22,11 +23,13 @@ class OptimalFilterStep(RecipeStep):
     filter_maker: "FilterMaker"
     transform_raw: Callable | None = None
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the optimal filter to the input DataFrame and return a new DataFrame with results."""
+        assert pulseframer is not None
+        rawcol = self.inputs[0]
         dfs = []
-        for df_iter in df.iter_slices(10000):
-            raw = df_iter[self.inputs[0]].to_numpy()
+        for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):
+            raw = raw_df[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
             peak_y, peak_x = self.filter.filter_records(raw)

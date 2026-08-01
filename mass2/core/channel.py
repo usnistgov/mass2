@@ -15,7 +15,6 @@ import pylab as plt
 from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
 import marimo as mo
-import functools
 import numpy as np
 import time
 from pathlib import Path
@@ -27,7 +26,7 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .offfiles import OffFile
-from .misc import alwaysTrue, plot_zoomable
+from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
@@ -69,6 +68,14 @@ class ChannelHeader:
     n_presamples: int
     n_samples: int
     df: pl.DataFrame = field(repr=False)
+    pulse_data_sources: tuple[str | None, ...] | None = field(default=None, repr=False)
+    noise_data_source: str | None = field(default=None, repr=False)
+
+    def leaf_data_sources(self) -> tuple[str | None, ...]:
+        """Leaf file paths behind this header's raw data, or `(data_source,)` if not itself a concatenation."""
+        if self.pulse_data_sources is not None:
+            return self.pulse_data_sources
+        return (self.data_source,)
 
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
@@ -99,6 +106,7 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+    pulseframer: PulseDataFramer | None = None
 
     def __post_init__(self) -> None:
         # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
@@ -136,17 +144,25 @@ class Channel:
     def head(self, n: int) -> "Channel":
         "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
         df = self.df.head(n)
-        return replace(self, df=df, npulses=len(df))
+        framer = self.pulseframer.select_rows(np.arange(len(df))) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def tail(self, n: int) -> "Channel":
         "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        orig_len = len(self.df)
         df = self.df.tail(n)
-        return replace(self, df=df, npulses=len(df))
+        start = orig_len - len(df)
+        framer = self.pulseframer.select_rows(np.arange(start, orig_len)) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
         "Return a new Channel, using only a random selection of `n` pulse records."
-        df = self.df.sample(n=n, fraction=fraction, with_replacement=False)
-        return replace(self, df=df, npulses=len(df))
+        df_indexed = self.df.with_row_index("__sample_idx__")
+        sampled = df_indexed.sample(n=n, fraction=fraction, with_replacement=False)
+        row_indices = sampled["__sample_idx__"].to_numpy()
+        df = sampled.drop("__sample_idx__")
+        framer = self.pulseframer.select_rows(row_indices) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
@@ -519,7 +535,7 @@ class Channel:
             plt.legend(title=color_col)
         plot_zoomable()
 
-    def plot_pulses(  # noqa: PLR0917
+    def plot_pulses(  # noqa: PLR0914, PLR0917
         self,
         length: int = 30,
         skip: int = 0,
@@ -571,7 +587,9 @@ class Channel:
         cm : str | Colormap, optional
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
-        pulse_type = self.df[pulse_field].dtype
+        assert self.pulseframer is not None
+        test_df = self.pulseframer.load_raw_pulse(0)
+        pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
         )
@@ -634,11 +652,11 @@ class Channel:
         upper_axis.set_xlabel("Time after trigger (ms)")
         plt.xlabel("Samples after trigger")
 
-        plot_columns = (pulse_field, "pretrig_mean")
-        df = lf.select(plot_columns).collect()
-        N = len(df)
-        pulses = df[pulse_field]
+        df = lf.select(("Record #", "pretrig_mean")).collect()
+        idx = df["Record #"]
         ptmean = df["pretrig_mean"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field]
+        N = len(idx)
         for i in range(N):
             pulse = pulses[i].to_numpy()
             color = cmap(i / N)
@@ -800,7 +818,7 @@ class Channel:
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
         t_start = time.time()
-        df2 = step.calc_from_df(self.df)
+        df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
@@ -887,10 +905,10 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
         """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
-        raw = self.df.limit(100)[col].to_numpy()
+        assert self.pulseframer is not None
+        raw = self.pulseframer.load_raw_chunk(0, 100)[col].to_numpy()
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
@@ -902,6 +920,7 @@ class Channel:
         out_names = mass2.core.pulse_algorithms.result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
+        assert self.pulseframer is not None
         outputs = list(out_names)
         step = SummarizeStep(
             inputs=[col],
@@ -910,7 +929,6 @@ class Channel:
             use_expr=pl.lit(True),
             frametime_s=self.frametime_s,
             peak_index=peak_index,
-            pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
@@ -983,17 +1001,10 @@ class Channel:
         NDArray
             _description_
         """
-        avg_pulse = (
-            self.df.lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(pulse_col)
-            .limit(limit)
-            .collect()
-            .to_series()
-            .to_numpy()
-            .mean(axis=0)
-        )
+        assert self.pulseframer is not None
+        idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
+        avg_pulse = pulses.mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
@@ -1192,12 +1203,16 @@ class Channel:
         tuple[NDArray, NDArray]
             _description_
         """
+        assert self.pulseframer is not None
+        # idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        # pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         df = (
             self.df.lazy()
+            .with_row_index("Record #")
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .select("Record #", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -1215,7 +1230,8 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        pulse = df["pulse"].to_numpy()
+        idx = df["Record #"]
+        pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
@@ -1372,17 +1388,10 @@ class Channel:
 
     def __hash__(self) -> int:
         """Return a hash based on the object's id."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: object) -> bool:
         """Return True if the other object is the same object (by id)."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
-        # only checks if the ids match, does not try to be equal if all contents are equal
         return id(self) == id(other)
 
     @classmethod
@@ -1392,17 +1401,26 @@ class Channel:
         noise_path: str | Path | None = None,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
+        max_pulses: int | None = None,
     ) -> "Channel":
         """Load a Channel from an LJH file, optionally with a NoiseChannel from a corresponding noise LJH file."""
         if not noise_path:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass2.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
+        if noise_path:
+            header = dataclasses.replace(header, noise_data_source=str(noise_path))
         channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+            df,
+            header=header,
+            npulses=ljh.npulses,
+            subframediv=ljh.subframediv,
+            noise=noise_channel,
+            transform_raw=transform_raw,
+            pulseframer=ljh,
         )
         return channel
 
@@ -1446,7 +1464,6 @@ class Channel:
         ch_num: int = 0,
         invert_data: bool = False,
         timestamps: bool = True,
-        row_index: bool = False,
         rescale: float = 1.0,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
@@ -1472,8 +1489,6 @@ class Channel:
             Whether to take the negative of the raw data, by default False
         timestamps : bool, optional
             Whether to generate timestamp guesses, based on file creation time, by default True
-        row_index: bool, optional
-            Whether to generate a column "index" counting [0...n-1], by default False
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
 
@@ -1495,10 +1510,7 @@ class Channel:
         frametime_s = 1 / samplerate
         pdata = load(pulse_fname)
         nsamples, npulses = pdata.shape
-        datadict = {"pulse": pdata.T}
-        pulse_df = pl.DataFrame(datadict)
-        if row_index:
-            pulse_df = pulse_df.with_row_index()
+        pulse_df = pl.DataFrame({"index": range(npulses)})
 
         # Numpy files don't contain pulse timestamps. Just assume:
         # a) the records are contiguous in time, and
@@ -1516,18 +1528,22 @@ class Channel:
             nch = None
         else:
             ndata = load(noise_fname)
-            noise_df = pl.DataFrame({"pulse": ndata.T})
-            nh = {
+            _, nnoise = ndata.shape
+            noise_df = pl.DataFrame({"index": range(nnoise)})
+            noise_header = pl.DataFrame({
                 "filename": noise_fname,
                 "continuous": True,
                 "Presamples": npresamples,
-            }
-            noise_header = pl.DataFrame(nh)
-            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s)
+            })
+            framer = PulseDataFromNumpy(ndata.T)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 
         source = os.path.basename(pulse_fname)
-        header = ChannelHeader(description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pulse_df)
-        return cls(pulse_df, header, npulses, noise=nch)
+        header = ChannelHeader(
+            description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pl.DataFrame()
+        )
+        framer = PulseDataFromNumpy(pdata.T)
+        return cls(pulse_df, header, npulses, noise=nch, pulseframer=framer)
 
     @classmethod
     def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":
@@ -1556,10 +1572,6 @@ class Channel:
         holding the data from all 5 objects, plus a new column named "element", which will be one of
         {"Be", "Fe", "Ge", "Se", "Xe"}, according to which LJH file it came from.
 
-        BEWARE: this will entail a copy of all raw data in all input LJH files, as far as we know.
-        That's a memory-intensive request. Use for small files only, or for `Channel` objects that are
-        no longer connected directly to raw pulse files!
-
         Parameters
         ----------
         sourcename : str
@@ -1577,12 +1589,18 @@ class Channel:
         # We'll copy the header and other non-dataframe stuff from the first constituent.
         combined_chan = next(iter(constituents.values()))
         df = pl.DataFrame()
+        framers: list[PulseDataFramer | None] = []
+        sources: list[str | None] = []
         for k, ch in constituents.items():
             assert ch.frametime_s == combined_chan.frametime_s
             assert ch.n_presamples == combined_chan.n_presamples
             assert ch.n_samples == combined_chan.n_samples
             df = df.vstack(ch.df.with_columns(pl.lit(k).alias(sourcename)))
-        return replace(combined_chan, df=df, npulses=len(df))
+            framers.append(ch.pulseframer)
+            sources.extend(ch.header.leaf_data_sources())
+        combined_pulseframer = mass2.core.misc.concat_pulseframers(framers)
+        header = replace(combined_chan.header, data_source=None, pulse_data_sources=tuple(sources))
+        return replace(combined_chan, header=header, df=df, npulses=len(df), pulseframer=combined_pulseframer)
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
@@ -1662,10 +1680,7 @@ class Channel:
 
     def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
         """Replace the dataframe with a new one, keeping all other attributes the same."""
-        return dataclasses.replace(
-            self,
-            df=df2,
-        )
+        return dataclasses.replace(self, df=df2, npulses=len(df2))
 
     def drop(self, *args: str) -> "Channel":
         "Return a Channel, after dropping one or more columns from the dataframe, by name"
@@ -1719,25 +1734,43 @@ class Channel:
         )
         return self.with_step(step)
 
-    def concat_df(self, df: pl.DataFrame) -> "Channel":
+    def concat_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> "Channel":
         """Concat the given dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new frame `df` has a history and/or steps, those will be lost"""
+        If the new frame `df` has a history and/or steps, those will be lost.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Rows to append after this channel's existing rows.
+        pulseframer : PulseDataFramer | None, optional
+            A source of raw pulses for the rows of `df`, by default None. When given (and this channel
+            already has a `pulseframer`), the result's `pulseframer` serves raw pulses from both sources,
+            in order. If omitted, the result's `pulseframer` is None, since raw pulses for the appended
+            rows would otherwise be unavailable.
+        """
+        combined_df = mass2.core.misc.concat_dfs_with_concat_state(self.df, df)
+        combined_pulseframer = mass2.core.misc.concat_pulseframers([self.pulseframer, pulseframer])
+        sources = self.header.leaf_data_sources() + (None,)
+        header = replace(self.header, data_source=None, pulse_data_sources=sources)
         ch2 = Channel(
-            mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
-            self.header,
-            self.npulses,
+            combined_df,
+            header,
+            len(combined_df),
             subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
+            pulseframer=combined_pulseframer,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
     def concat_ch(self, ch: "Channel") -> "Channel":
-        """Concat the given channel's dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new channel `ch` has a history and/or steps, those will be lost"""
-        ch2 = self.concat_df(ch.df)
-        return ch2
+        """Concat the given channel's dataframe (and raw-pulse source) to this one's, keeping all other
+        attributes the same. If the new channel `ch` has a history and/or steps, those will be lost"""
+        result = self.concat_df(ch.df, pulseframer=ch.pulseframer)
+        sources = self.header.leaf_data_sources() + ch.header.leaf_data_sources()
+        header = replace(result.header, data_source=None, pulse_data_sources=sources)
+        return replace(result, header=header)
 
     def phase_correct_mass_specific_lines(
         self,
@@ -1786,18 +1819,6 @@ class Channel:
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
-        tpi_microsec = (self.typical_peak_ind() - self.n_presamples) * (1e6 * self.frametime_s)
-        plottables = (
-            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
-            ("pulse_average", "Pulse Avg", "purple", None),
-            ("peak_value", "Peak value", "blue", None),
-            ("pretrig_rms", "Pretrig RMS", "green", [0, 4000]),
-            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
-            ("postpeak_deriv", "Max PostPk deriv", "gold", [0, 200]),
-            ("rise_time_µs", "Rise time (µs)", "orange", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-            ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-        )
-
         use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
@@ -1809,6 +1830,19 @@ class Channel:
             ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
             (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
+
+        tpi_microsec = df.filter(self.good_expr).select("peak_time_µs").median().collect().item()
+        plottables = (
+            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
+            ("pulse_average", "Pulse Avg", "purple", None),
+            ("peak_value", "Peak value", "blue", None),
+            ("pretrig_rms", "Pretrig RMS", "green", (0, 4000)),
+            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
+            ("postpeak_deriv", "Max PostPk deriv", "gold", (0, 200)),
+            ("rise_time_µs", "Rise time (µs)", "orange", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+            ("peak_time_µs", "Peak time (µs)", "red", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+        )
+
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")
@@ -1840,13 +1874,20 @@ class Channel:
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
-        pulse = self.df[col][index].to_numpy()
+        assert self.pulseframer is not None
+        pulse = self.pulseframer.load_raw_pulse(index)[col].to_numpy()
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
             print(f"pulse index={index}")
             print(result.fit_report())
         return result
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("pulseframer", None)
+        return state
 
 
 @dataclass(frozen=True)

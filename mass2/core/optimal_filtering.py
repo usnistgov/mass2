@@ -294,6 +294,7 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
+        assert isinstance(axis, plt.Axes)
         t = np.arange(len(self.values)) - self.n_pretrigger
         axis.plot(t, self.values, label="mass 5lag filter", **kwargs)
         axis.grid()
@@ -507,6 +508,7 @@ class FilterATS(Filter):
         _, nsamp = x.shape
 
         assert nsamp == len(self.values)
+        assert self.dt_values is not None
         return _filter_records_ats(x, self.values, self.dt_values)
 
 

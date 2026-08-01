@@ -9,6 +9,7 @@ from typing import Any
 from collections.abc import Iterable
 import mass2
 from .channel import Channel
+from .misc import PulseDataFramer
 from .recipe import RecipeStep
 from .phase_correct import PhaseCorrector
 
@@ -22,7 +23,7 @@ class PhaseCorrectMassStep(RecipeStep):
     previous_step_index: int
     phase_corrector: PhaseCorrector
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the phase-corrected pulse height and return a new DataFrame."""
         # since we only need to load two columns I'm assuming we can fit them in memory and just
         # loading them whole

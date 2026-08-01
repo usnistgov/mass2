@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import polars as pl
 import numpy as np
 import mass2
+from .misc import PulseDataFramer
 from .noise_algorithms import NoiseResult
 
 
@@ -19,6 +20,7 @@ class NoiseChannel:
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
+    pulseframer: PulseDataFramer | None = None
 
     # @functools.cache
     def calc_max_excursion(
@@ -30,10 +32,11 @@ class NoiseChannel:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
-        noise_traces = self.df.limit(n_limit)[trace_col_name].to_numpy()
-        excursion = excursion2d(noise_traces)
+        assert self.pulseframer is not None
+        noise_traces = self.pulseframer.load_raw_chunk(0, n_limit)[trace_col_name]
+        excursion = excursion2d(noise_traces.to_numpy())
         max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
-        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion)
+        df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion).with_columns(noise_traces)
         return df_noise2, max_excursion
 
     def get_records_2d(
@@ -70,8 +73,9 @@ class NoiseChannel:
 
             Shape: (n_pulses, len(pulse))
         """
+        assert self.pulseframer is not None
         df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)["pulse"].to_numpy()
+        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)[trace_col_name].to_numpy()
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -122,5 +126,11 @@ class NoiseChannel:
         """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
-        noise_channel = cls(df, header_df, header_df["Timebase"][0])
+        noise_channel = cls(df, header_df, header_df["Timebase"][0], pulseframer=ljh)
         return noise_channel
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("pulseframer", None)
+        return state

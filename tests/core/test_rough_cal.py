@@ -1,6 +1,7 @@
 import numpy as np
 import mass2
 import polars as pl
+from mass2.core.misc import PulseDataFromNumpy
 
 # set seed to control shuffle in the function and random errors in make_truth_ph
 rng = np.random.default_rng(1)
@@ -141,7 +142,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     header_df = pl.DataFrame()
     frametime_s = 1e-5
     df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -152,7 +153,8 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         df=header_df,
     )
     df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    framer = PulseDataFromNumpy(pulse_traces + noise_traces)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=framer)
     return ch
 
 
@@ -176,12 +178,11 @@ def test_two_peak_rough_cal_combinatoric() -> None:
     cut pulses that exceed that value (as ALL pulses will exceed it). Tests for issue #95."""
     signal = np.zeros(50, dtype=np.int16)
     signal[25:] = 1000
-    chA = dummy_channel(signal=signal)
-    chB = dummy_channel(signal=signal * 2)
+    chA = dummy_channel(signal=signal).summarize_pulses()
+    chB = dummy_channel(signal=signal * 2).summarize_pulses()
     df = pl.concat([chA.df, chB.df])
 
     ch = mass2.Channel(df, chA.header, npulses=len(df), noise=chA.noise)
-    ch = ch.summarize_pulses()
     # Try to calibrate with 2 peaks, like with ^153Gd data
     ch = ch.rough_cal_combinatoric([100, 180], "pulse_average", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
     assignment = ch.steps[-1].assignment_result

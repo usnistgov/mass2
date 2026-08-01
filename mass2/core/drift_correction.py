@@ -11,6 +11,7 @@ import typing
 import pylab as plt
 
 import mass2
+from .misc import PulseDataFramer
 from .recipe import RecipeStep
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class DriftCorrectStep(RecipeStep):
 
     dc: typing.Any
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the drift correction to the input DataFrame and return a new DataFrame with results."""
         indicator_col, uncorrected_col = self.inputs
         slope, offset = self.dc.slope, self.dc.offset
@@ -110,7 +111,7 @@ class TimeDriftCorrectStep(RecipeStep):
 
     correction: typing.Any
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the drift correction to the input DataFrame and return a new DataFrame with results."""
         time_col, uncorrected_col = self.inputs
         time_s = df[time_col].dt.epoch("ms").to_numpy() / 1e3

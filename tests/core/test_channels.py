@@ -10,6 +10,7 @@ import mass2
 import pulsedata
 import tempfile
 import pathlib
+from mass2.core.misc import PulseDataFromNumpy
 
 
 def test_ljh_to_polars():
@@ -20,6 +21,12 @@ def test_ljh_to_polars():
     _df, _header_df = ljh.to_polars()
 
 
+def dummy_dataframe(npulses: int) -> pl.DataFrame:
+    """Generate a dataframe with `npulses` rows. The Python API requires keeping a column in it, or it will
+    have zero rows."""
+    return pl.DataFrame({"_dummy": range(npulses)})
+
+
 def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
     rng = np.random.default_rng(seed)
     n = len(signal)
@@ -27,8 +34,8 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     pulse_traces = np.outer(rng.uniform(0.8, 1.2, size=npulses), signal).astype(np.int16)
     header_df = pl.DataFrame()
     frametime_s = 1e-5
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    df_noise = dummy_dataframe(len(noise_traces))
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, pulseframer=PulseDataFromNumpy(noise_traces))
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -38,8 +45,9 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         n_samples=n,
         df=header_df,
     )
-    df = pl.DataFrame({"pulse": pulse_traces + noise_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    pulseframer = PulseDataFromNumpy(pulse_traces + noise_traces)
+    df = dummy_dataframe(pulseframer.npulses)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=pulseframer)
     return ch
 
 
@@ -183,8 +191,8 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     pulse_traces = np.tile(signal, (npulses, 1)) + noise_traces
     header_df = pl.DataFrame({"continuous": [True]})
     frametime_s = 1e-5
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    df_noise = dummy_dataframe(npulses)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     header = mass2.ChannelHeader(
         "dummy for test",
         data_source=None,
@@ -194,8 +202,9 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
         n_samples=n,
         df=header_df,
     )
-    df = pl.DataFrame({"pulse": pulse_traces})
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
+    df = dummy_dataframe(npulses)
+    pulseframer = PulseDataFromNumpy(pulse_traces)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=pulseframer)
     ch = ch.filter5lag()
     step: mass2.core.OptimalFilterStep = ch.steps[-1]
     assert isinstance(step, mass2.core.OptimalFilterStep)
@@ -222,11 +231,13 @@ def test_noise_autocorr():
     frametime_s = 1e-5
     # 250 pulses of length 500
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
-    noise_traces = rng.standard_normal((250, 500))
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
+    npulses = 250
+    noise_traces = rng.standard_normal((npulses, 500))
+    df_noise = dummy_dataframe(npulses)
+    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     assert len(noise_ch.df) == 250
-    assert len(noise_ch.df["pulse"][0]) == 500
+    assert noise_ch.pulseframer is not None
+    assert len(noise_ch.pulseframer.load_raw_pulse(0)["pulse"]) == 500
     noise_autocorr_mass = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
     assert len(noise_autocorr_mass) == 500
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
@@ -254,9 +265,12 @@ def test_noise_psd():
     # sigma**2 = 1
     # delta_f == 1
     # PSD = 1/Hz
-    noise_traces = rng.standard_normal((1000, 500))
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    npulses = 1000
+    noise_traces = rng.standard_normal((npulses, 500))
+    df_noise = dummy_dataframe(npulses)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     assert noise_ch.frametime_s == frametime_s
 
     # segfactor is the number of pulses
@@ -287,10 +301,13 @@ def test_get_pulses_2d():
     rng = np.random.default_rng(1)
     header_df = pl.DataFrame()
     frametime_s = 0.5
-    # 1000 pulses of length 500
-    noise_traces = rng.standard_normal((10, 5))
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    # 10 pulses of length 5
+    npulses = 10
+    noise_traces = rng.standard_normal((npulses, 5))
+    df_noise = dummy_dataframe(npulses)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     pulses = noise_ch.get_records_2d()
     assert pulses.shape[0] == 10  # npulses
     assert pulses.shape[1] == 5  # length of pulses
@@ -308,30 +325,33 @@ def test_ravel_behavior():
 def test_noise_psd_ordering_should_be_extended_to_colored_noise():
     header_df = pl.DataFrame()
     frametime_s = 0.5
-    noise_traces = np.tile(np.arange(10), (5, 1))
-    assert np.allclose(noise_traces[0, :], np.arange(10))
-    assert np.allclose(noise_traces.shape, np.array([5, 10]))
-    df_noise = pl.DataFrame({"pulse": noise_traces})
-    noise_ch = mass2.NoiseChannel(df=df_noise, header_df=header_df, frametime_s=frametime_s)
+    pulse_len = 10
+    nfreq = 1 + pulse_len // 2
+    npulses = 5
+    noise_traces = np.tile(np.arange(10), (npulses, 1))
+    assert np.allclose(noise_traces[0, :], np.arange(pulse_len))
+    assert np.allclose(noise_traces.shape, np.array([npulses, pulse_len]))
+    df_noise = dummy_dataframe(npulses)
+    noise_ch = mass2.NoiseChannel(
+        df=df_noise, header_df=header_df, frametime_s=frametime_s, pulseframer=PulseDataFromNumpy(noise_traces)
+    )
     assert noise_ch.frametime_s == frametime_s
 
-    # segfactor is the number of pulses
-    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=5, dt=frametime_s)
-    assert len(f_mass) == 6  # half the length of the noise traces + 1
-    # expect = np.ones(6)
+    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(noise_traces.ravel(), segfactor=npulses, dt=frametime_s)
+    assert len(f_mass) == nfreq
 
     psd_raw_periodogram = mass2.core.noise_algorithms.noise_psd_periodogram(noise_traces, dt=frametime_s)
-    assert len(psd_raw_periodogram.frequencies) == 6  # half the length of the noise traces + 1
+    assert len(psd_raw_periodogram.frequencies) == nfreq
     assert np.allclose(f_mass, psd_raw_periodogram.frequencies)
     assert np.allclose(psd_raw_periodogram.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
     psd_raw = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
-    assert len(psd_raw.frequencies) == 6  # half the length of the noise traces + 1
+    assert len(psd_raw.frequencies) == nfreq
     assert np.allclose(f_mass, psd_raw.frequencies)
     assert np.allclose(psd_raw.psd[1:-1], psd_mass[1:-1], atol=0.15)
 
     psd = noise_ch.spectrum(excursion_nsigma=1e100)
-    assert len(psd.frequencies) == 6
+    assert len(psd.frequencies) == nfreq
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
     assert np.allclose(psd_raw.psd, psd.psd)
 
@@ -348,6 +368,9 @@ def test_concat_dfs_with_concat_state():
 
 def test_col_map_step():
     ch = dummy_channel()
+    assert ch.pulseframer is not None
+    raw_df = ch.pulseframer.load_raw_chunk(0, ch.npulses)
+    ch = dataclasses.replace(ch, df=ch.df.with_columns(raw_df))
 
     def std_of_pulses_chunk(pulse):
         return np.std(pulse)
@@ -364,7 +387,6 @@ def test_pretrig_mean_jump_fix_step():
     pretrig_mean = np.arange(len(ch.df)) % 50 + 725
     ch = ch.with_columns(pretrig_mean=pretrig_mean)
     ch2 = ch.correct_pretrig_mean_jumps(period=50)
-    assert "pulse" in ch2.df.columns
     assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
     step = ch2.steps[-1]
     assert step.inputs == ["pretrig_mean"]
@@ -389,7 +411,6 @@ def test_select_step():
     n = len(ch.df)
     ch = ch.with_columns(a=np.arange(n), b=(2 * np.arange(n)))
     ch2 = ch.with_select_step({"a*5": pl.col("a") * 5, "a+b": pl.col("a") + pl.col("b")})
-    assert "pulse" in ch2.df.columns
     assert all(ch2.df["a*5"].to_numpy() == ch.df["a"].to_numpy() * 5)
     assert all(ch2.df["a+b"].to_numpy() == ch.df["a"].to_numpy() + ch.df["b"].to_numpy())
     step = ch2.steps[-1]
@@ -427,7 +448,6 @@ def test_categorize_step():
         "b10": pl.col("b") == 10,
     }
     ch2 = ch.with_categorize_step(category_condition_dict=category_condition_dict)
-    assert "pulse" in ch2.df.columns
     step = ch2.steps[-1]
     assert set(step.inputs) == set(["a", "b"])
     assert step.output == ["category"]
@@ -533,12 +553,12 @@ def test_save_analysis(tmpdir):
     restored_ch = data2.channels[ch_num]
     assert len(restored_ch.df) == len(ch.df)
     assert restored_ch.header.ch_num == ch_num
-    assert_frame_equal(restored_ch.df, ch.df.drop("pulse"), check_column_order=False)
+    assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
 
     restored_ch2 = data2.bad_channels[bad_num]
     assert len(restored_ch2.ch.df) == len(ch2.df)
     assert restored_ch2.ch.header.ch_num == bad_num
-    assert_frame_equal(restored_ch2.ch.df, ch2.df.drop("pulse"))
+    assert_frame_equal(restored_ch2.ch.df, ch2.df)
 
 
 def test_save_analysis_with_ljh(tmpdir):
@@ -587,6 +607,9 @@ def test_change_time_zone():
 
 def test_channel_mismatched_n_samples():
     ch = dummy_channel()
+    assert ch.pulseframer is not None
+    raw_df = ch.pulseframer.load_raw_chunk(0, ch.npulses)
+    ch = dataclasses.replace(ch, df=ch.df.with_columns(raw_df))
     bad_header = dataclasses.replace(ch.header, n_samples=ch.header.n_samples + 1)
     with pytest.raises(ValueError, match="n_samples"):
         mass2.Channel(ch.df, bad_header, npulses=ch.npulses, noise=ch.noise)
@@ -603,9 +626,13 @@ def test_ch_from_numpy():
         ch = mass2.Channel.from_numpy(10000, nsamp // 2, fname, fname, "description", ch_num=5)
         data = mass2.Channels.from_oneChannel(ch)
         assert data.ch0.noise is not None
+        assert data.ch0.pulseframer is not None
+        assert data.ch0.noise.pulseframer is not None
+        raw_df1 = data.ch0.pulseframer.load_raw_chunk(0, npulses)
+        raw_df2 = data.ch0.noise.pulseframer.load_raw_chunk(0, npulses)
         for i in range(npulses):
-            assert np.all(data.ch0.df["pulse"][i].to_numpy() == raw[:, i])
-            assert np.all(data.ch0.noise.df["pulse"][i].to_numpy() == raw[:, i])
+            assert np.all(raw_df1["pulse"][i].to_numpy() == raw[:, i])
+            assert np.all(raw_df2["pulse"][i].to_numpy() == raw[:, i])
 
 
 def test_ch_from_numpy2():
@@ -618,6 +645,8 @@ def test_ch_from_numpy2():
     ch = mass2.Channel.from_numpy(rate, npre, pulsepath, noisepath, "description", ch_num=5)
     data = mass2.Channels.from_oneChannel(ch)
     assert data.ch0.noise is not None
+    assert data.ch0.pulseframer is not None
+    raw_df = data.ch0.pulseframer.load_raw_chunk(0, ch.npulses)
     for i in range(ch.npulses):
-        pulse = data.ch0.df["pulse"][i].to_numpy()
+        pulse = raw_df["pulse"][i].to_numpy()
         assert np.all(pulse < 5000) and np.all(pulse > -5000)
