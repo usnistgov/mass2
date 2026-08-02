@@ -30,21 +30,22 @@ def translate_external_trigger(args: argparse.Namespace) -> None:
         if args.verbose:
             print("No external trigger file found")
         return
-    path = trig_files[0]
-    out_path = path.replace(".bin", ".parquet")
-    if not args.force and os.path.exists(out_path):
-        raise OSError(f"Cannot overwrite {out_path} without --force argument.")
+    binary_path = trig_files[0]
+    parquet_path = binary_path.replace(".bin", ".parquet")
+    if not args.force and os.path.exists(parquet_path):
+        raise OSError(f"Cannot overwrite {parquet_path} without --force argument.")
+    print(f"Writing {binary_path}\n-> {parquet_path}")
 
-    print(f"Writing {path}\n-> {out_path}")
-    if args.dry_run:
-        return
-    with open(path, "rb") as _f:
+    with open(binary_path, "rb") as _f:
         _header_line = _f.readline()  # read the one header line before opening the binary data
         external_trigger_subframe_count = np.fromfile(_f, "int64")
         df = pl.DataFrame({"ext_trig_subframecount": external_trigger_subframe_count})
-    df.write_parquet(out_path)
     net = len(df)
-    print(f"We found {net} external triggers in {path}")
+    print(f"We found {net} external triggers in {binary_path}")
+
+    if args.dry_run:
+        return
+    df.write_parquet(parquet_path)
 
 
 def generate_ljh_metadata_df(ljh: dict[int, LJHFile]) -> pl.DataFrame:
@@ -83,49 +84,66 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
         print("No LJH files to translate")
         return
 
-    ljh: dict[int, LJHFile] = {}
+    ljhfiles: dict[int, LJHFile] = {}
     for in_fname in ljh_filenames:
         matches = re.search(r"chan(\d+)\.ljh", in_fname)
         if matches:
             ch = matches.groups()[0]
             ch_num = int(ch)
-            ljh[ch_num] = LJHFile.open(in_fname)
-    print(f"There are {len(ljh)} LJH files to read:")
-    print(f"Channels: {ljh.keys()}")
+            ljhfiles[ch_num] = LJHFile.open(in_fname)
+    print(f"There are {len(ljhfiles)} LJH files to read:")
+    print(f"Channels: {ljhfiles.keys()}")
     out_path = str(base / "channel_metadata.parquet")
     print(f"Writing {out_path}")
     if not args.dry_run:
-        df = generate_ljh_metadata_df(ljh)
+        df = generate_ljh_metadata_df(ljhfiles)
         df.write_parquet(out_path)
 
-    write_ljh_arrow(ljh, args)
+    write_ljh_arrow(ljhfiles, args)
 
 
-def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
-    base = Path(args.base_dir)
-    ljh0 = next(iter(ljh.values()))
+def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:
+    """Write a numbered collection of LJHFiles into a series of Arrow files.
+
+    The LJH files are numbered by channel number, but the output Arrow files are
+    sequential and mix all channels into the same files.
+
+    Parameters
+    ----------
+    ljhfiles : dict[int, LJHFile]
+        A map from channel number to a single-channel LJHFile object.
+    args : argparse.Namespace
+        Command-line arguments that control conversion behavior.
+    """
+    # Extract the timing information (subframe count and posix timestamps) as dictionaries
+    # of numpy arrays, indexed by channel number.
+    ljh0 = next(iter(ljhfiles.values()))
     frames_per_sec = 1 / ljh0.timebase
     if ljh0.subframediv is None:
         subframes_per_sec = int(64 * frames_per_sec)
     else:
         subframes_per_sec = int(ljh0.subframediv * frames_per_sec)
-    subframes = {k: v.subframecount for (k, v) in ljh.items()}
-    posix_usec = {k: v.datatimes_raw for (k, v) in ljh.items()}
+    subframes = {k: v.subframecount for (k, v) in ljhfiles.items()}
+    posix_usec = {k: v.datatimes_raw for (k, v) in ljhfiles.items()}
     first_subframe = np.min([sfc[0] for sfc in subframes.values()])
     final_subframe = np.max([sfc[-1] for sfc in subframes.values()])
 
+    # Construct the Arrow files to contain `args.pariod` seconds of data apiece.
+    base = Path(args.base_dir)
     output_number = 0
     while first_subframe < final_subframe:
         last_subframe = first_subframe + args.period * subframes_per_sec
         out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrow"
         duration = (last_subframe - first_subframe) / subframes_per_sec
-        print(f"Writing {out_name} with subframes {first_subframe}-{last_subframe} over {duration:.4f} s")
+        print(f"Writing {out_name} with subframes {first_subframe}-{last_subframe}. Duration: {duration:.4f} s")
         if args.dry_run:
             first_subframe = last_subframe
             continue
 
+        # For each LJH file, find the contiguous group of pulses that match this Arrow file's
+        # [first_subframe, last_subframe] range.
         all_df: list[pl.DataFrame] = []
-        for k, v in ljh.items():
+        for k, v in ljhfiles.items():
             start_idx = np.searchsorted(subframes[k], first_subframe, side="left")
             stop_idx = np.searchsorted(subframes[k], last_subframe, side="right")
             df = v.load_raw_chunk(start_idx, stop_idx)
@@ -138,13 +156,15 @@ def write_ljh_arrow(ljh: dict[int, LJHFile], args: argparse.Namespace) -> None:
         complete_df = pl.concat(all_df, rechunk=True)
         out_path = str(base / out_name)
 
-        # Generate the index map that *would* sort these columns
-        # If the data is already sorted, the index array is identical to its own row count
+        # Generate the index map that *would* sort these columns.
+        # If the data rows are already sorted, the index array is identical to its own row count.
+        # If they are not already sorted, sort. (It's better to test before blindly sorting.)
         indices = df.select(pl.arg_sort_by(["channel_number", "subframecount"])).to_series()
         if not indices.is_sorted():
             complete_df = complete_df.sort("channel_number", "subframecount")
-        complete_df.write_ipc(out_path)
 
+        # Write the Arrow IPC file, and prepare for next iteration.
+        complete_df.write_ipc(out_path)
         first_subframe = last_subframe
         output_number += 1
 
