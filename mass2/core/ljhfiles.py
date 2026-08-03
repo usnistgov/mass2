@@ -16,7 +16,7 @@ from abc import abstractmethod
 
 import tzlocal
 
-from .channel import PulseDataFramer
+from .misc import PulseDataFramer
 
 _local_timezone_name = tzlocal.get_localzone_name()
 

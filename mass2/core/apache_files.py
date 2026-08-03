@@ -1,4 +1,5 @@
 import argparse
+import functools
 import glob
 import numpy as np
 import os
@@ -6,9 +7,12 @@ import polars as pl
 import pyarrow.parquet as pq
 import re
 from pathlib import Path
+from dataclasses import dataclass
+from collections.abc import Iterable
 
 from .ljhutil import filename_glob_expand
 from .ljhfiles import LJHFile
+from .misc import PulseDataFramer
 
 """
 Functions to translate NIST LJH file format into a new format based on:
@@ -18,6 +22,34 @@ Functions to translate NIST LJH file format into a new format based on:
 
 See especially the script `ljh2apache`
 """
+
+
+@dataclass(frozen=True)
+class PulseDataFromArrow(PulseDataFramer):
+    lf: pl.LazyFrame
+
+    @functools.cached_property
+    def npulses(self) -> int:
+        return self.lf.select(pl.len()).collect().item()
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        stop = min(stop, self.npulses)
+        s = slice(start, stop, step)
+        return self.lf[s].select("pulse").collect()
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return self.lf.select("pulse").slice(id, 1).collect()
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return self.lf.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids))).collect()
+
+    def load_timing(self) -> pl.DataFrame:
+        return self.lf.drop("pulse").collect()
+
+    @classmethod
+    def open(cls, path: str | Path, channum: int) -> "PulseDataFromArrow":
+        lf = pl.scan_ipc(path).filter(pl.col("channel_number") == channum)
+        return cls(lf)
 
 
 def translate_external_trigger(args: argparse.Namespace) -> None:
