@@ -22,6 +22,7 @@ See especially the script `ljh2apache`
 
 def translate_external_trigger(args: argparse.Namespace) -> None:
     base = Path(args.base_dir)
+    output = Path(args.output)
     pattern = str(base / "*_external_trigger.bin")
     trig_files = glob.glob(pattern)
     nf = len(trig_files)
@@ -31,10 +32,12 @@ def translate_external_trigger(args: argparse.Namespace) -> None:
             print("No external trigger file found")
         return
     binary_path = trig_files[0]
-    parquet_path = binary_path.replace(".bin", ".parquet")
+    input_basename = os.path.basename(binary_path)
+    output_basename = input_basename.replace(".bin", ".parquet")
+    parquet_path = output / output_basename
     if not args.force and os.path.exists(parquet_path):
         raise OSError(f"Cannot overwrite {parquet_path} without --force argument.")
-    print(f"Writing {binary_path}\n-> {parquet_path}")
+    print(f"Converting {binary_path}\n-> {parquet_path}")
 
     with open(binary_path, "rb") as _f:
         _header_line = _f.readline()  # read the one header line before opening the binary data
@@ -78,6 +81,7 @@ def base32_crockford_encode(number: int, length: int = 1) -> str:
 
 def translate_ljh_files(args: argparse.Namespace) -> None:
     base = Path(args.base_dir)
+    output = Path(args.output)
     pattern = base / "*_chan*.ljh"
     ljh_filenames = filename_glob_expand(str(pattern))
     if len(ljh_filenames) == 0:
@@ -93,7 +97,7 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
             ljhfiles[ch_num] = LJHFile.open(in_fname)
     print(f"There are {len(ljhfiles)} LJH files to read:")
     print(f"Channels: {ljhfiles.keys()}")
-    out_path = str(base / "channel_metadata.parquet")
+    out_path = str(output / "channel_metadata.parquet")
     print(f"Writing {out_path}")
     if not args.dry_run:
         df = generate_ljh_metadata_df(ljhfiles)
@@ -129,7 +133,8 @@ def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> N
     final_subframe = np.max([sfc[-1] for sfc in subframes.values()])
 
     # Construct the Arrow files to contain `args.pariod` seconds of data apiece.
-    base = Path(args.base_dir)
+    output = Path(args.output)
+    print(f"Writing arrow files to directory {output}/")
     output_number = 0
     while first_subframe < final_subframe:
         last_subframe = first_subframe + args.period * subframes_per_sec
@@ -138,6 +143,7 @@ def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> N
         print(f"Writing {out_name} with subframes {first_subframe}-{last_subframe}. Duration: {duration:.4f} s")
         if args.dry_run:
             first_subframe = last_subframe
+            output_number += 1
             continue
 
         # For each LJH file, find the contiguous group of pulses that match this Arrow file's
@@ -154,7 +160,7 @@ def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> N
             ).with_columns(pl.from_epoch("timestamp", time_unit="us"))
             all_df.append(df)
         complete_df = pl.concat(all_df, rechunk=True)
-        out_path = str(base / out_name)
+        out_path = str(output / out_name)
 
         # Generate the index map that *would* sort these columns.
         # If the data rows are already sorted, the index array is identical to its own row count.
@@ -172,6 +178,7 @@ def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> N
 def main_ljh2apache() -> None:
     parser = argparse.ArgumentParser(description="Convert a set of LJH files to new apache file formats")
     parser.add_argument("base_dir", type=str, help="directory of files to process, with *_chan*.ljh as the LJH files")
+    parser.add_argument("-o", "--output", type=str, help="Write output to this directory (default: same as base_dir)")
     parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing data")
     parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run: say what would be done, but don't do it")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode; print extra info to terminal")
@@ -179,6 +186,8 @@ def main_ljh2apache() -> None:
         "-p", "--period", type=float, default=10, help="Period for starting new Arrow output files, in seconds (default=10)"
     )
     args = parser.parse_args()
+    if not args.output:
+        args.output = args.base_dir
 
     translate_external_trigger(args)
     translate_ljh_files(args)
