@@ -25,6 +25,7 @@ import mass2
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
+from .apache_files import PulseDataFromArrow
 from .offfiles import OffFile
 from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
@@ -80,7 +81,7 @@ class ChannelHeader:
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
         """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
-        filepath = df["Filename"][0]
+        filepath = df.item(0, "Filename")
         return cls(
             description=os.path.split(filepath)[-1],
             data_source=filepath,
@@ -88,6 +89,20 @@ class ChannelHeader:
             frametime_s=df["Timebase"][0],
             n_presamples=df["Presamples"][0],
             n_samples=df["Total Samples"][0],
+            df=df,
+        )
+
+    @classmethod
+    def from_channel_metadata_df(cls, df: pl.DataFrame) -> "ChannelHeader":
+        """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
+        filepath = df.item(0, "filename")
+        return cls(
+            description=os.path.split(filepath)[-1],
+            data_source=filepath,
+            ch_num=df["channel_number"][0],
+            frametime_s=df["timebase"][0],
+            n_presamples=df["npresamples"][0],
+            n_samples=df["nsamples"][0],
             df=df,
         )
 
@@ -864,7 +879,7 @@ class Channel:
 
     def with_range_around_median(self, col: str, range_up: float, range_down: float) -> "Channel":
         """Set good_expr to exclude pulses with `col` outside the given range around its median."""
-        med = np.median(self.df[col].to_numpy())
+        med = float(np.median(self.df[col].to_numpy()))
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
     def with_good_expr_below_nsigma_outlier_resistant(
@@ -1421,6 +1436,39 @@ class Channel:
             noise=noise_channel,
             transform_raw=transform_raw,
             pulseframer=ljh,
+        )
+        return channel
+
+    @classmethod
+    def from_arrow(
+        cls,
+        path: str | Path,
+        channum: int,
+        noise_path: str | Path | None = None,
+        transform_raw: Callable | None = None,
+    ) -> "Channel":
+        """Load a Channel from an Arrow IPC file, optionally with a NoiseChannel from a corresponding noise file."""
+        if not noise_path:
+            noise_channel = None
+        else:
+            noise_channel = NoiseChannel.from_ljh(noise_path)
+        metadata_path = Path(path).parent / "channel_metadata.parquet"
+        header_df = pl.read_parquet(metadata_path).filter(pl.col("channel_number") == channum)
+        header = ChannelHeader.from_channel_metadata_df(header_df)
+        subframediv = header_df.item(0, "subframediv")
+
+        framer = PulseDataFromArrow.open(path, channum)
+        df = framer.load_timing()
+        if noise_path:
+            header = dataclasses.replace(header, noise_data_source=str(noise_path))
+        channel = cls(
+            df,
+            header=header,
+            npulses=framer.npulses,
+            subframediv=subframediv,
+            noise=noise_channel,
+            transform_raw=transform_raw,
+            pulseframer=framer,
         )
         return channel
 
