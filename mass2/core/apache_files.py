@@ -148,7 +148,10 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
         df = generate_ljh_metadata_df(ljhfiles)
         df.write_parquet(out_path)
 
-    mix_ljh_arrow(ljhfiles, args)
+    if args.mix:
+        mix_ljh_arrow(ljhfiles, args)
+    else:
+        convert_ljh_arrow(ljhfiles, args)
 
 
 def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:  # noqa: PLR0914
@@ -301,8 +304,50 @@ def main_ljh2apache() -> None:
         "-b", "--batch", type=float, default=5, help="Period for starting a new record batch within an arrow file (default=5)"
     )
     args = parser.parse_args()
+    args.mix = True
     if not args.output:
         args.output = args.base_dir
+
+    translate_external_trigger(args)
+    translate_ljh_files(args)
+
+
+def convert_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:
+    """Write a numbered collection of LJHFiles into a series of single-channel Arrow IPC files.
+
+    The LJH files are numbered by channel number.
+
+    Parameters
+    ----------
+    ljhfiles : dict[int, LJHFile]
+        A map from channel number to a single-channel LJHFile object.
+    args : argparse.Namespace
+        Command-line arguments that control conversion behavior.
+    """
+    for chnum, ljh in ljhfiles.items():
+        ljhpath = Path(ljh.filename)
+        ljhstem = ljhpath.stem
+        outpath = Path(args.output) / (ljhstem + ".arrow")
+        print(f"Converting chan {chnum:4d}: {ljhpath} -> {outpath}")
+        if args.dry_run:
+            continue
+
+        df, _dfheader = ljh.to_polars(keep_raw_pulses=True)
+        df.write_ipc(outpath)
+
+
+def main_ljh2arrow() -> None:
+    parser = argparse.ArgumentParser(description="Convert a set of LJH files to new single-channel arrow IPC files")
+    parser.add_argument("base_dir", type=str, help="directory of files to process, with *_chan*.ljh as the LJH files")
+    parser.add_argument("-o", "--output", type=str, help="Write output to this directory (default: same as base_dir)")
+    parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing data")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run: say what would be done, but don't do it")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode; print extra info to terminal")
+    args = parser.parse_args()
+    args.mix = False
+    if not args.output:
+        args.output = args.base_dir
+    Path(args.output).mkdir(parents=True, exist_ok=True)
 
     translate_external_trigger(args)
     translate_ljh_files(args)
