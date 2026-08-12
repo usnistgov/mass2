@@ -4,6 +4,8 @@ import glob
 import numpy as np
 import os
 import polars as pl
+import pyarrow as pa
+from pyarrow import ipc
 import pyarrow.parquet as pq
 import re
 from pathlib import Path
@@ -35,20 +37,31 @@ class PulseDataFromArrow(PulseDataFramer):
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
         s = slice(start, stop, step)
-        return self.lf[s].select("pulse").collect()
+        print(f"Loading chunk {s}")
+        return self.lf[s].select("pulse").collect(engine="streaming")
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self.lf.select("pulse").slice(id, 1).collect()
+        return self.lf.select("pulse").slice(id, 1).collect(engine="streaming")
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self.lf.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids))).collect()
+        return self.lf.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids))).collect(engine="streaming")
 
     def load_timing(self) -> pl.DataFrame:
-        return self.lf.drop("pulse").collect()
+        return self.lf.drop("pulse").collect(engine="streaming")
 
     @classmethod
     def open(cls, path: str | Path, channum: int) -> "PulseDataFromArrow":
         lf = pl.scan_ipc(path).filter(pl.col("channel_number") == channum)
+        return cls(lf)
+
+
+@dataclass(frozen=True)
+class PulseDataFromParquet(PulseDataFromArrow):
+    lf: pl.LazyFrame
+
+    @classmethod
+    def open(cls, path: str | Path, channum: int) -> "PulseDataFromParquet":
+        lf = pl.scan_parquet(path).filter(pl.col("channel_number") == channum)
         return cls(lf)
 
 
@@ -135,10 +148,10 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
         df = generate_ljh_metadata_df(ljhfiles)
         df.write_parquet(out_path)
 
-    write_ljh_arrow(ljhfiles, args)
+    mix_ljh_arrow(ljhfiles, args)
 
 
-def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:
+def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:  # noqa: PLR0914
     """Write a numbered collection of LJHFiles into a series of Arrow files.
 
     The LJH files are numbered by channel number, but the output Arrow files are
@@ -159,50 +172,116 @@ def write_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> N
         subframes_per_sec = int(64 * frames_per_sec)
     else:
         subframes_per_sec = int(ljh0.subframediv * frames_per_sec)
-    subframes = {k: v.subframecount for (k, v) in ljhfiles.items()}
-    posix_usec = {k: v.datatimes_raw for (k, v) in ljhfiles.items()}
-    first_subframe = np.min([sfc[0] for sfc in subframes.values()])
-    final_subframe = np.max([sfc[-1] for sfc in subframes.values()])
+    subframes_per_batch = int(args.batch * subframes_per_sec)
+    subframes_per_file = int(args.period * subframes_per_sec)
 
-    # Construct the Arrow files to contain `args.pariod` seconds of data apiece.
+    first_subframe = np.min([ljh._mmap[0]["subframecount"] for ljh in ljhfiles.values()])
+    final_subframe = np.max([ljh._mmap[-1]["subframecount"] for ljh in ljhfiles.values()])
+    next_idx = {k: 0 for k in ljhfiles.keys()}
+
+    # Construct the Arrow files to contain `args.period` seconds of data apiece.
     output = Path(args.output)
     print(f"Writing arrow files to directory {output}/")
+
+    nsamples = ljh0.nsamples
+    raw_schema = pl.Schema([
+        ("pulse", pl.Array(pl.UInt16, shape=(nsamples,))),
+        ("subframecount", pl.Int64),
+        ("timestamp", pl.Datetime(time_unit="us", time_zone="America/Denver")),
+    ])
+
+    # Loop over files. Every args.period, close file and start a new one.
     output_number = 0
     while first_subframe < final_subframe:
-        last_subframe = first_subframe + args.period * subframes_per_sec
-        out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrow"
+        last_subframe = first_subframe + subframes_per_file
+        out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrows"
+        out_path = str(output / out_name)
+        parquet_name = out_name.replace("arrows", "parquet")
+        parquet_path = str(output / parquet_name)
+
         duration = (last_subframe - first_subframe) / subframes_per_sec
-        print(f"Writing {out_name} with subframes {first_subframe}-{last_subframe}. Duration: {duration:.4f} s")
+        print(f"Analyzing subframes {first_subframe}-{last_subframe}. Duration: {duration:.4f} s")
         if args.dry_run:
+            print(f"Writing {out_name}")
+            print(f"Writing {parquet_name}")
             first_subframe = last_subframe
             output_number += 1
             continue
 
-        # For each LJH file, find the contiguous group of pulses that match this Arrow file's
-        # [first_subframe, last_subframe] range.
-        all_df: list[pl.DataFrame] = []
-        for k, v in ljhfiles.items():
-            start_idx = np.searchsorted(subframes[k], first_subframe, side="left")
-            stop_idx = np.searchsorted(subframes[k], last_subframe, side="right")
-            df = v.load_raw_chunk(start_idx, stop_idx)
-            df = df.with_columns(
-                subframecount=subframes[k][start_idx:stop_idx],
-                timestamp=posix_usec[k][start_idx:stop_idx],
-                channel_number=pl.lit(k),
-            ).with_columns(pl.from_epoch("timestamp", time_unit="us"))
-            all_df.append(df)
-        complete_df = pl.concat(all_df, rechunk=True)
-        out_path = str(output / out_name)
+        all_batches: list[pl.DataFrame] = []
+        batch_first_subframe = first_subframe
+        size_MB = 0.0
+        while batch_first_subframe < last_subframe:
+            batch_last_subframe = batch_first_subframe + subframes_per_batch
+            all_df: list[pl.DataFrame] = []
 
-        # Generate the index map that *would* sort these columns.
-        # If the data rows are already sorted, the index array is identical to its own row count.
-        # If they are not already sorted, sort. (It's better to test before blindly sorting.)
-        indices = df.select(pl.arg_sort_by(["channel_number", "subframecount"])).to_series()
-        if not indices.is_sorted():
-            complete_df = complete_df.sort("channel_number", "subframecount")
+            # For each LJH file, find the contiguous group of pulses that match this Arrow file batch
+            # range of subframes: [batch_first_subframe, batch_last_subframe].
+            for k, v in ljhfiles.items():
+                start = next_idx[k]
+                last_allowable_idx = v.npulses
+                if start >= last_allowable_idx:
+                    continue
 
-        # Write the Arrow IPC file, and prepare for next iteration.
-        complete_df.write_ipc(out_path)
+                # Guess that 64 records is enough; if not, keep doubling the set until we have enough.
+                step = 64
+                while True:
+                    stop = start + step
+                    if stop > last_allowable_idx:
+                        stop = last_allowable_idx
+                        break
+                    if v._mmap[stop - 1]["subframecount"] >= batch_last_subframe:
+                        break
+                    step *= 2
+                sfc = v._mmap[start:stop]["subframecount"]
+                number_in_range = (sfc < batch_last_subframe).sum()
+                end = start + number_in_range
+                next_idx[k] = end
+                if end <= start:
+                    print(f"     chan {k:2d} has no records")
+                    continue
+
+                mmap = v._mmap[start:end]
+                df = (
+                    pl.DataFrame(
+                        {
+                            "pulse": mmap["pulse"],
+                            "subframecount": mmap["subframecount"],
+                            "timestamp": mmap["posix_usec"],
+                        },
+                        schema=raw_schema,
+                    )
+                    .with_columns(
+                        channel_number=pl.lit(k),
+                    )
+                    .with_columns(pl.from_epoch("timestamp", time_unit="us"))
+                )
+                all_df.append(df)
+            batch_first_subframe = batch_last_subframe
+            if len(all_df) == 0:
+                continue
+            complete_df = pl.concat(all_df, rechunk=True)
+            df_size_mb = float(complete_df.estimated_size("megabytes"))
+            all_batches.append(complete_df)
+            size_MB += df_size_mb
+            print(f"  Created batch {len(all_batches):4d} of size {df_size_mb:6.3f} MB, {len(complete_df)} rows")
+            if size_MB >= args.max_mb:
+                break
+
+        # Write the Arrow IPC file, one batch at a time, and prepare for next iteration.
+        first_table = all_batches[0].to_arrow()
+        ipc_schema = first_table.schema
+        print(f"Writing {out_name}")
+        with pa.OSFile(out_path, "wb") as f:
+            with ipc.new_stream(f, ipc_schema) as writer:
+                for df in all_batches:
+                    table = df.to_arrow()
+                    writer.write_table(table)
+
+        print("Building sorted frame for parquet file")
+        df = pl.concat(all_batches).sort("channel_number", "subframecount")
+        print(f"Writing {parquet_name}")
+        df.write_parquet(parquet_path)
         first_subframe = last_subframe
         output_number += 1
 
@@ -214,8 +293,12 @@ def main_ljh2apache() -> None:
     parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing data")
     parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run: say what would be done, but don't do it")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode; print extra info to terminal")
+    parser.add_argument("-m", "--max-mb", type=float, default=500, help="Maximum arrow file size in MB (default=500)")
     parser.add_argument(
-        "-p", "--period", type=float, default=10, help="Period for starting new Arrow output files, in seconds (default=10)"
+        "-p", "--period", type=float, default=600, help="Period for starting new Arrow IPC stream files, in seconds (default=60)"
+    )
+    parser.add_argument(
+        "-b", "--batch", type=float, default=5, help="Period for starting a new record batch within an arrow file (default=5)"
     )
     args = parser.parse_args()
     if not args.output:

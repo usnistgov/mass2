@@ -495,6 +495,35 @@ class Channels:
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir / filename
 
+    @classmethod
+    def from_parquet(
+        cls,
+        pulse_folder: str | Path,
+        noise_folder: str | Path | None = None,
+        limit: int | None = None,
+        exclude_ch_nums: list[int] | None = None,
+        include_ch_nums: list[int] | None = None,
+    ) -> "Channels":
+        metadata_path = Path(pulse_folder) / "channel_metadata.parquet"
+        df = pl.read_parquet(metadata_path)
+        channel_numbers = set(df["channel_number"])
+        if exclude_ch_nums is not None:
+            channel_numbers -= set(exclude_ch_nums)
+        if include_ch_nums is not None:
+            channel_numbers = channel_numbers.intersection(include_ch_nums)
+        if limit is None:
+            limit = len(channel_numbers)
+        assert len(channel_numbers) > 0
+        channels: dict[int, Channel] = {}
+        path = Path(pulse_folder) / "pulse_data_*.parquet"
+        noise_path = None if noise_folder is None else Path(noise_folder) / "pulse_data_*.parquet"
+        for k in channel_numbers:
+            channels[k] = Channel.from_parquet(path, k, noise_path)
+            if len(channels) == limit:
+                break
+        description = f"Parquet data from {pulse_folder}"
+        return cls(channels, description)
+
     def get_experiment_state_df(self, experiment_state_path: str | Path | None = None) -> pl.DataFrame:
         """Return a DataFrame containing experiment state information.
 
@@ -678,9 +707,7 @@ class Channels:
             combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
             sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
             header = dataclasses.replace(ch.header, data_source=None, pulse_data_sources=sources)
-            new_ch = dataclasses.replace(
-                ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer
-            )
+            new_ch = dataclasses.replace(ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer)
             new_channels[ch_num] = new_ch
         return mass2.Channels(new_channels, self.description + other_data.description)
 
@@ -843,6 +870,7 @@ class Channels:
             Channel
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
+
             def _reload_leaf_chan(data_source: str | None) -> Channel | None:
                 """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
                 if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):

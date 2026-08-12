@@ -25,7 +25,7 @@ import mass2
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
-from .apache_files import PulseDataFromArrow
+from .apache_files import PulseDataFromParquet
 from .offfiles import OffFile
 from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
@@ -1440,7 +1440,7 @@ class Channel:
         return channel
 
     @classmethod
-    def from_arrow(
+    def from_parquet(
         cls,
         path: str | Path,
         channum: int,
@@ -1451,13 +1451,13 @@ class Channel:
         if not noise_path:
             noise_channel = None
         else:
-            noise_channel = NoiseChannel.from_ljh(noise_path)
+            noise_channel = NoiseChannel.from_parquet(noise_path, channum)
         metadata_path = Path(path).parent / "channel_metadata.parquet"
         header_df = pl.read_parquet(metadata_path).filter(pl.col("channel_number") == channum)
         header = ChannelHeader.from_channel_metadata_df(header_df)
         subframediv = header_df.item(0, "subframediv")
 
-        framer = PulseDataFromArrow.open(path, channum)
+        framer = PulseDataFromParquet.open(path, channum)
         df = framer.load_timing()
         if noise_path:
             header = dataclasses.replace(header, noise_data_source=str(noise_path))
