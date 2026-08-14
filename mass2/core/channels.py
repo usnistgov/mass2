@@ -4,13 +4,13 @@ Data structures and methods for handling a group of microcalorimeter channels.
 
 from dataclasses import dataclass, field
 import dataclasses
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from numpy.typing import ArrayLike
 from typing import Any
 import polars as pl
 import pylab as plt
-import matplotlib
 import numpy as np
+import glob
 import joblib
 import traceback
 import lmfit
@@ -18,6 +18,7 @@ import dill
 import io
 import os
 import pathlib
+import re
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -114,7 +115,7 @@ class Channels:
         )
         return result
 
-    def plot_hist(self, col: str, bin_edges: ArrayLike, use_expr: pl.Expr = pl.lit(True), axis: plt.Axes | None = None) -> None:
+    def plot_hist(self, col: str, bin_edges: Sequence[float], use_expr: pl.Expr = pl.lit(True), axis: plt.Axes | None = None) -> None:
         """Plot a histogram for the given column across all channels."""
         df_small = self.dfg().lazy().filter(use_expr).select(col).collect()
         ax = mass2.misc.plot_hist_of_series(df_small[col], bin_edges, axis)
@@ -123,7 +124,7 @@ class Channels:
     def plot_hists(
         self,
         col: str,
-        bin_edges: ArrayLike,
+        bin_edges: Sequence[float],
         group_by_col: bool,
         axis: plt.Axes | None = None,
         use_expr: pl.Expr | None = None,
@@ -186,7 +187,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: plt.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the optimal filters for the channels in this Channels object.
@@ -197,7 +198,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : plt.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -224,7 +225,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: plt.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the average pulses (the signal model) for the channels in this Channels object.
@@ -235,7 +236,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : plt.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -272,7 +273,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: plt.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the noise power spectrum for the channels in this Channels object.
@@ -283,7 +284,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : plt.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -310,7 +311,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: plt.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the noise power autocorrelation for the channels in this Channels object.
@@ -321,7 +322,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : plt.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -496,7 +497,7 @@ class Channels:
         return output_dir / filename
 
     @classmethod
-    def from_parquet(
+    def from_ipc(
         cls,
         pulse_folder: str | Path,
         noise_folder: str | Path | None = None,
@@ -505,8 +506,17 @@ class Channels:
         include_ch_nums: list[int] | None = None,
     ) -> "Channels":
         metadata_path = Path(pulse_folder) / "channel_metadata.parquet"
-        df = pl.read_parquet(metadata_path)
-        channel_numbers = set(df["channel_number"])
+        channel_df = pl.read_parquet(metadata_path)
+        expected_channel_numbers = set(channel_df["channel_number"])
+        globpath = str(Path(pulse_folder) / "*_chan*.arrow")
+        found = glob.glob(globpath)
+        found_chan: set[int] = set()
+        for F in found:
+            match = re.search(r".*chan(\d+)$", Path(F).stem)
+            if match:
+                found_chan.add(int(match.group(1)))
+        channel_numbers = expected_channel_numbers.intersection(found_chan)
+
         if exclude_ch_nums is not None:
             channel_numbers -= set(exclude_ch_nums)
         if include_ch_nums is not None:
@@ -514,11 +524,14 @@ class Channels:
         if limit is None:
             limit = len(channel_numbers)
         assert len(channel_numbers) > 0
+
         channels: dict[int, Channel] = {}
-        path = Path(pulse_folder) / "pulse_data_*.parquet"
-        noise_path = None if noise_folder is None else Path(noise_folder) / "pulse_data_*.parquet"
-        for k in channel_numbers:
-            channels[k] = Channel.from_parquet(path, k, noise_path)
+        sorted_channels = list(channel_numbers)
+        sorted_channels.sort()
+        for k in sorted_channels:
+            path = Path(pulse_folder) / f"*_chan{k}.arrow"
+            noise_path = None if noise_folder is None else Path(noise_folder) / f"*_chan{k}.arrow"
+            channels[k] = Channel.from_ipc(path, k, noise_path)
             if len(channels) == limit:
                 break
         description = f"Parquet data from {pulse_folder}"

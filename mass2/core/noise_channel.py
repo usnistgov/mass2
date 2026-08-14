@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import polars as pl
 import numpy as np
 import mass2
-from .apache_files import PulseDataFromParquet
+from .apache_files import PulseDataFromArrow
 from .misc import PulseDataFramer
 from .noise_algorithms import NoiseResult
 
@@ -131,13 +131,13 @@ class NoiseChannel:
         return noise_channel
 
     @classmethod
-    def from_parquet(cls, path: str | Path, channum: int) -> "NoiseChannel":
-        """Create a NoiseChannel by loading data from the given LJH file path."""
+    def from_ipc(cls, path: str | Path, channum: int) -> "NoiseChannel":
+        """Create a NoiseChannel by loading data from the given arrow IPC file path."""
         metadata_path = Path(path).parent / "channel_metadata.parquet"
         header_df = pl.read_parquet(metadata_path).filter(pl.col("channel_number") == channum)
         frametime_s = header_df.item(0, "timebase")
 
-        framer = PulseDataFromParquet.open(path, channum)
+        framer = PulseDataFromArrow.open(path)
         df = framer.load_timing()
         channel = cls(
             df,

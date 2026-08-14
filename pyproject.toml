@@ -23,7 +23,6 @@ dependencies = [
     "marimo",
     "matplotlib>1.5",
     "numba",
-    # Numpy 2.4 is not currently compatible with numba
     "numpy>=2.0",
     "packaging",
     # A test_truebq_bin.py error came up with polars 1.40. Forbid for now.

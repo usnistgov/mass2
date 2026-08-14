@@ -10,11 +10,15 @@ import pyarrow.parquet as pq
 import re
 from pathlib import Path
 from dataclasses import dataclass
-from collections.abc import Iterable
+from collections.abc import Iterable, Generator
 
 from .ljhutil import filename_glob_expand
 from .ljhfiles import LJHFile
 from .misc import PulseDataFramer
+
+import tzlocal
+
+_local_timezone_name = tzlocal.get_localzone_name()
 
 """
 Functions to translate NIST LJH file format into a new format based on:
@@ -29,40 +33,54 @@ See especially the script `ljh2apache`
 @dataclass(frozen=True)
 class PulseDataFromArrow(PulseDataFramer):
     lf: pl.LazyFrame
+    path: Path
+
+    @property
+    def df(self) -> pl.DataFrame:
+        return pl.read_ipc(self.path, memory_map=True)
 
     @functools.cached_property
     def npulses(self) -> int:
-        return self.lf.select(pl.len()).collect().item()
+        return self.df.select(pl.len()).item()
+
+    def iterate_raw_pulses(self, chunksize: int, extra_fields: Iterable[str] = []) -> Generator[pl.DataFrame]:
+        """Yield successive chunks of `chunksize` raw pulses each, covering the whole source in order.
+        These chunks are memory mapped to the underlying Arrows file."""
+        df = self.df
+        try:
+            for i in range(0, self.npulses, chunksize):
+                yield df[i : i + chunksize]
+        finally:
+            del df
 
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
         s = slice(start, stop, step)
-        print(f"Loading chunk {s}")
-        return self.lf[s].select("pulse").collect(engine="streaming")
+        return self.df[s].select("pulse")
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self.lf.select("pulse").slice(id, 1).collect(engine="streaming")
+        return self.df.select("pulse").slice(id, 1)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self.lf.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids))).collect(engine="streaming")
+        return self.df.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids)))
 
     def load_timing(self) -> pl.DataFrame:
-        return self.lf.drop("pulse").collect(engine="streaming")
+        """Load the timing information from a raw data Arrows file.
+
+        Specifically, drop the pulse record column, and return *a copy* of the rest of
+        the information. Does not generate a memory map or leave a file open.
+
+        Returns
+        -------
+        pl.DataFrame
+            A copy of the raw timing information, but no pulse records.
+        """
+        return self.lf.drop("pulse").collect()
 
     @classmethod
-    def open(cls, path: str | Path, channum: int) -> "PulseDataFromArrow":
-        lf = pl.scan_ipc(path).filter(pl.col("channel_number") == channum)
-        return cls(lf)
-
-
-@dataclass(frozen=True)
-class PulseDataFromParquet(PulseDataFromArrow):
-    lf: pl.LazyFrame
-
-    @classmethod
-    def open(cls, path: str | Path, channum: int) -> "PulseDataFromParquet":
-        lf = pl.scan_parquet(path).filter(pl.col("channel_number") == channum)
-        return cls(lf)
+    def open(cls, path: str | Path) -> "PulseDataFromArrow":
+        lf = pl.scan_ipc(path)
+        return cls(lf, Path(path))
 
 
 def translate_external_trigger(args: argparse.Namespace) -> None:
