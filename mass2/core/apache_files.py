@@ -8,6 +8,7 @@ import pyarrow as pa
 from pyarrow import ipc
 import pyarrow.parquet as pq
 import re
+import shutil
 from pathlib import Path
 from dataclasses import dataclass
 from collections.abc import Iterable, Generator
@@ -357,10 +358,10 @@ def convert_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) ->
 def main_ljh2arrow() -> None:
     parser = argparse.ArgumentParser(description="Convert a set of LJH files to new single-channel arrow IPC files")
     parser.add_argument("base_dir", type=str, help="directory of files to process, with *_chan*.ljh as the LJH files")
-    parser.add_argument("-o", "--output", type=str, help="Write output to this directory (default: same as base_dir)")
-    parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing data")
-    parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run: say what would be done, but don't do it")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode; print extra info to terminal")
+    parser.add_argument("-o", "--output", type=str, help="write output to this directory (default: same as base_dir)")
+    parser.add_argument("-f", "--force", action="store_true", help="overwrite existing data")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="dry run: say what would be done, but don't do it")
+    parser.add_argument("-v", "--verbose", action="store_true", help="verbose mode; print extra info to terminal")
     args = parser.parse_args()
     args.mix = False
     if not args.output:
@@ -369,6 +370,89 @@ def main_ljh2arrow() -> None:
 
     translate_external_trigger(args)
     translate_ljh_files(args)
+
+
+def _get_parser(description: str, base_dir_help: str) -> argparse.ArgumentParser:
+    """Helper to keep CLI arguments DRY."""
+    parser = argparse.ArgumentParser(description=description)
+    # Using type=Path directly parses the string into a Path object
+    parser.add_argument("base_dir", type=Path, help=base_dir_help)
+    parser.add_argument("output_dir", type=Path, help="write output to this directory")
+    parser.add_argument("-f", "--force", action="store_true", help="overwrite existing data")
+    parser.add_argument("-n", "--dry-run", action="store_true", help="dry run: say what would be done, but don't do it")
+    return parser
+
+
+def main_arrow2parquet() -> None:
+    parser = _get_parser(
+        description="Convert a set of single-channel arrow IPC files to equivalent parquet files",
+        base_dir_help="directory of files to process, with *_chan*.arrow as the arrow files",
+    )
+    args = parser.parse_args()
+    base = Path(args.base_dir)
+    out = Path(args.output_dir)
+    arrow_parquet(base, out, arrow2parquet=True, dry_run=args.dry_run, force=args.force)
+
+
+def main_parquet2arrow() -> None:
+    parser = _get_parser(
+        description="Convert a set of single-channel parquet files to equivalent arrow IPC files",
+        base_dir_help="directory of files to process, with *_chan*.parquet as the parquet files",
+    )
+    args = parser.parse_args()
+    base = Path(args.base_dir)
+    out = Path(args.output_dir)
+    arrow_parquet(base, out, arrow2parquet=False, dry_run=args.dry_run, force=args.force)
+
+
+def arrow_parquet(base: Path, out: Path, arrow2parquet: bool, dry_run: bool, force: bool) -> None:
+    """Convert a directory of arrow files to another of equivalent parquet files, or vice versa
+
+    Parameters
+    ----------
+    base : Path
+        Where to find the input files (names will be *_chan.suffix)
+    out : Path
+        Where to place the output files (names will be *_chan.suffix)
+    arrow2parquet : bool
+        Whether to convert arrow to parquet, or the reverse. The input and output suffixes will be "arrow", "parquet"
+        respectively if True, or the reverse if False.
+    dry_run : bool
+        Whether to print intentions only and not perform the conversions
+    verbose : bool
+        Whether to print extra information
+    """
+    if not dry_run:
+        out.mkdir(parents=True, exist_ok=True)
+
+    # Copy auxiliary files
+    files_to_copy = {"channel_metadata.parquet", "*experiment_state.txt", "*external_trigger*.bin"}
+    for pattern in files_to_copy:
+        for f in base.glob(pattern):
+            newpath = out / f.name
+            if newpath.exists() and not force:
+                print(f"Skipping {f.name} (already exists). Use --force to overwrite.")
+                continue
+            print(f"Copying {f} -> {newpath}")
+            if not dry_run:
+                shutil.copy2(f, newpath)
+
+    if arrow2parquet:
+        oldsuffix, newsuffix = "arrow", "parquet"
+    else:
+        oldsuffix, newsuffix = "parquet", "arrow"
+
+    for f in base.glob(f"*_chan*.{oldsuffix}"):
+        newpath = out / f.with_suffix(f".{newsuffix}").name
+        if newpath.exists() and not force:
+            print(f"Skipping {f.name} (already exists). Use --force to overwrite.")
+            continue
+        print(f"Converting {f} -> {newpath}")
+        if not dry_run:
+            if arrow2parquet:
+                pl.scan_ipc(f).sink_parquet(newpath)
+            else:
+                pl.scan_parquet(f).sink_ipc(newpath)
 
 
 def analyze_compression(file_path: str) -> None:
