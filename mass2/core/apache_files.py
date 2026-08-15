@@ -405,7 +405,7 @@ def main_parquet2arrow() -> None:
     arrow_parquet(base, out, arrow2parquet=False, dry_run=args.dry_run, force=args.force)
 
 
-def arrow_parquet(base: Path, out: Path, arrow2parquet: bool, dry_run: bool, force: bool) -> None:
+def arrow_parquet(base: Path, out: Path, arrow2parquet: bool, dry_run: bool = False, force: bool = False) -> None:
     """Convert a directory of arrow files to another of equivalent parquet files, or vice versa
 
     Parameters
