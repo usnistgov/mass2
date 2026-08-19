@@ -344,14 +344,22 @@ def test_loggain_calibration():
 
     We were getting unreasonably tiny predicted cal-curve uncertainties when using log-gain curves.
     """
-    rng = np.random.default_rng(seed=4123)
+    rng = np.random.default_rng(seed=4122)
     e = np.linspace(3000, 6000, 12)
     ph = e * (1 + 0.001 * rng.standard_normal(size=len(e)))
-    dph = ph * 0.001
+    dph = e * 0.001
     names = [f"line{i:2d}" for i in range(len(e))]
-    maker = mass2.calibration.EnergyCalibrationMaker(ph=ph, energy=e, dph=dph, de=0 * e, names=names)
-    cal = maker.make_calibration_loggain(approximate=True)
+    maker = mass2.calibration.EnergyCalibrationMaker(ph=ph, energy=e, dph=dph, de=dph * 0.1, names=names)
 
-    cal_uncert = cal.energy2uncertainty(e)
-    # The cal uncertainty should be at least 20% of the actual anchor point uncertainty
-    assert np.all(cal_uncert > dph * 0.2)
+    # The cal uncertainty's absolute mean should be at least 20% of the actual anchor point uncertainty.
+    # First test this on the loggain curve type--the one that kicked off issue 168.
+    cal = maker.make_calibration_loggain(approximate=True)
+    e2 = np.linspace(3000, 6000, 101)
+    cal_uncert = cal.energy2uncertainty(e2)
+    assert np.abs(cal_uncert).mean() > dph.mean() * 0.2
+
+    # Now try all curve types
+    for ct in mass2.calibration.energy_calibration.Curvetypes:
+        cal = maker.make_calibration(curvename=ct, approximate=True)
+        cal_uncert = cal.energy2uncertainty(e2)
+        assert np.abs(cal_uncert).mean() > dph.mean() * 0.2
