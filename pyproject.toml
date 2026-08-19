@@ -9,7 +9,7 @@ authors = [
 
 requires-python = ">=3.10"
 readme = "README.md"
-license = "MIT"
+license = { text = "MIT" }
 keywords = ["mass", "dastard", "microcalorimeter"]
 
 dependencies = [
@@ -26,16 +26,16 @@ dependencies = [
     "numpy>=2.0",
     "packaging",
     # A test_truebq_bin.py error came up with polars 1.40. Forbid for now.
-    "polars<1.40",
+    "polars != 1.40",
     "progress",
-    "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
+    "pulsedata @ git+https://github.com/ggggggggg/pulsedata",
     "pyarrow",
     "pyqt5",
     "pyyaml",
     "scikit-learn",
     # Bitbucket pipeline tests failed with scipy-1.11.2 but passed with 1.11.1 and 1.11.3. Just require 1.12+
     "scipy>=1.12",
-    "tornado", # for matplotlib plots in Marimo
+    "tornado",  # for matplotlib plots in Marimo
     "tzlocal",
     "uncertainties",
     "xraydb",
