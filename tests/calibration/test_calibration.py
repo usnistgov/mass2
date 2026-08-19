@@ -13,7 +13,7 @@ import mass2
 from mass2.calibration import EnergyCalibrationMaker, Curvetypes
 
 
-def basic_nonlinearity(e: np.ndarray) -> np.ndarray:
+def basic_nonlinearity(e: np.ndarray | float) -> np.ndarray:
     return e**0.8
 
 
@@ -31,10 +31,11 @@ def compare_curves(curvetype1, use_approximation1, curvetype2, use_approximation
     # Careful here: don't use a point in linspace(3000,6000,npoints),
     # or you'll get exact agreement when you don't expect/want it.
     refenergy = 5100.0
+    aref = np.asarray([refenergy])
     ph1 = cal1.energy2ph(refenergy)
     ph2 = cal2.energy2ph(refenergy)
-    e1 = cal1.ph2energy(basic_nonlinearity(refenergy))
-    e2 = cal2.ph2energy(basic_nonlinearity(refenergy))
+    e1 = cal1.ph2energy(basic_nonlinearity(aref))
+    e2 = cal2.ph2energy(basic_nonlinearity(aref))
     doe1 = factory.drop_one_errors(curvetype1, use_approximation1)
     doe2 = factory.drop_one_errors(curvetype2, use_approximation2)
     return ph1, e1, doe1, ph2, e2, doe2, cal1, cal2
@@ -336,3 +337,21 @@ class TestJoeStyleEnergyCalibration:
         cal2 = factory2.make_calibration(Curvetypes.GAIN)
         assert cal1.ismonotonic
         assert not cal2.ismonotonic
+
+
+def test_loggain_calibration():
+    """Test for regression of issue 168 [https://github.com/usnistgov/mass2/issues/168]
+
+    We were getting unreasonably tiny predicted cal-curve uncertainties when using log-gain curves.
+    """
+    rng = np.random.default_rng(seed=4123)
+    e = np.linspace(3000, 6000, 12)
+    ph = e * (1 + 0.001 * rng.standard_normal(size=len(e)))
+    dph = ph * 0.001
+    names = [f"line{i:2d}" for i in range(len(e))]
+    maker = mass2.calibration.EnergyCalibrationMaker(ph=ph, energy=e, dph=dph, de=0 * e, names=names)
+    cal = maker.make_calibration_loggain(approximate=True)
+
+    cal_uncert = cal.energy2uncertainty(e)
+    # The cal uncertainty should be at least 20% of the actual anchor point uncertainty
+    assert np.all(cal_uncert > dph * 0.2)
