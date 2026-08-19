@@ -9,6 +9,7 @@ from pyarrow import ipc
 import pyarrow.parquet as pq
 import re
 import shutil
+import time
 from pathlib import Path
 from dataclasses import dataclass
 from collections.abc import Iterable, Generator
@@ -216,16 +217,13 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
     output_number = 0
     while first_subframe < final_subframe:
         last_subframe = first_subframe + subframes_per_file
-        out_name = f"pulse_data_{base32_crockford_encode(output_number, length=4)}.arrows"
+        out_name = f"all_pulses_{base32_crockford_encode(output_number, length=3)}.arrows_WAL"
         out_path = str(output / out_name)
-        parquet_name = out_name.replace("arrows", "parquet")
-        parquet_path = str(output / parquet_name)
 
         duration = (last_subframe - first_subframe) / subframes_per_sec
         print(f"Analyzing subframes {first_subframe}-{last_subframe}. Duration: {duration:.4f} s")
         if args.dry_run:
             print(f"Writing {out_name}")
-            print(f"Writing {parquet_name}")
             first_subframe = last_subframe
             output_number += 1
             continue
@@ -260,7 +258,8 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
                 end = start + number_in_range
                 next_idx[k] = end
                 if end <= start:
-                    print(f"     chan {k:2d} has no records")
+                    if args.verbose:
+                        print(f"     chan {k:2d} has no records")
                     continue
 
                 mmap = v._mmap[start:end]
@@ -293,18 +292,22 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
         # Write the Arrow IPC file, one batch at a time, and prepare for next iteration.
         first_table = all_batches[0].to_arrow()
         ipc_schema = first_table.schema
-        print(f"Writing {out_name}")
+        print(f"Writing {out_name}", end="\n\r")
         with pa.OSFile(out_path, "wb") as f:
             with ipc.new_stream(f, ipc_schema) as writer:
-                for df in all_batches:
+                for i, df in enumerate(all_batches):
                     table = df.to_arrow()
                     writer.write_table(table)
+                    # df_size_mb = float(complete_df.estimated_size("megabytes"))
+                    print(f"\bWriting batch number: {i}", end="\r")
+                    time.sleep(args.sleep)
+                print()
 
-        print("Building sorted frame for parquet file")
-        df = pl.concat(all_batches).sort("channel_number", "subframecount")
-        print(f"Writing {parquet_name}")
-        df.write_parquet(parquet_path)
-        first_subframe = last_subframe
+        final_ouput_name = Path(out_path).with_suffix(".arrows_timeorder")
+        os.rename(out_path, final_ouput_name)
+
+        # Ready for the next IPC file
+        first_subframe = batch_first_subframe
         output_number += 1
 
 
@@ -317,15 +320,17 @@ def main_ljh2apache() -> None:
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose mode; print extra info to terminal")
     parser.add_argument("-m", "--max-mb", type=float, default=500, help="Maximum arrow file size in MB (default=500)")
     parser.add_argument(
-        "-p", "--period", type=float, default=600, help="Period for starting new Arrow IPC stream files, in seconds (default=60)"
+        "-p", "--period", type=float, default=300, help="Period for starting new Arrow IPC stream files, in seconds (default=300)"
     )
     parser.add_argument(
         "-b", "--batch", type=float, default=5, help="Period for starting a new record batch within an arrow file (default=5)"
     )
+    parser.add_argument("-s", "--sleep", type=float, default=0, help="Sleep this many second between writing each batch (default=0)")
     args = parser.parse_args()
     args.mix = True
     if not args.output:
         args.output = args.base_dir
+    Path(args.output).mkdir(parents=True, exist_ok=True)
 
     translate_external_trigger(args)
     translate_ljh_files(args)
