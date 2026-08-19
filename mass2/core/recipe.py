@@ -62,14 +62,39 @@ class RecipeStep(ABC):
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(RecipeStep):
-    """A step to fix jumps in the pretrigger mean by unwrapping the phase angle, a periodic quantity."""
+    """A step to fix jumps in the pretrigger mean by unwrapping the phase angle, a periodic quantity
 
-    period: float
+    self.inputs name the following fields in the input pl.Dataframe:
+        [0] The pretrigger mean field that needs to have flux jumps removed.
+        [1] Any field that indicates strict time-ordering, generally "subframecount".
+    """
+
+    period: float  # Periodicity to be removed, typically 4096 or other power of 2.
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
-        """Calculate the jump-corrected pretrigger mean and return a new DataFrame."""
-        ptm1 = df[self.inputs[0]].to_numpy()
+        """Calculate the jump-corrected pretrigger mean and return a new DataFrame.
+
+        Thanks to fixing [issue 166](https://github.com/usnistgov/mass2/issues/166),
+        this will work whether or not the dataframe is already in time order.
+        """
+        ptmean_name, orderingfield_name = self.inputs
+        ptm1 = df[ptmean_name].to_numpy()
+
+        # Use the second column named in self.inputs as a strict time-ordering column.
+        # Generally this will prove to be already in order. But if it isn't, reorder the
+        # pretrigger means, apply the unwrap algorithm, and then restore the original ordering.
+        timeorder = df[orderingfield_name].to_numpy()
+        already_in_timeorder = np.all(timeorder[1:] >= timeorder[:-1])
+        if not already_in_timeorder:
+            sort_idx = timeorder.argsort()
+            ptm1 = ptm1[sort_idx]
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
+        if not already_in_timeorder:
+            # The following is an O(N) algorithm,
+            # whereas restore_idx = np.argsort(sort_idx) would work, but it takes O(N log N)
+            restore_idx = np.empty_like(sort_idx)
+            restore_idx[sort_idx] = np.arange(len(sort_idx))
+            ptm2 = ptm2[restore_idx]
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 

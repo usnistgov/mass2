@@ -4,6 +4,7 @@
 
 **2.1.0** June 24, 2026-
 * Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
+* Make pretrig mean jump correction work with non-time-ordered data (issue 166).
 
 **2.0.5** June 11, 2026
 * Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
