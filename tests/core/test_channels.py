@@ -24,7 +24,8 @@ def test_ljh_to_polars():
 def dummy_dataframe(npulses: int) -> pl.DataFrame:
     """Generate a dataframe with `npulses` rows. The Python API requires keeping a column in it, or it will
     have zero rows."""
-    return pl.DataFrame({"_dummy": range(npulses)})
+    idx = np.arange(npulses)
+    return pl.DataFrame({"_dummy": idx, "subframecount": idx * 100000})
 
 
 def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
@@ -389,7 +390,7 @@ def test_pretrig_mean_jump_fix_step():
     ch2 = ch.correct_pretrig_mean_jumps(period=50)
     assert all(np.diff(ch2.df["ptm_jf"].to_numpy()) == 1)
     step = ch2.steps[-1]
-    assert step.inputs == ["pretrig_mean"]
+    assert step.inputs == ["pretrig_mean", "subframecount"]
     assert step.output == ["ptm_jf"]
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
@@ -650,3 +651,36 @@ def test_ch_from_numpy2():
     for i in range(ch.npulses):
         pulse = raw_df["pulse"][i].to_numpy()
         assert np.all(pulse < 5000) and np.all(pulse > -5000)
+
+
+def test_flux_jump_correction_non_time_ordered_data():
+    """Check for [issue 166](https://github.com/usnistgov/mass2/issues/166)
+
+    Test that flux-jump correction still works even if raw data are re-ordered.
+    """
+    PERIOD = 4096
+    Npulses = 40
+    steps = 400
+    ptm_jumpy = np.arange(Npulses, dtype=np.float32) * steps + 2000
+    assert ptm_jumpy[-1] - ptm_jumpy[0] > PERIOD  # If not, you're not really testing the problem
+    ptm_correct = ptm_jumpy.copy()
+    ptm_jumpy[10:20] += 2 * PERIOD
+    info = {"pretrig_mean": ptm_jumpy, "subframecount": np.arange(Npulses) * 10000000}
+    df = pl.DataFrame(info)
+    header = mass2.ChannelHeader("", None, 100, 1e-5, 100, 200, pl.DataFrame())
+    ch = mass2.Channel(df, header, Npulses)
+
+    # First, make sure that correct_pretrig_mean_jumps works as expected: creating column "ptm_jf"
+    # with the corrected values.
+    assert np.all(df["pretrig_mean"].to_numpy() == ptm_jumpy)
+    ch1 = ch.correct_pretrig_mean_jumps(period=PERIOD)
+    assert np.all(ch1.df["pretrig_mean"].to_numpy() == ptm_jumpy)
+    assert np.all(ch1.df["ptm_jf"].to_numpy() == ptm_correct)
+
+    # Now test for issue 166, where a time-unordered data set fails.
+    shuffled_df = ch.df.sample(fraction=1.0, shuffle=True, seed=91)
+    ch2 = dataclasses.replace(ch, df=shuffled_df)
+
+    ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
+    sort_idx = ch3.df["subframecount"].to_numpy().argsort()
+    assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
