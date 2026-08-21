@@ -2,9 +2,13 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.1.0** June 24, 2026-
-* Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
+**2.1.1** August 21, 2026-
 * Add ability to read Arrow IPC for raw data, as well as LJH.
+
+**2.1.0** August 21, 2026
+* Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
+* Make pretrigger mean jump correction work with non-time-ordered data (issue 166).
+* Fix bug in GPR calibration error estimates for log-gain calibration curves (issue 168).
 
 **2.0.5** June 11, 2026
 * Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).

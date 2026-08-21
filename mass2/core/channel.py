@@ -955,7 +955,7 @@ class Channel:
     ) -> "Channel":
         """Correct pretrigger mean jumps in the raw pulse data, writing to a new column."""
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
-            inputs=[uncorrected],
+            inputs=[uncorrected, "subframecount"],
             output=[corrected],
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
