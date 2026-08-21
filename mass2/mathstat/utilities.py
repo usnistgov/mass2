@@ -10,7 +10,7 @@ Joe Fowler, NIST
 Started March 24, 2011
 """
 
-from typing import Any
+from typing import Any, NamedTuple
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import pylab as plt
@@ -113,7 +113,13 @@ def find_range_randomly(A: ArrayLike, nl: int, q: int = 1) -> NDArray:
     return Q
 
 
-def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArray, NDArray]:
+class SVDResult(NamedTuple):
+    U: np.ndarray
+    S: np.ndarray
+    Vh: np.ndarray
+
+
+def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> SVDResult:
     """Find approximate SVD of matrix A using nl random vectors and
     with q power iterations. Based on Halko Martinsson & Tropp Algorithm 5.1
 
@@ -124,6 +130,6 @@ def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArr
     A = np.asarray(A)
     Q = find_range_randomly(A, nl, q=q)
     B = Q.T @ A
-    SVD_B = np.linalg.svd(B, full_matrices=False)
-    u = Q @ SVD_B.U
-    return SVD_B._replace(U=u)
+    U, S, Vh = np.linalg.svd(B, full_matrices=False)
+    u = Q @ U
+    return SVDResult(U=u, S=S, Vh=Vh)

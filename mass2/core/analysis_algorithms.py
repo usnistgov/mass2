@@ -214,7 +214,7 @@ class HistogramSmoother:
 
     def __call__(self, values: ArrayLike) -> NDArray:
         """Return a smoothed histogram of the data vector <values>"""
-        contents, _ = np.histogram(values, self.nbins, self.limits)
+        contents, _ = np.histogram(np.asarray(values), self.nbins, self.limits)
         ftc = np.fft.rfft(contents)
         csmooth = np.fft.irfft(self.kernel_ft * ftc)
         csmooth[csmooth < 0] = 0

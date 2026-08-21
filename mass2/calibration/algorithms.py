@@ -45,6 +45,7 @@ def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> tuple[N
         pulse_heights (np.array(dtype=float)): a list of pulse heights (eg p_filt_value)
         gaussian_fwhm = fwhm of a gaussian that each pulse is smeared with, in same units as pulse heights
     """
+    pulse_heights = np.asarray(pulse_heights)
     # kernel density estimation (with a gaussian kernel)
     n = 128 * 1024
     gaussian_fwhm = float(gaussian_fwhm)
@@ -299,6 +300,7 @@ def singlefit(
     nbins = (hi - lo) / binsize_ph
     if nbins > 5000:
         raise ValueError("too damn many bins, dont like running out of memory")
+    ph = np.asarray(ph)
     counts, bin_edges = np.histogram(ph, np.arange(lo, hi, binsize_ph))
     e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
     model = get_model(name)

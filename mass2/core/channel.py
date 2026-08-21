@@ -1192,7 +1192,7 @@ class Channel:
         x, y, z = np.percentile(df["promptshifted"], [10, 50, 90])
         A = np.array([[x * x, x, 1], [y * y, y, 1], [z * z, z, 1]])
         param = np.linalg.solve(A, [-0.4, 0, +0.4])
-        ATime = np.poly1d(param)(df["promptshifted"])
+        ATime = np.poly1d(param)(df["promptshifted"].to_numpy())
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
@@ -1528,11 +1528,10 @@ class Channel:
             ndata = load(noise_fname)
             _, nnoise = ndata.shape
             noise_df = pl.DataFrame({"index": range(nnoise)})
-            noise_header = pl.DataFrame({
-                "filename": noise_fname,
-                "continuous": True,
-                "Presamples": npresamples,
-            })
+            noise_header = mass2.ChannelHeader(
+                data_source=str(noise_fname),
+                n_presamples=npresamples,
+            )
             framer = PulseDataFromNumpy(ndata.T)
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 

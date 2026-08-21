@@ -329,6 +329,7 @@ def hist_smoothed(
         lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
         hi = (np.max(pulse_heights) + 3 * fwhm_pulse_height_units).astype(np.float64)
         bin_edges = np.linspace(lo, hi, n + 1)
+    assert bin_edges is not None
 
     _, step_size = mass2.misc.midpoints_and_step_size(bin_edges)
     counts, _ = np.histogram(pulse_heights, bin_edges)
@@ -388,6 +389,7 @@ def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> Any:
         pulse_heights (np.array(dtype=float)): a list of pulse heights (eg p_filt_value)
         gaussian_fwhm = fwhm of a gaussian that each pulse is smeared with, in same units as pulse heights
     """
+    pulse_heights = np.asarray(pulse_heights)
     # kernel density estimation (with a gaussian kernel)
     n = 128 * 1024
     gaussian_fwhm = float(gaussian_fwhm)
@@ -616,7 +618,7 @@ def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -
         assignment_inds = np.array(indices)
         ph_assigned = np.array(ph[assignment_inds])
         residual_e, pfit_gain = find_pfit_gain_residual(ph_assigned, e)
-        rms_residual = mass2.misc.root_mean_squared(residual_e)
+        rms_residual = float(mass2.misc.root_mean_squared(residual_e))
         if rms_residual < best_rms_residual:
             best_rms_residual = rms_residual
             best_ph_assigned = ph_assigned
@@ -731,7 +733,7 @@ def eval_3peak_assignment_pfit_gain(
     if any(np.iscomplex(pfit_gain.roots())):
         # well formed calibrations have real roots
         return np.inf, "pfit_gain should not have complex roots"
-    rms_residual_e = mass2.misc.root_mean_squared(residual_e)
+    rms_residual_e = float(mass2.misc.root_mean_squared(residual_e))
     result = BestAssignmentPfitGainResult(
         rms_residual_e,
         ph_assigned=df["possible_ph"].to_numpy(),

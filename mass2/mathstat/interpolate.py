@@ -444,7 +444,8 @@ class NaturalBsplineBasis:
             coef[0] = self.coef_b[id]
         elif id >= self.Nk - 2:
             coef[-1] = self.coef_e[self.Nk - id - 1]
-        return splev(x, (self.padknots, coef, 3), der=der)
+        x = np.asarray(x)
+        return np.asarray(splev(x, (self.padknots, coef, 3), der=der))
 
     def values_matrix(self, der: int = 0) -> NDArray:
         """Return matrix M where M_ij = value at knot i for basis function j.
@@ -497,7 +498,8 @@ class SmoothingSpline:
             dx = np.zeros_like(err)
         else:
             roughfit = np.polyfit(self.x, self.y, 2)
-            slope = np.poly1d(np.polyder(roughfit, 1))(x)
+            deriv = np.polyder(roughfit, 1)
+            slope = np.poly1d(deriv)(self.x)
             err = np.sqrt((np.asarray(dx) * slope) ** 2 + self.dy**2)
 
         self.xscale = (self.x**2).mean() ** 0.5

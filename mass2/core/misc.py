@@ -166,7 +166,7 @@ def launch_examples() -> None:
         sys.exit(process.returncode)
 
 
-def root_mean_squared(x: ArrayLike, axis: int | tuple[int] | None = None) -> float:
+def root_mean_squared(x: ArrayLike, axis: int | tuple[int] | None = None) -> float | NDArray:
     """Return the root mean square of the input along the given axis or axes.
     Does _not_ subtract the mean first."""
     return np.sqrt(np.mean(np.asarray(x) ** 2, axis))
@@ -235,6 +235,7 @@ class PulseDataFramer(ABC):
     polars DataFrame objects."""
 
     if TYPE_CHECKING:
+
         @property
         def npulses(self) -> int: ...
 

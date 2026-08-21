@@ -947,6 +947,7 @@ class FilterMaker:
             filt_fourier = np.hstack([np.zeros(cut_pre), filt_fourier, np.zeros(cut_post)])
 
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
+        variance_fourier: float = 0.0
         if self.noise_autocorr is None:
             noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
             kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()

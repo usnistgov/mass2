@@ -750,9 +750,9 @@ class EnergyCalibration:
         # Plot smooth curve
         minph, maxph = self.ph.min() * 0.9, self.ph.max() * 1.1
         if min_energy is not None:
-            minph = self.energy2ph(min_energy)
+            minph = np.float64(self.energy2ph(min_energy))
         if max_energy is not None:
-            maxph = self.energy2ph(max_energy)
+            maxph = np.float64(self.energy2ph(max_energy))
         phplot = np.linspace(minph, maxph, 1000)
         eplot = self(phplot)
         gplot = phplot / eplot
