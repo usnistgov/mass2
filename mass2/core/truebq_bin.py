@@ -120,9 +120,22 @@ class TriggerResult:
             inds=inds,
         )
         df = pl.DataFrame({"pulse": pulses, "framecount": inds})
+        print("*****")
+        print(self.data_source.header_df)
+        print(self.data_source.header_df.columns)
+        print("*****")
+        header = ChannelHeader(
+            self.data_source.description,
+            str(self.data_source.bin_path),
+            self.data_source.channel_number,
+            self.data_source.frametime_s,
+            0,
+            0,
+            pl.DataFrame(),
+        )
         noise = NoiseChannel(
             df,
-            header_df=self.data_source.header_df,
+            header=header,
             frametime_s=self.data_source.frametime_s,
             pulseframer=misc.PulseDataFromNumpy(pulses),
         )

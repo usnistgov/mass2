@@ -26,6 +26,7 @@ from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
 from .apache_files import PulseDataFromArrow
+from .chan_header import ChannelHeader
 from .offfiles import OffFile
 from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
 from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
@@ -58,55 +59,6 @@ class ExtTriggerControl:
         return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
 
 
-@dataclass(frozen=True)
-class ChannelHeader:
-    """Metadata about a Channel, of the sort read from file header."""
-
-    description: str  # filename or date/run number, etc
-    data_source: str | None  # complete file path, if read from a file
-    ch_num: int
-    frametime_s: float
-    n_presamples: int
-    n_samples: int
-    df: pl.DataFrame = field(repr=False)
-    pulse_data_sources: tuple[str | None, ...] | None = field(default=None, repr=False)
-    noise_data_source: str | None = field(default=None, repr=False)
-
-    def leaf_data_sources(self) -> tuple[str | None, ...]:
-        """Leaf file paths behind this header's raw data, or `(data_source,)` if not itself a concatenation."""
-        if self.pulse_data_sources is not None:
-            return self.pulse_data_sources
-        return (self.data_source,)
-
-    @classmethod
-    def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
-        """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
-        filepath = df.item(0, "Filename")
-        return cls(
-            description=os.path.split(filepath)[-1],
-            data_source=filepath,
-            ch_num=df["Channel"][0],
-            frametime_s=df["Timebase"][0],
-            n_presamples=df["Presamples"][0],
-            n_samples=df["Total Samples"][0],
-            df=df,
-        )
-
-    @classmethod
-    def from_channel_metadata_df(cls, df: pl.DataFrame) -> "ChannelHeader":
-        """Construct from the LJH header dataframe as returned by LJHFile.to_polars()"""
-        filepath = df.item(0, "filename")
-        return cls(
-            description=os.path.split(filepath)[-1],
-            data_source=filepath,
-            ch_num=df["channel_number"][0],
-            frametime_s=df["timebase"][0],
-            n_presamples=df["npresamples"][0],
-            n_samples=df["nsamples"][0],
-            df=df,
-        )
-
-
 @dataclass(frozen=True)  # noqa: PLR0904
 class Channel:
     """A single microcalorimeter channel's pulse data and associated metadata."""
@@ -114,7 +66,6 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
-    subframediv: int | None = None
     noise: NoiseChannel | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
@@ -1432,7 +1383,6 @@ class Channel:
             df,
             header=header,
             npulses=ljh.npulses,
-            subframediv=ljh.subframediv,
             noise=noise_channel,
             transform_raw=transform_raw,
             pulseframer=ljh,
@@ -1444,6 +1394,7 @@ class Channel:
         cls,
         path: str | Path,
         channum: int,
+        header: ChannelHeader,
         noise_path: str | Path | None = None,
         transform_raw: Callable | None = None,
     ) -> "Channel":
@@ -1451,11 +1402,7 @@ class Channel:
         if not noise_path:
             noise_channel = None
         else:
-            noise_channel = NoiseChannel.from_ipc(noise_path, channum)
-        metadata_path = Path(path).parent / "channel_metadata.parquet"
-        header_df = pl.read_parquet(metadata_path).filter(pl.col("channel_number") == channum)
-        header = ChannelHeader.from_channel_metadata_df(header_df)
-        subframediv = header_df.item(0, "subframediv")
+            noise_channel = NoiseChannel.from_ipc(noise_path, channum, header)
 
         framer = PulseDataFromArrow.open(path)
         df = framer.load_timing()
@@ -1465,7 +1412,6 @@ class Channel:
             df,
             header=header,
             npulses=framer.npulses,
-            subframediv=subframediv,
             noise=noise_channel,
             transform_raw=transform_raw,
             pulseframer=framer,
@@ -1489,6 +1435,9 @@ class Channel:
         )
         df_header = pl.DataFrame(off.header)
         df_header = df_header.with_columns(pl.Series("Filename", [off.filename]))
+        subframediv = off.subframediv
+        if subframediv is None:
+            subframediv = 0
         header = ChannelHeader(
             f"{os.path.split(off.filename)[1]}",
             off.filename,
@@ -1497,8 +1446,9 @@ class Channel:
             off._mmap["recordPreSamples"][0],
             off._mmap["recordSamples"][0],
             df_header,
+            subframediv,
         )
-        channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
+        channel = cls(df, header, off.nRecords)
         return channel
 
     @classmethod
@@ -1678,8 +1628,8 @@ class Channel:
     def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":
         """Add external trigger times from an existing dataframe"""
         df = self.df
-        _subframediv = self.subframediv
-        if _subframediv is None:
+        _subframediv = self.header.subframediv
+        if _subframediv is None or _subframediv <= 0:
             _subframediv = 64
 
         # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
@@ -1804,7 +1754,6 @@ class Channel:
             combined_df,
             header,
             len(combined_df),
-            subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
             pulseframer=combined_pulseframer,

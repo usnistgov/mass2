@@ -19,6 +19,7 @@ from . import pulse_algorithms
 from . import noise_algorithms
 from . import ljhutil
 from . import misc
+from .chan_header import ChannelHeader
 from .misc import good_series, show
 from .noise_algorithms import NoiseResult
 from .noise_channel import NoiseChannel
@@ -34,7 +35,7 @@ from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
 from .drift_correction import drift_correct, DriftCorrectStep, TimeDriftCorrectStep
 from . import rough_cal
-from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
+from .channel import Channel, BadChannel, ExtTriggerControl
 from .truebq_bin import TrueBqBin
 from .channels import Channels
 from .rough_cal import RoughCalibrationStep

@@ -19,6 +19,7 @@ import io
 import os
 import pathlib
 import re
+import tomllib
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -505,9 +506,17 @@ class Channels:
         exclude_ch_nums: list[int] | None = None,
         include_ch_nums: list[int] | None = None,
     ) -> "Channels":
-        metadata_path = Path(pulse_folder) / "channel_metadata.parquet"
-        channel_df = pl.read_parquet(metadata_path)
-        expected_channel_numbers = set(channel_df["channel_number"])
+        metadata_pattern = Path(pulse_folder) / "*_configuration.toml"
+        metadata_files = glob.glob(str(metadata_pattern))
+        assert len(metadata_files) == 1, "require exactly one file in directory *_configuration.toml"
+
+        with open(metadata_files[0], "rb") as f:
+            metadata = tomllib.load(f)
+        required_fields = {"Timebase", "Nsamples", "Npresamples", "SubFrameDivisions"}
+        for rf in required_fields:
+            assert rf in metadata, f"metadata file {metadata_files[0]} does not contain field '{rf}'"
+        expected_channel_numbers = set(metadata["Channels"])
+
         globpath = str(Path(pulse_folder) / "*_chan*.arrow")
         found = glob.glob(globpath)
         found_chan: set[int] = set()
@@ -528,10 +537,23 @@ class Channels:
         channels: dict[int, Channel] = {}
         sorted_channels = list(channel_numbers)
         sorted_channels.sort()
-        for k in sorted_channels:
-            path = Path(pulse_folder) / f"*_chan{k}.arrow"
-            noise_path = None if noise_folder is None else Path(noise_folder) / f"*_chan{k}.arrow"
-            channels[k] = Channel.from_ipc(path, k, noise_path)
+        for cnum in sorted_channels:
+            path = Path(pulse_folder) / f"*_chan{cnum}.arrow"
+            noise_path = None if noise_folder is None else Path(noise_folder) / f"*_chan{cnum}.arrow"
+            header = mass2.ChannelHeader(
+                description="Arrows file",
+                data_source=str(path),
+                ch_num=cnum,
+                frametime_s=metadata["Timebase"],
+                n_presamples=metadata["Npresamples"],
+                n_samples=metadata["NSamples"],
+                subframediv=metadata["SubFrameDivisions"],
+                df=pl.DataFrame(),
+                pulse_data_sources=(str(path),),
+                noise_data_source=str(noise_path),
+            )
+
+            channels[cnum] = Channel.from_ipc(path, cnum, header, noise_path)
             if len(channels) == limit:
                 break
         description = f"Parquet data from {pulse_folder}"

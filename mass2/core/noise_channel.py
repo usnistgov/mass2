@@ -10,6 +10,7 @@ import polars as pl
 import numpy as np
 import mass2
 from .apache_files import PulseDataFromArrow
+from .chan_header import ChannelHeader
 from .misc import PulseDataFramer
 from .noise_algorithms import NoiseResult
 
@@ -19,7 +20,7 @@ class NoiseChannel:
     """A class to represent a channel with noise data only, and to analyze its noise characteristics."""
 
     df: pl.DataFrame  # DO NOT MUTATE THIS!!!
-    header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
+    header: ChannelHeader
     frametime_s: float
     pulseframer: PulseDataFramer | None = None
 
@@ -29,7 +30,7 @@ class NoiseChannel:
     ) -> tuple[pl.DataFrame, float]:
         """Compute the maximum excursion from the median for each noise record, and store in dataframe."""
 
-        def excursion2d(noise_trace: NDArray) -> float:
+        def excursion2d(noise_trace: NDArray) -> NDArray:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
@@ -117,32 +118,34 @@ class NoiseChannel:
 
     @property
     def is_continuous(self) -> bool:
-        "Whether this channel is continuous data (True) or triggered records with arbitrary gaps (False)."
-        if "continuous" in self.header_df:
-            return self.header_df["continuous"][0]
-        return False
+        """Whether this channel is continuous data (True) or triggered records with arbitrary gaps (False).
+        Assume data are continuous if the difference in subframecounts is always the same.
+        """
+        if "subframecount" not in self.df.columns:
+            return False
+        sfc = self.df["subframecount"].to_numpy()
+        delta_sfc = np.diff(sfc)
+        return np.min(delta_sfc) == np.max(delta_sfc)
 
     @classmethod
     def from_ljh(cls, path: str | Path) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
-        noise_channel = cls(df, header_df, header_df["Timebase"][0], pulseframer=ljh)
+        header = mass2.ChannelHeader.from_ljh_header_df(header_df)
+        noise_channel = cls(df, header, header.frametime_s, pulseframer=ljh)
         return noise_channel
 
     @classmethod
-    def from_ipc(cls, path: str | Path, channum: int) -> "NoiseChannel":
+    def from_ipc(cls, path: str | Path, channum: int, header: ChannelHeader) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given arrow IPC file path."""
-        metadata_path = Path(path).parent / "channel_metadata.parquet"
-        header_df = pl.read_parquet(metadata_path).filter(pl.col("channel_number") == channum)
-        frametime_s = header_df.item(0, "timebase")
 
         framer = PulseDataFromArrow.open(path)
         df = framer.load_timing()
         channel = cls(
             df,
-            header_df=header_df,
-            frametime_s=frametime_s,
+            header=header,
+            frametime_s=header.frametime_s,
             pulseframer=framer,
         )
         return channel
