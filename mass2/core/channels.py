@@ -508,7 +508,8 @@ class Channels:
     ) -> "Channels":
         metadata_pattern = Path(pulse_folder) / "*_configuration.toml"
         metadata_files = glob.glob(str(metadata_pattern))
-        assert len(metadata_files) == 1, "require exactly one file in directory *_configuration.toml"
+        nmf = len(metadata_files)
+        assert nmf == 1, f"require exactly one file in directory *_configuration.toml, found {nmf}"
 
         with open(metadata_files[0], "rb") as f:
             metadata = tomllib.load(f)
@@ -546,7 +547,7 @@ class Channels:
                 ch_num=cnum,
                 frametime_s=metadata["Timebase"],
                 n_presamples=metadata["Npresamples"],
-                n_samples=metadata["NSamples"],
+                n_samples=metadata["Nsamples"],
                 subframediv=metadata["SubFrameDivisions"],
                 df=pl.DataFrame(),
                 pulse_data_sources=(str(path),),

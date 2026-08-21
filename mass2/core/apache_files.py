@@ -154,19 +154,37 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
         return
 
     ljhfiles: dict[int, LJHFile] = {}
+    metadata_name = ""
     for in_fname in ljh_filenames:
         matches = re.search(r"chan(\d+)\.ljh", in_fname)
         if matches:
             ch = matches.groups()[0]
             ch_num = int(ch)
             ljhfiles[ch_num] = LJHFile.open(in_fname)
+            if not metadata_name:
+                metadata_name = Path(in_fname).name.replace(f"_chan{ch_num}.ljh", "_configuration.toml")
     print(f"There are {len(ljhfiles)} LJH files to read:")
     print(f"Channels: {ljhfiles.keys()}")
-    out_path = str(output / "channel_metadata.parquet")
+    out_path = str(output / metadata_name)
     print(f"Writing {out_path}")
     if not args.dry_run:
-        df = generate_ljh_metadata_df(ljhfiles)
-        df.write_parquet(out_path)
+        ljh = list(ljhfiles.values())[0]
+        datecode = "unknown"
+        with open(out_path, "wt", encoding="ascii") as f:
+            for line in [
+                "# ===============================================================",
+                "# TOML file created by ljh2arrow script",
+                f"# created at {time.ctime()}",
+                "# ===============================================================",
+                "",
+                f"Datecode = '{datecode}'",
+                f"Timebase = {ljh.timebase}",
+                f"Nsamples = {ljh.nsamples}",
+                f"Npresamples = {ljh.npresamples}",
+                f"Channels = {list(ljhfiles.keys())}",
+                f"SubFrameDivisions = {ljh.subframediv}",
+            ]:
+                f.write(line + "\n")
 
     if args.mix:
         mix_ljh_arrow(ljhfiles, args)
