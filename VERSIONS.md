@@ -5,6 +5,7 @@
 **2.1.1** August 21, 2026-
 * Add ability to read Arrow IPC for raw data, as well as LJH.
 * Read `*_configuration.toml` file in the Arrow directory.
+* Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
 
 **2.1.0** August 21, 2026
 * Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
