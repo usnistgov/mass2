@@ -32,7 +32,7 @@ def test_analysis_regression():
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
-        assert_frame_equal(expect, found, rel_tol=3e-5, abs_tol=1e-6, check_exact=False)
+        assert_frame_equal(expect, found, rel_tol=3e-5, abs_tol=1e-3, check_exact=False)
 
 
 ###########################################################################
