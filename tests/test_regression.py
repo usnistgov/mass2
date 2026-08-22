@@ -2,6 +2,7 @@ import polars as pl
 import mass2
 import pulsedata
 from polars.testing import assert_frame_equal
+import numpy as np
 
 
 def load_data():
@@ -32,6 +33,11 @@ def test_analysis_regression():
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+        c1 = expect["5lagy_dc"]
+        c2 = found["5lagy_dc"]
+        values = np.vstack([c1.to_numpy(), c2.to_numpy()])
+        for k in range(0, values.shape[1], 20):
+            print(values[:, k : k + 20])
         assert_frame_equal(expect, found, rel_tol=3e-5, abs_tol=1e-3, check_exact=False)
 
 
