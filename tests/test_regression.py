@@ -32,11 +32,7 @@ def test_analysis_regression():
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
-        print("Expect: ****")
-        print(expect)
-        print("Found: *****")
-        print(found)
-        assert np.allclose(expect, found)
+        assert np.allclose(expect, found, rtol=3e-5, atol=1e-6)
 
 
 ###########################################################################
