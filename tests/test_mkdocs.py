@@ -14,7 +14,7 @@ from mktestdocs import check_md_file
 """
 
 
-doc_paths = pathlib.Path("docs").glob("**/*.md")
+doc_paths = list(pathlib.Path("docs").glob("**/*.md"))
 
 
 @pytest.mark.parametrize("fpath", doc_paths, ids=str)

@@ -656,7 +656,7 @@ def minimize_entropy_linear(
 ) -> tuple[OptimizeResult, float32]:
     """Minimize the entropy of a histogram of drift-corrected pulse heights
     by varying the slope of a linear correction based on the given indicator."""
-    indicator_mean = np.mean(indicator)
+    indicator_mean = float32(np.mean(indicator))
     indicator_zero_mean = indicator - indicator_mean
 
     def entropy_fun(slope: float) -> float:
