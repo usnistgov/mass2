@@ -17,8 +17,7 @@ def load_data():
 def all_steps(ch: mass2.Channel) -> mass2.Channel:
     use_dc = pl.lit(True)
     return (
-        ch
-        .summarize_pulses()
+        ch.summarize_pulses()
         .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
         .filter5lag(f_3db=10000)
         .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=use_dc)
@@ -33,6 +32,10 @@ def test_analysis_regression():
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
+        print("Expect: ****")
+        print(expect)
+        print("Found: *****")
+        print(found)
         assert np.allclose(expect, found)
 
 
