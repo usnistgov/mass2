@@ -35,9 +35,9 @@ def test_analysis_regression():
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
         c1 = expect["5lagy_dc"]
         c2 = found["5lagy_dc"]
-        values = np.vstack([c1.to_numpy(), c2.to_numpy()])
-        for k in range(0, values.shape[1], 20):
-            print(values[:, k : k + 20])
+        values = np.vstack([c1.to_numpy(), c2.to_numpy()]).T
+        for a, b in values:
+            print(f"{a:9.4f}, {b:9.4f}, {np.abs(a - b):9.4f}, {np.abs(a / b - 1):9.6f}")
         assert_frame_equal(expect, found, rel_tol=3e-5, abs_tol=1e-3, check_exact=False)
 
 
