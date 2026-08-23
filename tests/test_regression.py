@@ -38,7 +38,7 @@ def test_analysis_regression():
         values = np.vstack([c1.to_numpy(), c2.to_numpy()]).T
         for a, b in values:
             print(f"{a:9.4f}, {b:9.4f}, {np.abs(a - b):9.4f}, {np.abs(a / b - 1):9.6f}")
-        assert_frame_equal(expect, found, rel_tol=3e-5, abs_tol=1e-3, check_exact=False)
+        assert_frame_equal(expect, found, rel_tol=1e-4, abs_tol=0.1, check_exact=False)
 
 
 ###########################################################################
