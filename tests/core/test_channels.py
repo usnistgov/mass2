@@ -163,7 +163,7 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
     sigma_noise = 1.0
     tau = [0.05, 0.25]
     t = np.linspace(-1, 1, n)
-    npre = (t < 0).sum()
+    npre = int((t < 0).sum())
     signal = np.exp(-t / tau[1]) - np.exp(-t / tau[0])
     signal[t <= 0] = 0
     signal *= Maxsignal / signal.max()
@@ -680,3 +680,49 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_pulses_in_dataframe():
+    """Test that it's possible to run a RecipeStep that needs raw pulse data
+    on a Channel where the pulse data live in a polars DataFrame, not in
+    a memory mapped file.
+
+    Online data analysis (MASSASSIN) will need this ability, as we stream
+    through the data and look at a mixture of channel's pulse records.
+    """
+    # First run the RecipeStep known as `Channel.summarize_pulses()` the normal
+    # way, then on a channel whose pulse framer reads records from a pl.Series.
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    data = mass2.Channels.from_ljh_folder(p.pulse_folder, p.noise_folder, limit=1)
+    ch = data.ch0
+    ch2 = ch.summarize_pulses()
+
+    N = ch.npulses
+    assert ch.pulseframer is not None
+    pulse_series = ch.pulseframer.load_raw_chunk(start=0, stop=N)["pulse"]
+    pulseframer = mass2.misc.DataFramerPolars(pulse_series)
+    ch3 = dataclasses.replace(ch, pulseframer=pulseframer)
+    ch4 = ch3.summarize_pulses()
+
+    assert_frame_equal(ch2.df, ch4.df)
+
+    # Now try the same test, running a bare RecipeStep outside the context of a Channel.
+    out_names = mass2.core.pulse_algorithms.result_dtype.names
+    assert out_names is not None
+    step = mass2.core.recipe.SummarizeStep(
+        inputs=["pulse"],
+        output=list(out_names),
+        good_expr=pl.lit(True),
+        use_expr=pl.lit(True),
+        frametime_s=ch3.frametime_s,
+        peak_index=ch3.typical_peak_ind(),
+        pretrigger_ignore_samples=0,
+        n_presamples=ch.n_presamples,
+        transform_raw=None,
+    )
+
+    assert isinstance(ch.pulseframer, mass2.core.LJHFile)
+    assert isinstance(pulseframer, mass2.misc.DataFramerPolars)
+    dfA = step.calc_from_df(ch.df, ch.pulseframer)
+    dfB = step.calc_from_df(ch.df, pulseframer)
+    assert_frame_equal(dfA, dfB)

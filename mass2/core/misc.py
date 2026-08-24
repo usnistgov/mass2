@@ -261,6 +261,28 @@ class PulseDataFramer(ABC):
 
 
 @dataclass(frozen=True)
+class DataFramerPolars(PulseDataFramer):
+    """Use this to yield pulse records from a polars Series. Helps to make it easy to run
+    a RecipeStep when the raw pulse data is already stored in polars.
+    """
+
+    ds: pl.Series
+
+    @property
+    def npulses(self) -> int:
+        return len(self.ds)
+
+    def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return pl.DataFrame(self.ds[start:stop:step])
+
+    def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return pl.DataFrame(self.ds[id])
+
+    def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        return pl.DataFrame([self.ds[id] for id in ids])
+
+
+@dataclass(frozen=True)
 class ReindexedPulseDataFramer(PulseDataFramer):
     """Wraps another PulseDataFramer, remapping virtual row `i` to `base` row `indices[i]`."""
 
