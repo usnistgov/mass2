@@ -2,7 +2,6 @@ import polars as pl
 import mass2
 import pulsedata
 from polars.testing import assert_frame_equal
-import numpy as np
 
 
 def load_data():
@@ -33,11 +32,13 @@ def test_analysis_regression():
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
-        c1 = expect["5lagy_dc"]
-        c2 = found["5lagy_dc"]
-        values = np.vstack([c1.to_numpy(), c2.to_numpy()]).T
-        for a, b in values:
-            print(f"{a:9.4f}, {b:9.4f}, {np.abs(a - b):9.4f}, {np.abs(a / b - 1):9.6f}")
+        # This code is from 22 August 2026, when I absolutely could not make the frames be approximately equal
+        # without printing every single value and checking it.
+        # c1 = expect["5lagy_dc"]
+        # c2 = found["5lagy_dc"]
+        # values = np.vstack([c1.to_numpy(), c2.to_numpy()]).T
+        # for a, b in values:
+        #     print(f"{a:9.4f}, {b:9.4f}, {np.abs(a - b):9.4f}, {np.abs(a / b - 1):9.6f}")
         assert_frame_equal(expect, found, rel_tol=1e-4, abs_tol=0.1, check_exact=False)
 
 
