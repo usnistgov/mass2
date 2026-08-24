@@ -4,7 +4,7 @@ Data structures and methods for handling a single microcalorimeter channel's pul
 
 from dataclasses import dataclass, field, replace
 import dataclasses
-from typing import Any
+from typing import Any, cast
 from numpy.typing import ArrayLike, NDArray
 from collections.abc import Callable, Iterable, Collection
 import os
@@ -1604,10 +1604,8 @@ class Channel:
 
         # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
         times = df_es["timestamp"]
-        expt_state_time_type = times.dtype
-        self_time_type = self.df["timestamp"].dtype
-        assert isinstance(expt_state_time_type, Datetime)
-        assert isinstance(self_time_type, Datetime)
+        expt_state_time_type = cast(Datetime, times.dtype)
+        self_time_type = cast(Datetime, self.df["timestamp"].dtype)
         desired_time_zone = self_time_type.time_zone
         if desired_time_zone is None:
             desired_time_zone = _local_timezone_name

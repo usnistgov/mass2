@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pylab as plt
 from numba import njit
 
-from typing import Any
+from typing import Any, cast
 from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -294,7 +294,7 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
-        assert isinstance(axis, plt.Axes)
+        axis = cast(plt.Axes, axis)
         t = np.arange(len(self.values)) - self.n_pretrigger
         axis.plot(t, self.values, label="mass 5lag filter", **kwargs)
         axis.grid()
