@@ -31,7 +31,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
 from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep, SummarizeExtendedStep
 from .noise_channel import NoiseChannel
 
 _local_timezone_name = tzlocal.get_localzone_name()
@@ -932,6 +932,45 @@ class Channel:
             pretrigger_ignore_samples=pretrigger_ignore_samples,
             n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
+        )
+        return self.with_step(step)
+
+    def summarize_pulses_extended(  # noqa: PLR0917
+        self,
+        col: str = "pulse",
+        pretrigger_ignore_samples: int = 0,
+        peak_index: int | None = None,
+        n_tail_samples: int = 0,
+        adc_max: int = 65535,
+        adc_min: int = 0,
+        sign_sigma: float = 3.0,
+        onset_sigma: float = 3.0,
+        onset_samples: int = 3,
+    ) -> "Channel":
+        """Summarize the pulses with an extended set of statistics."""
+        if peak_index is None:
+            peak_index = self.typical_peak_ind(col)
+        out_names = mass2.core.pulse_algorithms.extended_result_dtype.names
+        # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
+        assert out_names is not None
+        assert self.pulseframer is not None
+        outputs = list(out_names)
+        step = SummarizeExtendedStep(
+            inputs=[col],
+            output=outputs,
+            good_expr=self.good_expr,
+            use_expr=pl.lit(True),
+            frametime_s=self.frametime_s,
+            peak_index=peak_index,
+            pretrigger_ignore_samples=pretrigger_ignore_samples,
+            n_presamples=self.n_presamples,
+            transform_raw=self.transform_raw,
+            n_tail_samples=n_tail_samples,
+            adc_max=adc_max,
+            adc_min=adc_min,
+            sign_sigma=sign_sigma,
+            onset_sigma=onset_sigma,
+            onset_samples=onset_samples,
         )
         return self.with_step(step)
 

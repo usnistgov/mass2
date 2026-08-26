@@ -145,6 +145,53 @@ class SummarizeStep(RecipeStep):
 
 
 @dataclass(frozen=True)
+class SummarizeExtendedStep(RecipeStep):
+    """Summarize raw pulse data into an extended set of summary statistics using numba-accelerated code."""
+
+    frametime_s: float
+    peak_index: int
+    pretrigger_ignore_samples: int
+    n_presamples: int
+    transform_raw: Callable | None = None
+    n_tail_samples: int = 0
+    adc_max: int = 65535
+    adc_min: int = 0
+    sign_sigma: float = 3.0
+    onset_sigma: float = 3.0
+    onset_samples: int = 3
+
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
+        """Calculate the extended summary statistics and return a new DataFrame."""
+        assert pulseframer is not None
+        rawcol = self.inputs[0]
+        summaries = []
+        for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):
+            raw = raw_df[rawcol].to_numpy()
+            if self.transform_raw is not None:
+                raw = self.transform_raw(raw)
+
+            s = pl.from_numpy(
+                pulse_algorithms.summarize_data_numba_extended(
+                    raw,
+                    self.frametime_s,
+                    peak_samplenumber=self.peak_index,
+                    pretrigger_ignore_samples=self.pretrigger_ignore_samples,
+                    nPresamples=self.n_presamples,
+                    nTailsamples=self.n_tail_samples,
+                    adc_max=self.adc_max,
+                    adc_min=self.adc_min,
+                    sign_sigma=self.sign_sigma,
+                    onset_sigma=self.onset_sigma,
+                    onset_samples=self.onset_samples,
+                )
+            )
+            summaries.append(s)
+
+        df2 = pl.concat(summaries).with_columns(df)
+        return df2
+
+
+@dataclass(frozen=True)
 class ChangeTimeZoneStep(RecipeStep):
     """Replace all polars `Datetime` type series in the dataframe with ones using the given time zone.
 
