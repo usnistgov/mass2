@@ -382,7 +382,7 @@ class Channels:
                 new_channels[key] = channel
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
-    def linefit_joblib(self, line: str, col: str, prefer: str = "threads", n_jobs: int = 4) -> LineModelResult:
+    def linefit_joblib(self, line: str, col: str, prefer: str = "threads", n_jobs: int = 4) -> Any:
         """No one but Galen understands this function."""
 
         def work(key: int) -> LineModelResult:

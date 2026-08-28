@@ -11,10 +11,6 @@ from typing import cast
 import mass2
 
 
-def cold_start(recipes: dict[int, mass2.core.Recipe], input_dir: Path, output_dir: Path) -> None:
-    pass
-
-
 def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
     outputs = [
         "channel_number",
@@ -80,6 +76,18 @@ def raw_arrows_timezone(input_dir: Path) -> str:
     raise OSError(f"found no valid '*_chan*.arrow' or '*.arrows*' files in {input_dir}")
 
 
+RECIPE_OUTPUTS = (
+    "channel_number",
+    "good",
+    "timestamp",
+    "subframecount",
+    "pretrig_mean",
+    "5lagx",
+    "5lagy",
+    "energy",
+)
+
+
 @dataclass(frozen=True)
 class MassassinDirectory:
     recipes: dict[int, mass2.core.Recipe]
@@ -141,7 +149,7 @@ class MassassinDirectory:
             File path for writing the output dataframe, as Parquet.
         """
         input = Path(ipc_file)
-        print(f"Analzying {input.name}")
+        print(f"Analzying single-channel {input.name}")
         df_in = pl.read_ipc(input, memory_map=True)
         df = run_recipe(recipe, df_in)
         df = add_expt_state(df, self.expt_state_df)
@@ -160,7 +168,7 @@ class MassassinDirectory:
             return False
 
         for ipc_file in per_chan_files:
-            name = Path(ipc_file).name
+            name = Path(ipc_file).stem + ".parquet"
             output = self.output_dir / name
             channum = self.channum(name)
             assert channum >= 0, f"could not parse channel number from file {name=}"
@@ -171,6 +179,79 @@ class MassassinDirectory:
             self.process_singlechan(recipe, ipc_file, output)
 
         return True
+
+    def timeordered_files(self) -> list[str]:
+        files = glob.glob(str(self.input_dir / "*.arrows_timeorder"))
+        files.sort()
+        return files
+
+    def chanordered_files(self) -> list[str]:
+        files = glob.glob(str(self.input_dir / "*.arrows"))
+        files += glob.glob(str(self.input_dir / "*.arrows_timeorder"))
+        files.sort()
+        return files
+
+    def run_recipe(self, batch: pa.RecordBatch) -> pl.DataFrame:
+        frames: list[pl.DataFrame] = []
+
+        # 1. Convert the entire batch to Polars ONCE (zero-copy transfer)
+        full_df = pl.DataFrame(batch)
+
+        # 2. Partition the dataframe in a single O(N) pass.
+        # partition_by() returns a list of DataFrames, one for each unique channel.
+        for raw_df in full_df.partition_by("channel_number", maintain_order=False, include_key=True):
+            # Grab the channel number from the first row of this chunk
+            cnum = raw_df["channel_number"][0]
+            if cnum not in self.recipes:
+                continue
+
+            # 3. Process the recipe
+            framer = mass2.misc.DataFramerPolars(raw_df["pulse"])
+            recipe = self.recipes[cnum]
+            df = recipe.calc_from_df(raw_df, framer)
+            good = pl.lit(True)
+            for step in recipe.steps[::-1]:
+                try:
+                    good = step.good_expr
+                    break
+                except AttributeError:
+                    pass
+            df = df.with_columns(good=good).select(RECIPE_OUTPUTS)
+            frames.append(df)
+
+        # 4. Concat all processed frames
+        return pl.concat(frames)
+
+    def process_allchan(self, ipc_file: str, output: Path) -> None:
+        """Process the raw pulse data from a single channel with the given recipe
+
+        Parameters
+        ----------
+        recipe : mass2.core.Recipe
+            The recipe to run on the raw data
+        ipc_file : str
+            File path containing the raw pulse data in an Arrow IPC feather file
+        output : Path
+            File path for writing the output dataframe, as Parquet.
+        """
+        input = Path(ipc_file)
+        print(f"Analzying all-channel {input.name}")
+        df_in = pl.read_ipc_stream(input)
+        df = self.run_recipe(df_in)
+        df = add_expt_state(df, self.expt_state_df)
+        df.write_ipc(output)
+
+    def cold_start(self) -> None:
+        print("In cold_start")
+        files = self.chanordered_files()
+        print("Files:")
+        for f in files:
+            print("...", f)
+
+        for ipc_file in files:
+            name = Path(ipc_file).name
+            output = self.output_dir / name
+            self.process_allchan(ipc_file, output)
 
     @staticmethod
     def channum(name: str) -> int:
@@ -192,8 +273,7 @@ class MassassinDirectory:
 
         # TODO: Create 0MQ subscriber
 
-        # TODO: cold start
-        # cold_start(recipes, self.input_dir, self.output_dir)
+        self.cold_start()
 
         # TODO: streaming phase
         # TODO: When streaming is done, shuffle by channel.
