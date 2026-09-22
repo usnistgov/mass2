@@ -78,6 +78,7 @@ massassin = "mass2.core.massassin:main_massassin"
 mass2-ipython = "mass2.core.mass2main:main"
 mass2-marimo = "mass2.core.mass2notebook:main"
 mass2-examples = "mass2.core.misc:launch_examples"
+noise_analysis = "mass2.core.noise_analysis:main"
 
 
 [build-system]

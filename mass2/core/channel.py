@@ -82,6 +82,10 @@ class Channel:
             if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
                 raise ValueError(f"Column '{pulse_col}' has array width {dtype.size} but header.n_samples={self.header.n_samples}")
 
+    def to_noisechannel(self) -> NoiseChannel:
+        """Convert a normal Channel to a NoiseChannel"""
+        return NoiseChannel(df=self.df, header=self.header, frametime_s=self.header.frametime_s, pulseframer=self.pulseframer)
+
     @property
     def shortname(self) -> str:
         """A short name for this channel, suitable for plot titles."""
