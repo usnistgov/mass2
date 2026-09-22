@@ -6,6 +6,7 @@ A script to start an iPython session with all LJH files in the current directory
 
 from IPython import start_ipython
 import argparse
+import glob
 import os
 import numpy as np
 import scipy as sp
@@ -14,10 +15,18 @@ import polars as pl
 import mass2
 
 
-def load_ljh(directory: str, limit: int | None, exclude_ch_nums: list[int] | None) -> mass2.core.Channels:
-    """Load LJH files from the given directory, excluding any channels in exclude_ch_nums and including no more than `limit`."""
+def load_pulse_files(directory: str, limit: int | None, exclude_ch_nums: list[int] | None) -> mass2.core.Channels:
+    """Load LJH or Arrow files from the given directory,
+    excluding any channels in exclude_ch_nums and including no more than `limit`."""
+    if has_ipc_data(directory):
+        return mass2.core.Channels.from_ipc(directory, limit=limit, exclude_ch_nums=exclude_ch_nums)
     data = mass2.core.Channels.from_ljh_folder(directory, limit=limit, exclude_ch_nums=exclude_ch_nums)
     return data
+
+
+def has_ipc_data(data_dir: str) -> bool:
+    arrow_files = glob.glob(f"{data_dir}/*_chan*.arrow")
+    return len(arrow_files) > 0
 
 
 def main() -> None:
@@ -47,7 +56,7 @@ def main() -> None:
         if args.dir == ".":
             print(f" = {os.path.abspath(args.dir)}")
         print(f"Excluding channels in {args.exclude}")
-    data = load_ljh(args.dir, limit=args.limit, exclude_ch_nums=args.exclude)
+    data = load_pulse_files(args.dir, limit=args.limit, exclude_ch_nums=args.exclude)
 
     print(f"Object 'data' is loaded with {len(data.channels)} channels available")
     if args.no_ipython:
