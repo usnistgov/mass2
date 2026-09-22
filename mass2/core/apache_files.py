@@ -330,7 +330,7 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
 
 
 def main_ljh2apache() -> None:
-    parser = argparse.ArgumentParser(description="Convert a set of LJH files to new apache file formats")
+    parser = argparse.ArgumentParser(description="Convert a set of LJH files to new all-channel Arrow file formats")
     parser.add_argument("base_dir", type=str, help="directory of files to process, with *_chan*.ljh as the LJH files")
     parser.add_argument("-o", "--output", type=str, help="Write output to this directory (default: same as base_dir)")
     parser.add_argument("-f", "--force", action="store_true", help="Overwrite existing data")
