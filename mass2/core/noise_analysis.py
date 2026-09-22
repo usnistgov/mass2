@@ -71,7 +71,7 @@ def save_noise(results: dict[int, mass2.NoiseResult], filename: Path | str) -> N
     df.write_parquet(filename)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run a noise analysis on a set of LJH or Arrow IPC files",
     )
