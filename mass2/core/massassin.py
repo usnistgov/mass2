@@ -4,7 +4,7 @@ import pickle
 import polars as pl
 import pyarrow as pa
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -95,6 +95,7 @@ class MassassinDirectory:
     input_dir: Path
     output_dir: Path
     expt_state_df: pl.DataFrame
+    file_ids_complete: set[int] = field(default_factory=set)
 
     @classmethod
     def open(cls, recipe_file: str | Path, input_dir: str | Path, output_dir: str | Path) -> "MassassinDirectory":
@@ -222,7 +223,7 @@ class MassassinDirectory:
         # 4. Concat all processed frames
         return pl.concat(frames)
 
-    def process_allchan(self, ipc_file: str, output: Path) -> None:
+    def process_one_allchan_file(self, ipc_file: str, output: Path) -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
@@ -239,19 +240,32 @@ class MassassinDirectory:
         df_in = pl.read_ipc_stream(input)
         df = self.run_recipe(df_in)
         df = add_expt_state(df, self.expt_state_df)
-        df.write_ipc(output)
+        df.write_ipc_stream(output)
 
     def cold_start(self) -> None:
-        print("In cold_start")
         files = self.chanordered_files()
-        print("Files:")
-        for f in files:
-            print("...", f)
+        print(f"In cold_start, found {len(files)} to process")
 
+        files_processed = 0
         for ipc_file in files:
-            name = Path(ipc_file).name
-            output = self.output_dir / name
-            self.process_allchan(ipc_file, output)
+            ipc_path = Path(ipc_file)
+            stem = ipc_path.stem
+            file_id = int(stem.split("_")[-1])
+            if file_id in self.file_ids_complete:
+                continue
+            output = self.output_dir / ipc_path.name
+            self.process_one_allchan_file(ipc_file, output)
+            self.file_ids_complete.add(file_id)
+            files_processed += 1
+
+        # In case any new complete channel-ordered files were generated while we processed these, we'll
+        # run the cold start again to find any new, unprocessed files.
+        if files_processed > 0:
+            return self.cold_start()
+
+        # If we found no unprocessed files, it's time to look for the active WAL file.
+        # Find it, if any (else return)
+        # Process it
 
     @staticmethod
     def channum(name: str) -> int:
