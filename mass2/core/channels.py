@@ -478,7 +478,7 @@ class Channels:
                 pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums
             )
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
-        print(f"{description}")
+        # print(f"{description}")
         print(f"   from_ljh_folder has {len(pairs)} pairs")
         data = cls.from_ljh_path_pairs(pairs, description)
         print(f"   and the Channels obj has {len(data.channels)} pairs")
@@ -583,6 +583,7 @@ class Channels:
         """
         if experiment_state_path is None:
             ljh_path = self.get_a_source_path()
+            assert ljh_path is not None
             experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
