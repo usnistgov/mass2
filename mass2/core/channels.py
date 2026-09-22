@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import dataclasses
 from collections.abc import Callable, Iterable, Sequence
 from numpy.typing import ArrayLike
-from typing import Any
+from typing import Any, cast
 import polars as pl
 import pylab as plt
 import numpy as np
@@ -484,13 +484,19 @@ class Channels:
         print(f"   and the Channels obj has {len(data.channels)} pairs")
         return data
 
-    def get_an_ljh_path(self) -> Path:
-        """Return the path to a representative one of the LJH files used to create this Channels object."""
-        return pathlib.Path(self.ch0.header.df["Filename"][0])
+    def get_a_source_path(self) -> Path | None:
+        """Return the path to a representative one of the files used to create this Channels object."""
+        src = self.ch0.header.data_source
+        if src is None:
+            return None
+        return pathlib.Path(src)
 
-    def get_path_in_output_folder(self, filename: str | Path) -> Path:
+    def get_path_in_output_folder(self, filename: str | Path) -> Path | None:
         """Return a path in an output folder named like the run number, sibling to the LJH folder."""
-        ljh_path = self.get_an_ljh_path()
+        ljh_path = self.get_a_source_path()
+        if ljh_path is None:
+            return None
+        ljh_path = cast(Path, ljh_path)
         base_name, _ = ljh_path.name.split("_chan")
         date, run_num = base_name.split("_run")  # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = ljh_path.parent.parent / f"{run_num}mass2_output"
@@ -518,6 +524,8 @@ class Channels:
             assert rf in metadata, f"metadata file {metadata_files[0]} does not contain field '{rf}'"
         expected_channel_numbers = set(metadata["Channels"])
 
+        # Find all appropriately-named single-channel arrow files, and learn the channel numbers
+        # from the filename strings.
         globpath = str(Path(pulse_folder) / "*_chan*.arrow")
         found = glob.glob(globpath)
         found_chan: set[int] = set()
@@ -574,7 +582,7 @@ class Channels:
             A Data Frame with a table of experiment state labels and the corresponding start time (in Polars timestamp format).
         """
         if experiment_state_path is None:
-            ljh_path = self.get_an_ljh_path()
+            ljh_path = self.get_a_source_path()
             experiment_state_path = ljhutil.experiment_state_path_from_ljh_path(ljh_path)
         df = pl.read_csv(experiment_state_path, new_columns=["unixnano", "state_label"])
         df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
