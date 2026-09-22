@@ -3,8 +3,9 @@ Create a starter Marimo notebook for mass2 analysis, based on a template.
 """
 
 import argparse
-import subprocess
+import glob
 import os
+import subprocess
 from pathlib import Path
 import importlib.resources as pkg_resources
 
@@ -19,8 +20,15 @@ def create_notebook(data_dir: str | Path, notebook_name: str) -> None:
     with open(template_path, "r", encoding="utf-8") as fp:
         template_text = fp.read()
         output_text = template_text.replace("TEMPLATE_DIRECTORY", f"'{data_dir}'")
+        if has_ipc_data(data_dir):
+            output_text = output_text.replace("from_ljh_folder", "from_ipc")
     with open(notebook_name, "w", encoding="utf-8") as fp:
         fp.write(output_text)
+
+
+def has_ipc_data(data_dir: str | Path) -> bool:
+    arrow_files = glob.glob(f"{data_dir}/*_chan*.arrow")
+    return len(arrow_files) > 0
 
 
 def main() -> None:
