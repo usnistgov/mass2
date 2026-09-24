@@ -1686,7 +1686,7 @@ class Channel:
         df = self.df.drop(*args)
         return self.with_replacement_df(df)
 
-    def with_columns(self, *exprs: pl.Expr | Iterable[pl.Expr] | pl.DataFrame, **named_exprs: pl.Expr) -> "Channel":
+    def with_columns(self, *exprs: pl.Expr | Iterable[pl.Expr] | pl.DataFrame, **named_exprs: Any) -> "Channel":
         """Append expressions from *exprs or **named_exprs to the existing dataframe, preserving all other attributes.
 
         Possible uses include:

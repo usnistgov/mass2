@@ -9,6 +9,7 @@ import mass2
 from dataclasses import dataclass
 from numpy import ndarray
 from numpy.typing import NDArray, ArrayLike
+from typing import Any
 from collections.abc import Callable
 
 
@@ -217,7 +218,7 @@ class NoiseResult:
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
         loglog: bool = True,
-        **plotkwarg: dict,
+        **plotkwarg: Any,
     ) -> None:
         """Plot the power spectral density."""
         if axis is None:
@@ -244,7 +245,7 @@ class NoiseResult:
         axis: plt.Axes | None = None,
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
-        **plotkwarg: dict,
+        **plotkwarg: Any,
     ) -> None:
         """Plot PSD rebinned into logarithmically spaced frequency bins."""
         if axis is None:

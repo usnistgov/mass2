@@ -437,8 +437,8 @@ def test_filtering_steps():
 
 
 def test_categorize_step():
-    ch = dummy_channel(npulses=10)
-    n = len(ch.df)
+    n = 100
+    ch = dummy_channel(npulses=n)
     ch = ch.with_columns(a=np.arange(n), b=(2 * np.arange(n)))
     category_condition_dict = {
         "alessthan5": pl.col("a") < 5,
@@ -448,8 +448,9 @@ def test_categorize_step():
     step = ch2.steps[-1]
     assert set(step.inputs) == set(["a", "b"])
     assert step.output == ["category"]
-    df = ch2.df.with_columns(pl.Series("expected", ["alessthan5"] * 5 + ["b10"] + ["fallback"] * 4))
-    assert (df["expected"] == df["category"].cast(str)).all()
+    expected = pl.Series("expected", ["alessthan5"] * 5 + ["b10"] + ["alessthan5"] * 44 + ["fallback"] * (n - 50))
+    df = ch2.df.with_columns(expected)
+    assert (expected == df["category"].cast(str)).all()
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
         ch2.save_recipes(tmpfilename)

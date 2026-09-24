@@ -631,7 +631,7 @@ class Channels:
 
     def with_external_trigger_by_path(
         self,
-        path: str | None,
+        path: Path | str | None,
         output_control: ExtTriggerControl = ExtTriggerControl(),
     ) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
@@ -823,7 +823,7 @@ class Channels:
 
         Parameters
         ----------
-        path : Path | str
+        zip_path : Path | str
             Directory to save work in. If it doesn't exist, its parent should.
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
@@ -920,6 +920,8 @@ class Channels:
                 """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
                 if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):
                     return Channel.from_ljh(data_source)
+                if data_source is not None and data_source.endswith(".arrow"):
+                    raise NotImplementedError("cannot load analysis for IPC Arrow files yet")
                 return None
 
             pulseframer = None
