@@ -145,11 +145,11 @@ class TriggerResult:
         self, noise_n_dead_samples_after_pulse_trigger: int, npre: int, npost: int, invert: bool = False
     ) -> Channel:
         """Create a Channel object by copying pulse data into memory."""
-        noise = self.get_noise(
+        noise_result = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
             max_noise_triggers=1000,
-        )
+        ).spectrum()
         inds = self.trig_inds[self.trig_inds > npre]
         inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
         pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=inds)
@@ -167,7 +167,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise_result)
         return ch
 
     def to_channel_mmap(
@@ -179,11 +179,11 @@ class TriggerResult:
         verbose: bool = True,
     ) -> Channel:
         """Create a Channel object by memory-mapping pulse data from disk."""
-        noise = self.get_noise(
+        noise_result = self.get_noise(
             noise_n_dead_samples_after_pulse_trigger,
             npre + npost,
             max_noise_triggers=1000,
-        )
+        ).spectrum()
         inds = self.trig_inds[self.trig_inds > npre]  # ensure all inds inbounds
         inds = inds[inds < (len(self.data_source.data) - npre - npost)]  # ensure all inds inbounds
         pulses = gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
@@ -207,7 +207,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise_result)
         return ch
 
     # def to_summarized_channel(
