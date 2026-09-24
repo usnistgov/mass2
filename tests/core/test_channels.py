@@ -45,9 +45,10 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         df=pl.DataFrame(),
     )
     noise_ch = mass2.NoiseChannel(df_noise, header, frametime_s, pulseframer=PulseDataFromNumpy(noise_traces))
+    noise = noise_ch.spectrum()
     pulseframer = PulseDataFromNumpy(pulse_traces + noise_traces)
     df = dummy_dataframe(pulseframer.npulses)
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=pulseframer)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise, pulseframer=pulseframer)
     return ch
 
 
@@ -202,9 +203,10 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
         df=header_df,
     )
     noise_ch = mass2.NoiseChannel(df_noise, header, frametime_s, PulseDataFromNumpy(noise_traces))
+    noise = noise_ch.spectrum()
     df = dummy_dataframe(npulses)
     pulseframer = PulseDataFromNumpy(pulse_traces)
-    ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch, pulseframer=pulseframer)
+    ch = mass2.Channel(df, header, npulses=npulses, noise=noise, pulseframer=pulseframer)
     ch = ch.filter5lag()
     step: mass2.core.OptimalFilterStep = ch.steps[-1]
     assert isinstance(step, mass2.core.OptimalFilterStep)
@@ -227,14 +229,14 @@ def test_follow_mass_filtering_rst():  # noqa: PLR0914
 
 def test_noise_autocorr():
     rng = np.random.default_rng()
-    header_df = pl.DataFrame()
+    header = mass2.ChannelHeader()
     frametime_s = 1e-5
     # 250 pulses of length 500
     # noise that wil have covar of the form [1, 0, 0, 0, ...]
     npulses = 250
     noise_traces = rng.standard_normal((npulses, 500))
     df_noise = dummy_dataframe(npulses)
-    noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
+    noise_ch = mass2.NoiseChannel(df_noise, header, frametime_s, PulseDataFromNumpy(noise_traces))
     assert len(noise_ch.df) == 250
     assert noise_ch.pulseframer is not None
     assert len(noise_ch.pulseframer.load_raw_pulse(0)["pulse"]) == 500
@@ -441,7 +443,7 @@ def test_categorize_step():
     ch = dummy_channel(npulses=n)
     ch = ch.with_columns(a=np.arange(n), b=(2 * np.arange(n)))
     category_condition_dict = {
-        "alessthan5": pl.col("a") < 5,
+        "alessthan5": pl.col("a") < 50,
         "b10": pl.col("b") == 10,
     }
     ch2 = ch.with_categorize_step(category_condition_dict=category_condition_dict)
@@ -625,12 +627,10 @@ def test_ch_from_numpy():
         data = mass2.Channels.from_oneChannel(ch)
         assert data.ch0.noise is not None
         assert data.ch0.pulseframer is not None
-        assert data.ch0.noise.pulseframer is not None
+        assert data.ch0.noise.autocorr_vec is not None
         raw_df1 = data.ch0.pulseframer.load_raw_chunk(0, npulses)
-        raw_df2 = data.ch0.noise.pulseframer.load_raw_chunk(0, npulses)
         for i in range(npulses):
             assert np.all(raw_df1["pulse"][i].to_numpy() == raw[:, i])
-            assert np.all(raw_df2["pulse"][i].to_numpy() == raw[:, i])
 
 
 def test_ch_from_numpy2():

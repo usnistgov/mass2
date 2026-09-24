@@ -3,42 +3,71 @@ import glob
 import polars as pl
 from pathlib import Path
 
-import mass2
+from .channels import Channels
+from .noise_algorithms import NoiseResult
 
 
-def noise_analysis(directory: Path, excursion_nsigma: float = 5, verbose: bool = False) -> dict[int, mass2.NoiseResult]:
-    results: dict[int, mass2.NoiseResult] = {}
+def analyze_noise_directory(
+    directory: str | Path, excursion_nsigma: float = 5, verbose: bool = False, savefile: Path | str | None = None
+) -> dict[int, NoiseResult]:
+    """Analyze all the raw pulse data files in a given directory. Return the results, and optionally
+    store them as parquet file.
+
+    Parameters
+    ----------
+    directory : str | Path
+        Where the noise LJH or single-channel Arrow files are to be found
+    excursion_nsigma : float, optional
+        Exclude noise records with excursions more than this many sigma from median, by default 5
+    verbose : bool, optional
+        Print extra facts to the terminal, by default False
+    savefile : Path | str | None, optional
+        Save results as an Apache Parquet file to this path, by default None
+
+    Returns
+    -------
+    dict[int, NoiseResult]
+        _description_
+    """
+    # Strategy will be to analyze all existing single-channel arrow files, then any LJH files (omitting any LJH
+    # that copy the channel numbers of an arrow file in the same directory).
+    results: dict[int, NoiseResult] = {}
+    directory = Path(directory)
     arrow_files = glob.glob(str(directory / "*_chan*.arrow"))
     if len(arrow_files) > 0:
         arrow_files.sort()
         if verbose:
             print(f"Found {len(arrow_files)} Arrow files")
-        data1 = mass2.Channels.from_ipc(directory)
-        for cnum, ch in data1.channels.items():
-            if verbose:
-                print(f"Analyzing {ch.header.data_source}")
-            nch = ch.to_noisechannel()
-            results[cnum] = nch.spectrum()
+        data2 = Channels.from_ipc(directory)
+        results = data2.analyze_noise(excursion_nsigma=excursion_nsigma)
 
     ljh_files = glob.glob(str(directory / "*_chan*.ljh"))
     if len(ljh_files) > 0:
         exclude = list(results.keys())
-        data1 = mass2.Channels.from_ljh_folder(directory, exclude_ch_nums=exclude)
+        data2 = Channels.from_ljh_folder(directory, exclude_ch_nums=exclude)
         if verbose:
             if len(arrow_files) == 0:
                 print(f"Found {len(ljh_files)} LJH files")
             else:
-                print(f"Found {len(ljh_files)} LJH files, with {len(data1.channels)} not duplicating Arrow")
-        for cnum, ch in data1.channels.items():
-            if verbose:
-                print(f"Analyzing {ch.header.data_source}")
-            nch = ch.to_noisechannel()
-            results[cnum] = nch.spectrum()
+                print(f"Found {len(ljh_files)} LJH files, excluding any also found as Arrow")
+        results2 = data2.analyze_noise(excursion_nsigma=excursion_nsigma)
+        results = results2 | results
 
+    if savefile:
+        save_noise(results, savefile)
     return results
 
 
-def save_noise(results: dict[int, mass2.NoiseResult], filename: Path | str) -> None:
+def save_noise(results: dict[int, NoiseResult], filename: Path | str) -> None:
+    """Save noise analysis to a parquet file
+
+    Parameters
+    ----------
+    results : dict[int, NoiseResult]
+        A dictionary of `NoiseResult` objects, indexed by channel number.
+    filename : Path | str
+        Where to store the result
+    """
     keys = list(results.keys())
     keys.sort()
     rows = []
@@ -47,6 +76,7 @@ def save_noise(results: dict[int, mass2.NoiseResult], filename: Path | str) -> N
         row = {
             "channel_number": cnum,
             "dfreq": result.frequencies[1],
+            "dt": result.dt,
             "PSD": result.psd,
             "autocorr": result.autocorr_vec,
         }
@@ -64,6 +94,7 @@ def save_noise(results: dict[int, mass2.NoiseResult], filename: Path | str) -> N
         schema={
             "channel_number": pl.Int32,
             "dfreq": pl.Float64,
+            "dt": pl.Float64,
             "PSD": pl.Array(pl.Float64, npsd),
             "autocorr": pl.Array(pl.Float64, nacorr),
         },
@@ -72,6 +103,7 @@ def save_noise(results: dict[int, mass2.NoiseResult], filename: Path | str) -> N
 
 
 def main() -> None:
+    """A main script to generate a noise analysis for 1 or more directories"""
     parser = argparse.ArgumentParser(
         description="Run a noise analysis on a set of LJH or Arrow IPC files",
     )
@@ -91,8 +123,7 @@ def main() -> None:
     if not args.output:
         args.output = dir / "noise_analysis.parquet"
 
-    results = noise_analysis(dir, excursion_nsigma=args.excursion, verbose=args.verbose)
-    save_noise(results, args.output)
+    analyze_noise_directory(dir, excursion_nsigma=args.excursion, verbose=args.verbose, savefile=args.output)
 
 
 if __name__ == "__main__":

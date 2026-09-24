@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.11"
+__generated_with = "0.25.0"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -50,8 +50,12 @@ def _(mass2, pulsedata):
     data = mass2.Channels.from_ljh_folder(
         pulse_folder=_p.pulse_folder, noise_folder=_p.noise_folder
     )
+    noise_data = mass2.Channels.from_ljh_folder(
+        pulse_folder=_p.noise_folder
+    )
     print(data)
-    return (data,)
+    print(noise_data)
+    return data, noise_data
 
 
 @app.cell
@@ -197,20 +201,7 @@ def _(data3, dropdown_ch, mass2, pl, plt):
 
 @app.cell
 def _(data3, dropdown_ch, mass2):
-    data3.channels[dropdown_ch.value].noise.spectrum().plot()
-    mass2.show()
-    return
-
-
-@app.cell
-def _(data3, dropdown_ch, mass2, plt):
-    _ch = data3.channels[dropdown_ch.value]
-    plt.figure()
-    ax = plt.subplot(121)
-    _ch.plot_pulses(length=10, axis=ax)
-    plt.subplot(122, sharey=ax)
-    plt.plot(_ch.noise.pulseframer.load_raw_chunk(0, 10)["pulse"])
-    plt.suptitle("first 10 pulse traces and first 10 noise traces")
+    data3.channels[dropdown_ch.value].noise.plot()
     mass2.show()
     return
 
@@ -235,13 +226,16 @@ def _(data3, dropdown_ch, dropdown_step, mass2, mo):
 
 
 @app.cell
-def _(data3, dropdown_ch):
+def _(data3, dropdown_ch, noise_data):
     # use this filter to calculate baseline resolution
-    _ch = data3.channels[dropdown_ch.value]
-    _df = _ch.noise.df
-    for step in _ch.steps:
-        _df = step.calc_from_df(_df, _ch.noise.pulseframer)
-    df_baseline = _df
+    def analyze_noise_recipe():
+        _ch = data3.channels[dropdown_ch.value]
+        nch = noise_data.channels[dropdown_ch.value]
+        _df = nch.df
+        for step in _ch.steps:
+            _df = step.calc_from_df(_df, nch.pulseframer)
+        return _df
+    df_baseline = analyze_noise_recipe()
     df_baseline
     return (df_baseline,)
 

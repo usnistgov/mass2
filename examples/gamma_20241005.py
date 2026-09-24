@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.11"
+__generated_with = "0.25.0"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -78,7 +78,7 @@ def _(data, mass2, plt):
 
 @app.cell
 def _(data, mass2):
-    data.ch0.noise.spectrum().plot()
+    data.ch0.noise.plot()
     mass2.show()
     return
 
@@ -262,7 +262,7 @@ def _(data3, mass2, np):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Advanced analysis

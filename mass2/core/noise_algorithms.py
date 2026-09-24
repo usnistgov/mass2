@@ -2,13 +2,16 @@
 Algorithms to analyze noise data.
 """
 
+import glob
 import numpy as np
+import polars as pl
 import scipy as sp
 import pylab as plt  # type: ignore
 import mass2
 from dataclasses import dataclass
 from numpy import ndarray
 from numpy.typing import NDArray, ArrayLike
+from pathlib import Path
 from typing import Any
 from collections.abc import Callable
 
@@ -41,7 +44,8 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
         traces_used += 1
 
-    ac /= traces_used * nsamples
+    if traces_used > 0:
+        ac /= traces_used * nsamples
     # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
     # ac /= nsamples - np.arange(nsamples, dtype=float)
     return ac
@@ -151,15 +155,19 @@ def calc_autocorrelation_times(n: int, dt: float) -> NDArray:
     return np.arange(n) * dt
 
 
-def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "boxcar", detrend: bool = False) -> "NoiseResult":
+def noise_psd_periodogram(
+    data: ndarray,
+    dt: float,
+    window: ndarray | str = "boxcar",
+) -> "NoiseResult":
     """Compute the noise power spectral density using scipy's periodogram function and the autocorrelation."""
-    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
+    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=False)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
     Pxx_mean = np.mean(Pxx, axis=0)
     # Pxx_mean[j] is the averaged PSD at frequency f[j] over all traces
     autocorr_vec = calc_discontinuous_autocorrelation(data)
-    return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f)
+    return NoiseResult(psd=Pxx_mean, autocorr_vec=autocorr_vec, frequencies=f, dt=dt)
 
 
 def calc_noise_result(
@@ -201,7 +209,7 @@ def calc_noise_result(
             use skip_autocorr_if_length_over argument to override this"""
         )
         autocorr_vec = None
-    return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass)
+    return NoiseResult(psd=psd_mass, autocorr_vec=autocorr_vec, frequencies=f_mass, dt=dt)
 
 
 @dataclass
@@ -211,6 +219,19 @@ class NoiseResult:
     psd: np.ndarray
     autocorr_vec: np.ndarray | None
     frequencies: np.ndarray
+    dt: float
+
+    @classmethod
+    def from_parquet(cls, directory: str | Path, channum: int) -> "NoiseResult":
+        files = glob.glob(f"{str(directory)}/*noise_analysis.parquet")
+        assert len(files) == 1
+        parquetfile = files[0]
+        noise = pl.scan_parquet(parquetfile).filter(pl.col("channel_number") == channum).collect().row(0, named=True)
+        psd = np.asarray(noise["PSD"])
+        acorr = np.asarray(noise["autocorr"])
+        dt = noise["dt"]
+        freq = np.linspace(0, 0.5 / dt, len(psd))
+        return cls(psd=psd, autocorr_vec=acorr, frequencies=freq, dt=dt)
 
     def plot(
         self,

@@ -227,7 +227,7 @@ def _(mo):
 
 @app.cell
 def _(ch, mo, plt):
-    ch.noise.spectrum().plot()
+    ch.noise.plot()
     mo.mpl.interactive(plt.gcf())
     return
 

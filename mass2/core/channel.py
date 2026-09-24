@@ -35,6 +35,7 @@ from .optimal_filtering import FilterMaker
 from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
 from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
+from .noise_algorithms import NoiseResult
 
 _local_timezone_name = tzlocal.get_localzone_name()
 
@@ -66,7 +67,7 @@ class Channel:
     df: pl.DataFrame = field(repr=False)
     header: ChannelHeader = field(repr=True)
     npulses: int
-    noise: NoiseChannel | None = field(default=None, repr=False)
+    noise: NoiseResult | None = field(default=None, repr=False)
     good_expr: pl.Expr = field(default_factory=alwaysTrue)
     df_history: list[pl.DataFrame] = field(default_factory=list, repr=False)
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
@@ -1033,7 +1034,7 @@ class Channel:
                 f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
             )
 
-        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        noiseresult = self.noise
         if not fourier:
             assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
             Nac = len(noiseresult.autocorr_vec)
@@ -1124,7 +1125,7 @@ class Channel:
                 f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
             )
 
-        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        noiseresult = self.noise
         if not fourier:
             assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
             Nac = len(noiseresult.autocorr_vec)
@@ -1243,7 +1244,7 @@ class Channel:
         use = use_expr.and_(np.abs(pl.col("pulse_rms") / mprms - 1.0) < 0.3)
         limit = 4000
         avg_pulse, dt_model = self.compute_ats_model(pulse_col, use, limit)
-        noiseresult = self.noise.spectrum()
+        noiseresult = self.noise
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             dt_model=dt_model,
@@ -1368,26 +1369,25 @@ class Channel:
     def from_ljh(
         cls,
         path: str | Path,
-        noise_path: str | Path | None = None,
+        noise_directory: str | Path | None = None,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
         max_pulses: int | None = None,
     ) -> "Channel":
-        """Load a Channel from an LJH file, optionally with a NoiseChannel from a corresponding noise LJH file."""
-        if not noise_path:
-            noise_channel = None
-        else:
-            noise_channel = NoiseChannel.from_ljh(noise_path)
+        """Load a Channel from an LJH file, optionally with a NoiseResult from a separate directory."""
         ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
-        if noise_path:
-            header = dataclasses.replace(header, noise_data_source=str(noise_path))
+        if noise_directory:
+            noise_result = NoiseResult.from_parquet(noise_directory, ljh.channum)
+            header = dataclasses.replace(header, noise_data_source=str(noise_directory))
+        else:
+            noise_result = None
         channel = cls(
             df,
             header=header,
             npulses=ljh.npulses,
-            noise=noise_channel,
+            noise=noise_result,
             transform_raw=transform_raw,
             pulseframer=ljh,
         )
@@ -1399,24 +1399,24 @@ class Channel:
         path: str | Path,
         channum: int,
         header: ChannelHeader,
-        noise_path: str | Path | None = None,
+        noise_directory: str | Path | None = None,
         transform_raw: Callable | None = None,
     ) -> "Channel":
-        """Load a Channel from an Arrow IPC file, optionally with a NoiseChannel from a corresponding noise file."""
-        if not noise_path:
-            noise_channel = None
+        """Load a Channel from an Arrow IPC file, optionally with a NoiseResult from a separate directory."""
+        if not noise_directory:
+            noise_result = None
         else:
-            noise_channel = NoiseChannel.from_ipc(noise_path, channum, header)
+            noise_result = NoiseResult.from_parquet(noise_directory, channum)
 
         framer = PulseDataFromArrow.open(path)
         df = framer.load_timing()
-        if noise_path:
-            header = dataclasses.replace(header, noise_data_source=str(noise_path))
+        if noise_directory:
+            header = dataclasses.replace(header, noise_data_source=str(noise_directory))
         channel = cls(
             df,
             header=header,
             npulses=framer.npulses,
-            noise=noise_channel,
+            noise=noise_result,
             transform_raw=transform_raw,
             pulseframer=framer,
         )
@@ -1527,7 +1527,7 @@ class Channel:
             pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
 
         if noise_fname is None:
-            nch = None
+            noise_result = None
         else:
             ndata = load(noise_fname)
             _, nnoise = ndata.shape
@@ -1538,13 +1538,14 @@ class Channel:
             )
             framer = PulseDataFromNumpy(ndata.T)
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
+            noise_result = nch.spectrum()
 
         source = os.path.basename(pulse_fname)
         header = ChannelHeader(
             description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pl.DataFrame()
         )
         framer = PulseDataFromNumpy(pdata.T)
-        return cls(pulse_df, header, npulses, noise=nch, pulseframer=framer)
+        return cls(pulse_df, header, npulses, noise=noise_result, pulseframer=framer)
 
     @classmethod
     def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":

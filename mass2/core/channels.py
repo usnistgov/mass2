@@ -25,6 +25,7 @@ from zipfile import ZipFile
 
 import mass2
 from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
+from .noise_algorithms import NoiseResult
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
@@ -346,6 +347,43 @@ class Channels:
         plt.title("Noise autocorrelation")
         plot_zoomable()
 
+    def analyze_noise(
+        self,
+        trace_col_name: str = "pulse",
+        n_limit: int = 10000,
+        excursion_nsigma: float = 5,
+        skip_autocorr_if_length_over: int = 100_000,
+    ) -> dict[int, NoiseResult]:
+        """Analyze the raw pulse records as if they are noise records (which they should be, or this is a mistake)
+
+        Parameters
+        ----------
+        trace_col_name : str, optional
+            name of the dataframe column containing raw data, by default "pulse"
+        n_limit : int, optional
+            use no more than the first `n_limit` noise records, by default 10000
+        excursion_nsigma : float, optional
+            exclude any noise records that seem to contain pulses; specifically, any that have excursions more than this
+            factor times the normalized median absolute deviation away from the median, by default 5
+        skip_autocorr_if_length_over : int, optional
+            for records longer than this, do not attempt to compute the autocorrelation function, by default 100_000
+
+        Returns
+        -------
+        dict[int, NoiseResult]
+            _description_
+        """
+        results: dict[int, NoiseResult] = {}
+        for cnum, ch in self.channels.items():
+            nch = ch.to_noisechannel()
+            results[cnum] = nch.spectrum(
+                trace_col_name,
+                n_limit=n_limit,
+                excursion_nsigma=excursion_nsigma,
+                skip_autocorr_if_length_over=skip_autocorr_if_length_over,
+            )
+        return results
+
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
         new_channels = {}
@@ -403,47 +441,6 @@ class Channels:
         return id(self) == id(other)
 
     @classmethod
-    def from_ljh_path_pairs(cls, pulse_noise_pairs: Iterable[tuple[str, str]], description: str) -> "Channels":
-        """
-        Create a :class:`Channels` instance from pairs of LJH files.
-
-        Args:
-            pulse_noise_pairs (List[Tuple[str, str]]):
-                A list of `(pulse_path, noise_path)` tuples, where each entry contains
-                the file path to a pulse LJH file and its corresponding noise LJH file.
-            description (str):
-                A human-readable description for the resulting Channels object.
-
-        Returns:
-            Channels:
-                A Channels object with one :class:`Channel` per `(pulse_path, noise_path)` pair.
-
-        Raises:
-            AssertionError:
-                If two input files correspond to the same channel number.
-
-        Notes:
-            Each channel is created via :meth:`Channel.from_ljh`.
-            The channel number is taken from the LJH file header and used as the key
-            in the returned Channels mapping.
-
-        Examples:
-            >>> pairs = [
-            ...     ("datadir/run0000_ch0000.ljh", "datadir/run0001_ch0000.ljh"),
-            ...     ("datadir/run0000_ch0001.ljh", "datadir/run0001_ch0001.ljh"),
-            ... ]
-            >>> channels = Channels.from_ljh_path_pairs(pairs, description="Test run")
-            >>> list(channels.keys())
-            [0, 1]
-        """
-        channels: dict[int, Channel] = {}
-        for pulse_path, noise_path in pulse_noise_pairs:
-            channel = Channel.from_ljh(pulse_path, noise_path)
-            assert channel.header.ch_num not in channels.keys()
-            channels[channel.header.ch_num] = channel
-        return cls(channels, description)
-
-    @classmethod
     def from_off_paths(cls, off_paths: Iterable[str | Path], description: str) -> "Channels":
         """Create an instance from a sequence of OFF-file paths"""
         channels = {}
@@ -461,28 +458,62 @@ class Channels:
         exclude_ch_nums: list[int] | None = None,
         include_ch_nums: list[int] | None = None,
     ) -> "Channels":
-        """Create an instance from a directory of LJH files."""
-        assert os.path.isdir(pulse_folder), f"{pulse_folder=} {noise_folder=}"
-        pulse_folder = str(pulse_folder)
+        """Create an instance of :class:`Channels` from a folder of LJH files, optionally with noise in another folder.
+
+        Parameters
+        ----------
+        pulse_folder : str | Path
+            A folder containing one or more LJH or single-channel Arrow files representing pulses.
+        noise_folder : str | Path | None, optional
+            A folder containing one or more LJH or single-channel Arrow files representing noise (optional), by default None.
+            This folder will be checked for a `*_noise_analysis.parquet` file, and one will be created if none is found.
+        limit : int | None, optional
+            Analyze only this many channels, or all channels if None, by default None
+        exclude_ch_nums : list[int] | None, optional
+            Omit channels with these channel numbers, by default None
+        include_ch_nums : list[int] | None, optional
+            Omit any channels that don't have one of these channel numbers, by default None
+
+        Returns
+        -------
+        Channels
+            A Channels object with one :class:`Channel` per LJH or Arrow file found in the `pulse_path`, subject
+            to the the limit and exclusion/inclusion lists. If any pathological directory contains both an LJH and
+            Arrow file with the same channel number, the Arrow file takes precedence.
+
+        """
+        assert os.path.isdir(pulse_folder), f"Need a pulse folder:\n\t{pulse_folder=}\n\t{noise_folder=}"
         if exclude_ch_nums is None:
             exclude_ch_nums = []
-        if noise_folder is None:
-            paths = ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums)
-            if limit is not None:
-                paths = paths[:limit]
-            pairs = [(path, "") for path in paths]
-        else:
-            assert os.path.isdir(noise_folder), f"{pulse_folder=} {noise_folder=}"
-            noise_folder = str(noise_folder)
-            pairs = ljhutil.match_files_by_channel(
-                pulse_folder, noise_folder, limit=limit, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums
-            )
+        pulse_paths = ljhutil.find_ljh_files(pulse_folder, exclude_ch_nums=exclude_ch_nums, include_ch_nums=include_ch_nums)
+        if limit is not None:
+            pulse_paths = pulse_paths[:limit]
+
+        if noise_folder:
+            assert os.path.isdir(noise_folder), f"Need a noise_folder to be a directory:\n\t{pulse_folder=}\n\t{noise_folder=}"
+
+            # If there's no noise analysis file in the noise_folder, then make one.
+            if len(glob.glob(f"{noise_folder}/*noise_analysis.parquet")) == 0:
+                # We import this locally in the branch to avoid circular import errors.
+                from .noise_analysis import analyze_noise_directory  # noqa: PLC0415
+
+                data_files = glob.glob(f"{noise_folder}/*_chan*.ljh") + glob.glob(f"{noise_folder}/*_chan*.arrow")
+                assert len(data_files) > 0, "Need some LJH or arrow files named *_chan*.{ljh,arrow}"
+                savefile = "".join(data_files[0].split("_chan")[:-1]) + "_noise_analysis.parquet"
+                print(f"Savefile for noise analysis: '{savefile}'")
+
+                # TODO: what if we don't have write access to the noise directory?
+                analyze_noise_directory(noise_folder, savefile=savefile)
+
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
-        # print(f"{description}")
-        print(f"   from_ljh_folder has {len(pairs)} pairs")
-        data = cls.from_ljh_path_pairs(pairs, description)
-        print(f"   and the Channels obj has {len(data.channels)} pairs")
-        return data
+        print(f"   from_ljh_folder has {len(pulse_paths)} pairs")
+
+        channels: dict[int, Channel] = {}
+        for pulse_path in pulse_paths:
+            channel = Channel.from_ljh(pulse_path, noise_folder)
+            assert channel.header.ch_num not in channels.keys()
+            channels[channel.header.ch_num] = channel
+        return cls(channels, description)
 
     def get_a_source_path(self) -> Path | None:
         """Return the path to a representative one of the files used to create this Channels object."""
@@ -939,10 +970,7 @@ class Channels:
                     df = df.with_columns(ljh_backed_chan.df)
                     pulseframer = ljh_backed_chan.pulseframer
             df_history = [df] * len(ch.steps)
-            noise = None
-            if ch.header.noise_data_source is not None:
-                noise = mass2.NoiseChannel.from_ljh(ch.header.noise_data_source)
-            return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer, noise=noise)
+            return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer)
 
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"

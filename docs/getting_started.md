@@ -84,8 +84,7 @@ If you want to create a single `mass2.Channel` object (not created as part of a 
 
 ```python
 pfile = pn_pair.pulse_folder / "20240727_run0002_chan4220.ljh"
-nfile = pn_pair.noise_folder / "20240727_run0000_chan4220.ljh"  # the noise file is optional
-ch = mass2.Channel.from_ljh(pfile, nfile)
+ch = mass2.Channel.from_ljh(pfile, pn_pair.noise_folder)
 ```
 
 To open a single LJH file and study it as a pure file, you can use the internal class `LJHFile`, like this:
@@ -139,13 +138,13 @@ states = ch.df["state_label"]
 print(states.dtype)
 print(states.unique(), states.unique_counts())
 assert states.unique()[-2] == "SCAN3"
-assert states.unique_counts()[-2] == 42433
+assert states.unique_counts()[-2] == 44870
 ```
 
 The output reads:
 
 ```text
-['timestamp', 'pulse', 'subframecount', 'state_label']
+['timestamp', 'subframecount', 'state_label']
 Categorical
 shape: (6,)
 Series: 'state_label' [cat]
@@ -159,12 +158,12 @@ Series: 'state_label' [cat]
 ] shape: (6,)
 Series: 'state_label' [u32]
 [
+	1
 	4
-	4
-	11468
-	40854
-	42433
-	5237
+	11533
+	38197
+	44870
+	5395
 ]
 ```
 
