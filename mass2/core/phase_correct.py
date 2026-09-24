@@ -4,6 +4,7 @@ Classes and functions to correct for arrival-time bias in optimal filtering.
 
 import numpy as np
 import scipy as sp
+from typing import Literal
 from numpy.typing import NDArray, ArrayLike
 import h5py
 
@@ -158,10 +159,10 @@ def phase_correct(
         # because that one can have natural boundary conditions instead of insane
         # cubic functions in the extrapolation.
         if nonempty.sum() > 1:
-            spline_order = min(3, int(nonempty.sum() - 1))
-            crazy_spline = sp.interpolate.UnivariateSpline(x[nonempty], y[nonempty], w=w[nonempty] * (12**-0.5), k=spline_order)
-            phase_uniformifier_x = crazy_spline._data[0]
-            phase_uniformifier_y = crazy_spline._data[1]
+            spline_degree: Literal[1, 2, 3, 4, 5] = 3
+            crazy_spline = sp.interpolate.UnivariateSpline(x[nonempty], y[nonempty], w=w[nonempty] * (12**-0.5), k=spline_degree)
+            phase_uniformifier_x = crazy_spline.get_knots()
+            phase_uniformifier_y = crazy_spline(phase_uniformifier_x)
         else:
             phase_uniformifier_x = np.array([0, 0, 0, 0])
             phase_uniformifier_y = np.array([0, 0, 0, 0])
