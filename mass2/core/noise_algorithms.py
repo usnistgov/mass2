@@ -224,7 +224,7 @@ class NoiseResult:
     @classmethod
     def from_parquet(cls, directory: str | Path, channum: int) -> "NoiseResult":
         files = glob.glob(f"{str(directory)}/*noise_analysis.parquet")
-        assert len(files) == 1
+        assert len(files) == 1, f"found {len(files)} named {directory}/*noise_analysis.parquet; want 1"
         parquetfile = files[0]
         noise = pl.scan_parquet(parquetfile).filter(pl.col("channel_number") == channum).collect().row(0, named=True)
         psd = np.asarray(noise["PSD"])

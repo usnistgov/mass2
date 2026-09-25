@@ -386,12 +386,16 @@ class Channels:
             nch = ch.to_noisechannel()
             if verbose:
                 print(f"Analyzing noise for chan {cnum:5d} file {nch.header.data_source}")
-            results[cnum] = nch.spectrum(
-                trace_col_name,
-                n_limit=n_limit,
-                excursion_nsigma=excursion_nsigma,
-                skip_autocorr_if_length_over=skip_autocorr_if_length_over,
-            )
+            try:
+                results[cnum] = nch.spectrum(
+                    trace_col_name,
+                    n_limit=n_limit,
+                    excursion_nsigma=excursion_nsigma,
+                    skip_autocorr_if_length_over=skip_autocorr_if_length_over,
+                )
+            except ValueError as e:
+                print(f"Failed on channel {cnum}:")
+                print(e)
         return results
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
