@@ -93,6 +93,14 @@ class Channel:
         return self.header.description
 
     @property
+    def file_prefix(self) -> str:
+        """The data source's file prefix, everything before the _chanXYZ.suffix"""
+        if not self.header.data_source:
+            return ""
+        fname = Path(self.header.data_source).name
+        return "".join(fname.split("_chan")[:-1])
+
+    @property
     def ch_num(self) -> int:
         "Channel number, from the filename"
         return self.header.ch_num

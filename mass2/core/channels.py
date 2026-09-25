@@ -47,6 +47,11 @@ class Channels:
         assert len(self.channels) > 0, "channels must be non-empty"
         return next(iter(self.channels.values()))
 
+    @property
+    def file_prefix(self) -> str:
+        """A representative data source's file prefix, everything before the _chanXYZ.suffix"""
+        return self.ch0.file_prefix
+
     def with_more_channels(self, more: "Channels") -> "Channels":
         """Return a Channels object with additional Channels in it.
         New channels with the same number will overrule existing ones.
@@ -353,6 +358,7 @@ class Channels:
         n_limit: int = 10000,
         excursion_nsigma: float = 5,
         skip_autocorr_if_length_over: int = 100_000,
+        verbose: bool = False,
     ) -> dict[int, NoiseResult]:
         """Analyze the raw pulse records as if they are noise records (which they should be, or this is a mistake)
 
@@ -367,6 +373,8 @@ class Channels:
             factor times the normalized median absolute deviation away from the median, by default 5
         skip_autocorr_if_length_over : int, optional
             for records longer than this, do not attempt to compute the autocorrelation function, by default 100_000
+        verbose : bool, optional
+            whether to print per-channel updates to the terminal, by default False
 
         Returns
         -------
@@ -376,6 +384,8 @@ class Channels:
         results: dict[int, NoiseResult] = {}
         for cnum, ch in self.channels.items():
             nch = ch.to_noisechannel()
+            if verbose:
+                print(f"Analyzing noise for chan {cnum:5d} file {nch.header.data_source}")
             results[cnum] = nch.spectrum(
                 trace_col_name,
                 n_limit=n_limit,
