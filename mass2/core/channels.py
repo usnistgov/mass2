@@ -509,14 +509,13 @@ class Channels:
 
                 data_files = glob.glob(f"{noise_folder}/*_chan*.ljh") + glob.glob(f"{noise_folder}/*_chan*.arrow")
                 assert len(data_files) > 0, "Need some LJH or arrow files named *_chan*.{ljh,arrow}"
-                savefile = "".join(data_files[0].split("_chan")[:-1]) + "_noise_analysis.parquet"
-                print(f"Savefile for noise analysis: '{savefile}'")
 
                 # TODO: what if we don't have write access to the noise directory?
-                analyze_noise_directory(noise_folder, savefile=savefile)
+                print(f"No noise analysis Parquet file exists in {noise_folder}. Creating one now...")
+                analyze_noise_directory(noise_folder)
 
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
-        print(f"   from_ljh_folder has {len(pulse_paths)} pairs")
+        print(f"Channels.from_ljh_folder() finds {len(pulse_paths)} raw data files")
 
         channels: dict[int, Channel] = {}
         for pulse_path in pulse_paths:
