@@ -33,28 +33,35 @@ def analyze_noise_directory(
     # that copy the channel numbers of an arrow file in the same directory).
     results: dict[int, NoiseResult] = {}
     directory = Path(directory)
+    prefix = ""
     arrow_files = glob.glob(str(directory / "*_chan*.arrow"))
     if len(arrow_files) > 0:
         arrow_files.sort()
         if verbose:
             print(f"Found {len(arrow_files)} Arrow files")
-        data2 = Channels.from_ipc(directory)
-        results = data2.analyze_noise(excursion_nsigma=excursion_nsigma)
+        data1 = Channels.from_ipc(directory)
+        prefix = data1.file_prefix
+        results = data1.analyze_noise(excursion_nsigma=excursion_nsigma)
 
     ljh_files = glob.glob(str(directory / "*_chan*.ljh"))
     if len(ljh_files) > 0:
         exclude = list(results.keys())
         data2 = Channels.from_ljh_folder(directory, exclude_ch_nums=exclude)
+        if not prefix:
+            prefix = data2.file_prefix
         if verbose:
             if len(arrow_files) == 0:
                 print(f"Found {len(ljh_files)} LJH files")
             else:
                 print(f"Found {len(ljh_files)} LJH files, excluding any also found as Arrow")
-        results2 = data2.analyze_noise(excursion_nsigma=excursion_nsigma)
+        results2 = data2.analyze_noise(excursion_nsigma=excursion_nsigma, verbose=verbose)
         results = results2 | results
 
-    if savefile:
-        save_noise(results, savefile)
+    if not savefile:
+        savefile = f"{directory}/{prefix}_noise_analysis.parquet"
+
+    print(f"Writing to {savefile}")
+    save_noise(results, savefile)
     return results
 
 
@@ -108,7 +115,9 @@ def main() -> None:
         description="Run a noise analysis on a set of LJH or Arrow IPC files",
     )
     parser.add_argument("dir", type=str, nargs="?", default=".", help="directory to find LJH/Arrow files (default: current directory)")
-    parser.add_argument("output", type=str, nargs="?", default="", help="path to store result (default: dir/noise_analysis.parquet)")
+    parser.add_argument(
+        "-o", "--output", type=str, default="", help="path to store result (default: dir/{prefix}_noise_analysis.parquet)"
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="print arguments to terminal (default: False)")
     parser.add_argument(
         "-x",
@@ -120,8 +129,6 @@ def main() -> None:
 
     args = parser.parse_args()
     dir = Path(args.dir)
-    if not args.output:
-        args.output = dir / "noise_analysis.parquet"
 
     analyze_noise_directory(dir, excursion_nsigma=args.excursion, verbose=args.verbose, savefile=args.output)
 
