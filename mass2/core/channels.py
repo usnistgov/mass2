@@ -504,19 +504,7 @@ class Channels:
             pulse_paths = pulse_paths[:limit]
 
         if noise_folder:
-            assert os.path.isdir(noise_folder), f"Need a noise_folder to be a directory:\n\t{pulse_folder=}\n\t{noise_folder=}"
-
-            # If there's no noise analysis file in the noise_folder, then make one.
-            if len(glob.glob(f"{noise_folder}/*noise_analysis.parquet")) == 0:
-                # We import this locally in the branch to avoid circular import errors.
-                from .noise_analysis import analyze_noise_directory  # noqa: PLC0415
-
-                data_files = glob.glob(f"{noise_folder}/*_chan*.ljh") + glob.glob(f"{noise_folder}/*_chan*.arrow")
-                assert len(data_files) > 0, "Need some LJH or arrow files named *_chan*.{ljh,arrow}"
-
-                # TODO: what if we don't have write access to the noise directory?
-                print(f"No noise analysis Parquet file exists in {noise_folder}. Creating one now...")
-                analyze_noise_directory(noise_folder)
+            prepare_noise_folder(noise_folder)
 
         description = f"from_ljh_folder {pulse_folder=} {noise_folder=}"
         print(f"Channels.from_ljh_folder() finds {len(pulse_paths)} raw data files")
@@ -556,7 +544,11 @@ class Channels:
         exclude_ch_nums: list[int] | None = None,
         include_ch_nums: list[int] | None = None,
     ) -> "Channels":
-        metadata_pattern = Path(pulse_folder) / "*_configuration.toml"
+        if noise_folder:
+            prepare_noise_folder(noise_folder)
+
+        pulse_folder = Path(pulse_folder)
+        metadata_pattern = pulse_folder / "*_configuration.toml"
         metadata_files = glob.glob(str(metadata_pattern))
         nmf = len(metadata_files)
         assert nmf == 1, f"require exactly one file in directory *_configuration.toml, found {nmf}"
@@ -570,14 +562,13 @@ class Channels:
 
         # Find all appropriately-named single-channel arrow files, and learn the channel numbers
         # from the filename strings.
-        globpath = str(Path(pulse_folder) / "*_chan*.arrow")
         globpath = str(pulse_folder / "*_chan*.arrow")
         found = glob.glob(globpath)
-        found_chan: set[int] = set()
+        found_chan: dict[int, str] = {}
         for F in found:
             match = re.search(r".*chan(\d+)$", Path(F).stem)
             if match:
-                found_chan.add(int(match.group(1)))
+                found_chan[int(match.group(1))] = Path(F).name
         channel_numbers = expected_channel_numbers.intersection(found_chan)
 
         if exclude_ch_nums is not None:
@@ -592,11 +583,11 @@ class Channels:
         sorted_channels = list(channel_numbers)
         sorted_channels.sort()
         for cnum in sorted_channels:
-            path = Path(pulse_folder) / f"*_chan{cnum}.arrow"
-            noise_path = None if noise_folder is None else Path(noise_folder) / f"*_chan{cnum}.arrow"
+            pathname = found_chan[cnum]
+            path = pulse_folder / pathname
             header = mass2.ChannelHeader(
                 description="Arrows file",
-                data_source=str(path),
+                data_source=str(pathname),
                 ch_num=cnum,
                 frametime_s=metadata["Timebase"],
                 n_presamples=metadata["Npresamples"],
@@ -604,10 +595,10 @@ class Channels:
                 subframediv=metadata["SubFrameDivisions"],
                 df=pl.DataFrame(),
                 pulse_data_sources=(str(path),),
-                noise_data_source=str(noise_path),
+                noise_data_source=str(noise_folder),
             )
 
-            channels[cnum] = Channel.from_ipc(path, cnum, header, noise_path)
+            channels[cnum] = Channel.from_ipc(path, cnum, header, noise_folder)
             if len(channels) == limit:
                 break
         description = f"Parquet data from {pulse_folder}"
@@ -1005,3 +996,26 @@ class Channels:
                 restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
 
             return dataclasses.replace(data, channels=restored_channels, bad_channels=restored_bad_channels)
+
+
+def prepare_noise_folder(noise_folder: str | Path) -> None:
+    """Analyze noise pulse records in a folder and store result to a Parquet file.
+
+    Parameters
+    ----------
+    noise_folder : str | Path
+        The directory containing one or more raw pulse records (LJH or Arrow form) to be analyzed.
+    """
+    assert os.path.isdir(noise_folder), f"Need a noise_folder to be a directory:\n\t{noise_folder=}"
+
+    # If there's no noise analysis file in the noise_folder, then make one.
+    if len(glob.glob(f"{noise_folder}/*noise_analysis.parquet")) == 0:
+        # We import this locally in the branch to avoid circular import errors.
+        from .noise_analysis import analyze_noise_directory  # noqa: PLC0415
+
+        data_files = glob.glob(f"{noise_folder}/*_chan*.ljh") + glob.glob(f"{noise_folder}/*_chan*.arrow")
+        assert len(data_files) > 0, "Need some LJH or arrow files named *_chan*.{ljh,arrow}"
+
+        # TODO: what if we don't have write access to the noise directory?
+        print(f"No noise analysis Parquet file exists in {noise_folder}. Creating one now...")
+        analyze_noise_directory(noise_folder)
