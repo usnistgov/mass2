@@ -571,6 +571,7 @@ class Channels:
         # Find all appropriately-named single-channel arrow files, and learn the channel numbers
         # from the filename strings.
         globpath = str(Path(pulse_folder) / "*_chan*.arrow")
+        globpath = str(pulse_folder / "*_chan*.arrow")
         found = glob.glob(globpath)
         found_chan: set[int] = set()
         for F in found:
