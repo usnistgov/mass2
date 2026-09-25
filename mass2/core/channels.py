@@ -587,7 +587,7 @@ class Channels:
             path = pulse_folder / pathname
             header = mass2.ChannelHeader(
                 description="Arrows file",
-                data_source=str(pathname),
+                data_source=str(path),
                 ch_num=cnum,
                 frametime_s=metadata["Timebase"],
                 n_presamples=metadata["Npresamples"],
