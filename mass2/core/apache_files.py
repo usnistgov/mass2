@@ -343,7 +343,13 @@ def main_ljh2apache() -> None:
     parser.add_argument(
         "-b", "--batch", type=float, default=5, help="Period for starting a new record batch within an arrow file (default=5)"
     )
-    parser.add_argument("-s", "--sleep", type=float, default=0, help="Sleep this many second between writing each batch (default=0)")
+    parser.add_argument(
+        "-s",
+        "--sleep",
+        type=float,
+        default=0,
+        help="Sleep this many second between writing each batch (default=0). Use `sleep`=`batch` to run at 1x real-time speed.",
+    )
     args = parser.parse_args()
     args.mix = True
     if not args.output:

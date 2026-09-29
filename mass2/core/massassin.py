@@ -36,14 +36,37 @@ def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
     return df.with_columns(good=good).select(outputs)
 
 
+def attach_tz_to_naive_column(df: pl.DataFrame, time_col: str, new_tz: str) -> pl.DataFrame:
+    """If a given column of a dataframe is a Datetime lacking a time zone, attach the given time zone by name.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Existing data frame with a timestamp column
+    time_col : str
+        Name of the timestamp column (must be of type pl.Datetime in the schema)
+    new_tz : str
+        The time zone to attach, if the named column lacks a time zone
+
+    Returns
+    -------
+    pl.DataFrame
+        The updated data frame.
+    """
+    time_type = df.schema[time_col]
+    assert isinstance(time_type, pl.Datetime)
+    if time_type.time_zone is None:
+        df = df.with_columns(pl.col(time_col).dt.replace_time_zone(new_tz))
+    return df
+
+
 def load_expt_state_df(expt_state_file: str, target_time_zone: str) -> pl.DataFrame:
-    df = pl.read_csv(expt_state_file, new_columns=["unixnano", "state_label"])
-    df_es = df.select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+    df = pl.read_csv(expt_state_file, new_columns=["timestamp", "state_label"])
+    df_es = df.select(pl.from_epoch("timestamp", time_unit="ns").dt.cast_time_unit("us"))
+    df_es = attach_tz_to_naive_column(df_es, "timestamp", target_time_zone)
     df_labels = df.select(pl.col("state_label").str.strip_chars()).cast(pl.Categorical)
-    times = df_es["timestamp"]
-    times = times.dt.convert_time_zone(target_time_zone)
-    df_es = df_es.with_columns(timestamp=times)
-    return df_es.with_columns(df_labels)
+    times = df_es["timestamp"].dt.convert_time_zone(target_time_zone)
+    return df_es.with_columns(df_labels, timestamp=times)
 
 
 def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "timestamp") -> pl.DataFrame:
@@ -52,6 +75,7 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
 
     # 2. Sort both DataFrames by the timestamp (REQUIRED for join_asof)
     df_sorted = df.sort(time_col)
+    df_sorted = attach_tz_to_naive_column(df_sorted, time_col, "UTC")
     df_estate_sorted = df_estate.sort(time_col)
 
     # 3. Perform the as-of join
@@ -62,17 +86,18 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
     return joined.sort("__original_order__").drop("__original_order__")
 
 
-def raw_arrows_timezone(input_dir: Path) -> str:
+def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
     inputs_sorted = glob.glob(str(input_dir / "*_chan*.arrow"))
     inputs_unsorted = glob.glob(str(input_dir / "*.arrows*"))
     if len(inputs_sorted) > 0:
         lf = pl.scan_ipc(inputs_sorted[0])
         dtype = lf.collect_schema()["timestamp"]
         dtype = cast(pl.Datetime, dtype)
-        return str(dtype.time_zone)
+        return default_tz if dtype.time_zone is None else str(dtype.time_zone)
     if len(inputs_unsorted) > 0:
         with pa.ipc.open_stream(inputs_unsorted[0]) as reader:
-            return reader.schema.field("timestamp").type.tz
+            tz = reader.schema.field("timestamp").type.tz
+            return default_tz if tz is None else tz
     raise OSError(f"found no valid '*_chan*.arrow' or '*.arrows*' files in {input_dir}")
 
 
@@ -84,7 +109,7 @@ RECIPE_OUTPUTS = (
     "pretrig_mean",
     "5lagx",
     "5lagy",
-    "energy",
+    "energy1",
 )
 
 
