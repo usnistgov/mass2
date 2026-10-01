@@ -113,14 +113,16 @@ RECIPE_OUTPUTS = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class MassassinDirectory:
     recipes: dict[int, mass2.core.Recipe]
     recipe_file: Path
     input_dir: Path
     output_dir: Path
+    expt_state_path: Path
     expt_state_df: pl.DataFrame
     file_ids_complete: set[int] = field(default_factory=set)
+    file_prefix: str | None = None
 
     @classmethod
     def open(cls, recipe_file: str | Path, input_dir: str | Path, output_dir: str | Path) -> "MassassinDirectory":
@@ -129,11 +131,19 @@ class MassassinDirectory:
         input_dir = Path(input_dir)
         target_time_zone = raw_arrows_timezone(input_dir)
 
-        expt_state_df = pl.DataFrame()
         state_files = glob.glob(str(input_dir / "*_experiment_state.txt"))
-        if len(state_files) > 0:
-            expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
-        return cls(recipes, Path(recipe_file), Path(input_dir), Path(output_dir), expt_state_df)
+        assert len(state_files) > 0, f"found no experiment state file in {input_dir}"
+        assert len(state_files) == 1, f"found {len(state_files)} '*_experiment_state.txt' files in {input_dir}, want exactly 1"
+        expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
+        md = cls(recipes, Path(recipe_file), Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df)
+
+        # Check that input exists and contains raw pulse files and an experiment_state.txt file
+        md.validate_input()
+
+        # Create and check output directory
+        md.validate_output()
+
+        return md
 
     def validate_input(self) -> None:
         """Ensure that the given data directory is a directory and contains at least one appropriate data file
@@ -149,7 +159,7 @@ class MassassinDirectory:
         assert len(glob.glob(str(input_dir / "*.arrow*"))) > 0, f"{input_dir=} contains no Arrows files"
 
     def validate_output(self) -> None:
-        """Ensure that the given output directory can be created, or exists
+        """Ensure that the given output directory exists or can be created.
 
         Parameters
         ----------
