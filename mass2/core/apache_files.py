@@ -116,6 +116,15 @@ def translate_external_trigger(args: argparse.Namespace) -> None:
     df.write_parquet(parquet_path)
 
 
+def copy_experiment_state(args: argparse.Namespace) -> None:
+    base = Path(args.base_dir)
+    output = Path(args.output)
+    pattern = str(base / "*_experiment_state.txt")
+    state_files = glob.glob(pattern)
+    for sf in state_files:
+        shutil.copy(sf, output)
+
+
 def generate_ljh_metadata_df(ljh: dict[int, LJHFile]) -> pl.DataFrame:
     files = list(ljh.values())
     return pl.DataFrame({
@@ -357,6 +366,7 @@ def main_ljh2apache() -> None:
     Path(args.output).mkdir(parents=True, exist_ok=True)
 
     translate_external_trigger(args)
+    copy_experiment_state(args)
     translate_ljh_files(args)
 
 
