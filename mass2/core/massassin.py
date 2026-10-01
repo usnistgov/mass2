@@ -4,6 +4,7 @@ import pickle
 import polars as pl
 import pyarrow as pa
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
@@ -13,17 +14,17 @@ import mass2
 
 def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
     outputs = [
-        "channel_number",
         "good",
         "timestamp",
         "subframecount",
         "pretrig_mean",
         "5lagx",
         "5lagy",
-        "energy",
+        "energy1",
     ]
+    if "channel_number" in raw_df.columns:
+        outputs.append("channel_number")
 
-    # 3. Process the recipe
     framer = mass2.misc.DataFramerPolars(raw_df["pulse"])
     df = recipe.calc_from_df(raw_df, framer)
     good = pl.lit(True)
@@ -156,7 +157,22 @@ class MassassinDirectory:
         input_dir = self.input_dir
         assert input_dir.exists(), f"{input_dir=} does not exist"
         assert input_dir.is_dir(), f"{input_dir=} is not a directory"
-        assert len(glob.glob(str(input_dir / "*.arrow*"))) > 0, f"{input_dir=} contains no Arrows files"
+        onechan_files = glob.glob(str(input_dir / "*_chan*.arrow"))
+        if len(onechan_files) > 0:
+            f = Path(onechan_files[0])
+            stem = f.stem
+            matches = re.search(r"^(.*)_chan\d+$", stem)
+            assert matches, f"did not find pattern *_chan[digits] in file stem {stem}"
+            self.file_prefix = matches.group(1)
+            return
+
+        arrow_files = glob.glob(str(input_dir / "*.arrow*"))
+        assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
+        f = Path(arrow_files[0])
+        stem = f.stem
+        matches = re.search(r"^(.*)_\d+$", stem)
+        assert matches, f"did not find pattern *_[digits] in file stem {stem}"
+        self.file_prefix = matches.group(1)
 
     def validate_output(self) -> None:
         """Ensure that the given output directory exists or can be created.
@@ -192,7 +208,7 @@ class MassassinDirectory:
         df.write_parquet(output)
 
     def analyze_old_data(self) -> bool:
-        """_summary_
+        """Analyze "old data", meaning data that has already been unshuffled into single-channel files.
 
         Returns
         -------
@@ -204,28 +220,18 @@ class MassassinDirectory:
             return False
 
         for ipc_file in per_chan_files:
+            channum = self.channum(ipc_file)
+            assert channum >= 0, f"could not parse channel number from file {ipc_file=}"
             name = Path(ipc_file).stem + ".parquet"
             output = self.output_dir / name
-            channum = self.channum(name)
-            assert channum >= 0, f"could not parse channel number from file {name=}"
             try:
                 recipe = self.recipes[channum]
             except KeyError:
+                print(f"   found no recipe to match chan {channum}, file '{ipc_file}'")
                 pass
             self.process_singlechan(recipe, ipc_file, output)
 
         return True
-
-    def timeordered_files(self) -> list[str]:
-        files = glob.glob(str(self.input_dir / "*.arrows_timeorder"))
-        files.sort()
-        return files
-
-    def chanordered_files(self) -> list[str]:
-        files = glob.glob(str(self.input_dir / "*.arrows"))
-        files += glob.glob(str(self.input_dir / "*.arrows_timeorder"))
-        files.sort()
-        return files
 
     def run_recipe(self, batch: pa.RecordBatch) -> pl.DataFrame:
         frames: list[pl.DataFrame] = []
@@ -258,7 +264,7 @@ class MassassinDirectory:
         # 4. Concat all processed frames
         return pl.concat(frames)
 
-    def process_one_allchan_file(self, ipc_file: str, output: Path) -> None:
+    def process_one_allchan_file(self, ipc_file: str | Path, output: Path) -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
@@ -277,31 +283,6 @@ class MassassinDirectory:
         df = add_expt_state(df, self.expt_state_df)
         df.write_ipc_stream(output)
 
-    def cold_start(self) -> None:
-        files = self.chanordered_files()
-        print(f"In cold_start, found {len(files)} to process")
-
-        files_processed = 0
-        for ipc_file in files:
-            ipc_path = Path(ipc_file)
-            stem = ipc_path.stem
-            file_id = int(stem.split("_")[-1])
-            if file_id in self.file_ids_complete:
-                continue
-            output = self.output_dir / ipc_path.name
-            self.process_one_allchan_file(ipc_file, output)
-            self.file_ids_complete.add(file_id)
-            files_processed += 1
-
-        # In case any new complete channel-ordered files were generated while we processed these, we'll
-        # run the cold start again to find any new, unprocessed files.
-        if files_processed > 0:
-            return self.cold_start()
-
-        # If we found no unprocessed files, it's time to look for the active WAL file.
-        # Find it, if any (else return)
-        # Process it
-
     @staticmethod
     def channum(name: str) -> int:
         stem = Path(name).stem
@@ -311,21 +292,67 @@ class MassassinDirectory:
         return -1
 
     def run(self) -> None:
-        # Check that input exists and contains raw pulse files
-        self.validate_input()
+        """Run analysis recipe on live-streaming data, including a cold-start phase."""
 
-        # Create and check output directory
-        self.validate_output()
+        # TODO set up watchdog for expt state file, to re-generate the expt state dataframe.
 
-        if self.analyze_old_data():
-            return
+        seqnum = 0
+        FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
+        MAX_WAIT_TIME = 10.0  # wait this many seconds for the next file to exist before giving up.
+        while True:
+            # Compute the filename for this sequence number, whether finalized or in progress
+            finalized_path = self.input_dir / f"{self.file_prefix}_{seqnum:04d}.arrows"
+            wal_path = self.input_dir / f"{self.file_prefix}_{seqnum:04d}.arrows_WAL"
 
-        # TODO: Create 0MQ subscriber
+            # ---------------------------------------------------------
+            # CASE 1: COLD START (run recipe on a finalized file)
+            # ---------------------------------------------------------
+            if finalized_path.exists():
+                print(f"[{seqnum:04d}] Analyzing finalized file: {finalized_path}")
+                output_path = self.output_dir / finalized_path.name
+                self.process_one_allchan_file(finalized_path, output_path)
+                seqnum += 1
+                continue  # Immediately jump to the next sequence number
 
-        self.cold_start()
+            # ---------------------------------------------------------
+            # CASE 2: LIVE TAILING (run recipe on a write-ahead log)
+            # ---------------------------------------------------------
+            if wal_path.exists():
+                print(f"[{seqnum:04d}] Analyzing WAL file: {wal_path}")
+                try:
+                    output_path = self.output_dir / wal_path.name
+                    # TODO do something with the open file
+                    seqnum += 1
+                except FileNotFoundError:
+                    # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
+                    # in the microsecond between our os.path.exists() and our open().
+                    # We catch it, ignore it, and let the loop restart to catch it as Phase 1!
+                    pass
+                continue
 
-        # TODO: streaming phase
-        # TODO: When streaming is done, shuffle by channel.
+            # ---------------------------------------------------------
+            # CASE 3: WAIT FOR DATA (next seqnum doesn't exist yet)
+            # ---------------------------------------------------------
+            print(f"[{seqnum:04d}] Waiting for new DAQ file...")
+            # print(f"   {finalized_path}")
+            # print(f"   {wal_path}")
+            start_wait = time.time()
+            found = False
+
+            while time.time() - start_wait < MAX_WAIT_TIME:
+                # Check if either the WAL or a finalized file popped into existence
+                # TODO there might be a kind of flag to tell us there won't be a next file, so we can stop waiting.
+                if wal_path.exists() or finalized_path.exists():
+                    found = True
+                    break
+
+                # Simple polling is perfectly fine here. We are only checking directory entries,
+                # which is an ultra-cheap OS operation, and it only happens between file rotations.
+                time.sleep(FILE_POLL_TIME)
+
+            if not found:
+                print(f"[{seqnum:04d}] Timeout: No new file appeared within {MAX_WAIT_TIME} seconds. Shutting down.")
+                break
 
 
 def main_massassin() -> None:
@@ -344,6 +371,11 @@ def main_massassin() -> None:
         args.output_dir = args.input_dir / "mass"
 
     md = MassassinDirectory.open(args.recipe_file, args.input_dir, args.output_dir)
+
+    # First detect and process unshuffled (single-channel) data. Assume that if any are found, they are all that matters.
+    if md.analyze_old_data():
+        return
+
     md.run()
 
 
