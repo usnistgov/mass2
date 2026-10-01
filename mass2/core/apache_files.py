@@ -217,6 +217,11 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
     # Extract the timing information (subframe count and posix timestamps) as dictionaries
     # of numpy arrays, indexed by channel number.
     ljh0 = next(iter(ljhfiles.values()))
+    stem = Path(ljh0.filename).stem
+    matches = re.search(r"^(.*)_chan\d+$", stem)
+    assert matches, f"did not find pattern *_chan[digits] in file stem {stem}"
+    prefix = matches.group(1)
+
     frames_per_sec = 1 / ljh0.timebase
     if ljh0.subframediv is None:
         subframes_per_sec = int(64 * frames_per_sec)
@@ -244,7 +249,7 @@ def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> Non
     output_number = 0
     while first_subframe < final_subframe:
         last_subframe = first_subframe + subframes_per_file
-        out_name = f"all_pulses_{base32_crockford_encode(output_number, length=3)}.arrows_WAL"
+        out_name = f"{prefix}_{output_number:04d}.arrows_WAL"
         out_path = str(output / out_name)
 
         duration = (last_subframe - first_subframe) / subframes_per_sec
