@@ -199,6 +199,7 @@ def translate_ljh_files(args: argparse.Namespace) -> None:
         mix_ljh_arrow(ljhfiles, args)
     else:
         convert_ljh_arrow(ljhfiles, args)
+    Path(output / "COMPLETE").touch(mode=0o644)
 
 
 def mix_ljh_arrow(ljhfiles: dict[int, LJHFile], args: argparse.Namespace) -> None:  # noqa: PLR0914
