@@ -3,11 +3,12 @@ import glob
 import pickle
 import polars as pl
 import pyarrow as pa
+from pyarrow import ipc
 import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import cast
+from typing import cast, BinaryIO
 
 import mass2
 
@@ -291,6 +292,64 @@ class MassassinDirectory:
             return int(match.group(1))
         return -1
 
+    def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
+        with open(wal_path, "rb") as fp:
+            try:
+                reader = ipc.RecordBatchStreamReader(fp)
+                reader_schema = reader.schema
+            except pa.ArrowInvalid:
+                print("File is too new, schema not written yet.")
+                return
+
+            with open(output_path, "wb") as outp:
+                # Pass work off to a new method, simply to unindent by 2 levels.
+                self._analyze_open_WAL(fp, outp, reader_schema)
+
+    def _analyze_open_WAL(self, fp: BinaryIO, outp: BinaryIO, reader_schema: pa.schema) -> None:
+        FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
+        last_good_position = fp.tell()
+        writer: ipc.RecordBatchStreamWriter | None = None
+
+        while True:
+            fp.seek(last_good_position)
+
+            # Peek to see if the 8-byte-long EOS (end-of-stream) marker is next.
+            header = fp.read(8)
+
+            if len(header) < 8:
+                # Physical EOF (len=0): DAQ hasn't written the next batch or EOF yet, or
+                # Torn Write (0<len<8): DAQ is not finished writing the batch or EOF.
+                time.sleep(FILE_POLL_TIME)
+                continue
+
+            if header == b"\xff\xff\xff\xff\x00\x00\x00\x00":
+                # FOUND THE EOS MARKER! The DAQ closed the file cleanly.
+                print("Received EOS marker. Stream finalized.")
+                break
+
+            # If it is not the EOS marker, it's a real batch (either complete or partial).
+            # Rewind the pointer exactly 8 bytes so PyArrow can parse it normally.
+            fp.seek(last_good_position)
+
+            try:
+                # Let PyArrow read the full message, parse it, and update the bookmark
+                msg = ipc.read_message(fp)
+                batch = ipc.read_record_batch(msg, reader_schema)
+                last_good_position = fp.tell()
+
+                df = self.run_recipe(batch).to_arrow()
+                if len(df) == 0:
+                    continue
+                if not writer:
+                    writer = ipc.new_stream(outp, df.schema)
+                writer.write_table(df)
+                outp.flush()  # force new data out of Python into OS page cache
+
+            except pa.ArrowInvalid:
+                # Torn Write: The header was complete, but the payload data
+                # hasn't finished flushing to the disk yet.
+                time.sleep(FILE_POLL_TIME)
+
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
 
@@ -318,10 +377,10 @@ class MassassinDirectory:
             # CASE 2: LIVE TAILING (run recipe on a write-ahead log)
             # ---------------------------------------------------------
             if wal_path.exists():
-                print(f"[{seqnum:04d}] Analyzing WAL file: {wal_path}")
+                print(f"[{seqnum:04d}] Analyzing WAL       file: {wal_path}")
                 try:
                     output_path = self.output_dir / wal_path.name
-                    # TODO do something with the open file
+                    self.analyze_WAL_tail(wal_path, output_path)
                     seqnum += 1
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
