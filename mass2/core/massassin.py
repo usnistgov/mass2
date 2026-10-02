@@ -281,7 +281,6 @@ class MassassinDirectory:
         print(f"Analzying all-channel {input.name}")
         df_in = pl.read_ipc_stream(input)
         df = self.run_recipe(df_in)
-        df = add_expt_state(df, self.expt_state_df)
         df.write_ipc_stream(output)
 
     @staticmethod
