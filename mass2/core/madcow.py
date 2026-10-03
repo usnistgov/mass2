@@ -1,6 +1,6 @@
 import argparse
 import glob
-import pickle
+import numpy as np
 import polars as pl
 import pyarrow as pa
 from pyarrow import ipc
@@ -8,81 +8,10 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from numpy.typing import NDArray
 from typing import cast, BinaryIO
 
-import mass2
-
-
-def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
-    outputs = [
-        "good",
-        "timestamp",
-        "subframecount",
-        "pretrig_mean",
-        "5lagx",
-        "5lagy",
-        "energy1",
-    ]
-    if "channel_number" in raw_df.columns:
-        outputs.append("channel_number")
-
-    framer = mass2.misc.DataFramerPolars(raw_df["pulse"])
-    df = recipe.calc_from_df(raw_df, framer)
-    good = pl.lit(True)
-    for step in recipe.steps[::-1]:
-        try:
-            good = step.good_expr
-            break
-        except AttributeError:
-            pass
-    return df.with_columns(good=good).select(outputs)
-
-
-def attach_tz_to_naive_column(df: pl.DataFrame, time_col: str, new_tz: str) -> pl.DataFrame:
-    """If a given column of a dataframe is a Datetime lacking a time zone, attach the given time zone by name.
-
-    Parameters
-    ----------
-    df : pl.DataFrame
-        Existing data frame with a timestamp column
-    time_col : str
-        Name of the timestamp column (must be of type pl.Datetime in the schema)
-    new_tz : str
-        The time zone to attach, if the named column lacks a time zone
-
-    Returns
-    -------
-    pl.DataFrame
-        The updated data frame.
-    """
-    time_type = df.schema[time_col]
-    assert isinstance(time_type, pl.Datetime)
-    if time_type.time_zone is None:
-        df = df.with_columns(pl.col(time_col).dt.replace_time_zone(new_tz))
-    return df
-
-
-def load_expt_state_df(expt_state_file: str, target_time_zone: str) -> pl.DataFrame:
-    """Load the experiment state file as a small DataFrame
-
-    Parameters
-    ----------
-    expt_state_file : str
-        File name to load
-    target_time_zone : str
-        Convert the timestamp column to this time zone
-
-    Returns
-    -------
-    pl.DataFrame
-        _description_
-    """
-    df = pl.read_csv(expt_state_file, new_columns=["timestamp", "state_label"])
-    df_es = df.select(pl.from_epoch("timestamp", time_unit="ns").dt.cast_time_unit("us"))
-    df_es = attach_tz_to_naive_column(df_es, "timestamp", target_time_zone)
-    df_labels = df.select(pl.col("state_label").str.strip_chars()).cast(pl.Categorical)
-    times = df_es["timestamp"].dt.convert_time_zone(target_time_zone)
-    return df_es.with_columns(df_labels, timestamp=times)
+from .massassin import load_expt_state_df, attach_tz_to_naive_column
 
 
 def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "timestamp") -> pl.DataFrame:
@@ -103,13 +32,21 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
 
 
 def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
-    inputs_sorted = glob.glob(str(input_dir / "*_chan*.arrow"))
-    inputs_unsorted = glob.glob(str(input_dir / "*.arrows*"))
-    if len(inputs_sorted) > 0:
-        lf = pl.scan_ipc(inputs_sorted[0])
+    inputs_sortedP = glob.glob(str(input_dir / "*_chan*.parquet"))
+    if len(inputs_sortedP) > 0:
+        lf = pl.scan_parquet(inputs_sortedP[0])
         dtype = lf.collect_schema()["timestamp"]
         dtype = cast(pl.Datetime, dtype)
         return default_tz if dtype.time_zone is None else str(dtype.time_zone)
+
+    inputs_sortedA = glob.glob(str(input_dir / "*_chan*.arrow"))
+    if len(inputs_sortedA) > 0:
+        lf = pl.scan_ipc(inputs_sortedA[0])
+        dtype = lf.collect_schema()["timestamp"]
+        dtype = cast(pl.Datetime, dtype)
+        return default_tz if dtype.time_zone is None else str(dtype.time_zone)
+
+    inputs_unsorted = glob.glob(str(input_dir / "*.arrows*"))
     if len(inputs_unsorted) > 0:
         with pa.ipc.open_stream(inputs_unsorted[0]) as reader:
             tz = reader.schema.field("timestamp").type.tz
@@ -117,33 +54,41 @@ def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
     raise OSError(f"found no valid '*_chan*.arrow' or '*.arrows*' files in {input_dir}")
 
 
-RECIPE_OUTPUTS = (
-    "channel_number",
-    "good",
-    "timestamp",
-    "subframecount",
-    "pretrig_mean",
-    "5lagx",
-    "5lagy",
-    "energy1",
-)
-
-
 @dataclass(frozen=False)
-class MassassinDirectory:
-    recipes: dict[int, mass2.core.Recipe]
-    recipe_file: Path
+class MadCowDirectory:
     input_dir: Path
     output_dir: Path
     expt_state_path: Path
     expt_state_df: pl.DataFrame
-    file_ids_complete: set[int] = field(default_factory=set)
+    Emin: float
+    Emax: float
+    Nbins: int
+    state_spectra: dict[str, NDArray] = field(default_factory=dict)
+    chan_spectra: dict[int, NDArray] = field(default_factory=dict)
     file_prefix: str | None = None
 
     @classmethod
-    def open(cls, recipe_file: str | Path, input_dir: str | Path, output_dir: str | Path) -> "MassassinDirectory":
-        with open(recipe_file, "rb") as fp:
-            recipes = pickle.load(fp)
+    def open(cls, input_dir: str | Path, output_dir: str | Path, Emin: float, Emax: float, Nbins: int) -> "MadCowDirectory":
+        """Create a new MadCowDirectory
+
+        Parameters
+        ----------
+        input_dir : str | Path
+            _description_
+        output_dir : str | Path
+            _description_
+        Emin : float
+            _description_
+        Emax : float
+            _description_
+        Nbins : int
+            _description_
+
+        Returns
+        -------
+        MadCowDirectory
+            _description_
+        """
         input_dir = Path(input_dir)
         target_time_zone = raw_arrows_timezone(input_dir)
 
@@ -151,7 +96,7 @@ class MassassinDirectory:
         assert len(state_files) > 0, f"found no experiment state file in {input_dir}"
         assert len(state_files) == 1, f"found {len(state_files)} '*_experiment_state.txt' files in {input_dir}, want exactly 1"
         expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
-        md = cls(recipes, Path(recipe_file), Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df)
+        md = cls(Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df, Emin, Emax, Nbins)
 
         # Check that input exists and contains raw pulse files and an experiment_state.txt file
         md.validate_input()
@@ -169,10 +114,12 @@ class MassassinDirectory:
         input_dir : Path
             The data directory where raw pulse files live.
         """
+        assert self.Emin < self.Emax
+        assert self.Nbins > 1
         input_dir = self.input_dir
         assert input_dir.exists(), f"{input_dir=} does not exist"
         assert input_dir.is_dir(), f"{input_dir=} is not a directory"
-        onechan_files = glob.glob(str(input_dir / "*_chan*.arrow"))
+        onechan_files = glob.glob(str(input_dir / "*_chan*.parquet"))
         if len(onechan_files) > 0:
             f = Path(onechan_files[0])
             stem = f.stem
@@ -199,28 +146,46 @@ class MassassinDirectory:
         """
         output_dir = self.output_dir
         Path.mkdir(output_dir, mode=0o755, parents=True, exist_ok=True)
-        assert not output_dir.samefile(self.input_dir)
         assert output_dir.exists(), f"{output_dir=} could not be made"
         assert output_dir.is_dir(), f"{output_dir=} is not a directory"
 
-    def process_singlechan(self, recipe: mass2.core.Recipe, ipc_file: str, output: Path) -> None:
+    def process_singlechan(self, parquet_file: str, channum: int, time_col: str = "timestamp") -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
         ----------
-        recipe : mass2.core.Recipe
-            The recipe to run on the raw data
-        ipc_file : str
-            File path containing the raw pulse data in an Arrow IPC feather file
-        output : Path
-            File path for writing the output dataframe, as Parquet.
+        parquet_file : str
+            File path containing the analyzed pulse data in a Parquet file
         """
-        input = Path(ipc_file)
+        states_lazy = self.expt_state_df.lazy().sort(time_col)
+        input = Path(parquet_file)
         print(f"Analzying single-channel {input.name}")
-        df_in = pl.read_ipc(input, memory_map=True)
-        df = run_recipe(recipe, df_in)
-        df = add_expt_state(df, self.expt_state_df)
-        df.write_parquet(output)
+        df_joined = (
+            pl.scan_parquet(input)
+            # Remove data that fails cuts
+            .filter(pl.col("good"))
+            # Sort by the join key (timestamp), or tell Polars that they already ARE sorted. In this case, the latter
+            .with_columns(pl.col(time_col).set_sorted())
+            .join_asof(states_lazy, on=time_col, strategy="backward")
+            .select(["energy1", "state_label"])
+            .collect()
+        )
+
+        category_dfs = df_joined.partition_by("state_label", as_dict=True)
+        all_states_hist = np.zeros(self.Nbins, dtype=int)
+
+        for category_names, sub_df in category_dfs.items():
+            category_name = category_names[0]
+            if not category_name:
+                continue
+            assert isinstance(category_name, str), f"{category_name=}"
+            if category_name not in self.state_spectra:
+                self.state_spectra[category_name] = np.zeros(self.Nbins, dtype=int)
+            data_array = sub_df.get_column("energy1").to_numpy()
+            contents, _ = np.histogram(data_array, self.Nbins, (self.Emin, self.Emax))
+            self.state_spectra[category_name] += contents
+            all_states_hist += contents
+        self.chan_spectra[channum] = all_states_hist
 
     def analyze_old_data(self) -> bool:
         """Analyze "old data", meaning data that has already been unshuffled into single-channel files.
@@ -230,54 +195,36 @@ class MassassinDirectory:
         bool
             Whether an old data set was found, and analyzed
         """
-        per_chan_files = glob.glob(str(self.input_dir / "*_chan*.arrow"))
+        per_chan_files = glob.glob(str(self.input_dir / "*_chan*.parquet"))
         if len(per_chan_files) == 0:
             return False
 
-        for ipc_file in per_chan_files:
-            channum = self.channum(ipc_file)
-            assert channum >= 0, f"could not parse channel number from file {ipc_file=}"
-            name = Path(ipc_file).stem + ".parquet"
-            output = self.output_dir / name
-            try:
-                recipe = self.recipes[channum]
-            except KeyError:
-                print(f"   found no recipe to match chan {channum}, file '{ipc_file}'")
-                pass
-            self.process_singlechan(recipe, ipc_file, output)
+        # Analyze the spectra
+        for parquet_file in per_chan_files:
+            channum = self.channum(parquet_file)
+            assert channum >= 0, f"could not parse channel number from file {parquet_file=}"
+            self.process_singlechan(parquet_file, channum)
 
+        print("Yo!")
+        print(self.state_spectra.keys())
+
+        dfs = pl.DataFrame(
+            {
+                "state_label": list(self.state_spectra.keys()),
+                "spectra": list(self.state_spectra.values()),
+            },
+            schema={"state_label": pl.String, "spectra": pl.Array(pl.Int32, self.Nbins)},
+        )
+        dfs.write_ipc(self.output_dir / "state_spectra.arrow")
+        dfc = pl.DataFrame(
+            {
+                "channel_number": list(self.chan_spectra.keys()),
+                "spectra": list(self.chan_spectra.values()),
+            },
+            schema={"channel_number": pl.Int32, "spectra": pl.Array(pl.Int32, self.Nbins)},
+        )
+        dfc.write_ipc(self.output_dir / "channel_spectra.arrow")
         return True
-
-    def run_recipe(self, batch: pa.RecordBatch) -> pl.DataFrame:
-        frames: list[pl.DataFrame] = []
-
-        # 1. Convert the entire batch to Polars ONCE (zero-copy transfer)
-        full_df = pl.DataFrame(batch)
-
-        # 2. Partition the dataframe in a single O(N) pass.
-        # partition_by() returns a list of DataFrames, one for each unique channel.
-        for raw_df in full_df.partition_by("channel_number", maintain_order=False, include_key=True):
-            # Grab the channel number from the first row of this chunk
-            cnum = raw_df["channel_number"][0]
-            if cnum not in self.recipes:
-                continue
-
-            # 3. Process the recipe
-            framer = mass2.misc.DataFramerPolars(raw_df["pulse"])
-            recipe = self.recipes[cnum]
-            df = recipe.calc_from_df(raw_df, framer)
-            good = pl.lit(True)
-            for step in recipe.steps[::-1]:
-                try:
-                    good = step.good_expr
-                    break
-                except AttributeError:
-                    pass
-            df = df.with_columns(good=good).select(RECIPE_OUTPUTS)
-            frames.append(df)
-
-        # 4. Concat all processed frames
-        return pl.concat(frames)
 
     def process_one_allchan_file(self, ipc_file: str | Path, output: Path) -> None:
         """Process the raw pulse data from a single channel with the given recipe
@@ -291,6 +238,7 @@ class MassassinDirectory:
         output : Path
             File path for writing the output dataframe, as Parquet.
         """
+        raise NotImplementedError
         input = Path(ipc_file)
         print(f"Analzying all-channel {input.name}")
         df_in = pl.read_ipc_stream(input)
@@ -299,6 +247,18 @@ class MassassinDirectory:
 
     @staticmethod
     def channum(name: str) -> int:
+        """Find channel number given a string of a certain pattern
+
+        Parameters
+        ----------
+        name : str
+            Search this string for ending in *chan{digits}
+
+        Returns
+        -------
+        int
+            The digits embedded in the string name
+        """
         stem = Path(name).stem
         match = re.search(r".*chan(\d+)$", stem)
         if match:
@@ -319,6 +279,22 @@ class MassassinDirectory:
                 self._analyze_open_WAL(fp, outp, reader_schema)
 
     def _analyze_open_WAL(self, fp: BinaryIO, outp: BinaryIO, reader_schema: pa.schema) -> None:
+        """_summary_
+
+        Parameters
+        ----------
+        fp : BinaryIO
+            _description_
+        outp : BinaryIO
+            _description_
+        reader_schema : pa.schema
+            _description_
+
+        Raises
+        ------
+        NotImplementedError
+            _description_
+        """
         FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
         last_good_position = fp.tell()
         writer: ipc.RecordBatchStreamWriter | None = None
@@ -349,6 +325,8 @@ class MassassinDirectory:
                 msg = ipc.read_message(fp)
                 batch = ipc.read_record_batch(msg, reader_schema)
                 last_good_position = fp.tell()
+
+                raise NotImplementedError
 
                 df = self.run_recipe(batch).to_arrow()
                 if len(df) == 0:
@@ -427,22 +405,22 @@ class MassassinDirectory:
                 break
 
 
-def main_massassin() -> None:
-    description = "Run a recipe on raw data, either a complete or a live data set"
-    output_help = "write output to this directory, (default: $input_dir/mass)"
+def main_madcow() -> None:
+    description = """Microcalorimeter Analysis Display - Compilation Online Worker.
+Compile MASS results to spectra, either a complete or a live data set. MAD-Dash will display them."""
+    output_help = "write output to this directory, (default: $input_dir)"
 
     parser = argparse.ArgumentParser(description=description)
     # Using type=Path directly parses the string into a Path object
-    parser.add_argument("recipe_file", type=Path, help="the recipe file (saved by Mass2, generally as a *.pkl)")
     parser.add_argument("input_dir", type=Path, help="the directory to watch for raw pulse data")
     parser.add_argument("output_dir", type=Path, nargs="?", default=None, help=output_help)
     # parser.add_argument("-d", "--delayed", action="store_true", help="input contains old data; no need to monitor for new")
 
     args = parser.parse_args()
     if args.output_dir is None:
-        args.output_dir = args.input_dir / "mass"
+        args.output_dir = args.input_dir
 
-    md = MassassinDirectory.open(args.recipe_file, args.input_dir, args.output_dir)
+    md = MadCowDirectory.open(args.input_dir, args.output_dir, Emin=0, Emax=1000.0, Nbins=4000)
 
     # First detect and process unshuffled (single-channel) data. Assume that if any are found, they are all that matters.
     if md.analyze_old_data():
@@ -452,4 +430,4 @@ def main_massassin() -> None:
 
 
 if __name__ == "__main__":
-    main_massassin()
+    main_madcow()
