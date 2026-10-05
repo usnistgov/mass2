@@ -411,6 +411,16 @@ class MassassinDirectory:
                 modified_event.wait(timeout=1.0)
                 modified_event.clear()
 
+    @staticmethod
+    def sort_WAL_file(processed_wal_path: Path) -> None:
+        output_path = str(processed_wal_path.resolve()).replace(".arrows_WAL", ".arrows")
+        tmp_output = output_path.replace(".arrows", ".arrows_TMP")
+        df = pl.read_ipc_stream(processed_wal_path)
+        df = df.sort("channel_number", "subframecount")
+        df.write_ipc_stream(tmp_output)
+        processed_wal_path.unlink()
+        Path(tmp_output).rename(output_path)
+
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
 
@@ -445,6 +455,7 @@ class MassassinDirectory:
                     output_path = self.output_dir / wal_path.name
                     self.analyze_WAL_tail(wal_path, output_path)
                     seqnum += 1
+                    self.sort_WAL_file(output_path)
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
                     # in the moment between our os.path.exists() and our open().
