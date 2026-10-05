@@ -413,13 +413,27 @@ class MassassinDirectory:
 
     @staticmethod
     def sort_WAL_file(processed_wal_path: Path) -> None:
-        output_path = str(processed_wal_path.resolve()).replace(".arrows_WAL", ".arrows")
-        tmp_output = output_path.replace(".arrows", ".arrows_TMP")
+        """Sort the file by channel number first, then subframecount. Write sorted result to a new file with
+        suffix ".arrows". Make sure to write to a temporary file then rename, so that a torn write in the output
+        file never happens.
+
+        Parameters
+        ----------
+        processed_wal_path : Path
+            The Write-Ahead-Log file. Filename must have suffix "arrows_WAL". The resulting sorted file
+            will be the same but with suffix ".arrows"
+        """
+        assert processed_wal_path.suffix == ".arrows_WAL"
+        output_path = processed_wal_path.with_suffix(".arrows")
+        tmp_path = processed_wal_path.with_suffix(".arrows_TMP")
         df = pl.read_ipc_stream(processed_wal_path)
         df = df.sort("channel_number", "subframecount")
-        df.write_ipc_stream(tmp_output)
+
+        # Write the sorted data to a temporary name, then remove the original (unsorted _WAL) file,
+        # then move the sorted data to its final name (`output_path`).
+        df.write_ipc_stream(tmp_path)
         processed_wal_path.unlink()
-        Path(tmp_output).rename(output_path)
+        tmp_path.rename(output_path)
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
