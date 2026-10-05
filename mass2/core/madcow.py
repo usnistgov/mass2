@@ -14,6 +14,22 @@ from .misc import str2channum, chanfile_prefix
 
 
 def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "timestamp") -> pl.DataFrame:
+    """Add experiment state column named "state_label" to a data frame
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        The data frame to be supplemented with state labels
+    df_estate : pl.DataFrame
+        A table of state labels and the times that they start
+    time_col : str, optional
+        The dataframe column name to be used for time-matching, by default "timestamp"
+
+    Returns
+    -------
+    pl.DataFrame
+        The updated `df` now with a "state_label" column
+    """
     # 1. Add a temporary row index to remember the original order
     df = df.with_row_index("__original_order__")
 
@@ -55,6 +71,8 @@ def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
 
 @dataclass(frozen=False)
 class MadCowDirectory:
+    """Object to run MAD-COW on a single data directory"""
+
     input_dir: Path
     output_dir: Path
     expt_state_path: Path
@@ -158,8 +176,8 @@ class MadCowDirectory:
         parquet_file : Path
             File path containing the analyzed pulse data in a Parquet file
         """
-        states_lazy = self.expt_state_df.lazy().sort(time_col)
         print(f"Analzying single-channel {parquet_file.name}")
+        states_lazy = self.expt_state_df.lazy().sort(time_col)
         df_joined = (
             pl.scan_parquet(parquet_file)
             # Remove data that fails cuts
@@ -170,22 +188,28 @@ class MadCowDirectory:
             .select(["energy1", "state_label"])
             .collect()
         )
+        self.update_histograms(df_joined)
 
-        category_dfs = df_joined.partition_by("state_label", as_dict=True)
-        all_states_hist = np.zeros(self.Nbins, dtype=int)
+    def update_histograms(self, df_joined: pl.DataFrame) -> None:
+        fixed_E_bins = np.linspace(self.Emin, self.Emax, 1 + self.Nbins)
+        hist_by_channel = df_joined.group_by("channel_number").agg(pl.col("energy1").hist(fixed_E_bins).alias("hist"))
+        hist_by_state = df_joined.group_by("state_label").agg(pl.col("energy1").hist(fixed_E_bins).alias("hist"))
 
-        for category_names, sub_df in category_dfs.items():
-            category_name = category_names[0]
-            if not category_name:
-                continue
-            assert isinstance(category_name, str), f"{category_name=}"
-            if category_name not in self.state_spectra:
-                self.state_spectra[category_name] = np.zeros(self.Nbins, dtype=int)
-            data_array = sub_df.get_column("energy1").to_numpy()
-            contents, _ = np.histogram(data_array, self.Nbins, (self.Emin, self.Emax))
-            self.state_spectra[category_name] += contents
-            all_states_hist += contents
-        self.chan_spectra[channum] = all_states_hist
+        for row in hist_by_channel.iter_rows(named=True):
+            channum = row["channel_number"]
+            histogram = np.array(row["hist"])
+            if channum in self.chan_spectra:
+                self.chan_spectra[channum] += histogram
+            else:
+                self.chan_spectra[channum] = histogram
+
+        for row in hist_by_state.iter_rows(named=True):
+            state = row["state_label"]
+            histogram = np.array(row["hist"])
+            if state in self.state_spectra:
+                self.state_spectra[state] += histogram
+            else:
+                self.state_spectra[state] = histogram
 
     def analyze_old_data(self) -> bool:
         """Analyze "old data", meaning data that has already been unshuffled into single-channel files.
@@ -205,9 +229,10 @@ class MadCowDirectory:
             assert channum is not None, f"could not parse channel number from file {parquet_file=}"
             self.process_singlechan(parquet_file, channum)
 
-        print("Yo!")
-        print(self.state_spectra.keys())
+        self.write_histograms()
+        return True
 
+    def write_histograms(self) -> None:
         dfs = pl.DataFrame(
             {
                 "state_label": list(self.state_spectra.keys()),
@@ -224,26 +249,31 @@ class MadCowDirectory:
             schema={"channel_number": pl.Int32, "spectra": pl.Array(pl.Int32, self.Nbins)},
         )
         dfc.write_ipc(self.output_dir / "channel_spectra.arrow")
-        return True
 
-    def process_one_allchan_file(self, ipc_file: str | Path, output: Path) -> None:
+    def process_one_allchan_file(self, ipc_file: Path, output: Path, time_col: str = "timestamp") -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
         ----------
-        recipe : mass2.core.Recipe
-            The recipe to run on the raw data
-        ipc_file : str
+        ipc_file : Path
             File path containing the raw pulse data in an Arrow IPC feather file
         output : Path
             File path for writing the output dataframe, as Parquet.
         """
-        raise NotImplementedError
-        input = Path(ipc_file)
-        print(f"Analzying all-channel {input.name}")
-        df_in = pl.read_ipc_stream(input)
-        df = self.run_recipe(df_in)
-        df.write_ipc_stream(output)
+        print(f"Analzying all-channel {ipc_file.name}")
+        states = self.expt_state_df.sort(time_col)
+        df = pl.read_ipc_stream(ipc_file)
+        df = attach_tz_to_naive_column(df, time_col, "UTC")
+
+        df = (
+            # Sort by the join key (timestamp), or tell Polars that they already ARE sorted. In this case, the former.
+            df.filter(pl.col("good"))
+            .select(["channel_number", time_col, "energy1"])
+            .with_columns(pl.col(time_col).sort())
+            .join_asof(states, on=time_col, strategy="backward")
+            .drop(time_col)
+        )
+        self.update_histograms(df)
 
     def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
         with open(wal_path, "rb") as fp:
@@ -341,6 +371,7 @@ class MadCowDirectory:
                 print(f"[{seqnum:04d}] Analyzing finalized file: {finalized_path}")
                 output_path = self.output_dir / finalized_path.name
                 self.process_one_allchan_file(finalized_path, output_path)
+                self.write_histograms()
                 seqnum += 1
                 continue  # Immediately jump to the next sequence number
 
