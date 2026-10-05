@@ -1,10 +1,8 @@
 import argparse
-import glob
 import numpy as np
 import polars as pl
 import pyarrow as pa
 from pyarrow import ipc
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,6 +10,7 @@ from numpy.typing import NDArray
 from typing import cast, BinaryIO
 
 from .massassin import load_expt_state_df, attach_tz_to_naive_column
+from .misc import str2channum, chanfile_prefix
 
 
 def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "timestamp") -> pl.DataFrame:
@@ -32,21 +31,21 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
 
 
 def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
-    inputs_sortedP = glob.glob(str(input_dir / "*_chan*.parquet"))
+    inputs_sortedP = list(input_dir.glob("*_chan*.parquet"))
     if len(inputs_sortedP) > 0:
         lf = pl.scan_parquet(inputs_sortedP[0])
         dtype = lf.collect_schema()["timestamp"]
         dtype = cast(pl.Datetime, dtype)
         return default_tz if dtype.time_zone is None else str(dtype.time_zone)
 
-    inputs_sortedA = glob.glob(str(input_dir / "*_chan*.arrow"))
+    inputs_sortedA = list(input_dir.glob("*_chan*.arrow"))
     if len(inputs_sortedA) > 0:
         lf = pl.scan_ipc(inputs_sortedA[0])
         dtype = lf.collect_schema()["timestamp"]
         dtype = cast(pl.Datetime, dtype)
         return default_tz if dtype.time_zone is None else str(dtype.time_zone)
 
-    inputs_unsorted = glob.glob(str(input_dir / "*.arrows*"))
+    inputs_unsorted = list(input_dir.glob("*.arrows*"))
     if len(inputs_unsorted) > 0:
         with pa.ipc.open_stream(inputs_unsorted[0]) as reader:
             tz = reader.schema.field("timestamp").type.tz
@@ -92,8 +91,11 @@ class MadCowDirectory:
         input_dir = Path(input_dir)
         target_time_zone = raw_arrows_timezone(input_dir)
 
-        state_files = glob.glob(str(input_dir / "*_experiment_state.txt"))
-        assert len(state_files) > 0, f"found no experiment state file in {input_dir}"
+        state_files = list(input_dir.glob("*_experiment_state.txt"))
+        parent_state_files = list(input_dir.parent.glob("*_experiment_state.txt"))
+        assert len(state_files) + len(parent_state_files) > 0, f"found no experiment state file in {input_dir} or its parent"
+        if len(state_files) == 0:
+            state_files = parent_state_files
         assert len(state_files) == 1, f"found {len(state_files)} '*_experiment_state.txt' files in {input_dir}, want exactly 1"
         expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
         md = cls(Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df, Emin, Emax, Nbins)
@@ -119,22 +121,21 @@ class MadCowDirectory:
         input_dir = self.input_dir
         assert input_dir.exists(), f"{input_dir=} does not exist"
         assert input_dir.is_dir(), f"{input_dir=} is not a directory"
-        onechan_files = glob.glob(str(input_dir / "*_chan*.parquet"))
+        onechan_files = list(input_dir.glob("*_chan*.parquet"))
         if len(onechan_files) > 0:
             f = Path(onechan_files[0])
-            stem = f.stem
-            matches = re.search(r"^(.*)_chan\d+$", stem)
-            assert matches, f"did not find pattern *_chan[digits] in file stem {stem}"
-            self.file_prefix = matches.group(1)
+            prefix = chanfile_prefix(f)
+            assert prefix, f"did not find pattern *_chan[digits] in file {f}"
+            self.file_prefix = prefix
             return
 
-        arrow_files = glob.glob(str(input_dir / "*.arrow*"))
+        arrow_files = list(input_dir.glob("*.arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
         f = Path(arrow_files[0])
-        stem = f.stem
-        matches = re.search(r"^(.*)_\d+$", stem)
-        assert matches, f"did not find pattern *_[digits] in file stem {stem}"
-        self.file_prefix = matches.group(1)
+        prefix = chanfile_prefix(f)
+        assert prefix, f"did not find pattern *_chan[digits] in file {f}"
+        self.file_prefix = prefix
+        return
 
     def validate_output(self) -> None:
         """Ensure that the given output directory exists or can be created.
@@ -149,19 +150,18 @@ class MadCowDirectory:
         assert output_dir.exists(), f"{output_dir=} could not be made"
         assert output_dir.is_dir(), f"{output_dir=} is not a directory"
 
-    def process_singlechan(self, parquet_file: str, channum: int, time_col: str = "timestamp") -> None:
+    def process_singlechan(self, parquet_file: Path, channum: int, time_col: str = "timestamp") -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
         ----------
-        parquet_file : str
+        parquet_file : Path
             File path containing the analyzed pulse data in a Parquet file
         """
         states_lazy = self.expt_state_df.lazy().sort(time_col)
-        input = Path(parquet_file)
-        print(f"Analzying single-channel {input.name}")
+        print(f"Analzying single-channel {parquet_file.name}")
         df_joined = (
-            pl.scan_parquet(input)
+            pl.scan_parquet(parquet_file)
             # Remove data that fails cuts
             .filter(pl.col("good"))
             # Sort by the join key (timestamp), or tell Polars that they already ARE sorted. In this case, the latter
@@ -195,14 +195,14 @@ class MadCowDirectory:
         bool
             Whether an old data set was found, and analyzed
         """
-        per_chan_files = glob.glob(str(self.input_dir / "*_chan*.parquet"))
+        per_chan_files = list(self.input_dir.glob("*_chan*.parquet"))
         if len(per_chan_files) == 0:
             return False
 
         # Analyze the spectra
         for parquet_file in per_chan_files:
-            channum = self.channum(parquet_file)
-            assert channum >= 0, f"could not parse channel number from file {parquet_file=}"
+            channum = str2channum(parquet_file)
+            assert channum, f"could not parse channel number from file {parquet_file=}"
             self.process_singlechan(parquet_file, channum)
 
         print("Yo!")
@@ -244,26 +244,6 @@ class MadCowDirectory:
         df_in = pl.read_ipc_stream(input)
         df = self.run_recipe(df_in)
         df.write_ipc_stream(output)
-
-    @staticmethod
-    def channum(name: str) -> int:
-        """Find channel number given a string of a certain pattern
-
-        Parameters
-        ----------
-        name : str
-            Search this string for ending in *chan{digits}
-
-        Returns
-        -------
-        int
-            The digits embedded in the string name
-        """
-        stem = Path(name).stem
-        match = re.search(r".*chan(\d+)$", stem)
-        if match:
-            return int(match.group(1))
-        return -1
 
     def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
         with open(wal_path, "rb") as fp:

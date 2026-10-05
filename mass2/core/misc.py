@@ -10,6 +10,7 @@ import pylab as plt
 import polars as pl
 import dill
 import pathlib
+import re
 import subprocess
 import sys
 import marimo as mo
@@ -135,6 +136,46 @@ def plot_a_vs_b_series(a: pl.Series, b: pl.Series, axis: plt.Axes | None = None,
     axis.plot(a, b, ".", label=b.name, **plotkwarg)
     axis.set_xlabel(a.name)
     axis.set_ylabel(b.name)
+
+
+def str2channum(filename: str | Path) -> int | None:
+    """Find the channel number in a filename, of form *_chan{channum}.*
+
+    Parameters
+    ----------
+    filename : str
+        Search the stem of this string for ending in *chan{digits}
+
+    Returns
+    -------
+    int | None
+        The channel number, or None if cannot be computed
+    """
+    stem = Path(filename).stem
+    match = re.search(r".*chan(\d+)$", stem)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def chanfile_prefix(filename: str | Path) -> str | None:
+    """Find the Dastard prefix for a file of the form {prefix}_chan{digits}.{suffix}
+
+    Parameters
+    ----------
+    filename : str | Path
+        Filename to analyize
+
+    Returns
+    -------
+    str | None
+        The prefix, or None if cannot be computed
+    """
+    stem = Path(filename).stem
+    matches = re.search(r"^(.*)_chan\d+$", stem)
+    if not matches:
+        return None
+    return matches.group(1)
 
 
 def launch_examples() -> None:

@@ -3,7 +3,6 @@ import pickle
 import polars as pl
 import pyarrow as pa
 from pyarrow import ipc
-import re
 import time
 import threading
 from watchdog.observers import Observer
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import cast, BinaryIO
 
 import mass2
+from .misc import str2channum, chanfile_prefix
 
 
 ARROW_EOS_MARKER = b"\xff\xff\xff\xff\x00\x00\x00\x00"  # End-of-stream marker (8 bytes long)
@@ -216,19 +216,18 @@ class MassassinDirectory:
         onechan_files = list(input_dir.glob("*_chan*.arrow"))
         if len(onechan_files) > 0:
             f = onechan_files[0]
-            stem = f.stem
-            matches = re.search(r"^(.*)_chan\d+$", stem)
-            assert matches, f"did not find pattern *_chan[digits] in file stem {stem}"
-            self.file_prefix = matches.group(1)
+            prefix = chanfile_prefix(f)
+            assert prefix, f"did not find pattern *_chan[digits] in file {f}"
+            self.file_prefix = prefix
             return
 
         arrow_files = list(input_dir.glob("*.arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
         f = arrow_files[0]
-        stem = f.stem
-        matches = re.search(r"^(.*)_\d+$", stem)
-        assert matches, f"did not find pattern *_[digits] in file stem {stem}"
-        self.file_prefix = matches.group(1)
+        prefix = chanfile_prefix(f)
+        assert prefix, f"did not find pattern *_chan[digits] in file {f}"
+        self.file_prefix = prefix
+        return
 
     def validate_output(self) -> None:
         """Ensure that the given output directory exists or can be created.
@@ -275,7 +274,7 @@ class MassassinDirectory:
             return False
 
         for ipc_file in per_chan_files:
-            channum = self.channum(ipc_file.name)
+            channum = str2channum(ipc_file.name)
             assert channum, f"could not parse channel number from file {ipc_file=}"
             name = Path(ipc_file).stem + ".parquet"
             output = self.output_dir / name
@@ -336,14 +335,6 @@ class MassassinDirectory:
         df_in = pl.read_ipc_stream(input)
         df = self.run_recipe(df_in)
         df.write_ipc_stream(output)
-
-    @staticmethod
-    def channum(name: str) -> int | None:
-        stem = Path(name).stem
-        match = re.search(r".*chan(\d+)$", stem)
-        if match:
-            return int(match.group(1))
-        return None
 
     def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
         # Set up the threading event and Watchdog observer
