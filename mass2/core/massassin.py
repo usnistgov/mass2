@@ -5,6 +5,9 @@ import pyarrow as pa
 from pyarrow import ipc
 import re
 import time
+import threading
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast, BinaryIO
@@ -16,6 +19,20 @@ ARROW_EOS_MARKER = b"\xff\xff\xff\xff\x00\x00\x00\x00"  # End-of-stream marker (
 
 
 def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
+    """Run a Mass2 recipe on the given dataframe
+
+    Parameters
+    ----------
+    recipe : mass2.core.Recipe
+        The recipe to run
+    raw_df : pl.DataFrame
+        The data to process
+
+    Returns
+    -------
+    pl.DataFrame
+        Result of the recipe run on `raw_df`
+    """
     outputs = [
         "good",
         "timestamp",
@@ -129,6 +146,28 @@ RECIPE_OUTPUTS = (
     "5lagy",
     "energy1",
 )
+
+
+class FileModifiedHandler(FileSystemEventHandler):
+    """An event handler to set a threading event when a specified file is modified."""
+
+    def __init__(self, target_file: Path, modified_event: threading.Event):
+        """Initialize the event handler
+
+        Parameters
+        ----------
+        target_file : Path
+            File that will be watched
+        modified_event : threading.Event
+            The event to handle
+        """
+        self.target_file = target_file.resolve()
+        self.modified_event = modified_event
+
+    def on_modified(self, event: FileSystemEvent) -> None:
+        # Trigger the event only if the modified file is the exact file we are watching
+        if Path(str(event.src_path)).resolve() == self.target_file:
+            self.modified_event.set()
 
 
 @dataclass(frozen=False)
@@ -307,20 +346,32 @@ class MassassinDirectory:
         return None
 
     def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
-        with open(wal_path, "rb") as fp:
-            try:
-                reader = ipc.RecordBatchStreamReader(fp)
-                reader_schema = reader.schema
-            except pa.ArrowInvalid:
-                print("File is too new, schema not written yet.")
-                return
+        # Set up the threading event and Watchdog observer
+        modified_event = threading.Event()
+        event_handler = FileModifiedHandler(wal_path, modified_event)
+        observer = Observer()
+        # Watch the parent directory, since Watchdog monitors directories, not files
+        observer.schedule(event_handler, path=str(wal_path.parent), recursive=False)
+        observer.start()
 
-            with open(output_path, "wb") as outp:
-                # Pass work off to a new method, simply to unindent by 2 levels.
-                self._analyze_open_WAL(fp, outp, reader_schema)
+        try:
+            with open(wal_path, "rb") as fp:
+                try:
+                    reader = ipc.RecordBatchStreamReader(fp)
+                    reader_schema = reader.schema
+                except pa.ArrowInvalid:
+                    print("File is too new, schema not written yet.")
+                    return
 
-    def _analyze_open_WAL(self, fp: BinaryIO, outp: BinaryIO, reader_schema: pa.schema) -> None:
-        FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
+                with open(output_path, "wb") as outp:
+                    # Pass work off to a new method, simply to unindent by 2 levels.
+                    self._analyze_open_WAL(fp, outp, reader_schema, modified_event)
+        finally:
+            # Ensure the background thread is cleaned up when the file is finalized
+            observer.stop()
+            observer.join()
+
+    def _analyze_open_WAL(self, fp: BinaryIO, outp: BinaryIO, reader_schema: pa.schema, modified_event: threading.Event) -> None:
         last_good_position = fp.tell()
         writer: ipc.RecordBatchStreamWriter | None = None
 
@@ -333,7 +384,10 @@ class MassassinDirectory:
             if len(header) < 8:
                 # Physical EOF (len=0): DAQ hasn't written the next batch or EOF yet, or
                 # Torn Write (0<len<8): DAQ is not finished writing the batch or EOF.
-                time.sleep(FILE_POLL_TIME)
+                # Wait for watchdog to signal new data, then clear the flag
+                # Here and below, the 1-second timeout is a failsafe in case watchdog misses an event.
+                modified_event.wait(timeout=1.0)
+                modified_event.clear()
                 continue
 
             if header == ARROW_EOS_MARKER:
@@ -341,8 +395,8 @@ class MassassinDirectory:
                 print("Received EOS marker. Stream finalized.")
                 break
 
-            # If it is not the EOS marker, it's a real batch (either complete or partial).
-            # Rewind the pointer exactly 8 bytes so PyArrow can parse it normally.
+            # If the next 8 bytes are not the EOS marker, it's a real batch (either complete or partial).
+            # Rewind the pointer so PyArrow can parse as a normal batch.
             fp.seek(last_good_position)
 
             try:
@@ -362,7 +416,9 @@ class MassassinDirectory:
             except pa.ArrowInvalid:
                 # Torn Write: The header was complete, but the payload data
                 # hasn't finished flushing to the disk yet.
-                time.sleep(FILE_POLL_TIME)
+                # Wait for payload to finish flushing to disk
+                modified_event.wait(timeout=1.0)
+                modified_event.clear()
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
@@ -398,8 +454,8 @@ class MassassinDirectory:
                     seqnum += 1
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
-                    # in the microsecond between our os.path.exists() and our open().
-                    # We catch it, ignore it, and let the loop restart to catch it as Phase 1!
+                    # in the moment between our os.path.exists() and our open().
+                    # We catch it, ignore it, and let the loop restart to find it in Phase 1!
                     pass
                 continue
 
