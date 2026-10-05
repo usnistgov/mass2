@@ -158,8 +158,8 @@ def str2channum(filename: str | Path) -> int | None:
     return None
 
 
-def chanfile_prefix(filename: str | Path) -> str | None:
-    """Find the Dastard prefix for a file of the form {prefix}_chan{digits}.{suffix}
+def chanfile_prefix(filename: str | Path, chantext: str = "chan") -> str | None:
+    """Find the Dastard prefix for a file of the form {prefix}_{chantext}{digits}.{suffix}
 
     Parameters
     ----------
@@ -172,7 +172,7 @@ def chanfile_prefix(filename: str | Path) -> str | None:
         The prefix, or None if cannot be computed
     """
     stem = Path(filename).stem
-    matches = re.search(r"^(.*)_chan\d+$", stem)
+    matches = re.search(rf"^(.*)_{chantext}\d+$", stem)
     if not matches:
         return None
     return matches.group(1)

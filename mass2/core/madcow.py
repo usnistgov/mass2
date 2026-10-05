@@ -132,7 +132,7 @@ class MadCowDirectory:
         arrow_files = list(input_dir.glob("*.arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
         f = Path(arrow_files[0])
-        prefix = chanfile_prefix(f)
+        prefix = chanfile_prefix(f, chantext="")
         assert prefix, f"did not find pattern *_chan[digits] in file {f}"
         self.file_prefix = prefix
         return
@@ -202,7 +202,7 @@ class MadCowDirectory:
         # Analyze the spectra
         for parquet_file in per_chan_files:
             channum = str2channum(parquet_file)
-            assert channum, f"could not parse channel number from file {parquet_file=}"
+            assert channum is not None, f"could not parse channel number from file {parquet_file=}"
             self.process_singlechan(parquet_file, channum)
 
         print("Yo!")

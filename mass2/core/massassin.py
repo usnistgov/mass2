@@ -224,8 +224,8 @@ class MassassinDirectory:
         arrow_files = list(input_dir.glob("*.arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
         f = arrow_files[0]
-        prefix = chanfile_prefix(f)
-        assert prefix, f"did not find pattern *_chan[digits] in file {f}"
+        prefix = chanfile_prefix(f, chantext="")
+        assert prefix, f"did not find pattern *_[digits] in file {f}"
         self.file_prefix = prefix
         return
 
@@ -275,8 +275,8 @@ class MassassinDirectory:
 
         for ipc_file in per_chan_files:
             channum = str2channum(ipc_file.name)
-            assert channum, f"could not parse channel number from file {ipc_file=}"
-            name = Path(ipc_file).stem + ".parquet"
+            assert channum is not None, f"could not parse channel number from file {ipc_file=}"
+            name = ipc_file.stem + ".parquet"
             output = self.output_dir / name
             if channum not in self.recipes:
                 print(f"   found no recipe to match chan {channum}, file '{ipc_file}'")
@@ -413,8 +413,6 @@ class MassassinDirectory:
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
-
-        # TODO set up watchdog for expt state file, to re-generate the expt state dataframe.
 
         seqnum = 0
         FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
