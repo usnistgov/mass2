@@ -417,7 +417,11 @@ class MassassinDirectory:
         seqnum = 0
         FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
         MAX_WAIT_TIME = 10.0  # wait this many seconds for the next file to exist before giving up.
+        dircomplete_path = self.input_dir / "COMPLETE"
         while True:
+            if dircomplete_path.exists():
+                break
+
             # Compute the filename for this sequence number, whether finalized or in progress
             finalized_path = self.input_dir / f"{self.file_prefix}_{seqnum:04d}.arrows"
             wal_path = self.input_dir / f"{self.file_prefix}_{seqnum:04d}.arrows_WAL"
@@ -459,8 +463,7 @@ class MassassinDirectory:
 
             while time.time() - start_wait < MAX_WAIT_TIME:
                 # Check if either the WAL or a finalized file popped into existence
-                # TODO there might be a kind of flag to tell us there won't be a next file, so we can stop waiting.
-                if wal_path.exists() or finalized_path.exists():
+                if wal_path.exists() or finalized_path.exists() or dircomplete_path.exists():
                     found = True
                     break
 
@@ -471,6 +474,8 @@ class MassassinDirectory:
             if not found:
                 print(f"[{seqnum:04d}] Timeout: No new file appeared within {MAX_WAIT_TIME} seconds. Shutting down.")
                 break
+
+        (self.output_dir / "COMPLETE").touch(mode=0o644)
 
 
 def main_massassin() -> None:
