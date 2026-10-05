@@ -3,7 +3,6 @@ Create a starter Marimo notebook for mass2 analysis, based on a template.
 """
 
 import argparse
-import glob
 import os
 import subprocess
 from pathlib import Path
@@ -12,7 +11,7 @@ import importlib.resources as pkg_resources
 TEMPLATE_NAME = "notebook_starter_template.py"
 
 
-def create_notebook(data_dir: str | Path, notebook_name: str) -> None:
+def create_notebook(data_dir: Path, notebook_name: str) -> None:
     """Create a notebook file from a template, finding data from the data directory."""
     if os.path.exists(notebook_name):
         raise OSError(f"output notebook {notebook_name} exists")
@@ -26,8 +25,8 @@ def create_notebook(data_dir: str | Path, notebook_name: str) -> None:
         fp.write(output_text)
 
 
-def has_ipc_data(data_dir: str | Path) -> bool:
-    arrow_files = glob.glob(f"{data_dir}/*_chan*.arrow")
+def has_ipc_data(data_dir: Path) -> bool:
+    arrow_files = list(data_dir.glob("*_chan*.arrow"))
     return len(arrow_files) > 0
 
 

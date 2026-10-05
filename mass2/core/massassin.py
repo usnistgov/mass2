@@ -1,5 +1,4 @@
 import argparse
-import glob
 import pickle
 import polars as pl
 import pyarrow as pa
@@ -11,6 +10,9 @@ from pathlib import Path
 from typing import cast, BinaryIO
 
 import mass2
+
+
+ARROW_EOS_MARKER = b"\xff\xff\xff\xff\x00\x00\x00\x00"  # End-of-stream marker (8 bytes long)
 
 
 def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
@@ -62,7 +64,7 @@ def attach_tz_to_naive_column(df: pl.DataFrame, time_col: str, new_tz: str) -> p
     return df
 
 
-def load_expt_state_df(expt_state_file: str, target_time_zone: str) -> pl.DataFrame:
+def load_expt_state_df(expt_state_file: Path, target_time_zone: str) -> pl.DataFrame:
     """Load the experiment state file as a small DataFrame
 
     Parameters
@@ -103,8 +105,8 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
 
 
 def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
-    inputs_sorted = glob.glob(str(input_dir / "*_chan*.arrow"))
-    inputs_unsorted = glob.glob(str(input_dir / "*.arrows*"))
+    inputs_sorted = list(input_dir.glob("*_chan*.arrow"))
+    inputs_unsorted = list(input_dir.glob("*.arrows*"))
     if len(inputs_sorted) > 0:
         lf = pl.scan_ipc(inputs_sorted[0])
         dtype = lf.collect_schema()["timestamp"]
@@ -147,7 +149,7 @@ class MassassinDirectory:
         input_dir = Path(input_dir)
         target_time_zone = raw_arrows_timezone(input_dir)
 
-        state_files = glob.glob(str(input_dir / "*_experiment_state.txt"))
+        state_files = list(input_dir.glob("*_experiment_state.txt"))
         assert len(state_files) > 0, f"found no experiment state file in {input_dir}"
         assert len(state_files) == 1, f"found {len(state_files)} '*_experiment_state.txt' files in {input_dir}, want exactly 1"
         expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
@@ -172,18 +174,18 @@ class MassassinDirectory:
         input_dir = self.input_dir
         assert input_dir.exists(), f"{input_dir=} does not exist"
         assert input_dir.is_dir(), f"{input_dir=} is not a directory"
-        onechan_files = glob.glob(str(input_dir / "*_chan*.arrow"))
+        onechan_files = list(input_dir.glob("*_chan*.arrow"))
         if len(onechan_files) > 0:
-            f = Path(onechan_files[0])
+            f = onechan_files[0]
             stem = f.stem
             matches = re.search(r"^(.*)_chan\d+$", stem)
             assert matches, f"did not find pattern *_chan[digits] in file stem {stem}"
             self.file_prefix = matches.group(1)
             return
 
-        arrow_files = glob.glob(str(input_dir / "*.arrow*"))
+        arrow_files = list(input_dir.glob("*.arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
-        f = Path(arrow_files[0])
+        f = arrow_files[0]
         stem = f.stem
         matches = re.search(r"^(.*)_\d+$", stem)
         assert matches, f"did not find pattern *_[digits] in file stem {stem}"
@@ -203,7 +205,7 @@ class MassassinDirectory:
         assert output_dir.exists(), f"{output_dir=} could not be made"
         assert output_dir.is_dir(), f"{output_dir=} is not a directory"
 
-    def process_singlechan(self, recipe: mass2.core.Recipe, ipc_file: str, output: Path) -> None:
+    def process_singlechan(self, recipe: mass2.core.Recipe, ipc_file: Path, output: Path) -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
         Parameters
@@ -215,9 +217,8 @@ class MassassinDirectory:
         output : Path
             File path for writing the output dataframe, as Parquet.
         """
-        input = Path(ipc_file)
-        print(f"Analzying single-channel {input.name}")
-        df_in = pl.read_ipc(input, memory_map=True)
+        print(f"Analzying single-channel {ipc_file.name}")
+        df_in = pl.read_ipc(ipc_file, memory_map=True)
         df = run_recipe(recipe, df_in)
         df = add_expt_state(df, self.expt_state_df)
         df.write_parquet(output)
@@ -230,20 +231,20 @@ class MassassinDirectory:
         bool
             Whether an old data set was found, and analyzed
         """
-        per_chan_files = glob.glob(str(self.input_dir / "*_chan*.arrow"))
+        per_chan_files = list(self.input_dir.glob("*_chan*.arrow"))
         if len(per_chan_files) == 0:
             return False
 
         for ipc_file in per_chan_files:
-            channum = self.channum(ipc_file)
-            assert channum >= 0, f"could not parse channel number from file {ipc_file=}"
+            channum = self.channum(ipc_file.name)
+            assert channum, f"could not parse channel number from file {ipc_file=}"
             name = Path(ipc_file).stem + ".parquet"
             output = self.output_dir / name
-            try:
-                recipe = self.recipes[channum]
-            except KeyError:
+            if channum not in self.recipes:
                 print(f"   found no recipe to match chan {channum}, file '{ipc_file}'")
-                pass
+                continue
+
+            recipe = self.recipes[channum]
             self.process_singlechan(recipe, ipc_file, output)
 
         return True
@@ -298,12 +299,12 @@ class MassassinDirectory:
         df.write_ipc_stream(output)
 
     @staticmethod
-    def channum(name: str) -> int:
+    def channum(name: str) -> int | None:
         stem = Path(name).stem
         match = re.search(r".*chan(\d+)$", stem)
         if match:
             return int(match.group(1))
-        return -1
+        return None
 
     def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
         with open(wal_path, "rb") as fp:
@@ -335,7 +336,7 @@ class MassassinDirectory:
                 time.sleep(FILE_POLL_TIME)
                 continue
 
-            if header == b"\xff\xff\xff\xff\x00\x00\x00\x00":
+            if header == ARROW_EOS_MARKER:
                 # FOUND THE EOS MARKER! The DAQ closed the file cleanly.
                 print("Received EOS marker. Stream finalized.")
                 break
