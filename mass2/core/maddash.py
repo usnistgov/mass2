@@ -41,7 +41,7 @@ LOG_LINEAR_BUTTONS = [
     )
 ]
 
-DEFAULT_LAYOUT = dict(
+DEFAULT_LAYOUT: dict[str, Any] = dict(
     xaxis=dict(title="Energy (eV)", range=[0, 1000]),
     yaxis=dict(title="Intensity", type="linear"),
     template="plotly_dark",
@@ -118,12 +118,12 @@ def update_dashboard(
         for row in df_chan.iter_rows(named=True):
             channel_num: Any = row.get("channel_number", "Unknown")
             chan_spectra_data: list[float] = row.get("spectra", [])
-            events: int = int(row.get("events", sum(chan_spectra_data)))
+            events2: int = int(row.get("events", sum(chan_spectra_data)))
 
             label_str = str(channel_num)
             trace_name = label_str if "Chan" in label_str else f"Chan {label_str}"
 
-            fig_chan.add_trace(go.Scatter(x=X_ENERGY, y=chan_spectra_data, mode="lines", name=f"{trace_name} ({events:,} events)"))
+            fig_chan.add_trace(go.Scatter(x=X_ENERGY, y=chan_spectra_data, mode="lines", name=f"{trace_name} ({events2:,} events2)"))
 
     if chan_fig and "layout" in chan_fig:
         fig_chan.update_layout(**chan_fig["layout"])
