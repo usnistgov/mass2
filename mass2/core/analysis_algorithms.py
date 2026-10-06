@@ -267,25 +267,26 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     passed in as <indicator>.)
     """
     uncorrected = np.asarray(uncorrected)
-    indicator = np.array(indicator)  # make a copy
-    ptm_offset = np.median(indicator)
-    indicator -= ptm_offset
+    indicatorA: NDArray = np.array(indicator)
+    ptm_offset = np.median(indicatorA)
+    indicatorA -= ptm_offset
 
     if limit is None:
         pct99 = float(np.percentile(uncorrected, 99))
         limit = 1.25 * pct99
 
-    smoother = HistogramSmoother(0.5, [0, limit])
+    assert limit is not None
+    smoother = HistogramSmoother(0.5, (0, limit))
     assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
-    def entropy(param: NDArray, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
+    def entropy(param: float, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
         """Return the entropy of the drift-corrected values"""
         corrected = uncorrected * (1 + indicator * param)
         hsmooth = smoother(corrected)
         w = hsmooth > 0
         return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
 
-    drift_corr_param = sp.optimize.brent(entropy, (indicator, uncorrected, smoother), brack=[0, 0.001])
+    drift_corr_param = sp.optimize.brent(entropy, (indicatorA, uncorrected, smoother), brack=[0, 0.001])
 
     drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
     return drift_corr_param, drift_correct_info
