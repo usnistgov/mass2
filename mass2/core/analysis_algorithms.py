@@ -10,10 +10,10 @@ Created on Jun 9, 2014
 """
 
 import numpy as np
+import scipy as sp
 from numpy.typing import NDArray, ArrayLike
 from typing import Any
 from collections.abc import Callable
-import scipy as sp
 from numba import njit
 
 from mass2.mathstat.entropy import laplace_entropy
@@ -184,11 +184,11 @@ class HistogramSmoother:
     that histogram, we can smooth multiple histograms with the same geometry.
     """
 
-    def __init__(self, smooth_sigma: float, limits: ArrayLike):
+    def __init__(self, smooth_sigma: float, limits: tuple[float, float]):
         """Give the smoothing Gaussian's width as <smooth_sigma> and the
         [lower,upper] histogram limits as <limits>."""
 
-        self.limits = tuple(np.asarray(limits, dtype=float))
+        self.limits = limits
         self.smooth_sigma = smooth_sigma
 
         # Choose a reasonable # of bins, at least 1024 and a power of 2
@@ -203,7 +203,7 @@ class HistogramSmoother:
         nbins_forced_to_power_of_2 = 1 << (clamped_nbins.bit_length())
         # if nbins_forced_to_power_of_2 == max_nbins:
         #     print(f"Warning: HistogramSmoother (for drift correct) Limiting histogram bins to {max_nbins} (requested {nbins_guess})")
-        self.nbins = nbins_forced_to_power_of_2
+        self.nbins = int(nbins_forced_to_power_of_2)
         self.stepsize = dlimits / self.nbins
 
         # Compute the Fourier-space smoothing kernel
@@ -214,7 +214,7 @@ class HistogramSmoother:
 
     def __call__(self, values: ArrayLike) -> NDArray:
         """Return a smoothed histogram of the data vector <values>"""
-        contents, _ = np.histogram(values, self.nbins, self.limits)
+        contents, _ = np.histogram(values, bins=self.nbins, range=self.limits)
         ftc = np.fft.rfft(contents)
         csmooth = np.fft.irfft(self.kernel_ft * ftc)
         csmooth[csmooth < 0] = 0
@@ -239,7 +239,7 @@ def make_smooth_histogram(values: ArrayLike, smooth_sigma: float, limit: float, 
     """
     if upper_limit is None:
         limit, upper_limit = 0, limit
-    return HistogramSmoother(smooth_sigma, [limit, upper_limit])(values)
+    return HistogramSmoother(smooth_sigma, (limit, upper_limit))(values)
 
 
 def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None) -> tuple[float, dict]:

@@ -74,7 +74,8 @@ def test_bens_data():
     path = current_dir / "parquets" / "dc_test_from_bens_data_20260209.parquet"
     df = pl.read_parquet(path)
     df = df.with_columns(df.select(peak_value_f=pl.col("peak_value") * 1.0))
-    # dc = mass2.core.drift_correct(indicator=df["rel_sec"].to_numpy(), uncorrected=df["peak_value"].to_numpy())
+    dc = mass2.core.drift_correct(indicator=df["rel_sec"].to_numpy(), uncorrected=df["peak_value"].to_numpy())
+    print(dc)
     ch = channel_from_df(df)
     ch = ch.driftcorrect(indicator_col="rel_sec", uncorrected_col="peak_value", corrected_col="peak_value_dc")
 
