@@ -278,7 +278,7 @@ class MadCowDirectory:
         )
         self.update_histograms(df)
 
-    def analyze_WAL_tail(self, wal_path: Path) -> None:
+    def analyze_WAL_tail(self, wal_path: Path) -> bool:
         modified_event = threading.Event()
         event_handler = FileModifiedHandler(wal_path, modified_event)
         observer = Observer()
@@ -292,10 +292,11 @@ class MadCowDirectory:
                     reader_schema = reader.schema
                 except pa.ArrowInvalid:
                     print("File is too new, schema not written yet.")
-                    return
+                    return False
 
                 # Pass the modified_event into the processing loop
                 self._analyze_open_WAL(fp, reader_schema, modified_event, wal_path)
+                return True
         finally:
             observer.stop()
             observer.join()
@@ -388,14 +389,16 @@ class MadCowDirectory:
             if wal_path.exists():
                 print(f"[{seqnum:04d}] Analyzing WAL       file: {wal_path}")
                 try:
-                    self.analyze_WAL_tail(wal_path)
-                    self.write_histograms()
-                    seqnum += 1
+                    success = self.analyze_WAL_tail(wal_path)
+                    if success:
+                        self.write_histograms()
+                        seqnum += 1
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
                     # in the microsecond between our os.path.exists() and our open().
                     # We catch it, ignore it, and let the loop restart to catch it as Phase 1!
                     pass
+                time.sleep(FILE_POLL_TIME)
                 continue
 
             # ---------------------------------------------------------

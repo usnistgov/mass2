@@ -469,7 +469,6 @@ class MassassinDirectory:
                 try:
                     output_path = self.output_dir / wal_path.name
                     success = self.analyze_WAL_tail(wal_path, output_path)
-                    print(f"{success=}")
                     if success:
                         seqnum += 1
                         sort_WAL_file(output_path)
