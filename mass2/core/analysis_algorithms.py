@@ -280,7 +280,6 @@ def drift_correct(
     assert max_correction <= 1.0
     max_slope = -max_correction / indicatorA.min()
     min_slope = -max_correction / indicatorA.max()
-    print(f"{max_correction=} {min_slope=} {max_slope=}")
     assert min_slope < 0
     assert max_slope > 0
 

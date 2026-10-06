@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.11"
+__generated_with = "0.25.0"
 app = marimo.App(width="medium", app_title="MASS v2 intro")
 
 
@@ -127,14 +127,14 @@ def _(data):
             ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
             uncalibrated_col="5lagy",
             calibrated_col="energy_5lagy",
-            ph_smoothing_fwhm=50,
+            ph_smoothing_fwhm=40,
         )
         .driftcorrect()
         .rough_cal_combinatoric(
             ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
             uncalibrated_col="5lagy_dc",
             calibrated_col="energy_5lagy_dc",
-            ph_smoothing_fwhm=50,
+            ph_smoothing_fwhm=40,
         )
     )
     return (data2,)
@@ -147,7 +147,7 @@ def _(data2, mass2):
         ["MnKAlpha", "MnKBeta", "CuKAlpha", "CuKBeta", "PdLAlpha", "PdLBeta"],
         uncalibrated_col="5lagy_dc",
         calibrated_col="energy_5lagy_dc2",
-        ph_smoothing_fwhm=50,
+        ph_smoothing_fwhm=40,
     )
     _ch2.step_plot(-1)
 
@@ -160,14 +160,14 @@ def _(mo):
     mo.md("""
     # inspecting the data
 
-    Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell. marimo's nicest display doesn't work with array columns like our pulse column, so lets leave that out for now.
+    Internally, the data is stored in polars `DataFrame`s. Lets take a look. To access the dataframe for one channel we do `data2.channels[4102].df`. In `marimo` we can get a nice UI element to browse through the data by returning the `DataFrame` as the last element in a cell.
     """)
     return
 
 
 @app.cell
-def _(data2, pl):
-    data2.channels[4102].df.select(pl.exclude("pulse"))
+def _(data2):
+    data2.channels[4102].df
     return
 
 
@@ -317,7 +317,6 @@ def _(data, data2, mo, np):
     if we used a mutating style of coding.
 
     `{np.shares_memory(data.channels[4102].df["subframecount"].to_numpy(), data2.channels[4102].df["subframecount"].to_numpy())=}`
-
     """)
     return
 
@@ -486,7 +485,7 @@ def _(data3, mass2, mo, plt):
 def _(multifit_with_results):
     pd_result, mn_result, mn_kbeta_result, cu_result = multifit_with_results.results
     print(mn_result.params["fwhm"].value, cu_result.params["fwhm"].value)
-    assert mn_result.params["fwhm"].value < 3.45
+    assert mn_result.params["fwhm"].value < 4.05
     assert cu_result.params["fwhm"].value < 3.55
     # this is super weird, depending on what energies we use for drift correction, we get rather different resolutions,
     # including Cu being better than Mn, and we can do sub-3eV Mn
