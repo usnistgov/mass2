@@ -129,7 +129,7 @@ ELEMENTS = (
     "No",
     "Lr",
 )
-ATOMIC_NUMBERS = dict((ELEMENTS[i], i) for i in range(len(ELEMENTS)))
+ATOMIC_NUMBERS: dict[str, int] = dict((ELEMENTS[i], i) for i in range(len(ELEMENTS)))
 
 
 class NISTXrayDBFile:
@@ -142,7 +142,7 @@ class NISTXrayDBFile:
         files downloaded using NISTXrayDBRetrieve. If the list is empty (the
         default), then the file named by self.DEFAULT_FILENAME will be used."""
 
-        self.lines = {}
+        self.lines: dict[str, NISTXrayLine] = {}
         self.alllines = set()
 
         if not filenames:
@@ -188,7 +188,7 @@ class NISTXrayDBFile:
         "LG1": "L2N4",
     }
 
-    def get_lines_by_type(self, linetype: str) -> tuple["NISTXrayLine"]:
+    def get_lines_by_type(self, linetype: str) -> tuple["NISTXrayLine", ...]:
         """Return a tuple containing all lines of a certain type, e.g., "KL3".
         See self.LINE_NICKNAMES for some known line "nicknames"."""
         linetype = linetype.upper()
@@ -199,7 +199,7 @@ class NISTXrayDBFile:
         elif "GAMMA" in linetype:
             linetype = linetype.replace("GAMMA", "G")
         linetype = self.LINE_NICKNAMES.get(linetype, linetype)
-        lines = []
+        lines: list[NISTXrayLine] = []
         for element in ELEMENTS:
             linename = f"{element} {linetype}"
             if linename in self.lines:
@@ -320,8 +320,8 @@ def plot_line_uncertainties() -> None:
             plt.xlabel("Line energy (eV)")
         if i % NX == 0:
             plt.ylabel("Line uncertainty (eV)")
-        plt.ylim([1e-3, 10])
-        plt.xlim([100, 3e4])
+        plt.ylim(1e-3, 10)
+        plt.xlim(100, 3e4)
 
     for line in db.lines.values():
         if line.transition not in transitions:
@@ -363,7 +363,7 @@ def plot_line_energies() -> None:
         e = [line.peak for line in lines]
         plt.loglog(z, e, "o-", color=cm(float(i) / len(transitions)), label=linetype)
     plt.legend(loc="upper left")
-    plt.xlim([6, 100])
+    plt.xlim(6, 100)
     plt.grid()
     r = list(range(6, 22)) + list(range(22, 43, 2)) + list(range(45, 75, 3)) + list(range(75, 100, 5))
     plt.xticks(r, ["\n".join([ELEMENTS[i], str(i)]) for i in r])

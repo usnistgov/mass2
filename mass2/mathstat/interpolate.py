@@ -551,11 +551,11 @@ class SmoothingSpline:
         lhs = NTDinv @ self.N0
         rhs = self.N0.T @ (Dinv * self.y)
 
-        def best_params(p: NDArray) -> NDArray:
+        def best_params(p: float) -> NDArray:
             """Return the best-fit parameters for a given curvature penalty p."""
             return np.linalg.solve(p * (lhs - self.Omega) + self.Omega, p * rhs)
 
-        def chisq_difference(p: NDArray, target_chisq: float) -> float:
+        def chisq_difference(p: float, target_chisq: float) -> float:
             """Return the difference between the chi-squared for curvature penalty p
             and the target chi-squared."""
             # If curvature is too small, the computation can become singular.

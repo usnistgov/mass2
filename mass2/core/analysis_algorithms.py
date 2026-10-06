@@ -10,10 +10,10 @@ Created on Jun 9, 2014
 """
 
 import numpy as np
+import scipy as sp
 from numpy.typing import NDArray, ArrayLike
 from typing import Any
 from collections.abc import Callable
-import scipy as sp
 from numba import njit
 
 from mass2.mathstat.entropy import laplace_entropy
@@ -278,7 +278,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     smoother = HistogramSmoother(0.5, [0, limit])
     assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
-    def entropy(param: NDArray, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
+    def entropy(param: float, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
         """Return the entropy of the drift-corrected values"""
         corrected = uncorrected * (1 + indicator * param)
         hsmooth = smoother(corrected)
@@ -508,15 +508,15 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("Using %2d degrees for %6d photons (after %d downsample)", ndeg, N, downsample)
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
-    def model1(param_i: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
-        "The model function, with one parameter pi varied, others fixed."
+    def model1(param_i: float, i: int, param: NDArray, basis: NDArray) -> NDArray:
+        "The model function, with one parameter `param_i` varied, others fixed."
         pcopy = np.array(param)
         pcopy[i] = param_i
         return 1 + pcopy @ basis
 
-    def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
-        "The cost function (spectral entropy), with one parameter pi varied, others fixed."
-        return laplace_entropy(y * model1(pi, i, param, basis), w=w)
+    def cost1(param_i: float, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
+        "The cost function (spectral entropy), with one parameter `param_i` varied, others fixed."
+        return laplace_entropy(y * model1(param_i, i, param, basis), w=w)
 
     param = np.zeros(ndeg, dtype=float)
     xnorm = np.asarray(normalize(time), dtype=float)
