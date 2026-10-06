@@ -287,7 +287,12 @@ class MadCowDirectory:
             },
             schema={"state_label": pl.String, "Emin": pl.Float64, "Emax": pl.Float64, "spectra": pl.Array(pl.Int32, self.Nbins)},
         )
-        dfs.write_ipc(self.output_dir / "state_spectra.arrow")
+        # Update spectra atomically, by writing to a temp file and renaming
+        output_file = self.output_dir / "state_spectra.arrow"
+        tmp_file = output_file.with_suffix(".arrow_TMP")
+        dfs.write_ipc(tmp_file)
+        tmp_file.rename(output_file)
+
         dfc = pl.DataFrame(
             {
                 "channel_number": list(self.chan_spectra.keys()),
@@ -297,7 +302,11 @@ class MadCowDirectory:
             },
             schema={"channel_number": pl.Int32, "Emin": pl.Float64, "Emax": pl.Float64, "spectra": pl.Array(pl.Int32, self.Nbins)},
         )
-        dfc.write_ipc(self.output_dir / "channel_spectra.arrow")
+        # Update spectra atomically, by writing to a temp file and renaming
+        output_file = self.output_dir / "channel_spectra.arrow"
+        tmp_file = output_file.with_suffix(".arrow_TMP")
+        dfc.write_ipc(tmp_file)
+        tmp_file.rename(output_file)
 
     def process_one_allchan_file(self, ipc_file: Path, output: Path, time_col: str = "timestamp") -> None:
         """Process the raw pulse data from a single channel with the given recipe
