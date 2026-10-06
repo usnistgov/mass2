@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from numpy.typing import NDArray
 from typing import cast, BinaryIO
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from .massassin import FileModifiedHandler
 
@@ -50,6 +51,27 @@ def add_expt_state(df: pl.DataFrame, df_estate: pl.DataFrame, time_col: str = "t
 
 
 def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
+    """Find the first Apache file, and find the first timestamp value in the file.
+    Return the timezone name for that timestamp, or else `default_tz` if that value
+    is timezone-naive
+
+    Parameters
+    ----------
+    input_dir : Path
+        Directory to search for timestamp values
+    default_tz : str, optional
+        The timezone to assign if none is found in the file, by default "UTC"
+
+    Returns
+    -------
+    str
+        The timezone name.
+
+    Raises
+    ------
+    OSError
+        If no value files are found
+    """
     inputs_sortedP = list(input_dir.glob("*_chan*.parquet"))
     if len(inputs_sortedP) > 0:
         lf = pl.scan_parquet(inputs_sortedP[0])
@@ -69,7 +91,7 @@ def raw_arrows_timezone(input_dir: Path, default_tz: str = "UTC") -> str:
         with pa.ipc.open_stream(inputs_unsorted[0]) as reader:
             tz = reader.schema.field("timestamp").type.tz
             return default_tz if tz is None else tz
-    raise OSError(f"found no valid '*_chan*.arrow' or '*.arrows*' files in {input_dir}")
+    raise OSError(f"found no valid '*_chan*.parquet', '*_chan*.arrow' or '*.arrows*' files in {input_dir}")
 
 
 @dataclass(frozen=False)
@@ -83,6 +105,8 @@ class MadCowDirectory:
     Emin: float
     Emax: float
     Nbins: int
+    target_time_zone: str = "UTC"
+    _expt_state_dirty: bool = False
     state_spectra: dict[str, NDArray] = field(default_factory=dict)
     chan_spectra: dict[int, NDArray] = field(default_factory=dict)
     file_prefix: str | None = None
@@ -119,14 +143,12 @@ class MadCowDirectory:
             state_files = parent_state_files
         assert len(state_files) == 1, f"found {len(state_files)} '*_experiment_state.txt' files in {input_dir}, want exactly 1"
         expt_state_df = load_expt_state_df(state_files[0], target_time_zone)
-        md = cls(Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df, Emin, Emax, Nbins)
+        md = cls(Path(input_dir), Path(output_dir), Path(state_files[0]), expt_state_df, Emin, Emax, Nbins, target_time_zone)
 
-        # Check that input exists and contains raw pulse files and an experiment_state.txt file
+        # Check that input exists and contains analyzed pulse files and an experiment_state.txt file (possibly in parent directory)
+        # Check (optionally, create) output directory
         md.validate_input()
-
-        # Create and check output directory
         md.validate_output()
-
         return md
 
     def validate_input(self) -> None:
@@ -171,6 +193,16 @@ class MadCowDirectory:
         assert output_dir.exists(), f"{output_dir=} could not be made"
         assert output_dir.is_dir(), f"{output_dir=} is not a directory"
 
+    def reload_expt_state(self) -> None:
+        """Reload the experiment state DataFrame from the CSV file."""
+        try:
+            print(f"Reloading experiment state from {self.expt_state_path.name}...")
+            new_df = load_expt_state_df(self.expt_state_path, self.target_time_zone)
+            self.expt_state_df = new_df
+            self._state_dirty = True
+        except Exception as e:
+            print(f"Failed to reload experiment state: {e}")
+
     def process_singlechan(self, parquet_file: Path, channum: int, time_col: str = "timestamp") -> None:
         """Process the raw pulse data from a single channel with the given recipe
 
@@ -194,6 +226,13 @@ class MadCowDirectory:
         self.update_histograms(df_joined)
 
     def update_histograms(self, df_joined: pl.DataFrame) -> None:
+        """Update the running histogram contents from the data in `df_joined`
+
+        Parameters
+        ----------
+        df_joined : pl.DataFrame
+            The new data to use for updating histograms.
+        """
         fixed_E_bins = np.linspace(self.Emin, self.Emax, 1 + self.Nbins)
         hist_by_channel = df_joined.group_by("channel_number").agg(pl.col("energy1").hist(fixed_E_bins).alias("hist"))
         hist_by_state = df_joined.group_by("state_label").agg(pl.col("energy1").hist(fixed_E_bins).alias("hist"))
@@ -238,6 +277,7 @@ class MadCowDirectory:
         return True
 
     def write_histograms(self) -> None:
+        """Write the histograms to the standard output files."""
         dfs = pl.DataFrame(
             {
                 "state_label": list(self.state_spectra.keys()),
@@ -313,9 +353,15 @@ class MadCowDirectory:
         last_good_position = fp.tell()
         # Sort states once for the entire file stream to use in asof joins
         states = self.expt_state_df.sort("timestamp")
+        self._state_dirty = False
 
         last_write_time = time.time()
         while True:
+            # Catch updates to expt state file from watchdog in the background
+            if self._state_dirty:
+                states = self.expt_state_df.sort("timestamp")
+                self._state_dirty = False
+
             # Peek to see if the 8-byte-long EOS (end-of-stream) marker is next.
             fp.seek(last_good_position)
             header = fp.read(8)
@@ -368,8 +414,30 @@ class MadCowDirectory:
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
 
-        # TODO set up watchdog for expt state file, to re-generate the expt state dataframe.
+        #  Define the internal handler for the state file
+        class StateFileHandler(FileSystemEventHandler):
+            def __init__(self, md: "MadCowDirectory"):
+                self.md = md
 
+            def on_modified(self, event: FileSystemEvent) -> None:
+                # Ensure we only trigger if the specific state file was modified
+                if Path(str(event.src_path)).resolve() == self.md.expt_state_path.resolve():
+                    self.md.reload_expt_state()
+
+        # Start the background observer and then the main run loop
+        state_observer = Observer()
+        state_observer.schedule(StateFileHandler(self), path=str(self.expt_state_path.parent), recursive=False)
+        state_observer.start()
+        try:
+            self.run2()
+
+        finally:
+            # Clean up the thread if the loop breaks
+            state_observer.stop()
+            state_observer.join()
+
+    def run2(self) -> None:
+        """Main run loop of MAD-COW. Separated to new method to reduce indentation."""
         seqnum = 0
         FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
         MAX_WAIT_TIME = 10.0  # wait this many seconds for the next file to exist before giving up.
