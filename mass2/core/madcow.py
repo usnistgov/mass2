@@ -4,12 +4,15 @@ import polars as pl
 import pyarrow as pa
 from pyarrow import ipc
 import time
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from numpy.typing import NDArray
 from typing import cast, BinaryIO
+from watchdog.observers import Observer
+from .massassin import FileModifiedHandler
 
-from .massassin import load_expt_state_df, attach_tz_to_naive_column
+from .massassin import load_expt_state_df, attach_tz_to_naive_column, ARROW_EOS_MARKER
 from .misc import str2channum, chanfile_prefix
 
 
@@ -147,7 +150,7 @@ class MadCowDirectory:
             self.file_prefix = prefix
             return
 
-        arrow_files = list(input_dir.glob("*.arrow*"))
+        arrow_files = list(input_dir.glob("*[0-9].arrow*"))
         assert len(arrow_files) > 0, f"{input_dir=} contains no Arrows files"
         f = Path(arrow_files[0])
         prefix = chanfile_prefix(f, chantext="")
@@ -275,81 +278,85 @@ class MadCowDirectory:
         )
         self.update_histograms(df)
 
-    def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
-        with open(wal_path, "rb") as fp:
-            try:
-                reader = ipc.RecordBatchStreamReader(fp)
-                reader_schema = reader.schema
-            except pa.ArrowInvalid:
-                print("File is too new, schema not written yet.")
-                return
+    def analyze_WAL_tail(self, wal_path: Path) -> None:
+        modified_event = threading.Event()
+        event_handler = FileModifiedHandler(wal_path, modified_event)
+        observer = Observer()
+        observer.schedule(event_handler, path=str(wal_path.parent), recursive=False)
+        observer.start()
 
-            with open(output_path, "wb") as outp:
-                # Pass work off to a new method, simply to unindent by 2 levels.
-                self._analyze_open_WAL(fp, outp, reader_schema)
+        try:
+            with open(wal_path, "rb") as fp:
+                try:
+                    reader = ipc.RecordBatchStreamReader(fp)
+                    reader_schema = reader.schema
+                except pa.ArrowInvalid:
+                    print("File is too new, schema not written yet.")
+                    return
 
-    def _analyze_open_WAL(self, fp: BinaryIO, outp: BinaryIO, reader_schema: pa.schema) -> None:
-        """_summary_
+                # Pass the modified_event into the processing loop
+                self._analyze_open_WAL(fp, reader_schema, modified_event, wal_path)
+        finally:
+            observer.stop()
+            observer.join()
 
-        Parameters
-        ----------
-        fp : BinaryIO
-            _description_
-        outp : BinaryIO
-            _description_
-        reader_schema : pa.schema
-            _description_
+    def _analyze_open_WAL(self, fp: BinaryIO, reader_schema: pa.schema, modified_event: threading.Event, wal_path: Path) -> None:
+        """Process incoming PyArrow batches from a Write-Ahead Log in real time."""
 
-        Raises
-        ------
-        NotImplementedError
-            _description_
-        """
-        FILE_POLL_TIME = 0.2  # wait this many seconds before checking whether the next file exists yet.
         last_good_position = fp.tell()
-        writer: ipc.RecordBatchStreamWriter | None = None
+        # Sort states once for the entire file stream to use in asof joins
+        states = self.expt_state_df.sort("timestamp")
 
+        last_write_time = time.time()
         while True:
-            fp.seek(last_good_position)
-
             # Peek to see if the 8-byte-long EOS (end-of-stream) marker is next.
+            fp.seek(last_good_position)
             header = fp.read(8)
 
             if len(header) < 8:
-                # Physical EOF (len=0): DAQ hasn't written the next batch or EOF yet, or
-                # Torn Write (0<len<8): DAQ is not finished writing the batch or EOF.
-                time.sleep(FILE_POLL_TIME)
+                # Check if the file was renamed by the DAQ (stream finalized abruptly)
+                if not wal_path.exists():
+                    print("WAL file no longer exists. Assuming DAQ renamed it; stream finalized.")
+                    break
+                # Torn Write or EOF: Wait for DAQ to write more data
+                modified_event.wait(timeout=1.0)
+                modified_event.clear()
                 continue
 
-            if header == b"\xff\xff\xff\xff\x00\x00\x00\x00":
-                # FOUND THE EOS MARKER! The DAQ closed the file cleanly.
+            if header == ARROW_EOS_MARKER:
                 print("Received EOS marker. Stream finalized.")
                 break
 
-            # If it is not the EOS marker, it's a real batch (either complete or partial).
-            # Rewind the pointer exactly 8 bytes so PyArrow can parse it normally.
             fp.seek(last_good_position)
 
             try:
-                # Let PyArrow read the full message, parse it, and update the bookmark
                 msg = ipc.read_message(fp)
                 batch = ipc.read_record_batch(msg, reader_schema)
                 last_good_position = fp.tell()
 
-                raise NotImplementedError
+                # Convert zero-copy to Polars
+                df_batch = pl.DataFrame(batch)
 
-                df = self.run_recipe(batch).to_arrow()
-                if len(df) == 0:
-                    continue
-                if not writer:
-                    writer = ipc.new_stream(outp, df.schema)
-                writer.write_table(df)
-                outp.flush()  # force new data out of Python into OS page cache
+                # Apply the same filtering and joining logic used in process_one_allchan_file
+                df_batch = attach_tz_to_naive_column(df_batch, "timestamp", "UTC")
+                df_joined = (
+                    df_batch.filter(pl.col("good"))
+                    .select(["channel_number", "timestamp", "energy1"])
+                    .with_columns(pl.col("timestamp").sort())
+                    .join_asof(states, on="timestamp", strategy="backward")
+                    .drop("timestamp")
+                )
+
+                # Update the running histogram dictionaries
+                self.update_histograms(df_joined)
+                if time.time() - last_write_time > 1:
+                    last_write_time = time.time()
+                    self.write_histograms()
 
             except pa.ArrowInvalid:
-                # Torn Write: The header was complete, but the payload data
-                # hasn't finished flushing to the disk yet.
-                time.sleep(FILE_POLL_TIME)
+                # Torn Write: Header is complete but payload hasn't flushed yet
+                modified_event.wait(timeout=1.0)
+                modified_event.clear()
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
@@ -381,8 +388,8 @@ class MadCowDirectory:
             if wal_path.exists():
                 print(f"[{seqnum:04d}] Analyzing WAL       file: {wal_path}")
                 try:
-                    output_path = self.output_dir / wal_path.name
-                    self.analyze_WAL_tail(wal_path, output_path)
+                    self.analyze_WAL_tail(wal_path)
+                    self.write_histograms()
                     seqnum += 1
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
@@ -395,8 +402,6 @@ class MadCowDirectory:
             # CASE 3: WAIT FOR DATA (next seqnum doesn't exist yet)
             # ---------------------------------------------------------
             print(f"[{seqnum:04d}] Waiting for new DAQ file...")
-            # print(f"   {finalized_path}")
-            # print(f"   {wal_path}")
             start_wait = time.time()
             found = False
 
@@ -413,6 +418,8 @@ class MadCowDirectory:
 
             if not found:
                 print(f"[{seqnum:04d}] Timeout: No new file appeared within {MAX_WAIT_TIME} seconds. Shutting down.")
+                print(f"Was seeking {wal_path=}")
+                print(f"Was seeking {finalized_path=}")
                 break
 
 
