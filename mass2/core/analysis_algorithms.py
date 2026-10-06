@@ -272,7 +272,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     indicator -= ptm_offset
 
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
+        pct99 = float(np.percentile(uncorrected, 99))
         limit = 1.25 * pct99
 
     smoother = HistogramSmoother(0.5, [0, limit])
@@ -289,50 +289,6 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
 
     drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
     return drift_corr_param, drift_correct_info
-
-
-@njit
-def nearest_arrivals(reference_times: ArrayLike, other_times: ArrayLike) -> tuple[NDArray, NDArray]:
-    """Find the external trigger time immediately before and after each pulse timestamp
-
-    Args:
-        pulse_timestamps - 1d array of pulse timestamps whose nearest neighbors
-            need to be found.
-        external_trigger_timestamps - 1d array of possible nearest neighbors.
-
-    Returns:
-        (before_times, after_times)
-
-    before_times is an ndarray of the same size as pulse_timestamps.
-    before_times[i] contains the difference between the closest lesser time
-    contained in external_trigger_timestamps and pulse_timestamps[i]  or inf if there was no
-    earlier time in other_times Note that before_times is always a positive
-    number even though the time difference it represents is negative.
-
-    after_times is an ndarray of the same size as pulse_timestamps.
-    after_times[i] contains the difference between pulse_timestamps[i] and the
-    closest greater time contained in other_times or a inf number if there was
-    no later time in external_trigger_timestamps.
-    """
-    other_times = np.asarray(other_times)
-    nearest_after_index = np.searchsorted(other_times, reference_times)
-    # because both sets of arrival times should be sorted, there are faster algorithms than searchsorted
-    # for example: https://github.com/kwgoodman/bottleneck/issues/47
-    # we could use one if performance becomes an issue
-    last_index = np.searchsorted(nearest_after_index, other_times.size, side="left")
-    first_index = np.searchsorted(nearest_after_index, 1)
-
-    nearest_before_index = np.copy(nearest_after_index)
-    nearest_before_index[:first_index] = 1
-    nearest_before_index -= 1
-    before_times = reference_times - other_times[nearest_before_index]
-    before_times[:first_index] = np.inf
-
-    nearest_after_index[last_index:] = other_times.size - 1
-    after_times = other_times[nearest_after_index] - reference_times
-    after_times[last_index:] = np.inf
-
-    return before_times, after_times
 
 
 @njit
@@ -419,11 +375,12 @@ def correct_flux_jumps(vals: ArrayLike, mask: ArrayLike, flux_quant: float) -> N
     Returns:
     Array with values corrected
     """
+    vals = np.asarray(vals)
     return unwrap_n(vals, flux_quant, mask)
 
 
 @njit
-def unwrap_n(data: NDArray[np.uint16], period: float, mask: ArrayLike, n: int = 3) -> NDArray:
+def unwrap_n(data: NDArray, period: float, mask: ArrayLike, n: int = 3) -> NDArray:
     """Unwrap data that has been restricted to a given period.
 
     The algorithm iterates through each data point and compares
@@ -512,8 +469,8 @@ def time_drift_correct(  # noqa: PLR0914
     time = np.asarray(time)
     uncorrected = np.asarray(uncorrected)
     if limit is None:
-        pct99 = np.percentile(uncorrected, 99)
-        limit = (0, 1.25 * pct99)
+        pct99 = float(np.percentile(uncorrected, 99))
+        limit = (0.0, 1.25 * pct99)
 
     use = np.logical_and(uncorrected > limit[0], uncorrected < limit[1])
     time = np.asarray(time[use])
@@ -551,11 +508,11 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("Using %2d degrees for %6d photons (after %d downsample)", ndeg, N, downsample)
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
-    def model1(pi: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
+    def model1(param_i: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
         "The model function, with one parameter pi varied, others fixed."
         pcopy = np.array(param)
-        pcopy[i] = pi
-        return 1 + np.dot(basis.T, pcopy)
+        pcopy[i] = param_i
+        return 1 + pcopy @ basis
 
     def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
         "The cost function (spectral entropy), with one parameter pi varied, others fixed."
@@ -588,6 +545,106 @@ def time_drift_correct(  # noqa: PLR0914
     elif H3 <= 0 or H3 - H2 > 0.00001:
         model = model2
 
+    def safe_model(x: NDArray) -> NDArray:
+        "Return the TDC model, but enforcing no adjustment for times outside the range we learned on"
+        y = model(x)
+        y[x < -1] = 0
+        y[x > +1] = 0
+        return y
+
     info["entropies"] = (H1, H2, H3)
-    info["model"] = model
+    info["model"] = safe_model
     return info
+
+
+@njit
+def resample_pulses(pulses: NDArray, shifts: ArrayLike | float | int) -> NDArray:
+    """Resample multiple pulses (in place). The data will be modified and returned.
+
+    Shifts can be integer or not; if shifts have a fractional part, linear interpolation is used.
+
+    Positive values of `shifts` delay the values in a pulse record, and the initial value or values
+    are padded by copying the first value of the pulse record. Negative values shift the pulse earlier
+    in the record, and the final value is used to pad the end of the new record.
+
+    Parameters
+    ----------
+    pulses : NDArray
+        Array of pulses to resample _in place_. Size (N,M) for N pulses, each of length M.
+    shifts : ArrayLike | float | int
+        The number of samples to shift each pulse. Array of size `N`, or a scalar. If scalar,
+        apply the same shift to all `N` pulses. Values can be non-integer, producing a linear
+        interpolation of the data.
+
+    Returns
+    -------
+    NDArray
+        The `pulses` input array, which is modified by this operation.
+    """
+    # Positive shift means delay the record and pad the start.
+    # Negative shift means rewind the record and pad the end.
+    assert len(pulses.shape) == 2
+    Npulses, Nsamples = pulses.shape
+    if np.isscalar(shifts):
+        shift_vec = np.zeros(Npulses, dtype=float)
+        shift_vec.fill(shifts)
+        return resample_pulses(pulses, shift_vec)
+
+    shifts = np.asarray(shifts)
+    assert len(shifts) == Npulses
+    assert np.abs(shifts).max() < Nsamples
+
+    for pulse, shift in zip(pulses, shifts):
+        resample_one_pulse(pulse, shift)
+    return pulses
+
+
+@njit
+def resample_one_pulse(pulse: NDArray, shift: float | int) -> NDArray:
+    """Resample one pulses (in place). The data will be modified and returned.
+
+    Shift can be integer or not; if shift has a fractional part, linear interpolation is used.
+
+    Positive values of `shift` delay the values in a pulse record, and the initial value or values
+    are padded by copying the first value of the pulse record. Negative values shift the pulse earlier
+    in the record, and the final value is used to pad the end of the new record.
+
+    Parameters
+    ----------
+    pulse : NDArray
+        Pulse to resample _in place_.
+    shift : float | int
+        The number of samples to shift each pulse. Value can be non-integer, producing a linear
+        interpolation of the data.
+
+    Returns
+    -------
+    NDArray
+        The `pulse` input vector, which is modified by this operation.
+    """
+    Nsamples = len(pulse)
+    if shift > 0.0:
+        fullshift = int(shift)
+        fracshift = shift - fullshift
+        # integer shift
+        if fullshift > 0:
+            pulse[fullshift:] = pulse[:-fullshift]
+        # linear interpolation for the fraction
+        pulse[fullshift + 1 :] = np.rint((1.0 - fracshift) * pulse[fullshift + 1 :] + fracshift * pulse[fullshift:-1])
+        # fill the initial values
+        pulse[:fullshift] = pulse[fullshift]
+
+    elif shift < 0.0:
+        fullshift = -int(-shift)
+        fracshift = fullshift - shift
+        # integer shift
+        if fullshift < 0:
+            pulse[:fullshift] = pulse[-fullshift:]
+        # linear interpolation for the fraction
+        pulse[: Nsamples + fullshift - 1] = np.rint(
+            (1 - fracshift) * pulse[: Nsamples + fullshift - 1] + fracshift * pulse[1 : Nsamples + fullshift]
+        )
+        # fill the final values
+        pulse[Nsamples + fullshift :] = pulse[-1]
+    # Edge case of shift == 0.0 is a no-op and can be ignored.
+    return pulse

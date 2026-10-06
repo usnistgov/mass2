@@ -64,10 +64,7 @@ import pulsedata
 import mass2
 
 pn_pair = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
-data = mass2.Channels.from_ljh_folder(
-    pulse_folder=pn_pair.pulse_folder,
-    noise_folder=pn_pair.noise_folder
-)
+data = mass2.Channels.from_ljh_folder(pulse_folder=pn_pair.pulse_folder, noise_folder=pn_pair.noise_folder)
 ```
 
 The value returned, `data`, is a `mass2.Channels` object. At its heart is `data.channels`, a dictionary mapping from channel numbers to single-sensor objects of the type `mass2.Channel`.
@@ -76,8 +73,7 @@ When you create the `Channels`, there are options to exclude certain channels wi
 
 ```python
 less_data = mass2.Channels.from_ljh_folder(
-    pulse_folder=pn_pair.pulse_folder, noise_folder=pn_pair.noise_folder,
-    limit=5, exclude_ch_nums=[4220]
+    pulse_folder=pn_pair.pulse_folder, noise_folder=pn_pair.noise_folder, limit=5, exclude_ch_nums=[4220]
 )
 ```
 
@@ -96,7 +92,7 @@ To open a single LJH file and study it as a pure file, you can use the internal 
 
 ```python
 # mkdocs: render
-ljh = mass2.LJHFile.open(pn_pair.pulse_folder/"20240727_run0002_chan4220.ljh")
+ljh = mass2.LJHFile.open(pn_pair.pulse_folder / "20240727_run0002_chan4220.ljh")
 print(ljh.npulses, ljh.npresamples, ljh.nsamples)
 print(ljh.is_continuous)
 print(ljh.dtype)
@@ -117,6 +113,7 @@ off = mass2.core.OffFile(p / "20240727_run0002_chan4220.off")
 
 # Load multiple OFF files info a `Channels` object
 import glob
+
 files = glob.glob(str(p / "*_chan*.off"))
 offdata = mass2.Channels.from_off_paths(files, description="OFF file demo")
 
@@ -289,16 +286,15 @@ The `Channel.summarize_pulses()` method returns a new `Channel` with a much enha
 ```python
 # mkdocs: render
 def summarize_and_cut(ch: mass2.Channel) -> mass2.Channel:
-    return (
-        ch.summarize_pulses()
-        .with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
-    )
+    return ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv(8, 8)
+
+
 data = data.map(summarize_and_cut)
 
 # Plot a distribution
 ch = data.ch0
 prms = ch.df["pulse_rms"]
-hist_range = range=np.percentile(prms, [0.5, 99.5])
+hist_range = np.percentile(prms, [0.5, 99.5])
 bin_edges = np.linspace(hist_range[0], hist_range[1], 1000)
 ch.plot_hist("pulse_rms", bin_edges)
 plt.xlabel("Pulse rms (arbs)")
@@ -315,6 +311,8 @@ To compute an optimal filter for each channel, one must analyze the noise (to le
 # mkdocs: render
 def do_filter(ch: mass2.Channel) -> mass2.Channel:
     return ch.filter5lag(f_3db=10000)
+
+
 data = data.map(do_filter)
 ```
 
@@ -336,22 +334,21 @@ plt.subplot(221)
 plt.plot(maker.noise_autocorr[:100], ".-b")
 plt.plot(0, maker.noise_autocorr[0], "ok")
 plt.title("Noise autocorrelation")
-plt.xlabel(f"Lags (each lag = {maker.sample_time_sec*1e6:.2f} µs)")
+plt.xlabel(f"Lags (each lag = {maker.sample_time_sec * 1e6:.2f} µs)")
 
 plt.subplot(222)
-freq_khz = np.linspace(0, 0.5*1e-3/maker.sample_time_sec, len(maker.noise_psd))
+freq_khz = np.linspace(0, 0.5 * 1e-3 / maker.sample_time_sec, len(maker.noise_psd))
 plt.loglog(freq_khz[1:], maker.noise_psd[1:], "-g")
 plt.xlabel("Frequency (kHz)")
 plt.title("Noise power spectral density")
 plt.ylabel("Noise PSD (arbs$^2$ / Hz)")
 
 plt.subplot(212)
-t_ms = (np.arange(ch.header.n_samples)-ch.header.n_presamples)*maker.sample_time_sec*1000
+t_ms = (np.arange(ch.header.n_samples) - ch.header.n_presamples) * maker.sample_time_sec * 1000
 plt.plot(t_ms, maker.signal_model, "r")
 plt.title("Model pulse")
 plt.xlabel("Time after trigger (ms)")
 plt.ylabel("Signal (arbs)")
-plt.tight_layout()
 ```
 
 ### Corrections and energy calibration
@@ -361,23 +358,23 @@ We can apply the drift correction based on pretrigger mean to the filtered value
 ```python
 # mkdocs: render
 
+
 def dc_and_rough_cal2(ch: mass2.Channel) -> mass2.Channel:
     import polars as pl
-    use_cal = (pl.col("state_label") == "CAL2")
+
+    use_cal = pl.col("state_label") == "CAL2"
     use_dc = pl.lit(True)
-    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "FeLBeta",
-                "NiLAlpha", "NiLBeta", "CuLAlpha", "CuLBeta", 980]
+    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "FeLBeta", "NiLAlpha", "NiLBeta", "CuLAlpha", "CuLBeta", 980]
     return (
-        ch.rough_cal_combinatoric(
+        ch
+        .rough_cal_combinatoric(
             line_names=line_names,
             uncalibrated_col="pulse_rms",
             calibrated_col="energy_pulse_rms",
             ph_smoothing_fwhm=6,
             use_expr=use_cal,
         )
-        .driftcorrect(
-            indicator_col="pretrig_mean", uncorrected_col="5lagy",
-            use_expr=use_dc)
+        .driftcorrect(indicator_col="pretrig_mean", uncorrected_col="5lagy", use_expr=use_dc)
         .rough_cal_combinatoric(
             line_names,
             uncalibrated_col="5lagy_dc",
@@ -387,10 +384,11 @@ def dc_and_rough_cal2(ch: mass2.Channel) -> mass2.Channel:
         )
     )
 
+
 data = data.map(dc_and_rough_cal2)
 ch = data.ch0
 plt.clf()
-use = (pl.col("state_label") == "CAL2")
+use = pl.col("state_label") == "CAL2"
 ax = plt.subplot(211)
 ch.plot_hist("energy_pulse_rms", np.linspace(0, 1000, 1001), axis=ax, use_expr=use)
 plt.title("Rough-calibrated energy (not optimally filtered)")
@@ -400,7 +398,6 @@ ax = plt.subplot(212)
 ch.plot_hist("5lagy_dc", np.linspace(0, 2600, 1001), axis=ax, use_expr=use)
 plt.title("Uncalibrated, optimally filtered pulse heights")
 plt.xlabel("Pulse heights (arbs)")
-plt.tight_layout()
 ```
 
 Now, an improved calibration can be achieved with actual fits to the known calibration lines. (One subtle aspect of this improved calibration is that there must be an existing calibration _from_ the same field into energy that you want to use for the final. In this case, we must have that second `rough_cal_combinatoric` above, because only that second one uses the field `5lagy_dc` as its input. This allows the `multifit` calibration routine to know about the energy scale well enough to find the lines to fit. Furthermore, we have to track which step it was whose calibration we are improving upon. Here, that is the previous step, called `-1` in python. The first rough calibration wouldn't meet our needs, because it is a calibration from `pulse_rms` into energy, a totally different mapping.)
@@ -410,37 +407,37 @@ Now, an improved calibration can be achieved with actual fits to the known calib
 def do_multifit(ch: mass2.Channel) -> mass2.Channel:
     import mass2
     import polars as pl
+
     STEP_WITH_ROUGH_CAL = -1
     multifit = mass2.MultiFit(
         default_fit_width=80,
         default_use_expr=(pl.col("state_label") == "CAL2"),
         default_bin_size=0.3,
     )
-    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha",
-                "NiLAlpha", "CuLAlpha", 980.0]
+    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "NiLAlpha", "CuLAlpha", 980.0]
     dhigh = {"CuLAlpha": 12, "NiLAlpha": 12}
     dlow = {980.0: 20}
     for line in line_names:
         multifit = multifit.with_line(line, dlo=dlow.get(line, None), dhi=dhigh.get(line, None))
     return ch.multifit_mass_cal(multifit, STEP_WITH_ROUGH_CAL, "energy_5lagy_best")
 
+
 data = data.map(do_multifit)
 ch = data.ch0
 plt.clf()
 ax1 = plt.subplot(211)
-use_cal = (pl.col("state_label") == "CAL2")
+use_cal = pl.col("state_label") == "CAL2"
 edges = np.linspace(0, 1000, 1001)
 ch.plot_hist("energy_5lagy_best", edges, axis=ax1, use_expr=use_cal)
 plt.title("Calibrated energy, state='CAL2'")
 plt.xlabel("Pulse energy (eV)")
 
 ax2 = plt.subplot(212, sharex=ax1)
-use_noncal = (pl.col("state_label") == "SCAN3")
+use_noncal = pl.col("state_label") == "SCAN3"
 ch.plot_hist("energy_5lagy_best", edges, axis=ax2, use_expr=use_noncal)
 plt.title("Calibrated energy, state='SCAN3'")
 plt.xlabel("Pulse energy (eV)")
 plt.xlim([0, 1000])
-plt.tight_layout()
 ```
 
 ## Saving results and the `Recipe` system
@@ -455,16 +452,17 @@ Analysis "steps" have been mentioned before. The big idea is that each channel i
 
 Sometimes you run an analysis that you consider "final"; you want to keep the results only, and you expect (hope?) never to look at the raw LJH files again. We are still working out a standard system for caching computed data: how to name the files, how to combine them, etc. Here are two approaches that employ Parquet files. One stores a file per channel, and the other stores all data in a single file.
 
-**Approach A: one file per channel** Here we store each channel's dataframe in a separate file. Notice that we want to drop the column representing the raw pulse data, because the output would otherwise be far too large (and redundant). Probably it's fine to drop the subframe count, too, so we do that here.
+**Approach A: one file per channel** Here we store each channel's dataframe in a separate file. It's fine to drop the subframe count, too, so we do that here as a demonstration of the syntax.
 
 ```python
 # mkdocs: render
 # For automated tests, we want the output in a temporary directory
 import tempfile, os
+
 output_dir = tempfile.TemporaryDirectory(prefix="mass2_getting_started")
 print(f"Test output lives in '{output_dir.name}'")
 
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 for ch_num, ch in data.channels.items():
     filename = os.path.join(output_dir.name, f"output_test_chan{ch_num}.parquet")
     df = ch.df.drop(columns_to_drop)
@@ -490,7 +488,7 @@ This is similar, except that we use some new Polars tricks:
 2. `polars.concat()` to join rows from multiple dataframes
 
 ```python
-columns_to_drop = ("pulse", "subframecount")
+columns_to_drop = ("subframecount", )
 all_df = []
 for ch_num, ch in data.channels.items():
     df = ch.df.drop(columns_to_drop).with_columns(ch_num=pl.lit(ch_num))
@@ -530,8 +528,7 @@ Once a `mass2.Channels` object is created from raw LJH files, an existing recipe
 ```python
 pn_pair = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
 data_replay = mass2.Channels.from_ljh_folder(
-    pulse_folder=pn_pair.pulse_folder,
-    noise_folder=pn_pair.noise_folder
+    pulse_folder=pn_pair.pulse_folder, noise_folder=pn_pair.noise_folder
 ).with_experiment_state_by_path()
 data_replay = data_replay.load_recipes(trimmed_recipe_filename)
 

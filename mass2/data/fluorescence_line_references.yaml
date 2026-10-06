@@ -147,7 +147,7 @@
   URL: https://doi.org/10.1103/PhysRevB.97.125139
 
 - tag: Rough Estimate
-  description: Line energies from the stanard database, relative intensities and widths are guesses.
+  description: Line energies from the standard database, relative intensities and widths are guesses.
 
 - tag: Schweppe 1992 Al
   description: |
@@ -179,4 +179,7 @@
     The KBeta also appears to be a hack with scaled values.
 
 - tag: Zschornack
-  description: Zschornack, Günter H. (2007). Handbook of X-Ray Data. Springer-Verlag, Berlin.
+  description: |
+    Zschornack, Günter H. (2007). Handbook of X-Ray Data. Springer-Verlag, Berlin.
+    This text does not contain full line shapes, but just line energies, widths, and
+    relative intensities. Any line model based on this reference is an approximation.

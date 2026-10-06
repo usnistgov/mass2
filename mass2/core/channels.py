@@ -11,7 +11,6 @@ import polars as pl
 import pylab as plt
 import matplotlib
 import numpy as np
-import functools
 import joblib
 import traceback
 import lmfit
@@ -23,10 +22,11 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import mass2
-from .channel import Channel, ChannelHeader, BadChannel
+from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
+from .misc import plot_zoomable
 from . import ljhutil
 
 
@@ -65,7 +65,6 @@ class Channels:
         descr = self.description + more.description + "\nWarning! created by with_more_channels()"
         return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
 
-    @functools.cache
     def dfg(self, exclude: str = "pulse") -> pl.DataFrame:
         """Return a DataFrame containing good pulses from each channel. Excludes the given columns (default "pulse")."""
         # return a dataframe containing good pulses from each channel,
@@ -170,8 +169,7 @@ class Channels:
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
-
-        plt.tight_layout()
+        plot_zoomable()
 
     def _limited_chan_list(self, limit: int | None = 20, channels: list[int] | None = None) -> list[int]:
         """A helper to get a list of channel numbers, limited to the given number if needed, and including only
@@ -190,7 +188,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the optimal filters for the channels in this Channels object.
 
         Parameters
@@ -203,11 +201,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -225,6 +218,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Optimal filters")
+        plot_zoomable()
 
     def plot_avg_pulses(
         self,
@@ -232,7 +226,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the average pulses (the signal model) for the channels in this Channels object.
 
         Parameters
@@ -245,17 +239,23 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
             axis = fig.subplots()
 
         plot_these_chan = self._limited_chan_list(limit, channels)
+        frametime_ms = self.channels[plot_these_chan[0]].header.frametime_s * 1e3
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+
         n_expected = len(plot_these_chan)
         for i, ch_num in enumerate(plot_these_chan):
             ch = self.channels[ch_num]
@@ -266,6 +266,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Samples after trigger")
         plt.title("Average pulses")
+        plot_zoomable()
 
     def plot_noise_spectrum(
         self,
@@ -273,7 +274,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power spectrum for the channels in this Channels object.
 
         Parameters
@@ -286,11 +287,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -308,6 +304,7 @@ class Channels:
         plt.loglog()
         plt.xlabel("Frequency (Hz)")
         plt.title("Noise power spectral density")
+        plot_zoomable()
 
     def plot_noise_autocorr(
         self,
@@ -315,7 +312,7 @@ class Channels:
         channels: list[int] | None = None,
         colormap: matplotlib.colors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
-    ) -> plt.Axes:
+    ) -> None:
         """Plot the noise power autocorrelation for the channels in this Channels object.
 
         Parameters
@@ -328,11 +325,6 @@ class Channels:
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
-
-        Returns
-        -------
-        plt.Axes
-            The `plt.Axes` containing the plot.
         """
         if axis is None:
             fig = plt.figure()
@@ -350,6 +342,7 @@ class Channels:
         plt.legend()
         plt.xlabel("Lags")
         plt.title("Noise autocorrelation")
+        plot_zoomable()
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":
         """Map function `f` over all channels, returning a new Channels object containing the new Channel objects."""
@@ -401,9 +394,6 @@ class Channels:
 
     def __hash__(self) -> int:
         """Hash based on the object's id (identity)."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: Any) -> bool:
@@ -565,9 +555,37 @@ class Channels:
         df_es = self.get_experiment_state_df(experiment_state_path)
         return self.with_experiment_state_df(df_es)
 
-    def with_external_trigger_by_path(self, path: str | None = None) -> "Channels":
+    def with_external_trigger_by_path(
+        self,
+        path: str | None,
+        output_control: ExtTriggerControl = ExtTriggerControl(),
+    ) -> "Channels":
         """Return a copy of this Channels object with external trigger information added, loaded
-        from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented)."""
+        from the given path or EVENTUALLY (if None) inferring it from an LJH file (not yet implemented).
+
+        Parameters
+        ----------
+        path : str | Path | None, optional
+            load external trigger info from the given path or (if None) infer the path from an LJH file, by default None
+        output_control: ExtTriggerControl
+            Control which columns are added to the channels' dataframes:
+            ms_nearest_trig : bool, optional
+                whether to generate a column by this name, giving milliseconds since the last trigger (as + value) or
+                ms until the next one (as - value), whichever is nearer, by default True.
+            ms_last_trig : bool, optional
+                whether to generate a column by this name, giving ms since the last trigger, by default False
+            ms_next_trig : bool, optional
+                whether to generate a column by this name, giving ms until the next trigger, by default False
+            sf_last_trig : bool, optional
+                whether to generate a column by this name, giving subframes since the last trigger, by default False
+            sf_next_trig : bool, optional
+                whether to generate a column by this name, giving subframes until the next trigger, by default False
+
+        Returns
+        -------
+        Channels
+            An enhanced copy of self, with experiment state information added to each channel.
+        """
         if path is None:
             raise NotImplementedError("cannot infer external trigger path yet")
         with open(path, "rb") as _f:
@@ -576,15 +594,15 @@ class Channels:
         df_ext = pl.DataFrame({
             "subframecount": external_trigger_subframe_count,
         })
-        return self.with_external_trigger_df(df_ext)
+        return self.with_external_trigger_df(df_ext, output_control)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channels":
+    def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channels":
         """Return a copy of this Channels object with external trigger information added to each Channel,
-        found from the given DataFrame."""
+        found from the given DataFrame. `output_columns` controls what columns to store."""
 
         def with_etrig_df(channel: Channel) -> Channel:
             """Return a copy of one Channel object with external trigger information added to it"""
-            return channel.with_external_trigger_df(df_ext)
+            return channel.with_external_trigger_df(df_ext, output_control)
 
         return self.map(with_etrig_df)
 
@@ -657,9 +675,44 @@ class Channels:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
             combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
-            new_ch = ch.with_replacement_df(combined_df)
+            combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
+            sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
+            header = dataclasses.replace(ch.header, data_source=None, pulse_data_sources=sources)
+            new_ch = dataclasses.replace(
+                ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer
+            )
             new_channels[ch_num] = new_ch
         return mass2.Channels(new_channels, self.description + other_data.description)
+
+    @classmethod
+    def from_oneChannel(cls, ch: Channel) -> "Channels":
+        "Create a Channels object from a single Channel object"
+        return Channels({ch.ch_num: ch}, ch.header.description)
+
+    @classmethod
+    def combine_channels(cls, sourcename: str, constituents: dict[str, "Channels"]) -> "Channels":
+        """Combine 2 or more compatible `mass2.Channels` objects into one. See `mass2.Channel.combine_channels()`
+        for more info about what "compatible" might mean. Certainly all `Channel` objects should have equal
+        `n_samples`, `n_presamples`, and `frametime_s`.
+
+        Parameters
+        ----------
+        sourcename : str
+            Each `Channel` object will get a new column in its dataframe with this name.
+        constituents : dict[str, mass2.Channels]
+            The keys in this dictionary will become values in the `sourcename` data frame.
+
+        Returns
+        -------
+        Channels
+            An object combining the named values in the `constitutents` input.
+        """
+        base = next(iter(constituents.values()))
+        chdict: dict[int, mass2.Channel] = {}
+        for chnum in base.channels.keys():
+            d = {k: v.channels[chnum] for (k, v) in constituents.items()}
+            chdict[chnum] = mass2.Channel.combine_channels(sourcename=sourcename, constituents=d)
+        return Channels(chdict, base.description)
 
     @classmethod
     def from_df(
@@ -745,7 +798,7 @@ class Channels:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
-            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps)
+            return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
@@ -753,9 +806,11 @@ class Channels:
             for ch_num, ch in self.channels.items():
                 parquet_path = f"data_chan{ch_num:04d}.parquet"
                 channels[ch_num] = store_dataframe_to_parquet_and_return_pickleable_channel(ch, zf, parquet_path)
+                assert channels[ch_num].pulseframer is None
             for ch_num, badch in self.bad_channels.items():
                 parquet_path = f"data_bad_chan{ch_num:04d}.parquet"
                 ch = store_dataframe_to_parquet_and_return_pickleable_channel(badch.ch, zf, parquet_path)
+                assert ch.pulseframer is None
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
@@ -771,7 +826,7 @@ class Channels:
             Zipfile that work was saved in.
         """
         path = pathlib.Path(path)
-        path.exists() and path.is_file()
+        assert path.exists() and path.is_file()
 
         def _restore_dataframe(ch: Channel, df: pl.DataFrame) -> Channel:
             """Take a channel and replace its dataframe with the given one, loaded from a parquet file
@@ -788,17 +843,31 @@ class Channels:
             Channel
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
-            # If this channel was based on an LJH file, restore columns from the LJH file to the dataframe.
-            if ch.header.data_source is not None:
-                ljh_path = ch.header.data_source
-                if ljh_path.endswith(".ljh") or ljh_path.endswith(".noi"):
-                    ljh_backed_chan = Channel.from_ljh(ljh_path)
+            def _reload_leaf_chan(data_source: str | None) -> Channel | None:
+                """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
+                if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):
+                    return Channel.from_ljh(data_source)
+                return None
+
+            pulseframer = None
+            sources = ch.header.pulse_data_sources
+            if sources is not None:
+                restored_parts = [_reload_leaf_chan(src) for src in sources]
+                found_parts = [part for part in restored_parts if part is not None]
+                if restored_parts and len(found_parts) == len(restored_parts):
+                    raw_df = pl.concat([part.df for part in found_parts], how="vertical")
+                    df = df.with_columns(raw_df)
+                    pulseframer = mass2.core.misc.concat_pulseframers([part.pulseframer for part in found_parts])
+            else:
+                ljh_backed_chan = _reload_leaf_chan(ch.header.data_source)
+                if ljh_backed_chan is not None:
                     df = df.with_columns(ljh_backed_chan.df)
-            # df_history is needed for some debug plots to work. This version has strictly more columns than required
-            # at each history point. TODO: We could use the steps inputs and outputs to trim the appropriate columns.
-            # For getting started, though, it's easier just to let each dataframe in history equal the final dataframe.
+                    pulseframer = ljh_backed_chan.pulseframer
             df_history = [df] * len(ch.steps)
-            return dataclasses.replace(ch, df=df, df_history=df_history)
+            noise = None
+            if ch.header.noise_data_source is not None:
+                noise = mass2.NoiseChannel.from_ljh(ch.header.noise_data_source)
+            return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer, noise=noise)
 
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"

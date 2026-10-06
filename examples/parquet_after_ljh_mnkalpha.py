@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.16"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium", app_title="MASS v2 follow")
 
 
@@ -17,15 +17,13 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # loading data
     we load the same ljh files, the steps_dict and the resulting df to compare to
 
     # todo
-    * make a demo that uses a timer to read progressvley larger slices of the data, and outputs all the new data to some format
-    """
-    )
+    * make a demo that uses a timer to read progressively larger slices of the data, and outputs all the new data to some format.
+    """)
     return
 
 
@@ -69,12 +67,10 @@ def _(data2, mo, plt):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     # unified analysis experience
     We can create a `mass2.Channels` object from any `DataFrame` with a `ch_num` column (just rename it if you named it wrong!). then all our analysis and plotting methods work. We can use this to save intermediate results, or just to use our fitting tools on already analyzed data.
-    """
-    )
+    """)
     return
 
 

@@ -229,7 +229,7 @@ def add_hci_line(
     widths = np.asarray(widths)
     ratios = np.asarray(ratios)
     if nominal_peak_energy is None:
-        nominal_peak_energy = np.dot(energies, ratios) / np.sum(ratios)
+        nominal_peak_energy = (energies @ ratios) / np.sum(ratios)
     linetype = f"{int(spectr_ch)} {line_identifier}"
 
     spectrum_class = fluorescence_lines.addline(

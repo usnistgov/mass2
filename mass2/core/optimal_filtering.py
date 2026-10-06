@@ -11,7 +11,8 @@ from numpy.typing import ArrayLike, NDArray
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-from mass2.mathstat.toeplitz import ToeplitzSolver
+from mass2.mathstat.toeplitz import SymmetricToeplitz
+from mass2.core.misc import plot_zoomable
 
 
 @dataclass(frozen=True)
@@ -149,7 +150,7 @@ class ToeplitzWhitener:
         y[N - 1] /= self.phi[0]
         for i in range(N - 2, -1, -1):
             f = min(self.p + 1, N - i)
-            y[i] -= np.dot(y[i + 1 : i + f], self.phi[1:f])
+            y[i] -= y[i + 1 : i + f] @ self.phi[1:f]
             y[i] /= self.phi[0]
         return np.correlate(y, self.theta, "full")[self.q :]
 
@@ -169,7 +170,7 @@ class ToeplitzWhitener:
         y[N - 1] /= self.theta[0]
         for i in range(N - 2, -1, -1):
             f = min(self.q + 1, N - i)
-            y[i] -= np.dot(y[i + 1 : i + f], self.theta[1:f])
+            y[i] -= y[i + 1 : i + f] @ self.theta[1:f]
             y[i] /= self.theta[0]
         return np.correlate(y, self.phi, "full")[self.p :]
 
@@ -293,13 +294,14 @@ class Filter(ABC):
         if axis is None:
             plt.clf()
             axis = plt.subplot(111)
+        assert isinstance(axis, plt.Axes)
         t = np.arange(len(self.values)) - self.n_pretrigger
         axis.plot(t, self.values, label="mass 5lag filter", **kwargs)
         axis.grid()
         axis.set_title(f"Filter type={self._filter_type} V/dV={self.predicted_v_over_dv:.2f}")
         axis.set_ylabel("filter value")
         axis.set_xlabel("Samples")
-        plt.gcf().tight_layout()
+        plot_zoomable()
 
     def report(self, std_energy: float = 5898.8) -> None:
         """Report on estimated V/dV for the filter.
@@ -388,16 +390,71 @@ class Filter5Lag(Filter):
         nrec = x.shape[0]
         conv = np.zeros((nlags, nrec), dtype=float)
         for i in range(nlags - 1):
-            conv[i, :] = np.dot(x[:, i : i + 1 - nlags], self.values)
-        conv[nlags - 1, :] = np.dot(x[:, nlags - 1 :], self.values)
+            conv[i, :] = x[:, i : i + 1 - nlags] @ self.values
+        conv[nlags - 1, :] = x[:, nlags - 1 :] @ self.values
 
         # Least-squares fit of 5 values to a parabola.
         # Order is row 0 = constant ... row 2 = quadratic coefficients.
         if nlags != 5:
             raise NotImplementedError("Currently require 5 lags to estimate peak x, y")
-        param = np.dot(self.FIVELAG_FITTER, conv)
+        param = self.FIVELAG_FITTER @ conv
         peak_x = -0.5 * param[1, :] / param[2, :]
         peak_y = param[0, :] - 0.25 * param[1, :] ** 2 / param[2, :]
+        return peak_y, peak_x
+
+
+@dataclass(frozen=True)
+class Filter1Lag(Filter):
+    """Represent an optimal filter, specifically one intended for single-lag convolution with data
+
+    Returns
+    -------
+    Filter1Lag
+        An optimal filter, for single-lag convolution (i.e., a dot product) with the data
+    """
+
+    def __post_init__(self) -> None:
+        """Post-init checks that this filter, indeed, is a 1-lag one"""
+        assert self.convolution_lags == 1
+
+    @property
+    def is_arrival_time_safe(self) -> bool:
+        """Is this an arrival-time-safe filter?"""
+        return False
+
+    @property
+    def _filter_type(self) -> str:
+        """Name for this filter type"""
+        return "1lag"
+
+    def filter_records(self, x: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
+        """Filter one microcalorimeter record or an array of records.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            A 1-d array, a single pulse record, or a 2-d array, where `x[i, :]` is pulse record number `i`.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            1. The optimally filtered value, or an array (one per row) if the input is a 2-d array.
+            2. The phase, or arrival-time estimate in samples. Same shape as the filtered value.
+
+        Raises
+        ------
+        AssertionError
+            If the input array is the wrong length
+        """
+        x = np.asarray(x)
+        if x.ndim == 1:
+            x = x.reshape((1, len(x)))
+        _, nsamp = x.shape
+        assert nsamp == len(self.values)
+        dotproduct = x @ self.values
+
+        peak_x = np.zeros_like(x)
+        peak_y = dotproduct
         return peak_y, peak_x
 
 
@@ -451,6 +508,7 @@ class FilterATS(Filter):
         _, nsamp = x.shape
 
         assert nsamp == len(self.values)
+        assert self.dt_values is not None
         return _filter_records_ats(x, self.values, self.dt_values)
 
 
@@ -458,8 +516,8 @@ class FilterATS(Filter):
 def _filter_records_ats(x: NDArray, values: NDArray, dt_values: NDArray) -> tuple[np.ndarray, np.ndarray]:
     "A numba-JIT speedup of the core computation"
     x = x.astype(values.dtype)
-    conv0 = np.dot(x, values)
-    conv1 = np.dot(x, dt_values)
+    conv0 = x @ values
+    conv1 = x @ dt_values
     arrival_time = conv1 / conv0
     return conv0, arrival_time
 
@@ -527,6 +585,130 @@ class FilterMaker:
     sample_time_sec: float = 0.0
     peak: float = 0.0
 
+    def compute_constrained_1lag(
+        self,
+        constraints: ArrayLike | None = None,
+        fmax: float | None = None,
+        f_3db: float | None = None,
+        cut_pre: int = 0,
+        cut_post: int = 0,
+    ) -> Filter:
+        """Compute a single constrained optimal filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter. Can be used with 0-lag "convolution" only,
+        so cannot estimate arrival time.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        constraints: ndarray, optional
+            The vector or vectors to which the filter should be orthogonal. If a 2d array, each _row_
+            is a constraint, and the number of columns should be equal to the len(self.signal_model)
+            minus `(cut_pre+cut_post)`.
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 1-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+        if cut_pre < 0 or cut_post < 0:
+            raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
+
+        if self.noise_autocorr is None and self.whitener is None:
+            raise ValueError("FilterMaker must have noise_autocorr or whitener arguments to generate 1-lag filters")
+        noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
+        avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
+
+        n = len(avg_signal)
+        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+        pulse_model = np.vstack((avg_signal, np.ones_like(avg_signal)))
+        if constraints is not None:
+            pulse_model = np.vstack((pulse_model, constraints))
+        assert pulse_model.shape[1] == n
+
+        noise_corr = noise_autocorr[:n]
+        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+        Rinv_model = NoiseR.solve(pulse_model.T)
+        A = pulse_model @ Rinv_model
+        all_filters = np.linalg.solve(A, Rinv_model.T)
+        filt_noconst = all_filters[0]
+
+        band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
+
+        self._normalize_filter(filt_noconst, avg_signal)
+        variance = bracketR(filt_noconst, noise_corr)
+
+        # Set weights in the cut_pre and cut_post windows to 0
+        if cut_pre > 0 or cut_post > 0:
+            filt_noconst = np.hstack([np.zeros(cut_pre), filt_noconst, np.zeros(cut_post)])
+
+        if variance <= 0:
+            vdv = np.inf
+        else:
+            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+        return Filter1Lag(
+            filt_noconst,
+            peak,
+            variance,
+            vdv,
+            self.n_pretrigger,
+            None,
+            None,
+            avg_signal,
+            None,
+            1,
+            fmax,
+            f_3db,
+            cut_pre,
+            cut_post,
+        )
+
+    def compute_1lag(self, fmax: float | None = None, f_3db: float | None = None, cut_pre: int = 0, cut_post: int = 0) -> Filter:
+        """Compute a single filter, with optional low-pass filtering, and with optional zero
+        weights at the pre-trigger or post-trigger end of the filter. Can be used with 0-lag "convolution" only,
+        so cannot estimate arrival time.
+
+        Either or both of `fmax` and `f_3db` are allowed.
+
+        Parameters
+        ----------
+        fmax : Optional[float], optional
+            The strict maximum frequency to be passed in all filters, by default None
+        f_3db : Optional[float], optional
+            The 3 dB point for a one-pole low-pass filter to be applied to all filters, by default None
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Filter
+            A 1-lag optimal filter.
+
+        Raises
+        ------
+        ValueError
+            Under various conditions where arguments are inconsistent with the data
+        """
+        return self.compute_constrained_1lag(None, fmax=fmax, f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+
     def compute_constrained_5lag(
         self,
         constraints: ArrayLike | None = None,
@@ -586,10 +768,10 @@ class FilterMaker:
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        TS = ToeplitzSolver(noise_corr, symmetric=True)
-        Rinv_model = np.vstack([TS(r) for r in pulse_model])
-        A = pulse_model.dot(Rinv_model.T)
-        all_filters = np.linalg.solve(A, Rinv_model)
+        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+        Rinv_model = NoiseR.solve(pulse_model.T)
+        A = pulse_model @ Rinv_model
+        all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
@@ -760,13 +942,15 @@ class FilterMaker:
         sig_ft_weighted[0] = 0.0
         filt_fourier = np.fft.irfft(sig_ft_weighted) / window
         self._normalize_5lag_filter(filt_fourier, avg_signal)
+        # Set weights in the cut_pre and cut_post windows to 0
+        if cut_pre > 0 or cut_post > 0:
+            filt_fourier = np.hstack([np.zeros(cut_pre), filt_fourier, np.zeros(cut_post)])
 
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
         if self.noise_autocorr is None:
             noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
             kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()
             variance_fourier = 1.0 / kappa
-            print(kappa, noise_ft_squared)
         else:
             ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)
@@ -836,20 +1020,18 @@ class FilterMaker:
 
         if self.whitener is not None:
             WM = self.whitener(MT.T)
-            A = np.dot(WM.T, WM)
+            A = WM.T @ WM
             Ainv = np.linalg.inv(A)
             WtWM = self.whitener.applyWT(WM)
-            filt = np.dot(Ainv, WtWM.T)
+            filt = Ainv @ (WtWM.T)
 
         else:
             assert len(noise_autocorr) >= ns
             noise_corr = noise_autocorr[:ns]
-            TS = ToeplitzSolver(noise_corr, symmetric=True)
-
-            RinvM = np.vstack([TS(r) for r in MT]).T
-            A = np.dot(MT, RinvM)
-            Ainv = np.linalg.inv(A)
-            filt = np.dot(Ainv, RinvM.T)
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(MT.T)
+            A = MT @ Rinv_model
+            filt = np.linalg.solve(A, Rinv_model.T)
 
         band_limit(filt.T, self.sample_time_sec, fmax, f_3db)
 
@@ -973,7 +1155,7 @@ class FilterMaker:
         assert len(f) <= len(avg_signal) - 4
         conv = np.zeros(5, dtype=float)
         for i in range(5):
-            conv[i] = np.dot(f, avg_signal[i : i + len(f)])
+            conv[i] = f @ avg_signal[i : i + len(f)]
         x = np.linspace(-2, 2, 5)
         fit = np.polyfit(x, conv, 2)
         fit_ctr = -0.5 * fit[1] / fit[0]
@@ -992,7 +1174,7 @@ class FilterMaker:
             The signal to which filter `f` should give unit response
         """
         assert len(f) == len(avg_signal)
-        f *= 1 / np.dot(f, avg_signal)
+        f *= 1 / (f @ avg_signal)
 
 
 def bracketR(q: NDArray, noise: NDArray) -> float:
@@ -1010,5 +1192,6 @@ def bracketR(q: NDArray, noise: NDArray) -> float:
     r[n - 1 :: -1] = noise[:n]
     dot = 0.0
     for i in range(n):
-        dot += q[i] * r[n - i - 1 : 2 * n - i - 1].dot(q)
+        row_i = r[n - i - 1 : 2 * n - i - 1]
+        dot += q[i] * (row_i @ q)
     return dot

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium", app_title="EBIT MASS2 example")
 
 
@@ -10,6 +10,7 @@ def _():
     import pylab as plt
     import numpy as np
     import marimo as mo
+
     return mo, np, pl, plt
 
 
@@ -18,6 +19,7 @@ def _():
     import mass2
     import pulsedata
     import pathlib
+
     return mass2, pulsedata
 
 
@@ -48,6 +50,9 @@ def _(off_paths, pl):
     )
     timing_df = timing_df.select(
         "calibration_status", timestamp=pl.from_epoch("timestamp", time_unit="s")
+    ).with_columns(
+        # data were recorded as UTC times
+        pl.col("timestamp").dt.replace_time_zone("UTC")
     )
     timing_df
     return Path, timing_df
@@ -76,8 +81,13 @@ def _(Path, mo, np, off_paths, plt):
 @app.cell
 def _(data, pl, timing_df):
     def with_timing_df(ch):
-        # load the ebit calibration source timing file from csv
-        df2 = ch.df.join_asof(timing_df, left_on="timestamp", right_on="timestamp")
+        # We loaded the ebit calibration source timing file from csv and asserted EDT time zone.
+        # But have to convert to use the same time zone as ch.df if we want to join.
+        tz = ch.df["timestamp"].dtype.time_zone
+        timing_df2 = timing_df.with_columns(
+            pl.col("timestamp").dt.convert_time_zone(tz)
+        )
+        df2 = ch.df.join_asof(timing_df2, left_on="timestamp", right_on="timestamp")
         s = df2.select(
             state_label2=pl.concat_str(
                 ["state_label", "calibration_status"], ignore_nulls=True, separator="_"
@@ -313,16 +323,14 @@ def _(data5, dropdown_ch, mass2):
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
+    mo.md(r"""
     ### TODOS
     * hunter run on all data again and report any errors
     * plot rms_residual_energy vs channel number
     * plot gain spline vs channel
     * plot filt_value vs area
     * make a drift at a line plot
-    """
-    )
+    """)
     return
 
 

@@ -410,8 +410,7 @@ class EnergyCalibrationMaker:
             elif curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO}:
                 de_samplepoints = dspline
             elif curvename == Curvetypes.LOGGAIN:
-                abs_dfdp = np.abs(internal_spline(ph_samplepoints, der=1))
-                de_samplepoints = dspline * E_samplepoints * abs_dfdp
+                de_samplepoints = dspline * E_samplepoints
             else:
                 raise ValueError(f"curvename='{curvename}' not recognized")
 
@@ -710,7 +709,7 @@ class EnergyCalibration:
         ctype = cal_group.attrs["curvetype"]
         if isinstance(ctype, bytes):
             ctype = ctype.decode("utf-8")
-        curvetype = Curvetypes[ctype]
+        curvetype = Curvetypes[str(ctype)]
 
         maker = EnergyCalibrationMaker(
             cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], cal_group["name"][:]
@@ -772,6 +771,8 @@ class EnergyCalibration:
             plt.clf()
             axis = plt.subplot(111)
             # axis.set_xlim([x[0], x[-1]*1.1])
+
+        assert axis is not None
         if energy_x:
             axis.set_xlabel("Energy (eV)")
         else:

@@ -60,4 +60,4 @@ def test_creating_filter_from_non_LJH_data():
     print("predicted resolutions")
     filter_obj.report(std_energy=1000)
     chosen_filter = filter_obj.values
-    np.dot(chosen_filter, avg_pulse_values[2:-2])
+    _ = chosen_filter @ avg_pulse_values[2:-2]

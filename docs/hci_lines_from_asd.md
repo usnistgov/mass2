@@ -32,19 +32,19 @@ import pylab as plt
 
 test_asd = mass2.calibration.hci_lines.NIST_ASD()
 availableElements = test_asd.getAvailableElements()
-assert 'Ne' in availableElements
-availableNeCharges = test_asd.getAvailableSpectralCharges(element='Ne')
+assert "Ne" in availableElements
+availableNeCharges = test_asd.getAvailableSpectralCharges(element="Ne")
 assert 10 in availableNeCharges
-subsetNe10Levels = test_asd.getAvailableLevels(element='Ne', spectralCharge=10, maxLevels=6, getUncertainty=False)
-assert '2p 2P* J=1/2' in list(subsetNe10Levels.keys())
-exampleNeLevel = test_asd.getSingleLevel(element='Ne', spectralCharge=10, conf='2p', term='2P*', JVal='1/2', getUncertainty=False)
+subsetNe10Levels = test_asd.getAvailableLevels(element="Ne", spectralCharge=10, maxLevels=6, getUncertainty=False)
+assert "2p 2P* J=1/2" in list(subsetNe10Levels.keys())
+exampleNeLevel = test_asd.getSingleLevel(element="Ne", spectralCharge=10, conf="2p", term="2P*", JVal="1/2", getUncertainty=False)
 
 print(availableElements[:10])
 print(availableNeCharges)
 for k, v in subsetNe10Levels.items():
-  subsetNe10Levels[k] = round(v, 1)
+    subsetNe10Levels[k] = round(v, 1)
 print(subsetNe10Levels)
-print(f'{exampleNeLevel:.1f}')
+print(f"{exampleNeLevel:.1f}")
 ```
 
 ```text
@@ -64,21 +64,22 @@ As an example, let us create a H-like Be line. Here, we assume a lorentzian widt
 
 ```python
 # mkdocs: render
-test_element = 'Be'
+test_element = "Be"
 test_charge = 4
-test_conf = '2p'
-test_term = '2P*'
-test_JVal = '3/2'
-test_level = f'{test_conf} {test_term} J={test_JVal}'
+test_conf = "2p"
+test_term = "2P*"
+test_JVal = "3/2"
+test_level = f"{test_conf} {test_term} J={test_JVal}"
 test_energy = test_asd.getSingleLevel(
-    element=test_element, spectralCharge=test_charge,
-    conf=test_conf, term=test_term, JVal=test_JVal, getUncertainty=False)
-test_line = mass2.calibration.hci_lines.add_hci_line(element=test_element, spectr_ch=test_charge,
-line_identifier=test_level, energies=[test_energy], widths=[0.1], ratios=[1.0])
+    element=test_element, spectralCharge=test_charge, conf=test_conf, term=test_term, JVal=test_JVal, getUncertainty=False
+)
+test_line = mass2.calibration.hci_lines.add_hci_line(
+    element=test_element, spectr_ch=test_charge, line_identifier=test_level, energies=[test_energy], widths=[0.1], ratios=[1.0]
+)
 assert test_line.peak_energy == test_energy
 
-print(mass2.spectra[f'{test_element}{test_charge} {test_conf} {test_term} J={test_JVal}'])
-print(f'{test_line.peak_energy:.1f}')
+print(mass2.spectra[f"{test_element}{test_charge} {test_conf} {test_term} J={test_JVal}"])
+print(f"{test_line.peak_energy:.1f}")
 ```
 
 ```text
@@ -107,9 +108,9 @@ and then add some of the lower order H- and He-like Ga lines.
 
 ```python
 # mkdocs: render
-print([mass2.spectra['O7 1s.2p 1P* J=1'], round(mass2.spectra['O7 1s.2p 1P* J=1'].peak_energy,1)])
+print([mass2.spectra["O7 1s.2p 1P* J=1"], round(mass2.spectra["O7 1s.2p 1P* J=1"].peak_energy, 1)])
 
-test_element = 'Ga'
+test_element = "Ga"
 HLikeGaLines = mass2.calibration.hci_lines.add_H_like_lines_from_asd(asd=test_asd, element=test_element, maxLevels=6)
 HeLikeGaLines = mass2.calibration.hci_lines.add_He_like_lines_from_asd(asd=test_asd, element=test_element, maxLevels=7)
 

@@ -40,8 +40,9 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
         traces_used += 1
 
-    ac /= traces_used
-    ac /= nsamples - np.arange(nsamples, dtype=float)
+    ac /= traces_used * nsamples
+    # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
+    # ac /= nsamples - np.arange(nsamples, dtype=float)
     return ac
 
 
@@ -125,8 +126,9 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     if entries == 0:
         raise ValueError("Apparently all 'noise' chunks had large excursions from baseline, so no autocorrelation was computed")
 
-    ac /= entries
-    ac /= np.arange(chunksize, chunksize - n_lags + 0.5, -1.0, dtype=float)
+    ac /= entries * chunksize
+    # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
+    # ac /= np.arange(chunksize, chunksize - n_lags + 0.5, -1.0, dtype=float)
     return ac
 
 
@@ -160,7 +162,7 @@ def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "b
 
 
 def calc_noise_result(
-    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 10000
+    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 100_000
 ) -> "NoiseResult":
     """Analyze the noise as Mass has always done.
 
@@ -186,7 +188,6 @@ def calc_noise_result(
     data = np.asarray(data)
     data_zeromean = data - np.mean(data)
     (n_pulses, nsamples) = data_zeromean.shape
-    # see test_ravel_behavior to be sure this is written correctly
     f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
     if nsamples <= skip_autocorr_if_length_over:
         if continuous:
@@ -236,7 +237,6 @@ class NoiseResult:
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
         plt.title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
-        axis.figure.tight_layout()
 
     def plot_log_rebinned(
         self,
@@ -285,4 +285,3 @@ class NoiseResult:
         axis.grid(True, which="both")
         axis.set_xlabel("Frequency (Hz)")
         axis.set_title(f"Log-rebinned noise from {len(self.frequencies) * 2 - 2} samples")
-        axis.figure.tight_layout()

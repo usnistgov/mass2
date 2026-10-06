@@ -3,7 +3,6 @@ import uncertainties
 from uncertainties import unumpy as unp
 from mass2.materials import uncertainties_helpers
 
-import mass2
 import mass2.materials
 import pylab as plt
 

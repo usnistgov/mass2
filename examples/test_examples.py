@@ -32,8 +32,6 @@ def test_noise_limited_optical_tes():
     from . import npy_data_noise_limited_optical_tes as notebook
     notebook.app.run()
 
-# currently fails due to raising a warning on an unclosed file
-# @pytest.mark.filterwarnings("ignore:pytest.PytestUnraisableExceptionWarning")
-# def test_ebit_july2024_mass_off():
-#     from . import ebit_july2024_mass_off as notebook
-#     notebook.app.run()
+def test_ebit_july2024_mass_off():
+    from . import ebit_july2024_from_off as notebook
+    notebook.app.run()

@@ -11,6 +11,7 @@ import typing
 import pylab as plt
 
 import mass2
+from .misc import PulseDataFramer
 from .recipe import RecipeStep
 
 if TYPE_CHECKING:
@@ -44,7 +45,7 @@ class DriftCorrectStep(RecipeStep):
 
     dc: typing.Any
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the drift correction to the input DataFrame and return a new DataFrame with results."""
         indicator_col, uncorrected_col = self.inputs
         slope, offset = self.dc.slope, self.dc.offset
@@ -65,7 +66,6 @@ class DriftCorrectStep(RecipeStep):
             plt.gca(),
         )
         plt.legend()
-        plt.tight_layout()
         return plt.gca()
 
     @classmethod
@@ -103,3 +103,67 @@ class DriftCorrection:
         indicator = np.asarray(indicator)
         uncorrected = np.asarray(uncorrected)
         return uncorrected * (1 + (indicator - self.offset) * self.slope)
+
+
+@dataclass(frozen=True)
+class TimeDriftCorrectStep(RecipeStep):
+    """A RecipeStep to apply a drift correction to pulse data as a spline in time in a DataFrame."""
+
+    correction: typing.Any
+
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
+        """Apply the drift correction to the input DataFrame and return a new DataFrame with results."""
+        time_col, uncorrected_col = self.inputs
+        time_s = df[time_col].dt.epoch("ms").to_numpy() / 1e3
+
+        # If none of the times in the dataset are in the range we know how to correct, then simply duplicate the uncorrected column
+        if self.correction["tmin"] > time_s.max():
+            return df.select(pl.col(uncorrected_col).alias(self.output[0])).with_columns(df)
+        if self.correction["tmax"] < time_s.min():
+            return df.select(pl.col(uncorrected_col).alias(self.output[0])).with_columns(df)
+
+        tnorm = self.correction["normalize"](time_s)
+        model = self.correction["model"]
+        corrected_gain = 1 + model(tnorm)
+
+        df2 = df.select((pl.col(uncorrected_col) * corrected_gain).alias(self.output[0])).with_columns(df)
+        return df2
+
+    def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
+        """Plot the uncorrected and corrected values against the indicator for debugging purposes."""
+        indicator_col, uncorrected_col = self.inputs
+        # breakpoint()
+        df_small = df_after.lazy().filter(self.good_expr).filter(self.use_expr).select(self.inputs + self.output).collect()
+        mass2.misc.plot_a_vs_b_series(df_small[indicator_col], df_small[uncorrected_col])
+        mass2.misc.plot_a_vs_b_series(
+            df_small[indicator_col],
+            df_small[self.output[0]],
+            axis=plt.gca(),
+        )
+        plt.legend()
+        return plt.gca()
+
+    @classmethod
+    def learn(
+        cls, ch: "Channel", time_col: str, uncorrected_col: str, corrected_col: str | None, use_expr: pl.Expr, **kwargs: Any
+    ) -> "TimeDriftCorrectStep":
+        """Create a DriftCorrectStep by learning the correction from data in the given Channel."""
+        if corrected_col is None:
+            corrected_col = uncorrected_col + "_dc"
+
+        time_s, uncorrected_s = ch.good_serieses([time_col, uncorrected_col], use_expr)
+        time_float_s = time_s.dt.epoch("ms") / 1e3
+        pk = np.median(uncorrected_s)
+        w = np.maximum(pk / 3000.0, 1.0)
+
+        correction = mass2.core.analysis_algorithms.time_drift_correct(
+            time=time_float_s.to_numpy(), uncorrected=uncorrected_s.to_numpy(), w=w, **kwargs
+        )
+        step = cls(
+            inputs=[time_col, uncorrected_col],
+            output=[corrected_col],
+            good_expr=ch.good_expr,
+            use_expr=use_expr,
+            correction=correction,
+        )
+        return step

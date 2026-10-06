@@ -2,34 +2,59 @@
 Data structures and methods for handling a single microcalorimeter channel's pulse data and metadata.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import dataclasses
 from typing import Any
 from numpy.typing import ArrayLike, NDArray
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Collection
 import os
 import lmfit
 import polars as pl
+from polars.datatypes import Datetime
 import pylab as plt
+from matplotlib.colors import Colormap
 from matplotlib.backend_bases import MouseEvent
 import marimo as mo
-import functools
 import numpy as np
 import time
 from pathlib import Path
 
-from .noise_channel import NoiseChannel
-from .recipe import Recipe, RecipeStep, SummarizeStep
-from .drift_correction import DriftCorrectStep
-from .optimal_filtering import FilterMaker
-from .filter_steps import OptimalFilterStep
-from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
-from .misc import alwaysTrue
-from .offfiles import OffFile
-from . import misc
-from ..calibration.line_models import GenericLineModel, LineModelResult
-from ..calibration.fluorescence_lines import SpectralLine
+import tzlocal
+
 import mass2
+from ..calibration.fluorescence_lines import SpectralLine
+from ..calibration.line_models import GenericLineModel, LineModelResult
+from . import misc
+from .offfiles import OffFile
+from .misc import alwaysTrue, plot_zoomable, PulseDataFramer, PulseDataFromNumpy
+from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrationStep
+from .filter_steps import OptimalFilterStep
+from .optimal_filtering import FilterMaker
+from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
+from .recipe import Recipe, RecipeStep, SummarizeStep
+from .noise_channel import NoiseChannel
+
+_local_timezone_name = tzlocal.get_localzone_name()
+
+
+@dataclass(frozen=True)
+class ExtTriggerControl:
+    """Parameters to control what columns are added when we incorporate external trigger timing info"""
+
+    ms_nearest_trig: bool = True
+    ms_last_trig: bool = False
+    ms_next_trig: bool = False
+    sf_last_trig: bool = False
+    sf_next_trig: bool = False
+    absolute_sfs: bool = False
+
+    @property
+    def require_last(self) -> bool:
+        return self.ms_last_trig or self.sf_last_trig or self.ms_nearest_trig or self.absolute_sfs
+
+    @property
+    def require_next(self) -> bool:
+        return self.ms_next_trig or self.sf_next_trig or self.ms_nearest_trig or self.absolute_sfs
 
 
 @dataclass(frozen=True)
@@ -43,6 +68,14 @@ class ChannelHeader:
     n_presamples: int
     n_samples: int
     df: pl.DataFrame = field(repr=False)
+    pulse_data_sources: tuple[str | None, ...] | None = field(default=None, repr=False)
+    noise_data_source: str | None = field(default=None, repr=False)
+
+    def leaf_data_sources(self) -> tuple[str | None, ...]:
+        """Leaf file paths behind this header's raw data, or `(data_source,)` if not itself a concatenation."""
+        if self.pulse_data_sources is not None:
+            return self.pulse_data_sources
+        return (self.data_source,)
 
     @classmethod
     def from_ljh_header_df(cls, df: pl.DataFrame) -> "ChannelHeader":
@@ -73,11 +106,63 @@ class Channel:
     steps: Recipe = field(default_factory=Recipe.new_empty, repr=False)
     steps_elapsed_s: list[float] = field(default_factory=list)
     transform_raw: Callable | None = None
+    pulseframer: PulseDataFramer | None = None
+
+    def __post_init__(self) -> None:
+        # If column "pulse" exists and is an Array, make sure it has the same number of samples as the header
+        pulse_col = "pulse"
+        if pulse_col in self.df.columns:
+            dtype = self.df[pulse_col].dtype
+            if isinstance(dtype, pl.Array) and dtype.size != self.header.n_samples:
+                raise ValueError(f"Column '{pulse_col}' has array width {dtype.size} but header.n_samples={self.header.n_samples}")
 
     @property
     def shortname(self) -> str:
         """A short name for this channel, suitable for plot titles."""
         return self.header.description
+
+    @property
+    def ch_num(self) -> int:
+        "Channel number, from the filename"
+        return self.header.ch_num
+
+    @property
+    def frametime_s(self) -> float:
+        "Sample (or frame) period in seconds, from the file header"
+        return self.header.frametime_s
+
+    @property
+    def n_presamples(self) -> int:
+        "Pretrigger samples in each pulse record, from the file header"
+        return self.header.n_presamples
+
+    @property
+    def n_samples(self) -> int:
+        "Samples per pulse, from the file header"
+        return self.header.n_samples
+
+    def head(self, n: int) -> "Channel":
+        "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
+        df = self.df.head(n)
+        framer = self.pulseframer.select_rows(np.arange(len(df))) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
+
+    def tail(self, n: int) -> "Channel":
+        "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        orig_len = len(self.df)
+        df = self.df.tail(n)
+        start = orig_len - len(df)
+        framer = self.pulseframer.select_rows(np.arange(start, orig_len)) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
+
+    def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
+        "Return a new Channel, using only a random selection of `n` pulse records."
+        df_indexed = self.df.with_row_index("__sample_idx__")
+        sampled = df_indexed.sample(n=n, fraction=fraction, with_replacement=False)
+        row_indices = sampled["__sample_idx__"].to_numpy()
+        df = sampled.drop("__sample_idx__")
+        framer = self.pulseframer.select_rows(row_indices) if self.pulseframer is not None else None
+        return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def mo_stepplots(self) -> mo.ui.dropdown:
         """Marimo UI element to choose and display step plots, with a dropdown to choose channel number."""
@@ -91,7 +176,7 @@ class Channel:
         mo_ui = mo.ui.dropdown(
             desc_ind,
             value=first_non_summarize_step.description,
-            label=f"choose step for ch {self.header.ch_num}",
+            label=f"choose step for ch {self.ch_num}",
         )
 
         def show() -> mo.Html:
@@ -160,7 +245,18 @@ class Channel:
         use_good_expr: bool = True,
         use_expr: pl.Expr = pl.lit(True),
     ) -> tuple[NDArray, NDArray]:
-        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr."""
+        """Compute and plot a histogram of the given column, optionally filtering by good_expr and use_expr.
+
+        Args:
+            col (str): Name of the column to histogram
+            bin_edges (ArrayLike): Histogram bin edges
+            axis (plt.Axes | None, optional): The Axes to plot on, if None, create a new figure. Defaults to None.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+
+        Returns:
+            tuple[NDArray, NDArray]: Array of bin centers and counts, respectively
+        """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
         else:
@@ -168,14 +264,13 @@ class Channel:
 
         bin_centers, counts = self.hist(col, bin_edges=bin_edges, use_good_expr=use_good_expr, use_expr=use_expr)
         _, step_size = misc.midpoints_and_step_size(bin_edges)
-        plt.step(bin_centers, counts, where="mid")
+        ax.step(bin_centers, counts, where="mid")
 
         # Customize the plot
         ax.set_xlabel(str(col))
         ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} for {self.shortname}")
-
-        plt.tight_layout()
+        plot_zoomable()
         return bin_centers, counts
 
     def plot_hists(
@@ -189,13 +284,21 @@ class Channel:
         skip_none: bool = True,
     ) -> tuple[NDArray, dict[str, NDArray]]:
         """
-        Plots histograms for the given column, grouped by the specified column.
+        Plots histograms for values in the given column, grouped by the specified column. There will be
+        one separate histogram for each distinct values of the `group_by_col` column.
 
-        Parameters:
-        - col (str): The column name to plot.
-        - bin_edges (array-like): The edges of the bins for the histogram.
-        - group_by_col (str): The column name to group by. This is required.
-        - axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+        Args:
+            col (str): The column name to plot.
+            bin_edges (array-like): The edges of the bins for the histogram.
+            group_by_col (str): The column name to group by. This is required.
+            axis (matplotlib.Axes, optional): The axis to plot on. If None, a new figure is created.
+            use_good_expr (bool, optional): Whether to use the channel's built-in good expresion. Defaults to True.
+            use_expr (pl.Expr, optional): A use-expression to apply before plotting. Defaults to pl.lit(True).
+            skip_none (bool, optional): Whether to skip None in the groupings. Defaults to True.
+
+        Returns:
+            tuple[NDArray,dict[str, NDArray]]: Array of bin centers and a dictionary mapping group name to
+            counts in the histograms.
         """
         if axis is None:
             _, ax = plt.subplots()  # Create a new figure if no axis is provided
@@ -223,35 +326,32 @@ class Channel:
             bin_centers, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
-            plt.step(bin_centers, counts, where="mid", label=group_name_str)
-            # Plot the histogram for the current group
-            # if group_name == "EBIT":
-            #     ax.hist(values, bins=bin_edges, alpha=0.9, color="k", label=group_name_str)
-            # else:
-            #     ax.hist(values, bins=bin_edges, alpha=0.5, label=group_name_str)
-            # bin_centers, counts = misc.hist_of_series(values, bin_edges)
-            # plt.plot(bin_centers, counts, label=group_name)
+            ax.step(bin_centers, counts, where="mid", label=group_name_str)
         # Customize the plot
         ax.set_xlabel(str(col))
-        ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
+        if len(counts_dict) > 0:
+            ax.set_ylabel(f"Counts per {step_size:.02f} unit bin")
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
         ax.legend(title=group_by_col)
+        plot_zoomable()
 
-        plt.tight_layout()
         return bin_centers, counts_dict
 
-    def plot_scatter(
+    def plot_scatter(  # noqa: PLR0917
         self,
         x_col: str,
         y_col: str,
+        cont_color_col: str | None = None,
         color_col: str | None = None,
         use_expr: pl.Expr = pl.lit(True),
         use_good_expr: bool = True,
         skip_none: bool = True,
-        ax: plt.Axes | None = None,
-        annotate: bool = True,
+        axis: plt.Axes | None = None,
+        annotate: bool = False,
+        max_points: int | None = None,
+        extended_title: bool = True,
     ) -> None:
         """Generate a scatter plot of `y_col` vs `x_col`, optionally colored by `color_col`.
 
@@ -261,49 +361,88 @@ class Channel:
             Name of the column to put on the x axis
         y_col : str
             Name of the column to put on the y axis
+        cont_color_col : str | None, optional
+            Name of the column to use for continuously coloring points, by default None
         color_col : str | None, optional
-            Name of the column to color points by (generally a category like "state_label"), by default None
+            Name of the column to discretely color points by (generally a low cardinality
+            category like "state_label"), by default None
+            At least of `cont_color_col` and `color_col` must be None
         use_expr : pl.Expr, optional
             An expression to select plottable points, by default pl.lit(True)
         use_good_expr : bool, optional
             Whether to apply the object's `good_expr` before plotting, by default True
         skip_none : bool, optional
             Whether to skip color categories with no name, by default True
-        ax : plt.Axes | None, optional
+        axis : plt.Axes | None, optional
             Axes to plot on, by default None
         annotate : bool, optional
             Whether to annotate points that are hovered over or clicked on by the mouse, by default True
+        max_points: int, optional
+            Maximum number of points allowed in scatter plot (or if None, no maximum). To ensure representative
+            from all portions of the data, only 1 of each consecutive N points will be plotted, with N chosen to
+            be consistent with the `max_points` requirement.
+        extended_title : bool, optional
+            Whether to represent the use and good expressions as lines 2-3 in the plot title,
         """
-        if ax is None:
+        # You can't have both kinds of colors: you either use `color_col` for categorical coloring,
+        # or cont_color_col for continuous coloring, or neither.
+        assert color_col is None or cont_color_col is None
+
+        if axis is None:
             fig = plt.figure()
-            ax = plt.gca()
-        plt.sca(ax)  # set current axis so I can use plt api
-        fig = plt.gcf()
+            axis = plt.gca()
+        plt.sca(axis)  # set current axis so I can use plt api
         filter_expr = use_expr
         if use_good_expr:
             filter_expr = self.good_expr.and_(use_expr)
         index_name = "pulse_idx"
         # Caused errors in Polars 1.35 if this was "index". See issue #85.
 
+        # Plot only 1 data value out of every n, if max_points argument is an integer.
+        # Compute n from the ratio of all points to max_points.
+        plot_every_nth = 1
+        if max_points is not None:
+            if max_points < self.npulses:
+                plot_every_nth = 1 + (self.npulses - 1) // max_points
+
         columns_to_keep = [x_col, y_col, index_name]
         if color_col is not None:
             columns_to_keep.append(color_col)
-        df_small = self.df.lazy().with_row_index(name=index_name).filter(filter_expr).select(*columns_to_keep).collect()
+        if cont_color_col is not None:
+            columns_to_keep.append(cont_color_col)
+        df_small = (
+            self.df.lazy()
+            .with_row_index(name=index_name)
+            .filter(filter_expr)
+            .select(*columns_to_keep)
+            .gather_every(plot_every_nth)
+            .collect()
+        )
         lines_pnums: list[tuple[plt.Line2D, pl.Series]] = []
 
-        for (name,), data in df_small.group_by(color_col, maintain_order=True):
-            if name is None and skip_none and color_col is not None:
-                continue
-            (line,) = plt.plot(
-                data.select(x_col).to_series(),
-                data.select(y_col).to_series(),
-                ".",
-                label=name,
+        if cont_color_col is not None:
+            line = plt.scatter(
+                df_small.select(x_col).to_series(),
+                df_small.select(y_col).to_series(),
+                s=3,
+                c=df_small.select(cont_color_col).to_series(),
             )
-            lines_pnums.append((line, data.select(index_name).to_series()))
+
+        else:
+            for (name,), data in df_small.group_by(color_col, maintain_order=True):
+                if name is None and skip_none and color_col is not None:
+                    continue
+                (line,) = plt.plot(
+                    data.select(x_col).to_series(),
+                    data.select(y_col).to_series(),
+                    ".",
+                    label=name,
+                )
+                lines_pnums.append((line, data.select(index_name).to_series()))
 
         if annotate:
-            annotation = ax.annotate(
+            fig = plt.gcf()
+            annotation = axis.annotate(
                 "",
                 xy=(0, 0),
                 xytext=(-20, 20),
@@ -342,7 +481,7 @@ class Channel:
                     The mouse-related event; contains location information
                 """
                 vis = annotation.get_visible()
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -361,7 +500,7 @@ class Channel:
                 event : MouseEvent
                     The mouse-related event; contains location information
                 """
-                if event.inaxes != ax:
+                if event.inaxes != axis:
                     return
                 cont, ind = line.contains(event)
                 if cont:
@@ -375,13 +514,158 @@ class Channel:
 
         plt.xlabel(str(x_col))
         plt.ylabel(str(y_col))
-        title_str = f"""{self.header.description}
-        use_expr={str(use_expr)}
-        good_expr={str(self.good_expr)}"""
+
+        if extended_title:
+            title_parts = [self.header.description]
+
+            def truncated_str(s: str, max: int = 50) -> str:
+                if len(s) <= 50:
+                    return s
+                return s[:50] + "..."
+
+            if use_expr is not pl.lit(True):
+                usestr = truncated_str("Use: " + str(use_expr))
+                title_parts.append(usestr)
+            title_parts.append("Good: " + truncated_str(str(self.good_expr)))
+            title_str = "\n".join(title_parts)
+        else:
+            title_str = self.header.description
         plt.title(title_str)
         if color_col is not None:
             plt.legend(title=color_col)
-        plt.tight_layout()
+        plot_zoomable()
+
+    def plot_pulses(  # noqa: PLR0914, PLR0917
+        self,
+        length: int = 30,
+        skip: int = 0,
+        random: bool = False,
+        record_numbers: Collection[Any] | pl.Series | None = None,
+        subtract_baseline: bool = False,
+        derivative: bool = False,
+        summarize: bool = True,
+        summary_columns: Collection[Any] | None = None,
+        pulse_field: str = "pulse",
+        use_expr: pl.Expr = pl.lit(True),
+        use_good_expr: bool = True,
+        axis: plt.Axes | None = None,
+        cm: str | Colormap = "viridis_r",
+    ) -> None:
+        """Plot some example pulses
+
+        Parameters
+        ----------
+        length : int, optional
+            How many pulses to plot, by default 30
+        skip : int, optional
+            Start plotting at this pulse record number, by default 0
+        random : bool, optional
+            Whether to plot `length` randomly selected records, by default False
+            If True, `skip` is ignored.
+        record_numbers : Collection[Any] | pl.Series | None, optional
+            Plot the specified records, numbered from 0 for the first in the dataframe, by default None.
+            If given, `length`, `skip`, and `random` are ignored.
+        subtract_baseline : bool, optional
+            Whether to subtract the pretrigger mean before plotting each record, by default False
+        derivative : bool, optional
+            Whether to plot the "derivative" of a pulse (actually the successive differences), by default False
+        summarize : bool, optional
+            Whether to summarize key facts about each plotted pulse to the terminal, by default True
+        summary_columns : Collection[Any] | None, optional
+            Which specific data columns to report in the summary to the terminal, by default None
+            If None, then a pre-selected set are reported.
+        pulse_field : str
+            The column name in the polars dataframe where plottable pulses, by default "pulse"
+        use_expr : pl.Expr, optional
+            An expression to select plottable points, by default pl.lit(True)
+        use_good_expr : bool, optional
+            Whether to apply the object's `good_expr` before plotting, by default True
+            If True, then the existing `good_expr` will be applied AND the `use_expr` will be, too.
+        axis : plt.Axes | None, optional
+            Axes to plot on, by default None
+            If None, create a new figure.
+        cm : str | Colormap, optional
+            The colormap to use for distinguishing pulses, by default "viridis_r"
+        """
+        assert self.pulseframer is not None
+        test_df = self.pulseframer.load_raw_pulse(0)
+        pulse_type = test_df[pulse_field].dtype
+        assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
+            f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
+        )
+
+        if axis is None:
+            _, axis = plt.subplots()  # Create a new figure if no axis is provided
+
+        if use_good_expr and self.good_expr is not True:
+            # True doesn't implement .and_, haven't found a exper literal equivalent that does
+            # so we special case True
+            filter_expr = self.good_expr.and_(use_expr)
+        else:
+            filter_expr = use_expr
+
+        if isinstance(cm, str):
+            cmap = plt.get_cmap(cm)
+        else:
+            cmap = cm
+
+        lf = self.df.lazy().with_row_index("Record #")
+        if record_numbers is None:
+            if random:
+                title = f"{length} random pulses"
+                lf = lf.filter(filter_expr).collect().sample(length).lazy().sort("Record #")
+            else:
+                lf = lf.filter(filter_expr).slice(skip, length)
+                title = f"{length} selected pulses"
+        else:
+            title = f"Pulses #{record_numbers}"
+            lf = lf.filter(pl.col("Record #").is_in(record_numbers))
+        plt.title(f"{title} from Chan {self.ch_num}")
+        if summarize:
+            # Preferred data info to print to terminal.
+            if summary_columns is None:
+                summary_columns = [
+                    "Record #",
+                    "pretrig_mean",
+                    "pulse_rms",
+                    "pulse_average",
+                    "rise_time",
+                    "peak_value",
+                    "energy_5lagy",
+                    "state_label",
+                ]
+            # Remove preferred column if it doesn't exist
+            columns = [c for c in summary_columns if c in lf.collect_schema().names()]
+            summary_df = lf.select(columns).collect()
+            summary_df.show(limit=None)
+
+        frametime_ms = self.frametime_s * 1e3
+        sample_x = np.arange(self.header.n_samples) - self.header.n_presamples
+
+        def samples2ms(s: ArrayLike) -> ArrayLike:
+            return np.asarray(s) * frametime_ms
+
+        def ms2samples(ms: ArrayLike) -> ArrayLike:
+            return np.asarray(ms) / frametime_ms
+
+        upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
+        upper_axis.set_xlabel("Time after trigger (ms)")
+        plt.xlabel("Samples after trigger")
+
+        df = lf.select(("Record #", "pretrig_mean")).collect()
+        idx = df["Record #"]
+        ptmean = df["pretrig_mean"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field]
+        N = len(idx)
+        for i in range(N):
+            pulse = pulses[i].to_numpy()
+            color = cmap(i / N)
+            if subtract_baseline:
+                pulse = pulse - ptmean[i]  # noqa: PLR6104
+            if derivative:
+                pulse = np.hstack((0, np.diff(pulse)))
+            axis.plot(sample_x, pulse, color=color)
+        plot_zoomable()
 
     def good_series(self, col: str, use_expr: pl.Expr = pl.lit(True)) -> pl.Series:
         """Return a Polars Series of the given column, filtered by good_expr and use_expr."""
@@ -413,6 +697,20 @@ class Channel:
         for step in reversed(self.steps):
             if isinstance(step, OptimalFilterStep):
                 return step.filter.values
+        return None
+
+    @property
+    def last_v_over_dv(self) -> float | None:
+        """Return the predicted V/dV stored in the last recipe step that's an optimal filter step
+
+        Returns
+        -------
+        float | None
+            The last filtering step's predicted V/dV ratio, or None if no such step
+        """
+        for step in reversed(self.steps):
+            if isinstance(step, OptimalFilterStep):
+                return step.filter.predicted_v_over_dv
         return None
 
     @property
@@ -520,7 +818,7 @@ class Channel:
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
         t_start = time.time()
-        df2 = step.calc_from_df(self.df)
+        df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
@@ -607,10 +905,10 @@ class Channel:
                 good_expr = good_expr.and_(this_iter_good_expr)
         return self.with_good_expr(good_expr, replace)
 
-    @functools.cache
     def typical_peak_ind(self, col: str = "pulse") -> int:
         """Return the typical peak index of the given column, using the median peak index for the first 100 pulses."""
-        raw = self.df.limit(100)[col].to_numpy()
+        assert self.pulseframer is not None
+        raw = self.pulseframer.load_raw_chunk(0, 100)[col].to_numpy()
         if self.transform_raw is not None:
             raw = self.transform_raw(raw)
         return int(np.median(raw.argmax(axis=1)))
@@ -622,17 +920,17 @@ class Channel:
         out_names = mass2.core.pulse_algorithms.result_dtype.names
         # mypy (incorrectly) thinks `out_names` might be None, and `list(None)` is forbidden. Assertion makes it happy again.
         assert out_names is not None
+        assert self.pulseframer is not None
         outputs = list(out_names)
         step = SummarizeStep(
             inputs=[col],
             output=outputs,
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
-            frametime_s=self.header.frametime_s,
+            frametime_s=self.frametime_s,
             peak_index=peak_index,
-            pulse_col=col,
             pretrigger_ignore_samples=pretrigger_ignore_samples,
-            n_presamples=self.header.n_presamples,
+            n_presamples=self.n_presamples,
             transform_raw=self.transform_raw,
         )
         return self.with_step(step)
@@ -642,7 +940,7 @@ class Channel:
     ) -> "Channel":
         """Correct pretrigger mean jumps in the raw pulse data, writing to a new column."""
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
-            inputs=[uncorrected],
+            inputs=[uncorrected, "subframecount"],
             output=[corrected],
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
@@ -703,22 +1001,14 @@ class Channel:
         NDArray
             _description_
         """
-        avg_pulse = (
-            self.df
-            .lazy()
-            .filter(self.good_expr)
-            .filter(use_expr)
-            .select(pulse_col)
-            .limit(limit)
-            .collect()
-            .to_series()
-            .to_numpy()
-            .mean(axis=0)
-        )
-        avg_pulse -= avg_pulse[: self.header.n_presamples].mean()
+        assert self.pulseframer is not None
+        idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
+        avg_pulse = pulses.mean(axis=0)
+        avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
 
-    def filter5lag(
+    def filter5lag(  # noqa: PLR0917
         self,
         pulse_col: str = "pulse",
         peak_y_col: str = "5lagy",
@@ -726,6 +1016,10 @@ class Channel:
         f_3db: float = 25e3,
         use_expr: pl.Expr = pl.lit(True),
         time_constant_s_of_exp_to_be_orthogonal_to: float | None = None,
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
+        cut_pre: int = 0,
+        cut_post: int = 0,
     ) -> "Channel":
         """Compute a 5-lag optimal filter and apply it.
 
@@ -743,6 +1037,17 @@ class Channel:
             An expression to select pulses for averaging, by default pl.lit(True)
         time_constant_s_of_exp_to_be_orthogonal_to : float | None, optional
             Optionally an exponential decay time to make the filter insensitive to, by default None
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
 
         Returns
         -------
@@ -750,25 +1055,130 @@ class Channel:
             This channel with a Filter5LagStep added to the recipe.
         """
         assert self.noise
-        noiseresult = self.noise.spectrum(trunc_back=2, trunc_front=2)
+        shortening_5lag = 4  # 5-lag filters shorten the pulse by 2 on each end
+        n_samples_5lag = self.n_samples - shortening_5lag
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert n_samples_5lag <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_5lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_5lag}; {suggest}"
+
         avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
+
         if time_constant_s_of_exp_to_be_orthogonal_to is None:
-            filter5lag = filter_maker.compute_5lag(f_3db=f_3db)
+            if fourier:
+                filter5lag = filter_maker.compute_fourier(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+            else:
+                filter5lag = filter_maker.compute_5lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         else:
-            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, exp_time_seconds=time_constant_s_of_exp_to_be_orthogonal_to)
+            if fourier:
+                raise NotImplementedError(
+                    "Can't make filters orthogonal to an exponential AND in Fourier domain (i.e. without noise autocorrelation)"
+                )
+            ets = time_constant_s_of_exp_to_be_orthogonal_to
+            filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
             inputs=["pulse"],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
             filter=filter5lag,
+            spectrum=noiseresult,
+            filter_maker=filter_maker,
+            transform_raw=self.transform_raw,
+        )
+        return self.with_step(step)
+
+    def filter1lag(  # noqa: PLR0917
+        self,
+        pulse_col: str = "pulse",
+        peak_y_col: str = "1lagy",
+        peak_x_col: str = "1lagx",
+        f_3db: float = 25e3,
+        use_expr: pl.Expr = pl.lit(True),
+        fourier: bool = False,
+        longest_autocorr_filter: int = 10_000,
+        cut_pre: int = 0,
+        cut_post: int = 0,
+    ) -> "Channel":
+        """Compute a 1-lag optimal filter and apply it.
+
+        Parameters
+        ----------
+        pulse_col : str, optional
+            Which column contains raw data, by default "pulse"
+        peak_y_col : str, optional
+            Column to contain the optimal filter results, by default "1lagy"
+        peak_x_col : str, optional
+            Column to contain the 5-lag filter's estimate of arrival-time/phase, by default "1lagx"
+        f_3db : float, optional
+            A low-pass filter 3 dB point to apply to the computed filter, by default 25e3
+        use_expr : pl.Expr, optional
+            An expression to select pulses for averaging, by default pl.lit(True)
+        fourier : bool, optional
+            Whether to use filters constructed in the Fourier domain, by default False
+            The alternative, default choice is to construct time-domain filters using the noise autocorrelation
+        longest_autocorr_filter: int, optional
+            Don't compute noise autocorrelation-based filters if the record length exceeds this limit, by default 10000.
+            (Filters based on very long autocorrelations take O(N^2) operations and memory to generate.)
+            If exceeded, filters will be Fourier-space filters.
+        cut_pre : int
+            The number of initial samples to be given zero weight, by default 0
+        cut_post : int
+            The number of samples at the end of a record to be given zero weight, by default 0
+
+        Returns
+        -------
+        Channel
+            This channel with a Filter5LagStep added to the recipe.
+        """
+        assert self.noise
+        shortening_1lag = 0  # 1-lag filters do not shorten the pulse records
+        n_samples_1lag = self.n_samples - shortening_1lag
+        if not fourier:
+            suggest = "use `fourier=True` or increase `longest_autocorr_filter`"
+            assert n_samples_1lag <= longest_autocorr_filter, (
+                f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
+            )
+
+        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        if not fourier:
+            assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
+            Nac = len(noiseresult.autocorr_vec)
+            assert n_samples_1lag <= Nac, f"Autocorrelation result ({Nac}) is too short for {n_samples_1lag}; {suggest}"
+
+        avg_pulse = self.compute_average_pulse(pulse_col=pulse_col, use_expr=use_expr)
+        filter_maker = FilterMaker(
+            signal_model=avg_pulse,
+            n_pretrigger=self.n_presamples,
+            noise_psd=noiseresult.psd,
+            noise_autocorr=noiseresult.autocorr_vec,
+            sample_time_sec=self.frametime_s,
+        )
+
+        if fourier:
+            filter1lag = filter_maker.compute_fourier(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+        else:
+            filter1lag = filter_maker.compute_1lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
+        step = OptimalFilterStep(
+            inputs=["pulse"],
+            output=[peak_x_col, peak_y_col],
+            good_expr=self.good_expr,
+            use_expr=use_expr,
+            filter=filter1lag,
             spectrum=noiseresult,
             filter_maker=filter_maker,
             transform_raw=self.transform_raw,
@@ -793,13 +1203,16 @@ class Channel:
         tuple[NDArray, NDArray]
             _description_
         """
+        assert self.pulseframer is not None
+        # idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
+        # pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         df = (
-            self.df
-            .lazy()
+            self.df.lazy()
+            .with_row_index("Record #")
             .filter(self.good_expr)
             .filter(use_expr)
             .limit(limit)
-            .select(pulse_col, "pulse_rms", "promptness", "pretrig_mean")
+            .select("Record #", "pulse_rms", "promptness", "pretrig_mean")
             .collect()
         )
 
@@ -817,10 +1230,11 @@ class Channel:
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
-        pulse = df["pulse"].to_numpy()
-        avg_pulse = np.zeros(self.header.n_samples, dtype=float)
-        dt_model = np.zeros(self.header.n_samples, dtype=float)
-        for i in range(self.header.n_presamples, self.header.n_samples):
+        idx = df["Record #"]
+        pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
+        avg_pulse = np.zeros(self.n_samples, dtype=float)
+        dt_model = np.zeros(self.n_samples, dtype=float)
+        for i in range(self.n_presamples, self.n_samples):
             slope, offset = np.polyfit(df["ATime"], (pulse[:, i] - df["pretrig_mean"]), 1)
             dt_model[i] = -slope
             avg_pulse[i] = offset
@@ -863,10 +1277,10 @@ class Channel:
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             dt_model=dt_model,
-            n_pretrigger=self.header.n_presamples,
+            n_pretrigger=self.n_presamples,
             noise_psd=noiseresult.psd,
             noise_autocorr=noiseresult.autocorr_vec,
-            sample_time_sec=self.header.frametime_s,
+            sample_time_sec=self.frametime_s,
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
@@ -919,6 +1333,21 @@ class Channel:
         )
         return self.with_step(step)
 
+    def time_drift_correct(
+        self,
+        time_col: str = "timestamp",
+        uncorrected_col: str = "5lagy_dc",
+        corrected_col: str = "5lagy_tdc",
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "Channel":
+        """Correct for gain drifing slowly with time."""
+        # by defining a seperate learn method that takes ch as an argument,
+        # we can move all the code for the step outside of Channel
+        step = TimeDriftCorrectStep.learn(
+            ch=self, time_col=time_col, uncorrected_col=uncorrected_col, corrected_col=corrected_col, use_expr=use_expr
+        )
+        return self.with_step(step)
+
     def linefit(  # noqa: PLR0917
         self,
         line: GenericLineModel | SpectralLine | str | float,
@@ -959,17 +1388,10 @@ class Channel:
 
     def __hash__(self) -> int:
         """Return a hash based on the object's id."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
         return hash(id(self))
 
     def __eq__(self, other: object) -> bool:
         """Return True if the other object is the same object (by id)."""
-        # needed to make functools.cache work
-        # if self or self.anything is mutated, assumptions will be broken
-        # and we may get nonsense results
-        # only checks if the ids match, does not try to be equal if all contents are equal
         return id(self) == id(other)
 
     @classmethod
@@ -979,17 +1401,26 @@ class Channel:
         noise_path: str | Path | None = None,
         keep_posix_usec: bool = False,
         transform_raw: Callable | None = None,
+        max_pulses: int | None = None,
     ) -> "Channel":
         """Load a Channel from an LJH file, optionally with a NoiseChannel from a corresponding noise LJH file."""
         if not noise_path:
             noise_channel = None
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
-        ljh = mass2.LJHFile.open(path)
+        ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
         df, header_df = ljh.to_polars(keep_posix_usec)
         header = ChannelHeader.from_ljh_header_df(header_df)
+        if noise_path:
+            header = dataclasses.replace(header, noise_data_source=str(noise_path))
         channel = cls(
-            df, header=header, npulses=ljh.npulses, subframediv=ljh.subframediv, noise=noise_channel, transform_raw=transform_raw
+            df,
+            header=header,
+            npulses=ljh.npulses,
+            subframediv=ljh.subframediv,
+            noise=noise_channel,
+            transform_raw=transform_raw,
+            pulseframer=ljh,
         )
         return channel
 
@@ -999,8 +1430,12 @@ class Channel:
         assert off._mmap is not None
         df = pl.from_numpy(np.asarray(off._mmap))
         df = (
-            df
-            .select(pl.from_epoch("unixnano", time_unit="ns").dt.cast_time_unit("us").alias("timestamp"))
+            df.select(
+                pl.from_epoch("unixnano", time_unit="ns")
+                .dt.cast_time_unit("us")
+                .dt.convert_time_zone(_local_timezone_name)
+                .alias("timestamp")
+            )
             .with_columns(df)
             .select(pl.exclude("unixnano"))
         )
@@ -1018,8 +1453,171 @@ class Channel:
         channel = cls(df, header, off.nRecords, subframediv=off.subframediv)
         return channel
 
+    @classmethod
+    def from_numpy(  # noqa: PLR0917
+        cls,
+        samplerate: float,
+        npresamples: int,
+        pulse_fname: str | Path,
+        noise_fname: str | Path | None = None,
+        description: str = "",
+        ch_num: int = 0,
+        invert_data: bool = False,
+        timestamps: bool = True,
+        rescale: float = 1.0,
+    ) -> "Channel":
+        """Create a Channel object from a numpy *.npy file representing pulse records.
+        Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
+        use array[0, :, :] as the pulse data. Because the numpy file is not stored with a header,
+        information such as sample rate and # of presamples must be given.
+
+        Parameters
+        ----------
+        samplerate : float
+            Samples per second
+        npresamples : int
+            How many samples in each record precede the pulse trigger
+        pulse_fname : str | Path
+            File containing the raw pulse data  (assumes a *.npy file)
+        noise_fname : str | Path | None, optional
+            File containing the raw noise data, by default None
+        description : str, optional
+            A description to store with the channel, by default ""
+        ch_num : int, optional
+            A channel id number, by default 0
+        invert_data : bool, optional
+            Whether to take the negative of the raw data, by default False
+        timestamps : bool, optional
+            Whether to generate timestamp guesses, based on file creation time, by default True
+        rescale: float, optional
+            Multiply the raw data by this value to get reasonable scaling, by default 1.0
+
+        Returns
+        -------
+        mass2.Channel
+            The Channel created from the numpy file
+        """
+
+        def load(fname: str | Path) -> NDArray:
+            data = np.load(str(fname))
+            if data.ndim == 3:
+                data = data[0, :, :]
+            assert data.ndim == 2
+            if invert_data:
+                data = -data
+            return data * rescale
+
+        frametime_s = 1 / samplerate
+        pdata = load(pulse_fname)
+        nsamples, npulses = pdata.shape
+        pulse_df = pl.DataFrame({"index": range(npulses)})
+
+        # Numpy files don't contain pulse timestamps. Just assume:
+        # a) the records are contiguous in time, and
+        # b) the file's creation time = the time of the first record.
+        # This is clearly wrong, but it at least gives SOME timestamp values.
+        # If you don't like it, set timestamps to False.
+        if timestamps:
+            us_per_second = 1e6
+            ns_per_us = 1000
+            initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
+            times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+
+        if noise_fname is None:
+            nch = None
+        else:
+            ndata = load(noise_fname)
+            _, nnoise = ndata.shape
+            noise_df = pl.DataFrame({"index": range(nnoise)})
+            noise_header = pl.DataFrame({
+                "filename": noise_fname,
+                "continuous": True,
+                "Presamples": npresamples,
+            })
+            framer = PulseDataFromNumpy(ndata.T)
+            nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
+
+        source = os.path.basename(pulse_fname)
+        header = ChannelHeader(
+            description, source, ch_num, frametime_s, n_presamples=npresamples, n_samples=nsamples, df=pl.DataFrame()
+        )
+        framer = PulseDataFromNumpy(pdata.T)
+        return cls(pulse_df, header, npulses, noise=nch, pulseframer=framer)
+
+    @classmethod
+    def combine_channels(cls, sourcename: str, constituents: dict[str, "Channel"]) -> "Channel":
+        """Combine 2 or more channels into 1 (they presumably correspond to one microcalorimeter used
+        under different, discrete conditions). Add a new column to the combined channel's dataframe that
+        tracks their names (i.e, their keys in the dictionary `constituents`). The constituents must have
+        equal `n_samples`, `n_presamples`, and `frametime_s`. Any other incompatibility is used at your own
+        risk.
+
+        The first entry in `constituents` will govern the good expression and history of steps. For this reason,
+        it is best to combine channel objects before any receipe steps are performed.
+
+        Example:
+        ----------
+        >>> constituents = {
+        ...     "Be": mass2.Channel.from_ljh(pathBe),
+        ...     "Fe": mass2.Channel.from_ljh(pathFe),
+        ...     "Ge": mass2.Channel.from_ljh(pathGe),
+        ...     "Se": mass2.Channel.from_ljh(pathSe),
+        ...     "Xe": mass2.Channel.from_ljh(pathXe),
+        ... }
+        >>> composite = mass2.Channel.combine_channels(sourcename="element", constituents=constituents)
+
+        This will create 5 mass2.Channel objects from 5 separate LJH files, perhaps corresponding to measurements of
+        x rays from distinct elemental samples. The `combine_channels` call will generate a new `mass2.Channel`
+        holding the data from all 5 objects, plus a new column named "element", which will be one of
+        {"Be", "Fe", "Ge", "Se", "Xe"}, according to which LJH file it came from.
+
+        Parameters
+        ----------
+        sourcename : str
+            The name of the new dataframe column that will indicate the separate source of the original data.
+        constituents : dict[str, mass2.Channel]
+            A dictionary of named `mass2.Channel` objects. Their keys in this dictionary will be the string value
+            of the new `sourcename` column in the dataframe of the resulting `Channel`.
+
+        Returns
+        -------
+        Channel
+            A channel formed by combining the dataframes of the values of `constituents`, and assuming the header
+            info of the first entry in that dictionary applies to all other entries.
+        """
+        # We'll copy the header and other non-dataframe stuff from the first constituent.
+        combined_chan = next(iter(constituents.values()))
+        df = pl.DataFrame()
+        framers: list[PulseDataFramer | None] = []
+        sources: list[str | None] = []
+        for k, ch in constituents.items():
+            assert ch.frametime_s == combined_chan.frametime_s
+            assert ch.n_presamples == combined_chan.n_presamples
+            assert ch.n_samples == combined_chan.n_samples
+            df = df.vstack(ch.df.with_columns(pl.lit(k).alias(sourcename)))
+            framers.append(ch.pulseframer)
+            sources.extend(ch.header.leaf_data_sources())
+        combined_pulseframer = mass2.core.misc.concat_pulseframers(framers)
+        header = replace(combined_chan.header, data_source=None, pulse_data_sources=tuple(sources))
+        return replace(combined_chan, header=header, df=df, npulses=len(df), pulseframer=combined_pulseframer)
+
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+
+        # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
+        times = df_es["timestamp"]
+        expt_state_time_type = times.dtype
+        self_time_type = self.df["timestamp"].dtype
+        assert isinstance(expt_state_time_type, Datetime)
+        assert isinstance(self_time_type, Datetime)
+        desired_time_zone = self_time_type.time_zone
+        if desired_time_zone is None:
+            desired_time_zone = _local_timezone_name
+        if expt_state_time_type.time_zone != desired_time_zone:
+            times = times.dt.convert_time_zone(desired_time_zone)
+            df_es = df_es.with_columns(timestamp=times)
+
         if not self.df["timestamp"].is_sorted():
             df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
             # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
@@ -1029,27 +1627,78 @@ class Channel:
         df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         return self.with_replacement_df(df2)
 
-    def with_external_trigger_df(self, df_ext: pl.DataFrame) -> "Channel":
+    def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":
         """Add external trigger times from an existing dataframe"""
-        df2 = (
-            self.df
-            .with_columns(subframecount=pl.col("framecount") * self.subframediv)
-            .join_asof(df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig")
-            .join_asof(df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig")
-        )
+        df = self.df
+        _subframediv = self.subframediv
+        if _subframediv is None:
+            _subframediv = 64
+
+        # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
+        if "subframecount" not in df:
+            df = self.df.with_columns(subframecount=pl.col("framecount") * _subframediv)
+
+        assert output_control.require_last or output_control.require_next
+        subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
+
+        df_subframe = df.select("subframecount")
+        if output_control.require_last:
+            df_subframe = df_subframe.join_asof(
+                df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig"
+            )
+            delta = pl.col("subframecount").cast(pl.Int64) - pl.col("subframecount_prev_ext_trig")
+            df_subframe = df_subframe.with_columns(dsf_last_ext_trig=delta)
+        if output_control.require_next:
+            df_subframe = df_subframe.join_asof(
+                df_ext, on="subframecount", strategy="forward", coalesce=False, suffix="_next_ext_trig"
+            )
+            delta = pl.col("subframecount_next_ext_trig") - pl.col("subframecount").cast(pl.Int64)
+            df_subframe = df_subframe.with_columns(dsf_next_ext_trig=delta)
+
+        if output_control.ms_last_trig:
+            df_subframe = df_subframe.with_columns(ms_last_ext_trig=(pl.col("dsf_last_ext_trig") * subframe_time_ms))
+        if output_control.ms_next_trig:
+            df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
+        if output_control.ms_nearest_trig:
+            df_subframe = df_subframe.with_columns(
+                pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
+                .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
+                .alias("ms_nearest_ext_trig")
+            )
+
+        # Drop columns that the user doesn't want
+        if not output_control.absolute_sfs:
+            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
+        if not output_control.sf_last_trig:
+            df_subframe = df_subframe.drop("dsf_last_ext_trig")
+        if not output_control.sf_next_trig:
+            df_subframe = df_subframe.drop("dsf_next_ext_trig")
+
+        df2 = self.df.with_columns(df_subframe)
         return self.with_replacement_df(df2)
 
     def with_replacement_df(self, df2: pl.DataFrame) -> "Channel":
         """Replace the dataframe with a new one, keeping all other attributes the same."""
-        return dataclasses.replace(
-            self,
-            df=df2,
-        )
+        return dataclasses.replace(self, df=df2, npulses=len(df2))
 
-    def with_columns(self, df2: pl.DataFrame) -> "Channel":
-        """Append columns from df2 to the existing dataframe, keeping all other attributes the same."""
-        df3 = self.df.with_columns(df2)
-        return self.with_replacement_df(df3)
+    def drop(self, *args: str) -> "Channel":
+        "Return a Channel, after dropping one or more columns from the dataframe, by name"
+        df = self.df.drop(*args)
+        return self.with_replacement_df(df)
+
+    def with_columns(self, *exprs: pl.Expr | Iterable[pl.Expr] | pl.DataFrame, **named_exprs: pl.Expr) -> "Channel":
+        """Append expressions from *exprs or **named_exprs to the existing dataframe, preserving all other attributes.
+
+        Possible uses include:
+        1. ch.with_columns(pl.col("oldcolumn").sqrt().alias("newsqrt"), ... )
+        2. ch.with_columns(newsqrt=pl.col("oldcolumn").sqrt())
+        3. Two steps: construct a pl.DataFrame from a dict first
+            df = {"newsqrt": pl.col("oldcolumn").sqrt()}
+            ch.with_columns(df)
+        """
+        enhanced_df = self.df.with_columns(*exprs, **named_exprs)
+        return self.with_replacement_df(enhanced_df)
 
     def multifit_quadratic_gain_cal(
         self,
@@ -1085,25 +1734,43 @@ class Channel:
         )
         return self.with_step(step)
 
-    def concat_df(self, df: pl.DataFrame) -> "Channel":
+    def concat_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> "Channel":
         """Concat the given dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new frame `df` has a history and/or steps, those will be lost"""
+        If the new frame `df` has a history and/or steps, those will be lost.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Rows to append after this channel's existing rows.
+        pulseframer : PulseDataFramer | None, optional
+            A source of raw pulses for the rows of `df`, by default None. When given (and this channel
+            already has a `pulseframer`), the result's `pulseframer` serves raw pulses from both sources,
+            in order. If omitted, the result's `pulseframer` is None, since raw pulses for the appended
+            rows would otherwise be unavailable.
+        """
+        combined_df = mass2.core.misc.concat_dfs_with_concat_state(self.df, df)
+        combined_pulseframer = mass2.core.misc.concat_pulseframers([self.pulseframer, pulseframer])
+        sources = self.header.leaf_data_sources() + (None,)
+        header = replace(self.header, data_source=None, pulse_data_sources=sources)
         ch2 = Channel(
-            mass2.core.misc.concat_dfs_with_concat_state(self.df, df),
-            self.header,
-            self.npulses,
+            combined_df,
+            header,
+            len(combined_df),
             subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
+            pulseframer=combined_pulseframer,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
         return ch2
 
     def concat_ch(self, ch: "Channel") -> "Channel":
-        """Concat the given channel's dataframe to the existing dataframe, keeping all other attributes the same.
-        If the new channel `ch` has a history and/or steps, those will be lost"""
-        ch2 = self.concat_df(ch.df)
-        return ch2
+        """Concat the given channel's dataframe (and raw-pulse source) to this one's, keeping all other
+        attributes the same. If the new channel `ch` has a history and/or steps, those will be lost"""
+        result = self.concat_df(ch.df, pulseframer=ch.pulseframer)
+        sources = self.header.leaf_data_sources() + ch.header.leaf_data_sources()
+        header = replace(result.header, data_source=None, pulse_data_sources=sources)
+        return replace(result, header=header)
 
     def phase_correct_mass_specific_lines(
         self,
@@ -1134,7 +1801,7 @@ class Channel:
 
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
         """Save the recipe steps to a pickle file, keyed by channel number."""
-        steps = {self.header.ch_num: self.steps}
+        steps = {self.ch_num: self.steps}
         misc.pickle_object(steps, filename)
         return steps
 
@@ -1152,18 +1819,6 @@ class Channel:
             Whether to make the histograms have a logarithmic y-scale, by default False.
         """
         plt.figure()
-        tpi_microsec = (self.typical_peak_ind() - self.header.n_presamples) * (1e6 * self.header.frametime_s)
-        plottables = (
-            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
-            ("pulse_average", "Pulse Avg", "purple", None),
-            ("peak_value", "Peak value", "blue", None),
-            ("pretrig_rms", "Pretrig RMS", "green", [0, 4000]),
-            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
-            ("postpeak_deriv", "Max PostPk deriv", "gold", [0, 200]),
-            ("rise_time_µs", "Rise time (µs)", "orange", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-            ("peak_time_µs", "Peak time (µs)", "red", [-0.3 * tpi_microsec, 2 * tpi_microsec]),
-        )
-
         use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
@@ -1172,9 +1827,22 @@ class Channel:
 
         df = self.df.lazy().gather_every(downsample)
         df = df.with_columns(
-            ((pl.col("peak_index") - self.header.n_presamples) * (1e6 * self.header.frametime_s)).alias("peak_time_µs")
+            ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
+            (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
-        df = df.with_columns((pl.col("rise_time") * 1e6).alias("rise_time_µs"))
+
+        tpi_microsec = df.filter(self.good_expr).select("peak_time_µs").median().collect().item()
+        plottables = (
+            ("pulse_rms", "Pulse RMS", "#dd00ff", None),
+            ("pulse_average", "Pulse Avg", "purple", None),
+            ("peak_value", "Peak value", "blue", None),
+            ("pretrig_rms", "Pretrig RMS", "green", (0, 4000)),
+            ("pretrig_mean", "Pretrig Mean", "#00ff26", None),
+            ("postpeak_deriv", "Max PostPk deriv", "gold", (0, 200)),
+            ("rise_time_µs", "Rise time (µs)", "orange", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+            ("peak_time_µs", "Peak time (µs)", "red", (-0.3 * tpi_microsec, 2 * tpi_microsec)),
+        )
+
         existing_columns = df.collect_schema().names()
         preserve = [p[0] for p in plottables if p[0] in existing_columns]
         preserve.append("timestamp")
@@ -1206,13 +1874,20 @@ class Channel:
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
-        pulse = self.df[col][index].to_numpy()
-        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.header.n_presamples, dt=self.header.frametime_s)
+        assert self.pulseframer is not None
+        pulse = self.pulseframer.load_raw_pulse(index)[col].to_numpy()
+        result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
             print(f"pulse index={index}")
             print(result.fit_report())
         return result
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("pulseframer", None)
+        return state
 
 
 @dataclass(frozen=True)

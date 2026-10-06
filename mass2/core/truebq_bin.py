@@ -23,7 +23,7 @@ header_dtype = np.dtype([
     ("sample_rate_hz", np.float64),
     ("data_reduction_factor", np.int16),
     ("voltage_scale", np.float64),
-    ("aquisition_flags", np.uint16),
+    ("acquisition_flags", np.uint16),
     ("start_time", np.uint64, 2),
     ("stop_time", np.uint64, 2),  # often wrong, written at end of run
     ("number_of_samples", np.uint64),  # often wrong, written at end of run
@@ -81,8 +81,7 @@ class TriggerResult:
 
         # trigger indices (raw) → restrict to plotted window → convert to decimated indices
         trig_inds_raw = (
-            pl
-            .DataFrame({"trig_inds": self.trig_inds})
+            pl.DataFrame({"trig_inds": self.trig_inds})
             .filter(pl.col("trig_inds").is_between(raw_start, raw_stop))
             .to_series()
             .to_numpy()
@@ -125,6 +124,7 @@ class TriggerResult:
             df,
             header_df=self.data_source.header_df,
             frametime_s=self.data_source.frametime_s,
+            pulseframer=misc.PulseDataFromNumpy(pulses),
         )
         return noise
 
@@ -272,7 +272,7 @@ class TrueBqBin:
     frametime_s: float
     voltage_scale: float
     data: np.ndarray
-    # the bin file is a continuous data aqusition, untriggered
+    # the bin file is a continuous data acquisition, untriggered
 
     @classmethod
     def load(cls, bin_path: str | Path) -> "TrueBqBin":
@@ -413,11 +413,11 @@ def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float,
     # intitalize a,b,c
     j = 0
     cache[:] = data[j : (j + filter_len)]
-    b = np.dot(cache, filter)
+    b = cache @ filter
     a = b  # won't be used, just need same type
     j = 1
     cache[:] = data[j : (j + filter_len)]
-    c = np.dot(cache, filter)
+    c = cache @ filter
     j = 2
     ready = False
     prog_step = jmax // 100
@@ -429,7 +429,7 @@ def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float,
                 print(f"fasttrig_filter_trigger {prog_ticks}/{100}")
         a, b = b, c
         cache[:] = data[j : (j + filter_len)]
-        c = np.dot(cache, filter)
+        c = cache @ filter
         if b > threshold and b >= c and b > a and ready:
             inds.append(j)
             ready = False
@@ -510,13 +510,13 @@ def filter_and_residual_rms(
     residual_rms = np.zeros(len(trig_inds))
     filt_value_template = np.zeros(len(trig_inds))
     template = avg_pulse - np.mean(avg_pulse)
-    template /= np.sqrt(np.dot(template, template))
+    template /= np.linalg.norm(template)
     for i in range(len(trig_inds)):
         j = trig_inds[i]
         pulse = data[j - npre : j + nsamples - npre] * polarity
         pulse -= pulse.mean()
-        filt_value[i] = np.dot(chosen_filter, pulse)
-        filt_value_template[i] = np.dot(template, pulse)
+        filt_value[i] = chosen_filter @ pulse
+        filt_value_template[i] = template @ pulse
         residual = pulse - template * filt_value_template[i]
         residual_rms_val = misc.root_mean_squared(residual)
         residual_rms[i] = residual_rms_val
@@ -535,7 +535,7 @@ def fast_apply_filter(data: NDArray, filter_in: NDArray) -> NDArray:
     jmax = len(data) - filter_len - 1
     while j <= jmax:
         cache[:] = data[j : (j + filter_len)]
-        filter_out[j] = np.dot(cache, filter)
+        filter_out[j] = cache @ filter
         j += 1
     return filter_out
 

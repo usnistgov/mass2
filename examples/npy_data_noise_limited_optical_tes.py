@@ -1,7 +1,15 @@
 import marimo
 
-__generated_with = "0.13.15"
+__generated_with = "0.23.11"
 app = marimo.App(width="medium")
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Some examples of studying optical TES data from numpy files
+    """)
+    return
 
 
 @app.cell
@@ -12,52 +20,32 @@ def _():
     import marimo as mo
     import mass2
     import pulsedata
-    return mass2, np, pl, plt, pulsedata
+
+    return mass2, mo, np, pl, plt, pulsedata
 
 
 @app.cell
-def _(mass2, pl, pulse_traces):
-    def channel_from_npy_arrays(pulses_traces, noise_traces, npresamples, frametime_s, ch_num: int = 0):
-        header_df = pl.DataFrame()
-        frametime_s = 1e-5
-        df_noise = pl.DataFrame({"pulse": noise_traces})
-        noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s)
-        nsamples, npulses = pulses_traces.shape
-        header = mass2.ChannelHeader(
-            description="from npy arrays",
-            data_source=None,
-            ch_num=ch_num,
-            frametime_s=frametime_s,
-            n_presamples=npresamples,
-            n_samples=nsamples,
-            df=header_df,
-        )
-        df = pl.DataFrame({"pulse": pulse_traces}).with_row_index()
-        ch = mass2.Channel(df, header, npulses=npulses, noise=noise_ch)
-        return ch
-    return (channel_from_npy_arrays,)
-
-
-@app.cell
-def _(np, pulsedata):
+def _(mass2, pulsedata):
     pulse_noise_pair = pulsedata.numpy["noise_limited_optical_tes"]
     noisepath = pulse_noise_pair.noise
     pulsepath = pulse_noise_pair.pulse
-    pulse_traces = np.load(pulsepath)[0].T*-1e4 # it's easier to work with positive going pulses for now with typical scale around 1000 units large
-    noise_traces = np.load(noisepath)[0].T*1e4
-    return noise_traces, pulse_traces
-
-
-@app.cell
-def _(channel_from_npy_arrays, noise_traces, pulse_traces):
-    ch = channel_from_npy_arrays(pulse_traces, noise_traces, npresamples = 300, frametime_s=6.25e-5)
+    ch = mass2.Channel.from_numpy(
+        samplerate = 16e3,
+        npresamples=300,
+        pulse_fname=pulsepath,
+        noise_fname=noisepath,
+        description="from npy arrays",
+        invert_data=True,
+        rescale=1e4
+    )
     return (ch,)
 
 
 @app.cell
 def _(ch, plt):
     plt.figure()
-    plt.plot(ch.df.limit(20)["pulse"].to_numpy().T)
+    _pulses = ch.pulseframer.load_raw_chunk(0, 20)["pulse"].to_numpy().T
+    plt.plot(_pulses)
     return
 
 
@@ -75,7 +63,7 @@ def _(ch2):
 
 @app.cell
 def _(ch2, np, plt):
-    ch2.plot_hist("peak_value", np.linspace(0,5000,100))
+    ch2.plot_hist("peak_value", np.linspace(0, 5000, 100))
     plt.gcf()
     return
 
@@ -88,14 +76,14 @@ def _(ch2, pl):
 
 @app.cell
 def _(ch3, np, plt):
-    ch3.plot_hist("5lagy", np.linspace(-1000,3000,500))
+    ch3.plot_hist("5lagy", np.linspace(-1000, 3000, 500))
     plt.gcf()
     return
 
 
 @app.cell
 def _(ch3):
-    ch4=ch3
+    ch4 = ch3.with_columns(ch3.pulseframer.load_raw_chunk(0, ch3.npulses))
     # here we would do calibration, but the mass2 gain based calibration fails from learning from points at energy=0 currently,
     # since gains=ph/e = inf when e=0
     return (ch4,)
@@ -110,7 +98,7 @@ def _(ch4, plt):
 
 @app.cell
 def _(ch4, pl):
-    avg_pulse = ch4.df.filter(pl.col("5lagy").is_between(1000,1500))["pulse"].to_numpy().mean(axis=0)
+    avg_pulse = ch4.df.filter(pl.col("5lagy").is_between(1000, 1500))["pulse"].to_numpy().mean(axis=0)
     return (avg_pulse,)
 
 
@@ -129,7 +117,7 @@ def _(avg_pulse, np):
         unit_vec = avg_pulse / norm
 
         def get_residual_rms(pulse):
-            height = np.dot(pulse, unit_vec)
+            height = pulse @ unit_vec
             residuals = pulse - (height * unit_vec)
             return np.sqrt(np.mean(residuals**2))
 
@@ -141,8 +129,9 @@ def _(avg_pulse, np):
 
 @app.cell
 def _(ch4, get_residual_rms, mass2, pl):
-    ch5: mass2.Channel =ch4.with_column_map_step(f=get_residual_rms, input_col="pulse", output_col = "residual_rms")
-    ch5 = ch5.with_categorize_step({"clean":pl.lit(True),"residual_rms>100":pl.col("residual_rms")>100,"residual_rms>150":pl.col("residual_rms")>150,"residual_rms>200":pl.col("residual_rms")>200})
+    ch5: mass2.Channel = ch4.with_column_map_step(f=get_residual_rms, input_col="pulse", output_col="residual_rms")
+    ch5 = ch5.with_categorize_step({"clean": pl.lit(True), "residual_rms>100": pl.col(
+        "residual_rms") > 100, "residual_rms>150": pl.col("residual_rms") > 150, "residual_rms>200": pl.col("residual_rms") > 200})
     return (ch5,)
 
 
@@ -156,7 +145,7 @@ def _(ch5: "mass2.Channel"):
 def _(ch5: "mass2.Channel", pl, plt):
     plt.figure()
     plt.title("rejected pulses based on residual_rms>200")
-    plt.plot(ch5.df.filter(pl.col("category")=="residual_rms>200").limit(100)["pulse"].to_numpy().T)
+    plt.plot(ch5.df.filter(pl.col("category") == "residual_rms>200").limit(100)["pulse"].to_numpy().T)
     plt.gcf()
     return
 
@@ -165,7 +154,7 @@ def _(ch5: "mass2.Channel", pl, plt):
 def _(ch5: "mass2.Channel", pl, plt):
     plt.figure()
     plt.title("rejected pulses based on residual_rms>150")
-    plt.plot(ch5.df.filter(pl.col("category")=="residual_rms>150").limit(100)["pulse"].to_numpy().T)
+    plt.plot(ch5.df.filter(pl.col("category") == "residual_rms>150").limit(100)["pulse"].to_numpy().T)
     plt.gcf()
     return
 
@@ -177,7 +166,7 @@ def _():
 
 @app.cell
 def _(ch5: "mass2.Channel", np, plt):
-    ch5.plot_hist("residual_rms", np.arange(0, 400,1))
+    ch5.plot_hist("residual_rms", np.arange(0, 400, 1))
     plt.gcf()
     return
 
@@ -192,7 +181,7 @@ def _(ch5: "mass2.Channel", plt):
 @app.cell
 def _(ch5: "mass2.Channel", plt):
     ch5.plot_scatter("index", "5lagy", color_col="category")
-    plt.ylim(1000,1500)
+    plt.ylim(1000, 1500)
     plt.gcf()
     return
 
@@ -200,15 +189,15 @@ def _(ch5: "mass2.Channel", plt):
 @app.cell
 def _(ch5: "mass2.Channel", plt):
     ch5.plot_scatter("5lagx", "5lagy", color_col="category")
-    plt.ylim(1000,1500)
-    plt.xlim(-1,1)
+    plt.ylim(1000, 1500)
+    plt.xlim(-1, 1)
     plt.gcf()
     return
 
 
 @app.cell
 def _(ch5: "mass2.Channel", np, plt):
-    ch5.plot_hists("5lagy", np.linspace(-500,3000,1000), group_by_col="category")
+    ch5.plot_hists("5lagy", np.linspace(-500, 3000, 1000), group_by_col="category")
     plt.yscale("log")
     plt.gcf()
     return

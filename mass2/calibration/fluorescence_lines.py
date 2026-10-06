@@ -1061,6 +1061,35 @@ addline(
 )
 
 addline(
+    element="Ge",
+    material="metal",
+    linetype="KAlpha",
+    reference_short="Zschornack",
+    reference_plot_instrument_gaussian_fwhm=0.17,
+    nominal_peak_energy=9886.52,
+    energies=np.array((9886.52, 9855.42)),
+    lorentzian_fwhm=np.array((2.8, 2.9)),
+    reference_amplitude=np.array((0.600, 0.309)),
+    ka12_energy_diff=31.10,
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+)
+
+
+addline(
+    element="Ge",
+    material="metal",
+    linetype="KBeta",
+    reference_short="Zschornack",
+    reference_plot_instrument_gaussian_fwhm=0.17,
+    nominal_peak_energy=10982.19,
+    energies=np.array((10982.19, 10978.1)),
+    lorentzian_fwhm=np.array((5.56, 5.84)),
+    reference_amplitude=np.array((8.62, 4.40)),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+)
+
+
+addline(
     element="Se",
     material="metal",
     linetype="KAlpha",
@@ -1160,6 +1189,35 @@ addline(
     # We estimate 17680 by reading Figure 2.
     lorentzian_fwhm=np.array((6.171, 5.89, 10.8)),
     reference_amplitude=np.array((100, 50.49, 5.2)),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+)
+
+
+addline(
+    element="Nb",
+    material="metal",
+    linetype="KAlpha",
+    reference_short="Zschornack",
+    reference_plot_instrument_gaussian_fwhm=0.17,
+    nominal_peak_energy=16615.16,
+    energies=np.array((16615.16, 16521.28)),
+    lorentzian_fwhm=np.array((5.80, 6.01)),
+    reference_amplitude=np.array((1.669, 0.874)),
+    ka12_energy_diff=93.9,
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+)
+
+
+addline(
+    element="Nb",
+    material="metal",
+    linetype="KBeta",
+    reference_short="Zschornack",
+    reference_plot_instrument_gaussian_fwhm=0.17,
+    nominal_peak_energy=18622.68,
+    energies=np.array((18622.68, 18606.5)),
+    lorentzian_fwhm=np.array((6.95, 6.81)),
+    reference_amplitude=np.array((0.2607, 0.1339)),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
 )
 

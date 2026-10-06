@@ -14,7 +14,6 @@ from typing import Any
 from numpy.typing import ArrayLike, NDArray
 import numpy as np
 import pylab as plt
-from collections import namedtuple
 
 __all__ = ["plot_as_stepped_hist", "plot_stepped_hist_poisson_errors", "find_svd_randomly", "find_range_randomly"]
 
@@ -53,7 +52,7 @@ def plot_as_stepped_hist(axis: plt.Axes, data: ArrayLike, bins: ArrayLike, **kwa
     y[1:-1:2] = data
     y[2:-1:2] = data
     axis.plot(x, y, **kwargs)
-    axis.set_xlim([x[0], x[-1]])
+    axis.set_xlim(x[0], x[-1])
 
 
 def plot_stepped_hist_poisson_errors(
@@ -107,10 +106,9 @@ def find_range_randomly(A: ArrayLike, nl: int, q: int = 1) -> NDArray:
     A = np.asarray(A)
     _m, n = A.shape
     Omega = rng.standard_normal((n, nl))
-    Y = np.dot(A, Omega)
+    Y = A @ Omega
     for _ in range(q):
-        Y = np.dot(A.T, Y)
-        Y = np.dot(A, Y)
+        Y = A @ (A.T @ Y)
     Q, _R = np.linalg.qr(Y)
     return Q
 
@@ -125,8 +123,7 @@ def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArr
     """
     A = np.asarray(A)
     Q = find_range_randomly(A, nl, q=q)
-    B = np.dot(Q.T, A)
+    B = Q.T @ A
     SVD_B = np.linalg.svd(B, full_matrices=False)
-    u = np.dot(Q, SVD_B.U)
-    SVDResult = namedtuple("SVDResult", ["U", "W", "Vh"])
-    return SVDResult(U=u, W=SVD_B.W, Vh=SVD_B.Vh)
+    u = Q @ SVD_B.U
+    return SVD_B._replace(U=u)

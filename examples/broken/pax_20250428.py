@@ -63,7 +63,7 @@ def _(data, mass2, np, pl):
         )
         ptm1 = ch.df["pretrig_mean"].to_numpy()
         ptm2 = np.unwrap(ptm1 % 4096, period=4096)
-        ch = ch.with_columns(pl.DataFrame({"ptm2": ptm2}))
+        ch = ch.with_columns(ptm2=ptm2)
         return ch
 
     data2 = data.map(_do_analysis)
@@ -235,7 +235,6 @@ def _(ch_num, data3, mass2, np, plt):
         plt.xlabel(x_label)
         plt.ylabel("signal (arb)")
         plt.title(ch.header.description)
-        plt.tight_layout()
         return plt.gca()
 
     plot_pulses(data3.channels[ch_num], spread_col="energy_5lagy_dc")
@@ -283,7 +282,7 @@ def _(ch_num, data3, mass2, np, plt):
     _ch = data3.channels[ch_num]
     _df = _ch.noise.df
     for step in _ch.steps:
-        _df = step.calc_from_df(_df)
+        _df = step.calc_from_df(_df, _ch.pulseframer)
     df_baseline = _df
     df_baseline
     _energy_col = "energy_5lagy_dc"

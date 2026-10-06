@@ -1,10 +1,57 @@
 # Mass Versions
 
-## Mass Version 2 (2025-)
+## Mass Version 2 (2025-present)
 
-**2.0.1** November 7, 2025-
+**2.1.0** August 21, 2026
+* Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).
+* Make pretrigger mean jump correction work with non-time-ordered data (issue 166).
+* Fix bug in GPR calibration error estimates for log-gain calibration curves (issue 168).
+
+**2.0.5** June 11, 2026
+* Fix typo in Getting Started doc that can shadow `range` and screw up your iPython session (issue 137).
+* Several small quality-of-life changes (issue 139):
+  * Use the clearer notation `A @ v` for matrix-vector, vector-vector, and similar dot products.
+  * Use an API for `Channel.with_columns()` like that of `pl.DataFrame` to match user expectations.
+  * Add method `combine_channels(sourcename, dict)` to `Channel` and `Channels`.
+* Add Generalized Column Subset Selection (issue 140).
+* Add fast solver for `SymmetricToeplitz` matrices (issue 143).
+* Add Kα and Kβ line models for Ge and Nb based on Zschornack book (issue 145).
+* Add tests to verify the V/dV filter calculation (issue 152).
+
+**2.0.4** April 14, 2026
+* Add `mass2.Channel.from_numpy()` to read optical TES raw data. Tests to go with it.
+* Some improvements to plotting:
+  * Remove `plt.tight_layout()` in mass; prefer user set `figure.constrained_layout.use : True` in matplotlibrc.
+  * Set most mass plots to call `plot_zoomable`, which turns on mouse zooming (same as typing 'O' in window).
+  * Fix bugs: failing to plot channel histograms on existing axes.
+* Make the parameters `cut_pre` and `cut_post` work with Fourier-domain filters.
+* Make a recipe step to use the time-drift-correct algorithm (PR 127, issues 125+131).
+* Make `Channel.filter1lag()` method to use single-lag optimal filters more easily (issue 124).
+* Add options to the external-trigger reader, letting user pick what quantities to keep (issue 128).
+
+**2.0.3** March 13, 2026
+* Add some convenient plotting features like `Channel.plot_pulses()`.
+* Add secondary x axis to that method and to `Channels.plot_avg_pulse()` to give time in ms.
+* CI testing: use Python 3.10 and 3.14 (replacing 3.13).
+* Add `resample_pulses` and `resample_one_pulse` to `mass2.core.analysis_algorithms`.
+* Add an example notebook `examples/f3db_sweep_example.py` with multiple opt filters (PR 114).
+* Interpret all times in the local timezone. Add `ChangeTimeZoneStep` to change that (PR 115).
+* Let `Channel.filter5lag()` user can elect Fourier-based filters for very long records (PR 117).
+* Check on `Channel` creation that raw pulses (if any) match the header's `n_samples` (issue 118).
+* This is the last release fully reviewed by project Co-Director (now Emeritus) Galen O'Neil.
+
+**2.0.2** February 24, 2026
+* Adapt to change in the `numpy.linalg.svd` API (issue 97).
+* Add one-lag optimal filters for optical TESs (issue 99).
+* Fix problem reading external trigger data with LJH files (issue 101).
+* Seven security updates to `uv.lock` prompted by GitHub's "dependabot"
+
+**2.0.1** February 12, 2026
 * Work around Polars bug: can't `group_by` a frame with an `"index"` column (issue 85).
 * Make the `OptimalFilterStep.dbg_plot()` generate a new figure (issue 83).
+* Fix combinatoric rough cal with one peak (PR 92).
+* Add argument to `Channel.plot_scatter()` to plot some max number of points (PR 94).
+* Fix combinatoric rough cal with two peaks and increasing gain (issue 95).
 
 **2.0.0** November 4, 2025
 * Add a way to open LJH files for specific channels only, an include list (issue 81).
@@ -368,7 +415,7 @@
 
 **0.4.4** August 2016
 
-* Young changed the version number, but I (JF) do not know why.
+* Young changed the revision number, but I (JF) do not know why.
 
 **0.4.3** May 2016
 

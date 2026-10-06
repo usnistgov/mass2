@@ -2,6 +2,7 @@
 Define RecipeStep and Recipe classes for processing pulse data in a sequence of steps.
 """
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, overload
 from collections.abc import Iterable, Callable, Sequence
@@ -9,10 +10,11 @@ import polars as pl
 import numpy as np
 import pylab as plt
 from . import pulse_algorithms
+from .misc import PulseDataFramer
 
 
 @dataclass(frozen=True)
-class RecipeStep:
+class RecipeStep(ABC):
     """Represent one step in a data processing recipe.
 
     A step has inputs, outputs, and a calculation method. It also has a good_expr and use_expr that
@@ -36,10 +38,15 @@ class RecipeStep:
         """A short description of this step, including its inputs and outputs."""
         return f"{type(self).__name__} inputs={self.inputs} outputs={self.output}"
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Calculate the outputs from the inputs in the given DataFrame, returning a new DataFrame."""
-        # TODO: should this be an abstract method?
-        return df.filter(self.good_expr)
+    @abstractmethod
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
+        """Calculate the outputs from the inputs in the given DataFrame, returning a new DataFrame.
+        A RecipeStep that needs access to raw data, like optimal filtering or SummarizeData, will
+        use its non-trivial `PulseDataFramer` argument. But steps that work only on analyzed data, like
+        drift correction, will supply `pulseframer=None`."""
+        # A simplest possible implementation would be something like:
+        # return df.filter(self.good_expr)
+        pass
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         """Generate a diagnostic plot of the results after this step."""
@@ -55,14 +62,39 @@ class RecipeStep:
 
 @dataclass(frozen=True)
 class PretrigMeanJumpFixStep(RecipeStep):
-    """A step to fix jumps in the pretrigger mean by unwrapping the phase angle, a periodic quantity."""
+    """A step to fix jumps in the pretrigger mean by unwrapping the phase angle, a periodic quantity
 
-    period: float
+    self.inputs name the following fields in the input pl.Dataframe:
+        [0] The pretrigger mean field that needs to have flux jumps removed.
+        [1] Any field that indicates strict time-ordering, generally "subframecount".
+    """
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Calculate the jump-corrected pretrigger mean and return a new DataFrame."""
-        ptm1 = df[self.inputs[0]].to_numpy()
+    period: float  # Periodicity to be removed, typically 4096 or other power of 2.
+
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
+        """Calculate the jump-corrected pretrigger mean and return a new DataFrame.
+
+        Thanks to fixing [issue 166](https://github.com/usnistgov/mass2/issues/166),
+        this will work whether or not the dataframe is already in time order.
+        """
+        ptmean_name, orderingfield_name = self.inputs
+        ptm1 = df[ptmean_name].to_numpy()
+
+        # Use the second column named in self.inputs as a strict time-ordering column.
+        # Generally this will prove to be already in order. But if it isn't, reorder the
+        # pretrigger means, apply the unwrap algorithm, and then restore the original ordering.
+        timeorder = df[orderingfield_name].to_numpy()
+        already_in_timeorder = np.all(timeorder[1:] >= timeorder[:-1])
+        if not already_in_timeorder:
+            sort_idx = timeorder.argsort()
+            ptm1 = ptm1[sort_idx]
         ptm2 = np.unwrap(ptm1 % self.period, period=self.period)
+        if not already_in_timeorder:
+            # The following is an O(N) algorithm,
+            # whereas restore_idx = np.argsort(sort_idx) would work, but it takes O(N log N)
+            restore_idx = np.empty_like(sort_idx)
+            restore_idx[sort_idx] = np.arange(len(sort_idx))
+            ptm2 = ptm2[restore_idx]
         df2 = pl.DataFrame({self.output[0]: ptm2}).with_columns(df)
         return df2
 
@@ -74,7 +106,6 @@ class PretrigMeanJumpFixStep(RecipeStep):
         plt.legend()
         plt.xlabel("timestamp")
         plt.ylabel("pretrig mean")
-        plt.tight_layout()
         return plt.gca()
 
 
@@ -84,16 +115,17 @@ class SummarizeStep(RecipeStep):
 
     frametime_s: float
     peak_index: int
-    pulse_col: str
     pretrigger_ignore_samples: int
     n_presamples: int
     transform_raw: Callable | None = None
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
+        assert pulseframer is not None
+        rawcol = self.inputs[0]
         summaries = []
-        for df_iter in df.select(self.inputs).iter_slices():
-            raw = df_iter[self.pulse_col].to_numpy()
+        for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):
+            raw = raw_df[rawcol].to_numpy()
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
 
@@ -110,6 +142,56 @@ class SummarizeStep(RecipeStep):
 
         df2 = pl.concat(summaries).with_columns(df)
         return df2
+
+
+@dataclass(frozen=True)
+class ChangeTimeZoneStep(RecipeStep):
+    """Replace all polars `Datetime` type series in the dataframe with ones using the given time zone.
+
+    Alternatively, replace only the columns named in `inputs` if not an empty collection.
+
+    Usage:
+    >>> ctzstep = mass2.core.ChangeTimeZoneStep.new("America/Chicago")
+    >>> ch2 = ch.with_step(ctzstep)
+    """
+
+    new_time_zone: str
+
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
+        "Change timezones for all `Datetime`-type series in `df`"
+
+        # When there are no fields listed in self.inputs, convert all `pl.Datetime`-type columns
+        if len(self.inputs) == 0:
+            return df.with_columns(pl.col(pl.Datetime).dt.convert_time_zone(self.new_time_zone))
+
+        def change_zone(col_name: str) -> pl.Expr:
+            return pl.col(col_name).dt.convert_time_zone(self.new_time_zone)
+
+        return df.with_columns([change_zone(col_name) for col_name in self.inputs])
+
+    @classmethod
+    def new(cls, new_time_zone: str, inputs: list[str] = []) -> "ChangeTimeZoneStep":
+        """Create a ChangeTimeZoneStep
+
+        Parameters
+        ----------
+        new_time_zone : str
+            The time zone to change to
+        inputs : list[str], optional
+            the dataframe columns to change, by default [], which means all the columns of type Datetime
+
+        Returns
+        -------
+        ChangeTimeZoneStep
+            A RecipeStep for changing time zones.
+        """
+        return cls(
+            inputs=inputs,
+            output=[],
+            good_expr=pl.lit(True),
+            use_expr=pl.lit(True),
+            new_time_zone=new_time_zone,
+        )
 
 
 @dataclass(frozen=True)
@@ -137,7 +219,7 @@ class ColumnAsNumpyMapStep(RecipeStep):
         if not callable(self.f):
             raise ValueError(f"f must be a callable, got {self.f}")
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the new column by applying `f` to the input column, returning a new DataFrame."""
         output_col = self.output[0]
         output_segments = []
@@ -170,7 +252,7 @@ class CategorizeStep(RecipeStep):
         first_condition = next(iter(self.category_condition_dict.values()))
         assert first_condition is True or first_condition.meta.eq(pl.lit(True)), err_msg
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the category for each pulse and return a new DataFrame with a column for the category names."""
         output_col = self.output[0]
 
@@ -202,7 +284,7 @@ class SelectStep(RecipeStep):
 
     col_expr_dict: dict[str, pl.Expr]
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Select the given columns and return a new DataFrame."""
         df2 = df.select(**self.col_expr_dict).with_columns(df)
         return df2
@@ -218,10 +300,10 @@ class Recipe(Sequence[RecipeStep]):
     # 1. we could calculate filt_value_5lag and filt_phase_5lag at the same time
     # 2. we could calculate intermediate quantities optionally and not materialize all of them
 
-    def calc_from_df(self, df: pl.DataFrame) -> pl.DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
         for step in self.steps:
-            df = step.calc_from_df(df).with_columns(df)
+            df = step.calc_from_df(df, pulseframer).with_columns(df)
         return df
 
     @classmethod

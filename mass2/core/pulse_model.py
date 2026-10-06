@@ -6,13 +6,13 @@ from numpy.typing import NDArray
 import pylab as plt
 import numpy as np
 import h5py
-import mass2
 from mass2.common import tostr
+from mass2.mathstat.utilities import find_range_randomly
 
 
 class PulseModel:
     """Object to hold a "pulse model", meaning a low-dimensional linear basis to express "all" pulses,
-    along with a projector such that projector.dot(basis) is the identity matrix.
+    along with a projector such that (projector @ basis) is the identity matrix.
 
     Also has the capacity to store to and restore from HDF5, and the ability to compute additional
     basis elements and corresponding projectors with method _additional_projectors_tsvd"""
@@ -140,7 +140,7 @@ class PulseModel:
         """
         Given an existing basis with projectors, compute a basis with n_basis elements
         by randomized SVD of the residual elements of the training data in pulses_for_svd.
-        It should be the case that projectors.dot(basis) is approximately the identity matrix.
+        It should be the case that (projectors @ basis) is approximately the identity matrix.
 
         It is assumed that the projectors will have been computed from the basis in some
         noise-optimal way, say, from optimal filtering. However, the additional basis elements
@@ -161,10 +161,10 @@ class PulseModel:
         mpc = np.matmul(projectors, pulses_for_svd)  # modeled pulse coefs
         mp = np.matmul(basis, mpc)  # modeled pulse
         residuals = pulses_for_svd - mp
-        Q = mass2.mathstat.utilities.find_range_randomly(residuals, n_basis - n_existing)
+        Q = find_range_randomly(residuals, n_basis - n_existing)
 
         projectors2 = np.linalg.pinv(Q)  # = Q.T, perhaps??
-        projectors2 -= projectors2.dot(basis).dot(projectors)
+        projectors2 -= (projectors2 @ basis) @ projectors
 
         basis = np.hstack([basis, Q])
         projectors = np.vstack([projectors, projectors2])

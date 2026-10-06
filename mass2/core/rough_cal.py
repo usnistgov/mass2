@@ -12,7 +12,6 @@ import pylab as plt  # type: ignore
 import polars as pl
 from matplotlib.axes._axes import Axes
 from numpy import float32, ndarray
-from polars.dataframe.frame import DataFrame
 from numpy.polynomial import Polynomial
 from scipy.optimize._optimize import OptimizeResult  # type: ignore
 import scipy as sp
@@ -21,7 +20,7 @@ import itertools
 import mass2
 from .channel import Channel
 from .recipe import RecipeStep
-from .misc import alwaysTrue
+from .misc import alwaysTrue, PulseDataFramer
 
 # from . import rough_cal
 from mass2.calibration.algorithms import line_names_and_energies
@@ -56,8 +55,7 @@ def rank_3peak_assignments(
     df1 = df1.filter((pl.col("e0") < pl.col("e1")).and_(pl.col("ph0") < pl.col("ph1")))
     # 2) the gain slope must be negative
     df1 = (
-        df1
-        .with_columns(gain1=pl.col("ph1") / pl.col("e1"))
+        df1.with_columns(gain1=pl.col("ph1") / pl.col("e1"))
         .with_columns(gain_slope=(pl.col("gain1") - pl.col("gain0")) / (pl.col("ph1") - pl.col("ph0")))
         .filter(pl.col("gain_slope") < 0)
     )
@@ -756,7 +754,7 @@ class RoughCalibrationStep(RecipeStep):
     ph2energy: Callable
     success: bool
 
-    def calc_from_df(self, df: DataFrame) -> DataFrame:
+    def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Apply the rough calibration to a dataframe."""
         # only works with in memory data, but just takes it as numpy data and calls function
         # is much faster than map_elements approach, but wouldn't work with out of core data without some extra book keeping
@@ -776,21 +774,19 @@ class RoughCalibrationStep(RecipeStep):
         else:
             self.dbg_plot_failure(df_after, **kwargs)
 
-    def dbg_plot_success(self, df: DataFrame, **kwargs: Any) -> None:
+    def dbg_plot_success(self, df: pl.DataFrame, **kwargs: Any) -> None:
         """Create diagnostic plots of the rough calibration step, if it succeeded."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.assignment_result:
             self.assignment_result.plot(ax=axs[0])
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
-        plt.tight_layout()
 
-    def dbg_plot_failure(self, df: DataFrame, **kwargs: None) -> None:
+    def dbg_plot_failure(self, df: pl.DataFrame, **kwargs: None) -> None:
         """Create diagnostic plots of the rough calibration step, if it failed."""
         _, axs = plt.subplots(2, 1, figsize=(11, 6))
         if self.pfresult:
             self.pfresult.plot(self.assignment_result, ax=axs[1])
-        plt.tight_layout()
 
     def energy2ph(self, energy: ArrayLike) -> NDArray | float:
         """Convert energy to pulse height using the fitted gain curve."""
@@ -816,12 +812,15 @@ class RoughCalibrationStep(RecipeStep):
         assert len(uncalibrated) > 10, "not enough pulses"
         pfresult = peakfind_local_maxima_of_smoothed_hist(uncalibrated, fwhm_pulse_height_units=ph_smoothing_fwhm)
         assignment_result = find_optimal_assignment2(pfresult.ph_sorted_by_prominence()[: len(ee) + n_extra], ee, names)
+        # phzerogain doesn't exist if there is only one line, and it might make no sense even if it does.
+        good_expr_with_new_info = ch.good_expr
         if len(line_names) > 1:
+            # Fix issue #95: don't cut pulses exceeding max_ph if that value is negative or cuts most pulses.
             # exclude pulses with values where the gain is negative
-            good_expr_with_new_info = ch.good_expr.and_(pl.col(uncalibrated_col) < assignment_result.phzerogain())
-        else:
-            # phzerogain doesn't exist if there is only one line
-            good_expr_with_new_info = ch.good_expr
+            max_ph = assignment_result.phzerogain()
+            if max_ph > 0 and max_ph > np.median(uncalibrated):
+                good_expr_with_new_info = ch.good_expr.and_(pl.col(uncalibrated_col) < max_ph)
+
         step = cls(
             [uncalibrated_col],
             [calibrated_col],
