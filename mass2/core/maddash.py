@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 import dash
 from dash import dcc, html, Input, Output, State
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import polars as pl
 import numpy as np
@@ -40,7 +41,6 @@ LOG_LINEAR_BUTTONS = [
     )
 ]
 
-# Default layout for initialization
 DEFAULT_LAYOUT = dict(
     xaxis=dict(title="Energy (eV)", range=[0, 1000]),
     yaxis=dict(title="Intensity", type="linear"),
@@ -49,44 +49,60 @@ DEFAULT_LAYOUT = dict(
     updatemenus=LOG_LINEAR_BUTTONS,
 )
 
-# Initialize the Dash app
 app = dash.Dash(__name__)
 
-# Application Layout
 app.layout = html.Div([
     html.H1(f"Live X-Ray Spectra Dashboard ({DATA_DIR.name})", style={"font-family": "sans-serif"}),
-    # Initialize graphs with the bounded layout so [0, 1000] is enforced on load
+    # Hidden store to track the last modified times known to the client
+    dcc.Store(id="client-version", data=""),
     dcc.Graph(id="state-spectra-graph", figure=go.Figure(layout=dict(title="State Spectra", **DEFAULT_LAYOUT))),
     dcc.Graph(id="channel-spectra-graph", figure=go.Figure(layout=dict(title="Channel Spectra", **DEFAULT_LAYOUT))),
-    # Trigger updates every 5 seconds
-    dcc.Interval(id="polling-interval", interval=5000, n_intervals=0),
+    # Fast polling (500ms). Costs almost nothing because of PreventUpdate
+    dcc.Interval(id="polling-interval", interval=500, n_intervals=0),
 ])
 
 
-# Callback to update both graphs on every interval tick
 @app.callback(
-    [Output("state-spectra-graph", "figure"), Output("channel-spectra-graph", "figure")],
+    [Output("state-spectra-graph", "figure"), Output("channel-spectra-graph", "figure"), Output("client-version", "data")],
     [Input("polling-interval", "n_intervals")],
-    [State("state-spectra-graph", "figure"), State("channel-spectra-graph", "figure")],
+    [State("state-spectra-graph", "figure"), State("channel-spectra-graph", "figure"), State("client-version", "data")],
 )
-def update_dashboard(n_intervals: int | None, state_fig: dict | None, chan_fig: dict | None) -> tuple[go.Figure, go.Figure]:
+def update_dashboard(
+    n_intervals: int | None, state_fig: dict | None, chan_fig: dict | None, client_version: str
+) -> tuple[go.Figure, go.Figure, str]:
+    state_file: Path = DATA_DIR / "state_spectra.arrow"
+    chan_file: Path = DATA_DIR / "channel_spectra.arrow"
+
+    # ----------------------------------------
+    # Stateless Modification Check
+    # ----------------------------------------
+    try:
+        # Get modification times (st_mtime). Default to 0.0 if file doesn't exist yet.
+        state_mtime = state_file.stat().st_mtime if state_file.exists() else 0.0
+        chan_mtime = chan_file.stat().st_mtime if chan_file.exists() else 0.0
+    except OSError:
+        # Failsafe in case a file is caught exactly mid-deletion during atomic rename
+        raise PreventUpdate
+
+    current_server_version = f"{state_mtime}_{chan_mtime}"
+
+    if current_server_version == client_version:
+        raise PreventUpdate
+
     # ----------------------------------------
     # 1. State Spectra Processing
     # ----------------------------------------
-    state_file: Path = DATA_DIR / "state_spectra.arrow"
-    df_state: pl.DataFrame = pl.read_ipc(state_file)
     fig_state: go.Figure = go.Figure()
 
-    for row in df_state.iter_rows(named=True):
-        state: str = str(row.get("state_label", "Unknown State"))
-        spectra_data: list[float] = row.get("spectra", [])
+    if state_mtime > 0.0:
+        df_state: pl.DataFrame = pl.read_ipc(state_file)
+        for row in df_state.iter_rows(named=True):
+            state: str = str(row.get("state_label", "Unknown State"))
+            spectra_data: list[float] = row.get("spectra", [])
+            events: int = int(row.get("events", sum(spectra_data)))
 
-        events: int = int(row.get("events", sum(spectra_data)))
+            fig_state.add_trace(go.Scatter(x=X_ENERGY, y=spectra_data, mode="lines", name=f"{state} ({events:,} events)"))
 
-        fig_state.add_trace(go.Scatter(x=X_ENERGY, y=spectra_data, mode="lines", name=f"{state} ({events:,} events)"))
-
-    # If the user has interacted with the graph, state_fig['layout'] holds their custom zoom/scale.
-    # We pass it straight back to perfectly preserve their viewport.
     if state_fig and "layout" in state_fig:
         fig_state.update_layout(**state_fig["layout"])
     else:
@@ -95,28 +111,26 @@ def update_dashboard(n_intervals: int | None, state_fig: dict | None, chan_fig: 
     # ----------------------------------------
     # 2. Channel Spectra Processing
     # ----------------------------------------
-    chan_file: Path = DATA_DIR / "channel_spectra.arrow"
-    df_chan: pl.DataFrame = pl.read_ipc(chan_file).sort("channel_number")
     fig_chan: go.Figure = go.Figure()
 
-    for row in df_chan.iter_rows(named=True):
-        channel_num: Any = row.get("channel_number", "Unknown")
-        chan_spectra_data: list[float] = row.get("spectra", [])
+    if chan_mtime > 0.0:
+        df_chan: pl.DataFrame = pl.read_ipc(chan_file).sort("channel_number")
+        for row in df_chan.iter_rows(named=True):
+            channel_num: Any = row.get("channel_number", "Unknown")
+            chan_spectra_data: list[float] = row.get("spectra", [])
+            events: int = int(row.get("events", sum(chan_spectra_data)))
 
-        events: int = int(row.get("events", sum(chan_spectra_data)))
+            label_str = str(channel_num)
+            trace_name = label_str if "Chan" in label_str else f"Chan {label_str}"
 
-        label_str = str(channel_num)
-        trace_name = label_str if "Chan" in label_str else f"Chan {label_str}"
+            fig_chan.add_trace(go.Scatter(x=X_ENERGY, y=chan_spectra_data, mode="lines", name=f"{trace_name} ({events:,} events)"))
 
-        fig_chan.add_trace(go.Scatter(x=X_ENERGY, y=chan_spectra_data, mode="lines", name=f"{trace_name} ({events:,} events)"))
-
-    # Preserve client-side layout manipulations
     if chan_fig and "layout" in chan_fig:
         fig_chan.update_layout(**chan_fig["layout"])
     else:
         fig_chan.update_layout(title="Channel Spectra", **DEFAULT_LAYOUT)
 
-    return fig_state, fig_chan
+    return fig_state, fig_chan, current_server_version
 
 
 if __name__ == "__main__":
