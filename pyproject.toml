@@ -13,6 +13,7 @@ license = { text = "MIT" }
 keywords = ["mass", "dastard", "microcalorimeter"]
 
 dependencies = [
+    "dash",
     "deprecation",
     "dill",
     "fastdtw",
