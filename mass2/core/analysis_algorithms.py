@@ -242,7 +242,9 @@ def make_smooth_histogram(values: ArrayLike, smooth_sigma: float, limit: float, 
     return HistogramSmoother(smooth_sigma, (limit, upper_limit))(values)
 
 
-def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None) -> tuple[float, dict]:
+def drift_correct(
+    indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None, max_correction: float = 0.1
+) -> tuple[float, dict]:
     """Compute a drift correction that minimizes the spectral entropy.
 
     Args:
@@ -251,6 +253,8 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
             Assumed to have some gain that is linearly related to indicator.
         limit: The upper limit of uncorrected values over which entropy is
             computed (default None).
+        max_correction: at the extremes, the gain is changed from 1 by no more than
+            ± this factor
 
     Generally indicator will be the pretrigger mean of the pulses, but you can
     experiment with other choices.
@@ -272,8 +276,13 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     indicatorA -= ptm_offset
     # Require that the slope never be so positive or so negative as to make the gain go negative when the indicator
     # takes on its minimum or maximum values, respectively. Fixes #176.
-    max_slope = -1.0 / indicatorA.min()
-    min_slope = -1.0 / indicatorA.max()
+    assert max_correction >= 0
+    assert max_correction <= 1.0
+    max_slope = -max_correction / indicatorA.min()
+    min_slope = -max_correction / indicatorA.max()
+    print(f"{max_correction=} {min_slope=} {max_slope=}")
+    assert min_slope < 0
+    assert max_slope > 0
 
     if limit is None:
         pct99 = float(np.percentile(uncorrected, 99))
@@ -290,11 +299,13 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
         w = hsmooth > 0
         return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
 
-    drift_corr_param = sp.optimize.brent(entropy, (indicatorA, uncorrected, smoother), brack=[0, 0.001])
-    drift_corr_param = sp.optimize.fminbound(entropy, min_slope, max_slope, (indicatorA, uncorrected, smoother))
+    drift_corr_result = sp.optimize.minimize_scalar(
+        entropy, bracket=(0, 1e-3), bounds=(min_slope, max_slope), method="bounded", args=(indicatorA, uncorrected, smoother)
+    )
 
-    drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
-    return drift_corr_param, drift_correct_info
+    best_slope = drift_corr_result.x
+    drift_correct_info = {"type": "ptmean_gain", "slope": best_slope, "median_pretrig_mean": ptm_offset}
+    return best_slope, drift_correct_info
 
 
 @njit
