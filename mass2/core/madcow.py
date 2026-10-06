@@ -241,17 +241,21 @@ class MadCowDirectory:
         dfs = pl.DataFrame(
             {
                 "state_label": list(self.state_spectra.keys()),
+                "Emin": self.Emin,
+                "Emax": self.Emax,
                 "spectra": list(self.state_spectra.values()),
             },
-            schema={"state_label": pl.String, "spectra": pl.Array(pl.Int32, self.Nbins)},
+            schema={"state_label": pl.String, "Emin": pl.Float64, "Emax": pl.Float64, "spectra": pl.Array(pl.Int32, self.Nbins)},
         )
         dfs.write_ipc(self.output_dir / "state_spectra.arrow")
         dfc = pl.DataFrame(
             {
                 "channel_number": list(self.chan_spectra.keys()),
+                "Emin": self.Emin,
+                "Emax": self.Emax,
                 "spectra": list(self.chan_spectra.values()),
             },
-            schema={"channel_number": pl.Int32, "spectra": pl.Array(pl.Int32, self.Nbins)},
+            schema={"channel_number": pl.Int32, "Emin": pl.Float64, "Emax": pl.Float64, "spectra": pl.Array(pl.Int32, self.Nbins)},
         )
         dfc.write_ipc(self.output_dir / "channel_spectra.arrow")
 

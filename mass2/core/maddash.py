@@ -18,8 +18,6 @@ args: argparse.Namespace = parser.parse_args()
 # Safely resolve the provided directory path
 DATA_DIR: Path = Path(args.data_dir).resolve()
 
-# Pre-compute the energy x-axis (4000 bins) globally
-X_ENERGY: np.ndarray = np.linspace(0.125, 999.875, 4000)
 
 # Reusable button configuration for toggling y-axis scale
 LOG_LINEAR_BUTTONS = [
@@ -100,7 +98,7 @@ app.layout = html.Div([
         State("client-version", "data"),
     ],
 )
-def update_dashboard(
+def update_dashboard(  # noqa: PLR0914
     n_intervals: int | None, total_fig: dict | None, state_fig: dict | None, chan_fig: dict | None, client_version: str
 ) -> tuple[go.Figure, go.Figure, go.Figure, str]:
     state_file: Path = DATA_DIR / "state_spectra.arrow"
@@ -130,12 +128,20 @@ def update_dashboard(
 
     if state_mtime > 0.0:
         df_state: pl.DataFrame = pl.read_ipc(state_file)
-        total_spectra_data = np.zeros(len(X_ENERGY), dtype=float)
+        total_spectra_data = np.zeros(len(df_state["spectra"][0]), dtype=float)
         for row in df_state.iter_rows(named=True):
             state: str = str(row.get("state_label", "Unknown State"))
+            Emin = row.get("Emin", 0.0)
+            Emax = row.get("Emax", 1e4)
             spectra_data: list[float] = row.get("spectra", [])
             events: int = int(row.get("events", sum(spectra_data)))
             total_spectra_data += np.array(spectra_data)
+
+            # Calculate bin width and centers dynamically
+            Nbins = len(spectra_data)
+            assert Nbins == len(total_spectra_data), "MAD-Dash assumes all spectra are of equal length, but they aren't"
+            bin_width = (Emax - Emin) / Nbins
+            X_ENERGY = np.linspace(Emin + 0.5 * bin_width, Emax - 0.5 * bin_width, Nbins)
 
             fig_state.add_trace(go.Scatter(x=X_ENERGY, y=spectra_data, mode="lines", name=f"{state} ({events:,} events)"))
 
@@ -169,11 +175,19 @@ def update_dashboard(
         df_chan: pl.DataFrame = pl.read_ipc(chan_file).sort("channel_number")
         for row in df_chan.iter_rows(named=True):
             channel_num: Any = row.get("channel_number", "Unknown")
+            Emin = row.get("Emin", 0.0)
+            Emax = row.get("Emax", 1e4)
             chan_spectra_data: list[float] = row.get("spectra", [])
             events2: int = int(row.get("events", sum(chan_spectra_data)))
 
             label_str = str(channel_num)
             trace_name = label_str if "Chan" in label_str else f"Chan {label_str}"
+
+            # Calculate bin width and centers dynamically
+            Nbins = len(spectra_data)
+            assert Nbins == len(total_spectra_data), "MAD-Dash assumes all spectra are of equal length, but they aren't"
+            bin_width = (Emax - Emin) / Nbins
+            X_ENERGY = np.linspace(Emin + 0.5 * bin_width, Emax - 0.5 * bin_width, Nbins)
 
             fig_chan.add_trace(go.Scatter(x=X_ENERGY, y=chan_spectra_data, mode="lines", name=f"{trace_name} ({events2:,} events2)"))
 
