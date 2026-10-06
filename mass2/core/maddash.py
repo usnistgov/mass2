@@ -55,6 +55,7 @@ app.layout = html.Div([
     html.H1(f"Live X-Ray Spectra Dashboard ({DATA_DIR.name})", style={"font-family": "sans-serif"}),
     # Hidden store to track the last modified times known to the client
     dcc.Store(id="client-version", data=""),
+    dcc.Graph(id="total-spectra-graph", figure=go.Figure(layout=dict(title="Overall Spectrum (All Channels)", **DEFAULT_LAYOUT))),
     dcc.Graph(id="state-spectra-graph", figure=go.Figure(layout=dict(title="State Spectra", **DEFAULT_LAYOUT))),
     dcc.Graph(id="channel-spectra-graph", figure=go.Figure(layout=dict(title="Channel Spectra", **DEFAULT_LAYOUT))),
     # Fast polling (500ms). Costs almost nothing because of PreventUpdate
@@ -63,13 +64,23 @@ app.layout = html.Div([
 
 
 @app.callback(
-    [Output("state-spectra-graph", "figure"), Output("channel-spectra-graph", "figure"), Output("client-version", "data")],
+    [
+        Output("total-spectra-graph", "figure"),
+        Output("state-spectra-graph", "figure"),
+        Output("channel-spectra-graph", "figure"),
+        Output("client-version", "data"),
+    ],
     [Input("polling-interval", "n_intervals")],
-    [State("state-spectra-graph", "figure"), State("channel-spectra-graph", "figure"), State("client-version", "data")],
+    [
+        State("total-spectra-graph", "figure"),
+        State("state-spectra-graph", "figure"),
+        State("channel-spectra-graph", "figure"),
+        State("client-version", "data"),
+    ],
 )
 def update_dashboard(
-    n_intervals: int | None, state_fig: dict | None, chan_fig: dict | None, client_version: str
-) -> tuple[go.Figure, go.Figure, str]:
+    n_intervals: int | None, total_fig: dict | None, state_fig: dict | None, chan_fig: dict | None, client_version: str
+) -> tuple[go.Figure, go.Figure, go.Figure, str]:
     state_file: Path = DATA_DIR / "state_spectra.arrow"
     chan_file: Path = DATA_DIR / "channel_spectra.arrow"
 
@@ -90,19 +101,38 @@ def update_dashboard(
         raise PreventUpdate
 
     # ----------------------------------------
-    # 1. State Spectra Processing
+    # 1. State and Total Spectra Processing
     # ----------------------------------------
+    fig_total: go.Figure = go.Figure()
     fig_state: go.Figure = go.Figure()
 
     if state_mtime > 0.0:
         df_state: pl.DataFrame = pl.read_ipc(state_file)
+        total_spectra_data = np.zeros(len(X_ENERGY), dtype=float)
         for row in df_state.iter_rows(named=True):
             state: str = str(row.get("state_label", "Unknown State"))
             spectra_data: list[float] = row.get("spectra", [])
             events: int = int(row.get("events", sum(spectra_data)))
+            total_spectra_data += np.array(spectra_data)
 
             fig_state.add_trace(go.Scatter(x=X_ENERGY, y=spectra_data, mode="lines", name=f"{state} ({events:,} events)"))
 
+        # Plot the accumulated total spectrum
+        total_events = int(np.sum(total_spectra_data))
+        fig_total.add_trace(
+            go.Scatter(
+                x=X_ENERGY,
+                y=total_spectra_data,
+                mode="lines",
+                name=f"All Channels ({total_events:,} events)",
+                fill="tozeroy",  # Optional: Adds a nice visual weight to the total plot
+            )
+        )
+
+    if total_fig and "layout" in total_fig:
+        fig_total.update_layout(**total_fig["layout"])
+    else:
+        fig_total.update_layout(title="Total Spectrum (all channels)", **DEFAULT_LAYOUT)
     if state_fig and "layout" in state_fig:
         fig_state.update_layout(**state_fig["layout"])
     else:
@@ -130,7 +160,7 @@ def update_dashboard(
     else:
         fig_chan.update_layout(title="Channel Spectra", **DEFAULT_LAYOUT)
 
-    return fig_state, fig_chan, current_server_version
+    return fig_total, fig_state, fig_chan, current_server_version
 
 
 if __name__ == "__main__":

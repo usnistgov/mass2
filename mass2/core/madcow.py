@@ -208,6 +208,8 @@ class MadCowDirectory:
 
         for row in hist_by_state.iter_rows(named=True):
             state = row["state_label"]
+            if not state:
+                continue
             histogram = np.array(row["hist"])
             if state in self.state_spectra:
                 self.state_spectra[state] += histogram
