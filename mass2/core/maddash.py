@@ -49,7 +49,29 @@ DEFAULT_LAYOUT: dict[str, Any] = dict(
     updatemenus=LOG_LINEAR_BUTTONS,
 )
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, update_title="")
+
+# The "nuclear option" for Safari: Hardcode the title into the raw HTML template to prevent
+# Dash from using the title "Dash" and flashing to "Updating..." every 500 ms.
+app.index_string = """
+<!DOCTYPE html>
+<html>
+    <head>
+        {{%metas%}}
+        <title>MAD-Dash Spectra</title>
+        {{%favicon%}}
+        {{%css%}}
+    </head>
+    <body>
+        {{%app_entry%}}
+        <footer>
+            {{%config%}}
+            {{%scripts%}}
+            {{%renderer%}}
+        </footer>
+    </body>
+</html>
+"""
 
 app.layout = html.Div([
     html.H1(f"Live X-Ray Spectra Dashboard ({DATA_DIR.name})", style={"font-family": "sans-serif"}),
