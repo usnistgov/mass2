@@ -170,6 +170,30 @@ class FileModifiedHandler(FileSystemEventHandler):
             self.modified_event.set()
 
 
+def sort_WAL_file(processed_wal_path: Path) -> None:
+    """Sort an Arrows IPC stream file by channel number first, then subframecount. Write sorted result to a new file
+    with suffix ".arrows". Make sure to write to a temporary file then rename, so that a torn write in the output
+    file never happens.
+
+    Parameters
+    ----------
+    processed_wal_path : Path
+        The Write-Ahead-Log file. Filename must have suffix "arrows_WAL". The resulting sorted file
+        will be the same but with suffix ".arrows"
+    """
+    assert processed_wal_path.suffix == ".arrows_WAL"
+    output_path = processed_wal_path.with_suffix(".arrows")
+    tmp_path = processed_wal_path.with_suffix(".arrows_TMP")
+    df = pl.read_ipc_stream(processed_wal_path)
+    df = df.sort("channel_number", "subframecount")
+
+    # Write the sorted data to a temporary name, then remove the original (unsorted _WAL) file,
+    # then move the sorted data to its final name (`output_path`).
+    df.write_ipc_stream(tmp_path)
+    processed_wal_path.unlink()
+    tmp_path.rename(output_path)
+
+
 @dataclass(frozen=False)
 class MassassinDirectory:
     recipes: dict[int, mass2.core.Recipe]
@@ -336,7 +360,7 @@ class MassassinDirectory:
         df = self.run_recipe(df_in)
         df.write_ipc_stream(output)
 
-    def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> None:
+    def analyze_WAL_tail(self, wal_path: Path, output_path: Path) -> bool:
         # Set up the threading event and Watchdog observer
         modified_event = threading.Event()
         event_handler = FileModifiedHandler(wal_path, modified_event)
@@ -352,11 +376,12 @@ class MassassinDirectory:
                     reader_schema = reader.schema
                 except pa.ArrowInvalid:
                     print("File is too new, schema not written yet.")
-                    return
+                    return False
 
                 with open(output_path, "wb") as outp:
                     # Pass work off to a new method, simply to unindent by 2 levels.
                     self._analyze_open_WAL(fp, outp, reader_schema, modified_event)
+                    return True
         finally:
             # Ensure the background thread is cleaned up when the file is finalized
             observer.stop()
@@ -411,30 +436,6 @@ class MassassinDirectory:
                 modified_event.wait(timeout=1.0)
                 modified_event.clear()
 
-    @staticmethod
-    def sort_WAL_file(processed_wal_path: Path) -> None:
-        """Sort the file by channel number first, then subframecount. Write sorted result to a new file with
-        suffix ".arrows". Make sure to write to a temporary file then rename, so that a torn write in the output
-        file never happens.
-
-        Parameters
-        ----------
-        processed_wal_path : Path
-            The Write-Ahead-Log file. Filename must have suffix "arrows_WAL". The resulting sorted file
-            will be the same but with suffix ".arrows"
-        """
-        assert processed_wal_path.suffix == ".arrows_WAL"
-        output_path = processed_wal_path.with_suffix(".arrows")
-        tmp_path = processed_wal_path.with_suffix(".arrows_TMP")
-        df = pl.read_ipc_stream(processed_wal_path)
-        df = df.sort("channel_number", "subframecount")
-
-        # Write the sorted data to a temporary name, then remove the original (unsorted _WAL) file,
-        # then move the sorted data to its final name (`output_path`).
-        df.write_ipc_stream(tmp_path)
-        processed_wal_path.unlink()
-        tmp_path.rename(output_path)
-
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
 
@@ -467,9 +468,11 @@ class MassassinDirectory:
                 print(f"[{seqnum:04d}] Analyzing WAL       file: {wal_path}")
                 try:
                     output_path = self.output_dir / wal_path.name
-                    self.analyze_WAL_tail(wal_path, output_path)
-                    seqnum += 1
-                    self.sort_WAL_file(output_path)
+                    success = self.analyze_WAL_tail(wal_path, output_path)
+                    print(f"{success=}")
+                    if success:
+                        seqnum += 1
+                        sort_WAL_file(output_path)
                 except FileNotFoundError:
                     # EDGE CASE PROTECTION: The Go DAQ closed and renamed the file
                     # in the moment between our os.path.exists() and our open().
@@ -481,8 +484,6 @@ class MassassinDirectory:
             # CASE 3: WAIT FOR DATA (next seqnum doesn't exist yet)
             # ---------------------------------------------------------
             print(f"[{seqnum:04d}] Waiting for new DAQ file...")
-            # print(f"   {finalized_path}")
-            # print(f"   {wal_path}")
             start_wait = time.time()
             found = False
 
