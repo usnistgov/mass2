@@ -272,8 +272,8 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     indicatorA -= ptm_offset
     # Require that the slope never be so positive or so negative as to make the gain go negative when the indicator
     # takes on its minimum or maximum values, respectively. Fixes #176.
-    # max_slope = -1.0 / indicatorA.min()
-    # min_slope = -1.0 / indicatorA.max()
+    max_slope = -1.0 / indicatorA.min()
+    min_slope = -1.0 / indicatorA.max()
 
     if limit is None:
         pct99 = float(np.percentile(uncorrected, 99))
@@ -291,7 +291,7 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
         return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
 
     drift_corr_param = sp.optimize.brent(entropy, (indicatorA, uncorrected, smoother), brack=[0, 0.001])
-    # drift_corr_param = sp.optimize.fminbound(entropy, min_slope, max_slope, (indicatorA, uncorrected, smoother))
+    drift_corr_param = sp.optimize.fminbound(entropy, min_slope, max_slope, (indicatorA, uncorrected, smoother))
 
     drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
     return drift_corr_param, drift_correct_info
