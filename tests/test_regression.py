@@ -10,7 +10,7 @@ def load_data():
     data1 = mass2.Channels.from_ljh_folder(shorter_pulse_files, pairs.noise_folder)
 
     pairs = pulsedata.pulse_noise_ljh_pairs["regression"]
-    data2 = mass2.Channels.from_ljh_folder(pairs.pulse_folder, pairs.noise_folder)
+    data2 = mass2.Channels.from_ljh_folder(pairs.pulse_folder)
     return data1.with_more_channels(data2)
 
 

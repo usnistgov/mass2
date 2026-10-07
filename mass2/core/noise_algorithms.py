@@ -84,7 +84,7 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
         Returns:
             A number: (1, 3, or 5)*(a power of two), whichever is smallest.
         """
-        pow2 = np.round(2 ** np.ceil(np.log2(n)))
+        pow2 = np.round(1 << (int(n).bit_length()))
         if n == pow2:
             return int(n)
         elif n > 0.75 * pow2:
