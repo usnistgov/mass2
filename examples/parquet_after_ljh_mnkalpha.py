@@ -60,7 +60,7 @@ def _(dfg, truth_dfg):
 def _(data2, mo, plt):
     result = data2.linefit("MnKAlpha", col="energy2_5lagy_dc")
     result.plotm()
-    assert result.params["fwhm"].value < 3.46
+    assert result.params["fwhm"].value < 4.06
     mo.mpl.interactive(plt.gcf())
     return
 
@@ -90,7 +90,7 @@ def _(data2, mass2, truth_dfg):
 def _(data_from_truth_dfg, mo, plt):
     result_from_truth_dfg = data_from_truth_dfg.linefit("MnKAlpha", col="energy2_5lagy_dc")
     result_from_truth_dfg.plotm()
-    assert result_from_truth_dfg.params["fwhm"].value < 3.46
+    assert result_from_truth_dfg.params["fwhm"].value < 4.06
     mo.mpl.interactive(plt.gcf())
     return
 

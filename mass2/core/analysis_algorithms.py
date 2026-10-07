@@ -10,10 +10,10 @@ Created on Jun 9, 2014
 """
 
 import numpy as np
+import scipy as sp
 from numpy.typing import NDArray, ArrayLike
 from typing import Any
 from collections.abc import Callable
-import scipy as sp
 from numba import njit
 
 from mass2.mathstat.entropy import laplace_entropy
@@ -184,11 +184,11 @@ class HistogramSmoother:
     that histogram, we can smooth multiple histograms with the same geometry.
     """
 
-    def __init__(self, smooth_sigma: float, limits: ArrayLike):
+    def __init__(self, smooth_sigma: float, limits: tuple[float, float]):
         """Give the smoothing Gaussian's width as <smooth_sigma> and the
         [lower,upper] histogram limits as <limits>."""
 
-        self.limits = tuple(np.asarray(limits, dtype=float))
+        self.limits = limits
         self.smooth_sigma = smooth_sigma
 
         # Choose a reasonable # of bins, at least 1024 and a power of 2
@@ -199,11 +199,11 @@ class HistogramSmoother:
         max_nbins = 32768  # 32k bins, 2**15
 
         # Clamp nbins_guess to at least min_nbins
-        clamped_nbins = np.clip(nbins_guess, min_nbins, max_nbins)
-        nbins_forced_to_power_of_2 = int(2 ** np.ceil(np.log2(clamped_nbins)))
+        clamped_nbins = int(np.clip(nbins_guess, min_nbins, max_nbins))
+        nbins_forced_to_power_of_2 = 1 << (clamped_nbins.bit_length())
         # if nbins_forced_to_power_of_2 == max_nbins:
         #     print(f"Warning: HistogramSmoother (for drift correct) Limiting histogram bins to {max_nbins} (requested {nbins_guess})")
-        self.nbins = nbins_forced_to_power_of_2
+        self.nbins = int(nbins_forced_to_power_of_2)
         self.stepsize = dlimits / self.nbins
 
         # Compute the Fourier-space smoothing kernel
@@ -214,7 +214,7 @@ class HistogramSmoother:
 
     def __call__(self, values: ArrayLike) -> NDArray:
         """Return a smoothed histogram of the data vector <values>"""
-        contents, _ = np.histogram(values, self.nbins, self.limits)
+        contents, _ = np.histogram(values, bins=self.nbins, range=self.limits)
         ftc = np.fft.rfft(contents)
         csmooth = np.fft.irfft(self.kernel_ft * ftc)
         csmooth[csmooth < 0] = 0
@@ -239,10 +239,12 @@ def make_smooth_histogram(values: ArrayLike, smooth_sigma: float, limit: float, 
     """
     if upper_limit is None:
         limit, upper_limit = 0, limit
-    return HistogramSmoother(smooth_sigma, [limit, upper_limit])(values)
+    return HistogramSmoother(smooth_sigma, (limit, upper_limit))(values)
 
 
-def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None) -> tuple[float, dict]:
+def drift_correct(
+    indicator: ArrayLike, uncorrected: ArrayLike, limit: float | None = None, max_correction: float = 0.1
+) -> tuple[float, dict]:
     """Compute a drift correction that minimizes the spectral entropy.
 
     Args:
@@ -251,6 +253,8 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
             Assumed to have some gain that is linearly related to indicator.
         limit: The upper limit of uncorrected values over which entropy is
             computed (default None).
+        max_correction: at the extremes, the gain is changed from 1 by no more than
+            ± this factor
 
     Generally indicator will be the pretrigger mean of the pulses, but you can
     experiment with other choices.
@@ -267,28 +271,40 @@ def drift_correct(indicator: ArrayLike, uncorrected: ArrayLike, limit: float | N
     passed in as <indicator>.)
     """
     uncorrected = np.asarray(uncorrected)
-    indicator = np.array(indicator)  # make a copy
-    ptm_offset = np.median(indicator)
-    indicator -= ptm_offset
+    indicatorA: NDArray = np.array(indicator)
+    ptm_offset = np.median(indicatorA)
+    indicatorA -= ptm_offset
+    # Require that the slope never be so positive or so negative as to make the gain go negative when the indicator
+    # takes on its minimum or maximum values, respectively. Fixes #176.
+    assert max_correction >= 0
+    assert max_correction <= 1.0
+    max_slope = -max_correction / indicatorA.min()
+    min_slope = -max_correction / indicatorA.max()
+    assert min_slope < 0
+    assert max_slope > 0
 
     if limit is None:
         pct99 = float(np.percentile(uncorrected, 99))
         limit = 1.25 * pct99
 
-    smoother = HistogramSmoother(0.5, [0, limit])
+    assert limit is not None
+    smoother = HistogramSmoother(0.5, (0, limit))
     assert smoother.nbins < 1e6, "will be crazy slow, should not be possible"
 
-    def entropy(param: NDArray, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
+    def entropy(param: float, indicator: NDArray, uncorrected: NDArray, smoother: HistogramSmoother) -> float:
         """Return the entropy of the drift-corrected values"""
         corrected = uncorrected * (1 + indicator * param)
         hsmooth = smoother(corrected)
         w = hsmooth > 0
         return -(np.log(hsmooth[w]) * hsmooth[w]).sum()
 
-    drift_corr_param = sp.optimize.brent(entropy, (indicator, uncorrected, smoother), brack=[0, 0.001])
+    drift_corr_result = sp.optimize.minimize_scalar(
+        entropy, bracket=(0, 1e-3), bounds=(min_slope, max_slope), method="bounded", args=(indicatorA, uncorrected, smoother)
+    )
 
-    drift_correct_info = {"type": "ptmean_gain", "slope": drift_corr_param, "median_pretrig_mean": ptm_offset}
-    return drift_corr_param, drift_correct_info
+    best_slope = drift_corr_result.x
+    drift_correct_info = {"type": "ptmean_gain", "slope": best_slope, "median_pretrig_mean": ptm_offset}
+    return best_slope, drift_correct_info
 
 
 @njit
