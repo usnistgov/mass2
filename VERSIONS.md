@@ -5,7 +5,9 @@
 **2.1.1** August 21, 2026-
 * Reorganize the `Channel` object so that instead of owning a full `NoiseChannel` object (optional), it can own
   an (optional) `NoiseResult` object. To look at noise traces will now require a separate `Channel` (issue 175).
-* Add ability to read Arrow IPC for raw data, as well as LJH.
+* Add ability to convert LJH raw pulse files into Arrow IPC or Parquet formats (issue 164)
+* Add ability to read Arrow IPC for raw data, as well as LJH (issue 177).
+* Add first draft of MASSASSIN, MAD-COW, and MAD-Dash for online analysis (issue 177).
 * Read `*_configuration.toml` file in the Arrow directory.
 * Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).
