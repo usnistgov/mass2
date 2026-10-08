@@ -75,9 +75,12 @@ ljh_truncate = "mass2.core.ljhutil:main_ljh_truncate"
 mass2-ipython = "mass2.core.mass2main:main"
 mass2-marimo = "mass2.core.mass2notebook:main"
 mass2-examples = "mass2.core.misc:launch_examples"
+mass2-live-sim = "mass2.live.demo.simulate:main"
 mass2-live-apply = "mass2.live.core.cli:apply_main"
 mass2-live-hist = "mass2.live.core.cli:hist_main"
 mass2-live-view = "mass2.live.viewer.server:main"
+mass2-live-demo = "mass2.live.demo.launcher:main"
+mass2-live-export = "mass2.live.demo.export:main"
 
 
 [build-system]
@@ -98,6 +101,7 @@ mass2 = [
     "calibration/nist_asd_2023.pickle.gz",
     "live/viewer/viewer.html",
     "live/viewer/apache-arrow-*",
+    "live/demo/recipes/*.pkl",
 ]
 
 [tool.setuptools_scm]
