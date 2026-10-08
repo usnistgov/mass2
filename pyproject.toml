@@ -77,6 +77,7 @@ mass2-marimo = "mass2.core.mass2notebook:main"
 mass2-examples = "mass2.core.misc:launch_examples"
 mass2-live-apply = "mass2.live.core.cli:apply_main"
 mass2-live-hist = "mass2.live.core.cli:hist_main"
+mass2-live-view = "mass2.live.viewer.server:main"
 
 
 [build-system]
@@ -95,6 +96,8 @@ mass2 = [
     "calibration/nist_xray_data.dat",
     "calibration/low_z_xray_data.dat",
     "calibration/nist_asd_2023.pickle.gz",
+    "live/viewer/viewer.html",
+    "live/viewer/apache-arrow-*",
 ]
 
 [tool.setuptools_scm]
