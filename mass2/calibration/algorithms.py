@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from typing import Any, cast
 from numpy.typing import ArrayLike, NDArray
 import itertools
+import lmfit
 import numpy as np
 
 
@@ -230,6 +231,17 @@ def get_model(
             )
         line = SpectralLine.quick_monochromatic_line(f"{lineNameOrEnergy}eV", float(lineNameOrEnergy), 0.001, 0)
     return line.model(has_linear_background=has_linear_background, has_tails=has_tails, prefix=prefix)
+
+
+def fit_line_counts(
+    model: GenericLineModel, bin_centers: NDArray, counts: NDArray, params_update: lmfit.Parameters = lmfit.Parameters()
+) -> LineModelResult:
+    """Fit `model` to a histogram, `counts` at `bin_centers`, with the energy scale fixed (dph_de = 1): what
+    `Channel.linefit` and `Channels.linefit` do once they have histogrammed their column, for anyone holding counts."""
+    params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
+    params["dph_de"].set(1.0, vary=False)
+    params = params.update(params_update)
+    return model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
 
 
 def multifit(

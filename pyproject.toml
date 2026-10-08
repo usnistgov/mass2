@@ -29,6 +29,8 @@ dependencies = [
     # A test_truebq_bin.py error came up with polars 1.40. Forbid for now.
     "polars<1.40",
     "progress",
+    # pyarrow: polars cannot append to, or incrementally read, an Arrow IPC stream (mass2.live)
+    "pyarrow",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata#egg=pulsedata",
     "pyqt5",
     "pyyaml",
@@ -73,6 +75,8 @@ ljh_truncate = "mass2.core.ljhutil:main_ljh_truncate"
 mass2-ipython = "mass2.core.mass2main:main"
 mass2-marimo = "mass2.core.mass2notebook:main"
 mass2-examples = "mass2.core.misc:launch_examples"
+mass2-live-apply = "mass2.live.core.cli:apply_main"
+mass2-live-hist = "mass2.live.core.cli:hist_main"
 
 
 [build-system]

@@ -1366,12 +1366,7 @@ class Channel:
         _bin_edges = np.arange(pe - dlo, pe + dhi, binsize)
         df_small = self.df.lazy().filter(self.good_expr).filter(use_expr).select(col).collect()
         bin_centers, counts = misc.hist_of_series(df_small[col], _bin_edges)
-        params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
-        params["dph_de"].set(1.0, vary=False)
-        print(f"before update {params=}")
-        params = params.update(params_update)
-        print(f"after update {params=}")
-        result = model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
+        result = mass2.calibration.algorithms.fit_line_counts(model, bin_centers, counts, params_update)
         result.set_label_hints(
             binsize=bin_centers[1] - bin_centers[0],
             ds_shortname=self.header.description,
