@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>mass2 live analysis</title>
+<style>
+  :root {
+    --paper: #f2f4f3; --ink: #1e2a32; --muted: #5f6c74; --rule: #d3d9dc; --panel: #ffffff; --focus: #0072b2;
+    --sum-fill: rgba(30, 42, 50, 0.12); --alert: #b3261e; --ramp-floor: 0; --lit: #0072b2; --lit-bg: #e3f0f9;
+    font-family: "IBM Plex Sans", "Source Sans 3", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink); background: var(--paper);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12181c; --ink: #e3e8eb; --muted: #94a1a9; --rule: #2c363c; --panel: #192126; --focus: #56b4e9;
+      --sum-fill: rgba(227, 232, 235, 0.10); --alert: #ff8a80; --ramp-floor: 0.3; --lit: #56b4e9; --lit-bg: #1d3442;
+    }
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  [hidden] { display: none !important; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); background: var(--paper); }
+  body {
+    margin: 0 auto; max-width: 1440px; background: var(--paper); line-height: 1.4;
+    padding: 16px max(20px, env(safe-area-inset-right, 0px)) 32px max(20px, env(safe-area-inset-left, 0px));
+  }
+  h1 { font-size: 1.375rem; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 1.0625rem; font-weight: 650; margin: 0; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.8125rem; }
+
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  #datasetLabel { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--muted); }
+  select { font: inherit; font-size: 0.9375rem; padding: 5px 8px; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); color: var(--ink); max-width: 100%; }
+  #speedLabel { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--muted); }
+  #speedLabel input { width: 140px; accent-color: var(--ink); }
+  #speedLabel output { min-width: 9ch; color: var(--ink); font-weight: 600; }
+  #memory { margin: 8px 0 0; }
+  #memory b { color: var(--ink); font-weight: 600; }
+  .proc .name .mem { font-weight: 400; color: var(--muted); font-size: 0.8125rem; }
+  #explain { margin: 8px 0 14px; max-width: 80ch; font-size: 0.9375rem; color: var(--muted); }
+  #explain strong { color: var(--ink); font-weight: 600; }
+
+  /* counters */
+  #counters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .counter { background: var(--panel); padding: 10px 14px 12px; min-width: 0; transition: background-color 0.6s; }
+  .counter .label { font-size: 0.8125rem; color: var(--muted); }
+  .counter .value { font-size: 1.625rem; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .counter .value .unit { font-size: 0.875rem; font-weight: 500; color: var(--muted); margin-left: 4px; }
+  .counter .delta { font-size: 0.8125rem; color: var(--muted); min-height: 1.2em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .counter.bumped { background: var(--lit-bg); transition: none; }
+  .state-pill { display: inline-flex; align-items: center; gap: 8px; }
+  .state-pill::before { content: ""; width: 14px; height: 14px; border-radius: 3px; background: var(--swatch, var(--muted)); }
+
+  /* view switch */
+  nav.views { display: flex; gap: 0; margin: 16px 0 12px; border-bottom: 1px solid var(--rule); }
+  nav.views button { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; font-size: 0.9375rem; padding: 8px 14px; color: var(--muted); }
+  nav.views button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  #status { margin-left: auto; align-self: center; font-size: 0.8125rem; color: var(--muted); padding: 0 4px 6px; text-align: right; }
+  #status.alert { color: var(--alert); }
+
+  button {
+    font: inherit; font-size: 0.8125rem; padding: 5px 10px; min-height: 32px; border-radius: 4px; cursor: pointer;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--rule);
+  }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; margin-left: -1px; }
+  .seg button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 4px 4px 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); position: relative; }
+
+  /* panels */
+  .spectra { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .plots { display: grid; gap: 16px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 14px 10px; min-width: 0; }
+  .panel-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  .panel-head .desc { font-size: 0.875rem; color: var(--muted); max-width: 70ch; margin-top: 2px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .tools .label { font-size: 0.8125rem; color: var(--muted); margin-right: 2px; }
+  canvas { display: block; width: 100%; cursor: crosshair; touch-action: pan-y; }
+  #spectrum { height: 340px; }
+  #waterfall { height: 420px; }
+  .zoombar { margin: 2px 0 0; }
+  .fitgrid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  #fitImg { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 4px; background: #fff; }
+  #fitParams { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 0.875rem; }
+  #fitParams dt { color: var(--muted); }
+  #fitParams dd { margin: 0; }
+  #fitParams .big { font-size: 1.375rem; font-weight: 650; }
+  #fitTrend { height: 170px; cursor: default; }
+  @media (max-width: 760px) { .fitgrid { grid-template-columns: 1fr; } }
+  #zoomInfo b { color: var(--ink); font-weight: 600; }
+  .readout { min-height: 1.4em; font-size: 0.8125rem; color: var(--muted); margin-top: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+  .chips .label { font-size: 0.8125rem; color: var(--muted); margin-right: 2px; }
+  button.chip { display: inline-flex; align-items: center; gap: 6px; }
+  button.chip::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--swatch); flex: none; }
+  button.chip[aria-pressed="false"] { color: var(--muted); }
+  button.chip[aria-pressed="false"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--swatch); }
+  button.chip .n { color: var(--muted); }
+  button.overlay::after { content: "×"; margin-left: 2px; color: var(--muted); font-size: 1rem; line-height: 1; }
+  .heat-key { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--muted); }
+  .heat-key i { display: inline-block; width: 90px; height: 10px; border-radius: 2px;
+    background: linear-gradient(90deg, #00224e, #394870, #707173, #a89d71, #e6cd50, #fdea45); }
+
+  /* detector array */
+  .array-panel { position: sticky; top: 12px; }
+  #grid { display: grid; gap: 4px; margin: 10px 0 8px; }
+  #grid button.pixel {
+    aspect-ratio: 1; padding: 2px; min-height: 0; border: 2px solid transparent; border-radius: 5px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+    color: var(--cell-ink, #fff); background: var(--cell, var(--rule)); position: relative;
+  }
+  #grid button.pixel .ch { font-size: 0.875rem; font-weight: 650; }
+  #grid button.pixel .v { font-size: 0.6875rem; opacity: 0.95; }
+  #grid button.pixel[data-real="true"]::after {
+    content: "real"; position: absolute; top: 2px; left: 3px; font-size: 0.5625rem; font-weight: 600; opacity: 0.85;
+  }
+  #grid button.pixel[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--sel); }
+  #gridKey { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 0.75rem; color: var(--muted); }
+  #gridKey i { flex: 1; height: 10px; border-radius: 2px; }
+  #pixelDetail { margin-top: 10px; font-size: 0.8125rem; border-top: 1px solid var(--rule); padding-top: 8px; min-height: 3.2em; }
+  #pixelDetail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; }
+  #pixelDetail dt { color: var(--muted); }
+  #pixelDetail dd { margin: 0; }
+
+  /* pipeline view */
+  .pipeline { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .col h3 { font-size: 0.875rem; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+  .file, .proc { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; transition: border-color 0.8s, background-color 0.8s; }
+  .file .name { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.875rem; font-weight: 600; word-break: break-all; }
+  .file .kind { font-size: 0.75rem; color: var(--muted); }
+  .file .stats { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 0.8125rem; }
+  .file .stats b { font-weight: 650; }
+  .file.written, .proc.running { border-color: var(--lit); background: var(--lit-bg); transition: none; }
+  .proc .name { font-weight: 650; }
+  .proc .what { font-size: 0.8125rem; color: var(--muted); margin-top: 2px; }
+  .proc .src { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.75rem; color: var(--muted); }
+  ol.steps { list-style: none; margin: 8px 0 0; padding: 0; counter-reset: step; }
+  ol.steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr auto; gap: 2px 8px; align-items: start; padding: 8px 8px; border-radius: 5px; transition: background-color 0.6s; }
+  ol.steps li::before { content: counter(step); width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--rule); display: grid; place-items: center; font-size: 0.75rem; font-weight: 650; color: var(--muted); transition: all 0.6s; }
+  ol.steps li.lit { background: var(--lit-bg); transition: none; }
+  ol.steps li.lit::before { background: var(--lit); border-color: var(--lit); color: var(--panel); transition: none; }
+  ol.steps .t { font-weight: 600; font-size: 0.875rem; }
+  ol.steps .d { grid-column: 2 / 4; font-size: 0.8125rem; color: var(--muted); }
+  ol.steps .m { font-size: 0.8125rem; text-align: right; white-space: nowrap; }
+  .loopnote { font-size: 0.8125rem; color: var(--muted); padding: 8px 8px 2px; border-top: 1px dashed var(--rule); margin-top: 6px; }
+  .arrow { text-align: center; color: var(--muted); font-size: 0.8125rem; margin: -2px 0 8px; }
+  body:not(.replay) [data-file] { cursor: pointer; }
+  body:not(.replay) .file[data-file] .name::after { content: " ⓘ"; color: var(--muted); font-weight: 400; }
+  #peek { border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); color: var(--ink); padding: 14px 16px; max-width: min(1100px, calc(100vw - 32px)); }
+  #peek::backdrop { background: rgba(0, 0, 0, 0.35); }
+  #peek header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  #peek h4 { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.9375rem; }
+  #peek header button { margin-left: auto; font: inherit; border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); color: var(--ink); padding: 2px 9px; cursor: pointer; }
+  #peek .scroll { overflow-x: auto; }
+  #peek table { border-collapse: collapse; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.75rem; }
+  #peek th, #peek td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
+  #peek th { background: var(--paper); }
+  #peek th small { display: block; color: var(--muted); font-weight: 400; }
+  .flow-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--rule); margin-right: 6px; vertical-align: middle; }
+  .flow-dot.on { background: var(--lit); animation: blink 0.9s ease-out; }
+  @keyframes blink { from { box-shadow: 0 0 0 6px var(--lit-bg); } to { box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) {
+    .counter, .file, .proc, ol.steps li, ol.steps li::before { transition: none !important; }
+    .flow-dot.on { animation: none; }
+  }
+
+  @media (max-width: 1100px) {
+    .spectra { grid-template-columns: 1fr; }
+    .array-panel { position: static; order: -1; }
+    .pipeline { grid-template-columns: 1fr; }
+    #grid { max-width: 420px; }
+  }
+  @media (max-width: 760px) {
+    #counters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .counter .value { font-size: 1.375rem; }
+  }
+  @media (max-width: 640px) {
+    body { padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+    h1 { font-size: 1.1875rem; }
+    #spectrum { height: 280px; }
+    #waterfall { height: 380px; }
+    .panel { padding: 12px 10px 8px; }
+    .hint { display: none; }
+    #status { flex-basis: 100%; text-align: left; margin-left: 0; padding-top: 6px; }
+    nav.views { flex-wrap: wrap; }
+    #datasetLabel { flex-basis: 100%; min-width: 0; }
+    #datasetLabel select { flex: 1; min-width: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>mass2 live analysis</h1>
+  <label id="datasetLabel" hidden>Dataset <select id="datasetPicker"></select></label>
+  <label id="speedLabel" hidden>Playback speed
+    <input type="range" id="speed" min="0" max="8" step="1" value="2" aria-describedby="speedValue">
+    <output id="speedValue">5× real time</output>
+  </label>
+</header>
+<p id="explain">Waiting for the first histograms from mass2-live-hist…</p>
+
+<section id="counters" aria-label="Running totals">
+  <div class="counter" id="c-records"><div class="label">Pulse records processed</div><div class="value">—</div><div class="delta"></div></div>
+  <div class="counter" id="c-good"><div class="label">Good pulses histogrammed</div><div class="value">—</div><div class="delta"></div></div>
+  <div class="counter" id="c-rate"><div class="label">Processing rate</div><div class="value">—</div><div class="delta"></div></div>
+  <div class="counter" id="c-state"><div class="label">Experiment state now</div><div class="value">—</div><div class="delta"></div></div>
+  <div class="counter" id="c-clock"><div class="label">Time of newest pulse</div><div class="value">—</div><div class="delta"></div></div>
+</section>
+<p class="small muted" id="memory" hidden></p>
+
+<nav class="views" role="tablist" aria-label="View">
+  <button role="tab" id="tab-spectra" aria-selected="true" aria-controls="view-spectra">Spectra</button>
+  <button role="tab" id="tab-pipeline" aria-selected="false" aria-controls="view-pipeline">Pipeline and files</button>
+  <span id="status"></span>
+</nav>
+
+<!-- ======================= Spectra view ======================= -->
+<main id="view-spectra" class="spectra" role="tabpanel" aria-labelledby="tab-spectra">
+  <div class="plots">
+    <section class="panel" aria-labelledby="specTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="specTitle">Energy spectrum</h2>
+          <p class="desc" id="specDesc">Good pulses from all channels, summed.</p>
+        </div>
+        <div class="tools">
+          <span class="label">Selected states</span>
+          <span class="seg"><button id="sumBtn" aria-pressed="true">Summed</button><button id="eachBtn" aria-pressed="false">Each in its colour</button></span>
+          <span class="label">Counts axis</span>
+          <span class="seg"><button id="logBtn" aria-pressed="true">Log</button><button id="linBtn" aria-pressed="false">Linear</button></span>
+        </div>
+      </div>
+      <div class="tools zoombar">
+        <span class="label">Energy axis</span>
+        <span class="seg">
+          <button id="panLeft" aria-label="Pan to lower energy">◀</button>
+          <button id="zoomOut" aria-label="Zoom out">− Zoom out</button>
+          <button id="zoomIn" aria-label="Zoom in">+ Zoom in</button>
+          <button id="panRight" aria-label="Pan to higher energy">▶</button>
+        </span>
+        <button id="resetBtn">Full range</button>
+      </div>
+      <p class="small muted" id="zoomInfo" style="margin:6px 0 2px"></p>
+      <div class="chips" id="stateChips"><span class="label">States in the spectrum and the line fit:</span></div>
+      <div class="chips" id="overlayChips"></div>
+      <canvas id="spectrum" aria-label="Energy spectrum plot"></canvas>
+      <div class="readout" id="specReadout"><span class="hint">Zoom with the buttons, by dragging across an energy range, by pinching on a phone, or with a trackpad pinch (or Ctrl + scroll) on a computer.</span></div>
+    </section>
+
+    <section class="panel" id="fitPanel" aria-labelledby="fitTitle" hidden>
+      <div class="panel-head">
+        <div>
+          <h2 id="fitTitle">Line fit</h2>
+          <p class="desc" id="fitDesc"></p>
+        </div>
+        <div class="tools"><button id="fitZoom">Show the fit region in the spectrum</button></div>
+      </div>
+      <div class="fitgrid">
+        <img id="fitImg" alt="The latest fit, drawn by mass2's plotm: data points, fitted line shape, and fit parameters">
+        <div>
+          <dl id="fitParams"></dl>
+          <canvas id="fitTrend" aria-label="Resolution of each refit over time"></canvas>
+          <p class="small muted">Resolution (FWHM) from each refit, with ±1σ bars. It should settle as counts build up.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="fallTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="fallTitle">Energy vs time, with the experiment state</h2>
+          <p class="desc" id="fallDesc">Newest at the top; a new row starts at each experiment state change. The column on the left shows each row's state.</p>
+        </div>
+        <span class="heat-key" id="heatKey">fewer <i></i> more counts</span>
+      </div>
+      <div class="tools" style="margin-bottom:8px"><span class="label">Row length</span><span class="seg" id="rowSeg"></span></div>
+      <canvas id="waterfall" aria-label="Energy versus time plot"></canvas>
+      <div class="readout" id="fallReadout"></div>
+    </section>
+  </div>
+
+  <aside class="panel array-panel" aria-labelledby="arrayTitle">
+    <h2 id="arrayTitle">Detector array</h2>
+    <p class="desc small muted" id="arrayDesc">Each square is one detector channel, drawn at its position in the array. Tap squares to overlay their spectra.</p>
+    <div id="grid" role="group" aria-label="Detector channels"></div>
+    <div id="gridKey"></div>
+    <p class="small muted" id="metricNote" style="margin-top:6px"></p>
+    <div id="pixelDetail"></div>
+  </aside>
+</main>
+
+<!-- ======================= Pipeline view ======================= -->
+<main id="view-pipeline" class="pipeline" role="tabpanel" aria-labelledby="tab-pipeline" hidden>
+  <div class="col">
+    <h3>On disk before the run</h3>
+    <div class="file" id="f-ljh"><div class="kind">Detector data, original</div><div class="name">*.ljh</div><div class="stats"></div></div>
+    <div class="file" id="f-recipe"><div class="kind">Saved recipe, loaded once at start</div><div class="name"></div><div class="stats"></div></div>
+    <div class="arrow">↓ read by</div>
+    <div class="proc" id="p-sim"><div class="name">mass2-live-sim</div><div class="src">mass2/live/demo/simulate.py · Python</div><div class="what"></div></div>
+    <div class="arrow" data-file="pulses.arrows">↓ appends to</div>
+    <div class="file" id="f-input" data-file="pulses.arrows"><div class="kind">Raw pulses, Arrow IPC stream, growing</div><div class="name">pulses.arrows</div><div class="stats"></div></div>
+    <div class="file" id="f-statesfile" data-file="pulses_experiment_state.txt"><div class="kind">Experiment states, DASTARD text format, growing</div><div class="name">pulses_experiment_state.txt</div><div class="stats"></div></div>
+  </div>
+
+  <div class="col">
+    <h3>The core loop, mass2-live-apply</h3>
+    <div class="proc" id="p-apply">
+      <div class="name"><span class="flow-dot" id="loopDot"></span>mass2-live-apply</div>
+      <div class="src">mass2/live/core/loop.py (run_live_apply) · Python</div>
+      <div class="what" id="applyWhat"></div>
+      <ol class="steps" id="steps">
+        <li data-step="read"><span class="t">Read the new raw records</span><span class="m"></span><span class="d">Every complete record batch appended to pulses.arrows since the last poll.</span></li>
+        <li data-step="recipe"><span class="t">mass2 applies each channel's recipe</span><span class="m"></span><span class="d" id="recipeSteps"></span></li>
+        <li data-step="write"><span class="t">Append the analyzed records</span><span class="m"></span><span class="d">One batch per poll, the same rows in the same order, appended to analyzed.arrows.</span></li>
+      </ol>
+      <p class="loopnote">↻ then, when caught up, waits 0.5 s; polls again</p>
+    </div>
+    <div class="arrow" data-file="analyzed.arrows">↓ appends to</div>
+    <div class="file" id="f-output" data-file="analyzed.arrows"><div class="kind">Per-pulse results, Arrow IPC stream, growing</div><div class="name">analyzed.arrows</div><div class="stats"></div></div>
+  </div>
+
+  <div class="col">
+    <div class="arrow">analyzed.arrows and pulses_experiment_state.txt read by</div>
+    <div class="proc" id="p-hist"><div class="name">mass2-live-hist</div><div class="src">mass2/live/core/loop.py (run_live_hist) · Python</div>
+      <div class="what">Labels each record with its experiment state, histograms the good ones (mass2's hist_of_series) by channel in time slices that end every slice length and at each state change, and refits the line on them every few seconds.</div><div class="what" id="fitWhat"></div></div>
+    <div class="arrow">↓ appends to the growing streams; rewrites the slice still filling</div>
+    <div class="file" id="f-hist" data-file="hist/histograms.arrows"><div class="kind">Finished histograms, one per row with its record count and binning, Arrow IPC stream, growing</div><div class="name">hist/histograms.arrows</div><div class="stats"></div></div>
+    <div class="file" id="f-current" data-file="hist/histograms_current.arrows"><div class="kind">Slice still filling, rewritten each poll</div><div class="name">hist/histograms_current.arrows</div><div class="stats"></div></div>
+    <div class="file" id="f-fits" data-file="hist/fits.arrows"><div class="kind">Every fit so far, each with its plotm image, Arrow IPC stream, growing</div><div class="name">hist/fits.arrows</div><div class="stats"></div></div>
+    <div class="arrow">↓ every file above read by</div>
+    <div class="proc" id="p-server"><div class="name">The viewer server</div><div class="src">mass2/live/viewer/server.py · Python</div>
+      <div class="what">Follows histograms.arrows and fits.arrows, keeping the run's totals by channel and state and the recent slices summed over channels; on each request it sends what the page draws: the totals, and the newest rows of the energy-vs-time plot at the page's row length.</div></div>
+    <div class="arrow">↓ every 2 s, as an Arrow IPC stream over HTTP (GET api/state)</div>
+    <div class="proc" id="p-view"><div class="name">This page</div><div class="src">mass2/live/viewer/viewer.html · JavaScript</div><div class="what" id="viewWhat"></div></div>
+  </div>
+</main>
+
+<!-- replay data -->
+<dialog id="peek"><header><h4></h4><span class="muted"></span><button type="button" aria-label="Close">✕</button></header><div class="scroll"></div></dialog>
+<script>
+"use strict";
+// ======================================================================================
+// Colours
+const CHANNEL_COLOURS = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#e69f00", "#56b4e9"];  // Okabe–Ito
+const STATE_COLOURS = ["#4e79a7", "#e15759", "#59a14f", "#b07aa1", "#f28e2b", "#76b7b2", "#9c755f", "#edc948"];
+const NO_STATE = "(none)", NO_STATE_COLOUR = "#b8c0c4";
+const RAMP = [[0, 34, 78], [57, 72, 108], [112, 113, 115], [168, 157, 113], [230, 205, 80], [253, 234, 69]];  // cividis-like
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+let INK, MUTED, RULE, PANEL;
+function readTheme() { INK = css("--ink"); MUTED = css("--muted"); RULE = css("--rule"); PANEL = css("--panel"); }
+readTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readTheme(); render(); });
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function rampAt(stops, f) {
+  const x = Math.min(1, Math.max(0, f)) * (stops.length - 1), k = Math.min(stops.length - 2, Math.floor(x)), t = x - k;
+  return stops[k].map((v, j) => Math.round(v + t * (stops[k + 1][j] - v)));
+}
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const inkOn = c => (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) > 150 ? "#1e2a32" : "#ffffff";
+
+// ======================================================================================
+// Formatting: one set of formatters so every view shows the same numbers the same way
+const fmt = {
+  int: n => n == null ? "—" : Math.round(n).toLocaleString("en-US"),
+  plus: n => n > 0 ? `+${Math.round(n).toLocaleString("en-US")}` : "no change",
+  bytes(n) {
+    if (n == null) return "—";
+    const u = ["B", "kB", "MB", "GB"]; let i = 0;
+    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    return `${n.toFixed(n < 10 && i ? 1 : 0)} ${u[i]}`;
+  },
+  clock: t => new Date(t * 1000).toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+  pct: x => `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(1)}%`,
+  energy(e, big) { return big ? `${(e / 1000).toFixed(2)} keV` : `${e.toFixed(1)} eV`; },
+  ms: x => x == null ? "" : x < 10 ? `${x.toFixed(1)} ms` : `${Math.round(x)} ms`,
+};
+
+// ======================================================================================
+// State
+const S = {
+  run: null, meta: null, channels: [], status: null, controller: null,
+  rows: [], rowS: null,  // the time-plot rows the server (or the recording) built, and their length, s
+  nSlices: 0, openGood: 0,
+  timeline: [], stateNames: [], hiddenStates: new Set(), overlay: [], log: true, view: null,
+  tab: "spectra", detail: null, fits: null,
+  eachState: false,    // spectrum: one curve per selected state, in its colour, instead of their sum
+  rowChoice: null,     // time plot: row length chosen in the page, seconds of data; null = follow the playback speed
+  prev: null,          // previous status, for "+N since last update" and the rate
+  rate: null,
+};
+const REPLAY = window.MASS2_REPLAY ? makeReplay(window.MASS2_REPLAY) : null;
+const POLL_MS = REPLAY ? 500 : 2000;  // a replay answers from the recording; the live server is asked every 2 s
+
+// ======================================================================================
+// Replay of a recorded run (pages made by mass2-live-export): answers like the server's /api/state.
+function makeReplay(data) {
+  // A recording holds one pass of the slices mass2-live-hist finished, each in one state, with their original
+  // timestamps: [seconds after t0 (a slice_s boundary), records, {state: {channel: [bin gap, count, ...]}}]. Playing
+  // it at `speed` times real time hands the page the same answers the live server would give at that moment.
+  const byKey = Object.fromEntries(data.datasets.map(d => [d.key, d]));
+  for (const d of data.datasets) {  // when each slice ends, and running totals after it, so any moment's counters are exact
+    const sl = d.meta.slice_s;
+    d.ends = d.slices.map(([t], i) => Math.min((Math.floor(t / sl) + 1) * sl, d.slices[i + 1]?.[0] ?? Infinity));
+    let r = 0, g = 0;
+    d.cum = [[0, 0]];
+    for (const [, recs, sp] of d.slices) {
+      r += recs;
+      for (const chans of Object.values(sp)) for (const pairs of Object.values(chans)) for (let k = 1; k < pairs.length; k += 2) g += pairs[k];
+      d.cum.push([r, g]);
+    }
+    d.duration = d.ends.at(-1);
+  }
+  let active = data.datasets[0].key, run = 0, speed = 5, virt = 0, lastWall = Date.now();
+  const tick = () => { const now = Date.now(); virt += (now - lastWall) / 1000 * speed; lastWall = now; return virt; };
+  let acc;  // what has been replayed so far: totals by state and channel, and the slices, newest last
+  const restart = () => { virt = 0; lastWall = Date.now(); run += 1; acc = { k: 0, totals: {}, history: [] }; };  // a new dataset only
+  restart();
+
+  return {
+    get speed() { return speed; },
+    setSpeed(x) { tick(); speed = x; },
+    switch(key) { if (byKey[key]) { active = key; restart(); } },
+    state(rowS) {
+      // The recording plays once, as a mass2-live-demo run does, then ends, keeping everything it showed.
+      const d = byKey[active], t0 = d.meta.t0, sl = d.meta.slice_s, N = d.slices.length, nb = d.meta.nbins;
+      const elapsed = Math.min(tick(), d.duration);
+      for (; acc.k < N && d.ends[acc.k] <= elapsed; acc.k++) {  // add the slices finished since the last answer
+        const [t, , counts] = d.slices[acc.k];
+        for (const [st, chans] of Object.entries(counts)) for (const [ch, h] of Object.entries(chans)) decodeInto(((acc.totals[st] ??= {})[ch] ??= new Float32Array(nb)), h);
+        acc.history.push({ t: t0 + t, counts });
+      }
+      if (acc.history.length > 20000) acc.history.splice(0, acc.history.length - 20000);
+      const nDone = acc.k, [records, good] = d.cum[nDone], bpr = d.meta.bytes_per_record;
+      const states = d.states.filter(([t]) => t <= elapsed).map(([t, l]) => [t0 + t, l]);
+      return {
+        run, meta: d.meta, n_slices: nDone, open_good: 0, states, totals: acc.totals, ...timeRowsOf(acc.history, rowS > 0 ? rowS : sl, nb),
+        status: {
+          records, good_pulses: good,
+          input_bytes: Math.round(records * bpr.input), output_bytes: Math.round(records * bpr.output),
+          stream_ended: nDone === N, updated_unix_s: Date.now() / 1000,
+          first_data_us: (t0 + d.slices[0][0]) * 1e6, latest_data_us: (t0 + elapsed) * 1e6,
+        },
+        controller: { datasets: data.datasets.map(x => ({ key: x.key, title: x.title })), active, phase: "running", speed },
+        fits: { ...d.fits, fits: d.fits.fits.filter(f => f.t <= elapsed).map(f => ({ ...f, t: t0 + f.t })) },  // those made so far
+      };
+    },
+  };
+}
+
+// ---- one playback-speed control: the recording's speed here, the real simulator's in mass2-live-demo
+function setupSpeed() {
+  const label = document.getElementById("speedLabel"), input = document.getElementById("speed"), out = document.getElementById("speedValue");
+  const speeds = REPLAY ? [1, 2, 5, 10, 30, 60, 120, 300, 600] : [1, 2, 5, 10, 20, 30];  // live: what the pipeline keeps up with
+  const show = x => { out.textContent = `${x}× real time`; input.value = String(Math.max(0, speeds.indexOf(x))); };
+  input.max = String(speeds.length - 1);
+  input.addEventListener("input", async () => {
+    const x = speeds[Number(input.value)];
+    show(x);
+    if (REPLAY) REPLAY.setSpeed(x);
+    else await fetch("api/speed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ speed: x }) });
+    poll();  // Auto rows follow the speed
+  });
+  return { label, show };
+}
+const SPEED = setupSpeed();
+function currentSpeed() { return REPLAY ? REPLAY.speed : (S.controller?.speed ?? 1); }
+
+// ======================================================================================
+// Data in. Every answer, from the live server or from a recording, holds what the plots draw: `totals`
+// ({state: {channel: counts}}) and `rows` ([{t, stateSum: {state: counts}}], the newest time-plot rows, `row_s`
+// long). The page keeps nothing between answers but its own choices.
+let failingSince = null, pollTimer = null;  // when requests to the server started failing; the next poll
+async function poll() {
+  clearTimeout(pollTimer);
+  let s;
+  try {
+    const rowS = S.meta ? rowLength() : 0;
+    s = REPLAY ? REPLAY.state(rowS) : await fetchState(rowS);
+  } catch (e) {
+    failingSince ??= Date.now();
+    const secs = (Date.now() - failingSince) / 1000;
+    if (e.message === "busy") setStatus("Every run this computer can host is in use; retrying…", false);
+    else if (secs < 30) setStatus("Connection interrupted; retrying…", false);  // e.g. the tunnel reconnecting: usually seconds
+    else setStatus(`Cannot reach the viewer server for ${Math.round(secs)} s. Check that mass2-live-demo or mass2-live-view is still running.`, true);
+    pollTimer = setTimeout(poll, POLL_MS);
+    return;
+  }
+  failingSince = null;
+  try {
+    if (s.run !== S.run) resetData(s.run);
+    ingest(s);
+  } catch (e) {
+    console.error("mass2 live viewer: could not show this update", e);  // a page bug, not the server: keep polling
+  }
+  pollTimer = setTimeout(poll, POLL_MS);
+}
+
+// ---- the live server's answer: an Arrow IPC stream, one row per histogram (kind "total" or "row", t, state,
+// ch_num, its nonempty bins and their counts), with everything else as JSON in the schema metadata.
+const ARROW = REPLAY ? null : new Promise((ok, fail) => {
+  const el = document.createElement("script");
+  el.src = "arrow.js"; el.onload = ok; el.onerror = fail;
+  document.head.append(el);
+});
+async function fetchState(rowS) {
+  await ARROW;
+  const res = await fetch(`api/state?row_s=${rowS}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(res.status === 503 ? "busy" : `HTTP ${res.status}`);
+  const table = Arrow.tableFromIPC(new Uint8Array(await res.arrayBuffer()));
+  const s = JSON.parse(table.schema.metadata.get("mass2.live"));
+  const [kind, t, state, ch, bins, counts] = ["kind", "t", "state", "ch_num", "bins", "counts"].map(name => table.getChild(name));
+  const totals = {}, rows = [];
+  for (let i = 0; i < table.numRows; i++) {
+    const h = new Float32Array(s.meta.nbins);
+    decodeInto(h, { bins: bins.get(i).toArray(), counts: counts.get(i).toArray() });
+    if (kind.get(i) === "total") (totals[state.get(i)] ??= {})[String(ch.get(i))] = h;
+    else rows.push({ t: t.get(i), st: state.get(i), sum: h });  // a time-plot row, in one state
+  }
+  return Object.assign(s, { totals, rows: rows.sort((a, b) => a.t - b.t) });
+}
+
+function decodeInto(target, h) {  // h: {bins, counts} from the live server, or [bin gap, count, ...] from a recording
+  if (Array.isArray(h)) { for (let q = 0, i = 0; q < h.length; q += 2) { i += h[q]; target[i] += h[q + 1]; } return; }
+  const { bins, counts } = h;
+  for (let k = 0; k < bins.length; k++) target[bins[k]] += counts[k];
+}
+
+// For a recording: the newest MAX_ROWS rows of the time plot, made as the live server makes them (server.py
+// _time_rows): a row starts at each state change and every `len` s within a state, so a row is in one state; a
+// state's last row, if shorter than len / 2, joins the row before it. Each recorded slice is in one state.
+const MAX_ROWS = 120;  // more than the canvas shows (one row needs at least 4 px)
+function timeRowsOf(history, len, nb) {
+  const parts = history.filter(h => Object.keys(h.counts).length > 0).map(h => {
+    const [st, chans] = Object.entries(h.counts)[0];
+    return { t: h.t, st, chans };
+  });
+  const starts = [];
+  parts.forEach((p, i) => {
+    const last = starts.at(-1);
+    if (last && p.st === last.st && p.t < last.t + len) return;
+    if (starts.length > 1 && p.st !== last.st && last.st === starts.at(-2).st && p.t - last.t < len / 2) starts.pop();
+    starts.push({ t: p.t, st: p.st, i });
+  });
+  const keep = starts.slice(-MAX_ROWS);
+  const rows = keep.map((r, k) => {
+    const sum = new Float32Array(nb);
+    for (const p of parts.slice(r.i, k + 1 < keep.length ? keep[k + 1].i : parts.length)) for (const h of Object.values(p.chans)) decodeInto(sum, h);
+    return { t: r.t, st: r.st, sum };
+  });
+  return { rows, row_s: len };
+}
+
+const T = { byState: {}, stateSum: {} };  // totals by state and channel, and by state summed over channels
+function resetData(run) {
+  document.getElementById("specReadout").textContent = "";
+  document.getElementById("fallReadout").textContent = "";
+  Object.assign(S, { run, meta: null, rows: [], rowS: null, channels: [], timeline: [], stateNames: [], view: null,
+    overlay: [], detail: null, prev: null, rate: null, status: null });
+  T.byState = {}; T.stateSum = {};
+  S.hiddenStates.clear();
+}
+
+function ingest(s) {
+  S.controller = s.controller;
+  showDatasets();
+  if (s.meta) {
+    if (!S.meta) { S.meta = s.meta; S.view = [s.meta.e_lo, s.meta.e_hi]; }
+    T.byState = s.totals;
+    T.stateSum = Object.fromEntries(Object.entries(s.totals).map(([st, chans]) => {
+      const sum = new Float32Array(s.meta.nbins);
+      for (const h of Object.values(chans)) for (let i = 0; i < h.length; i++) sum[i] += h[i];
+      return [st, sum];
+    }));
+    S.rows = s.rows; S.rowS = s.row_s; S.nSlices = s.n_slices; S.openGood = s.open_good;
+    S.timeline = s.states;
+    S.fits = s.fits || null;
+    S.processes = s.processes ?? null;
+    S.fileBytes = s.file_bytes ?? null;
+    S.visitor = s.visitor ?? null;
+    const counted = new Set(Object.values(s.totals).flatMap(chans => Object.keys(chans)));
+    S.channels = [...new Set([...Object.keys(s.meta.layout ?? {}), ...counted])].sort((a, b) => a - b);
+    noteStates();
+    if (!REPLAY) followSelection(s.hidden_states);
+    const st = s.status;
+    if (st && S.status && st.updated_unix_s > S.status.updated_unix_s) {
+      const r = (st.records - S.status.records) / (st.updated_unix_s - S.status.updated_unix_s);
+      S.rate = S.rate == null ? r : 0.6 * S.rate + 0.4 * r;
+    }
+    S.prev = S.status;
+    S.status = st;
+    SPEED.label.hidden = !(REPLAY || S.controller);
+    if (document.activeElement !== document.getElementById("speed")) SPEED.show(currentSpeed());
+    render();
+    const nFits = S.fits?.fits?.length ?? 0, seen = S.seen ?? { slices: S.nSlices, fits: nFits };
+    if (st && (!S.prev || st.updated_unix_s !== S.prev.updated_unix_s)) {
+      animateLoop({ new_records: st.records - (S.prev?.records ?? 0), new_slices: S.nSlices - seen.slices, new_fits: nFits - seen.fits });
+    }
+    S.seen = { slices: S.nSlices, fits: nFits };
+  }
+  showStatus();
+}
+
+// ---- time-plot row length: chosen in the page, or long enough to fill in ~12 s of wall time at the current
+// playback speed; never shorter than one slice
+const ROW_STEPS = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600, 7200, 10800, 21600, 43200];
+function rowLength() {
+  const base = S.meta.slice_s, want = S.rowChoice ?? currentSpeed() * 12;
+  const nice = ROW_STEPS.find(x => x >= want) ?? want;
+  return Math.max(1, Math.round(nice / base)) * base;
+}
+function timeRows() {  // the rows to draw, oldest first, each ending where the next begins; the newest is still filling
+  const latest = S.status?.latest_data_us ? S.status.latest_data_us / 1e6 : Infinity, n = S.rows.length;
+  return { len: S.rowS, rows: S.rows.map((r, k) => ({ ...r, end: k + 1 < n ? S.rows[k + 1].t : latest, live: k + 1 === n && !S.status?.stream_ended })) };
+}
+
+// ======================================================================================
+// Derived quantities (shared by every view)
+const visibleStates = () => S.stateNames.filter(st => !S.hiddenStates.has(st));
+const total = a => { let t = 0; for (const v of a) t += v; return t; };
+const bigEnergy = () => S.meta && S.meta.e_hi >= 20000;
+const energyUnit = () => bigEnergy() ? "keV" : "eV";
+
+function noteStates() {
+  const seen = new Set(S.stateNames);
+  const add = st => { if (!seen.has(st)) { seen.add(st); S.stateNames.push(st); } };
+  for (const [, label] of S.timeline) add(label);
+  for (const st of Object.keys(T.stateSum)) add(st);
+}
+
+// Good pulses at the finest bin size, summed over the whole run. chans = null means all channels.
+function sumAll(chans, states) {
+  const out = new Float32Array(S.meta.nbins);
+  const add = a => { if (a) for (let i = 0; i < a.length; i++) out[i] += a[i]; };
+  for (const st of states) {
+    if (chans == null) add(T.stateSum[st]);
+    else for (const ch of chans) add(T.byState[st]?.[ch]);
+  }
+  return out;
+}
+
+// ---- rates: counts per second of measurement (data time), so the playback speed never changes them. With a state filter, the time is the time spent in those states.
+function exposureS(states) {
+  const st = S.status;
+  if (!st?.first_data_us || !st.latest_data_us) return null;
+  const a = st.first_data_us / 1e6, b = st.latest_data_us / 1e6, tl = S.timeline;
+  const spans = [[a, tl.length ? tl[0][0] : b, NO_STATE], ...tl.map(([t, l], k) => [t, k + 1 < tl.length ? tl[k + 1][0] : b, l])];
+  let secs = 0;
+  for (const [t0, t1, l] of spans) if (states.includes(l)) secs += Math.max(0, Math.min(t1, b) - Math.max(t0, a));
+  return secs;
+}
+function fmtRate(r) {
+  if (r == null || !isFinite(r)) return "—";
+  if (r === 0) return "0";
+  if (r >= 100) return fmt.int(r);
+  if (r >= 1) return r.toFixed(r >= 10 ? 1 : 2);
+  return r.toPrecision(2);
+}
+const fmtDuration = s => s >= 3600 ? `${+(s / 3600).toFixed(2)} h` : s >= 60 ? `${+(s / 60).toFixed(1)} min` : `${+s.toFixed(1)} s`;
+
+// ---- display binning: coarse at full range, finer as you zoom, never finer than the stored bins
+const NICE = [1, 2, 4, 5, 10, 20, 25, 40, 50, 100, 200, 250, 400, 500, 1000, 2000, 2500, 5000, 10000];
+function displayBinning(pw) {
+  const m = S.meta, w = m.bin_width, n = (S.view[1] - S.view[0]) / w;
+  const want = Math.max(1, Math.ceil(n / Math.max(120, pw / 2.5)));  // at least ~2.5 px per bin
+  const f = NICE.find(k => k >= want) ?? want;
+  const dw = f * w;
+  const j0 = Math.max(0, Math.floor((S.view[0] - m.e_lo) / dw)), j1 = Math.min(Math.ceil(m.nbins / f), Math.ceil((S.view[1] - m.e_lo) / dw));
+  return { f, dw, j0, j1 };
+}
+function rebin(base, f, j0, j1) {
+  const out = new Float32Array(Math.max(0, j1 - j0));
+  for (let j = j0; j < j1; j++) { let acc = 0; const end = Math.min(base.length, (j + 1) * f); for (let i = j * f; i < end; i++) acc += base[i]; out[j - j0] = acc; }
+  return out;
+}
+const fmtWidth = dw => dw >= 1000 ? `${+(dw / 1000).toPrecision(3)} keV` : `${+dw.toPrecision(3)} eV`;
+
+function stateAt(t) {
+  let label = NO_STATE;
+  for (const [ts, l] of S.timeline) { if (ts <= t) label = l; else break; }
+  return label;
+}
+const stateColour = st => st === NO_STATE ? NO_STATE_COLOUR
+  : STATE_COLOURS[S.stateNames.filter(s => s !== NO_STATE).indexOf(st) % STATE_COLOURS.length];
+const overlayColour = ch => CHANNEL_COLOURS[S.overlay.indexOf(ch) % CHANNEL_COLOURS.length];
+
+function layout() {
+  const L = S.meta.layout;
+  if (L) return L;
+  const n = S.channels.length, nx = Math.ceil(Math.sqrt(n)), out = {};  // no layout given: a plain square grid
+  S.channels.forEach((ch, k) => { out[ch] = { x: k % nx, y: Math.floor(k / nx), copy_of: null, gain: 1 }; });
+  return out;
+}
+
+// ======================================================================================
+// Header, counters, status
+function showDatasets() {
+  const label = document.getElementById("datasetLabel"), picker = document.getElementById("datasetPicker"), c = S.controller;
+  label.hidden = !c;
+  if (!c) return;
+  const keys = c.datasets.map(d => d.key).join();
+  if (picker.dataset.keys !== keys) {
+    picker.replaceChildren(...c.datasets.map(d => new Option(d.title, d.key)));
+    picker.dataset.keys = keys;
+  }
+  if (pickerSending == null) picker.value = c.active;  // always the server's dataset, which anyone viewing may change
+}
+let pickerSending = null;  // a dataset this page asked for, until the server has answered
+document.getElementById("datasetPicker").onchange = async e => {
+  const picker = e.target;
+  setStatus(`Starting a new run of ${picker.selectedOptions[0].text}…`, false);
+  picker.blur();
+  if (REPLAY) { REPLAY.switch(picker.value); return; }
+  pickerSending = picker.value;
+  try { await fetch("api/dataset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: picker.value }) }); }
+  finally { pickerSending = null; }
+};
+
+function setStatus(text, alert) {
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.classList.toggle("alert", !!alert);
+}
+
+function showStatus() {
+  const st = S.status, c = S.controller;
+  if (c && c.phase !== "running") return setStatus(`${c.phase}…`);
+  if (!st || !st.records) {
+    const title = c?.datasets?.find(d => d.key === c.active)?.title;
+    return setStatus(REPLAY ? "" : title ? `Starting a new run of ${title}: first results in a few seconds…` : "Waiting for the first processed records…");
+  }
+  const age = Date.now() / 1000 - st.updated_unix_s, notes = [];
+  if (st.stream_ended) notes.push("input stream finished");
+  else if (age > 5) notes.push(`no update from mass2-live-hist for ${age.toFixed(0)} s`);
+  setStatus(notes.join(" · ") || (REPLAY ? "Playing back a recording" : `Live, updated ${fmt.clock(st.updated_unix_s)}`), !st.stream_ended && age > 5);
+}
+
+function setCounter(id, valueHtml, delta, bumped) {
+  const el = document.getElementById(id);
+  el.querySelector(".value").innerHTML = valueHtml;
+  el.querySelector(".delta").textContent = delta;
+  if (bumped && !REDUCED_MOTION) {
+    el.classList.add("bumped");
+    setTimeout(() => el.classList.remove("bumped"), 60);
+  }
+}
+
+function renderCounters() {
+  const st = S.status, p = S.prev;
+  if (!st) return;
+  const lp = { new_records: st.records - (p?.records ?? 0) };
+  setCounter("c-records", fmt.int(st.records), `${fmt.plus(st.records - (p?.records ?? 0))} this update`, p && st.records > p.records);
+  const share = st.records ? 100 * st.good_pulses / st.records : 0;
+  setCounter("c-good", fmt.int(st.good_pulses), `${share.toFixed(0)}% of all records`, p && st.good_pulses > p.good_pulses);
+  setCounter("c-rate", S.rate == null ? "—" : `${fmt.int(S.rate)}<span class="unit">records/s</span>`,
+    REPLAY ? "of playback (wall clock)" : `${fmt.int(lp.new_records)} records last poll`, false);
+  const latest = st.latest_data_us ? st.latest_data_us / 1e6 : null;
+  if (latest) {
+    const now = stateAt(latest), since = [...S.timeline].reverse().find(([t]) => t <= latest);
+    setCounter("c-state", `<span class="state-pill" style="--swatch:${stateColour(now)}">${escapeHtml(now)}</span>`,
+      since ? `since ${fmt.clock(since[0])}` : "no state change yet", p && stateAt(p.latest_data_us / 1e6) !== now);
+    const day = new Date(latest * 1000).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" });
+    setCounter("c-clock", fmt.clock(latest), REPLAY
+      ? `${day}, original time, playing ${currentSpeed()}× real time`
+      : S.controller ? `original time, simulator playing ${currentSpeed()}× real time` : "from pulse timestamps", false);
+  }
+}
+
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function renderExplain() {
+  const el = document.getElementById("explain");
+  if (!S.meta) return;
+  const n = S.channels.length, real = Object.values(layout()).filter(p => p.copy_of == null).length;
+  const source = REPLAY
+    ? `<strong>Playing back a recorded run</strong> of the mass2 live pipeline, with the original times, at ${document.getElementById("speedValue").textContent} (set it with Playback speed; it plays once and ends, as a live run does).`
+    : "<strong>Live:</strong> mass2-live-apply is analysing pulses as they are written; this page refreshes every 2 s.";
+  el.innerHTML = `${source} Raw detector pulses from ${fmt.int(n)} channels (${real} real, ${n - real} simulated copies) are turned `
+    + `into energies by a saved mass2 recipe, then histogrammed. The spectra show only <em>good</em> pulses: ones that pass the recipe's quality cuts.`
+    + (S.visitor ? ` <strong>This run is yours:</strong> the dataset, speed and states you choose change only it. Send someone this page's address to show them `
+      + `the same run. It ends ${Math.round(S.visitor.idle_s / 60)} min after the last page showing it closes (${S.visitor.runs} of ${S.visitor.max_runs} runs in use).` : "");
+}
+
+// ======================================================================================
+// Spectra view
+function margins(canvasId) {
+  const narrow = innerWidth < 640;
+  // Both plots share left/right margins so their energy axes line up.
+  const left = narrow ? 112 : 158;
+  return { left, right: narrow ? 8 : 14, top: canvasId === "waterfall" ? 24 : 10, bottom: 46,
+           font: narrow ? 10.5 : 12, state: narrow ? 46 : 72, tickw: narrow ? 48 : 80, narrow };
+}
+
+function setup(canvas) {
+  const dpr = window.devicePixelRatio || 1, m = margins(canvas.id);
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = `${m.font}px system-ui, sans-serif`;
+  const pw = w - m.left - m.right, ph = h - m.top - m.bottom;
+  const xOf = e => m.left + pw * (e - S.view[0]) / (S.view[1] - S.view[0]);
+  return { ctx, w, h, pw, ph, m, xOf };
+}
+
+function niceTicks(lo, hi, n) {
+  const step0 = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(step0));
+  const step = [1, 2, 5, 10].map(k => k * mag).find(s => s >= step0);
+  const ticks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) ticks.push(+v.toPrecision(12));
+  return ticks;
+}
+
+function energyAxis(g) {
+  const { ctx, h, m, pw, xOf } = g, scale = bigEnergy() ? 1000 : 1;
+  ctx.fillStyle = MUTED; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillRect(m.left, h - m.bottom, pw, 1);
+  for (const e of niceTicks(S.view[0], S.view[1], Math.max(3, pw / 90))) {
+    const x = xOf(e);
+    ctx.fillRect(x, h - m.bottom, 1, 5);
+    ctx.fillText(+(e / scale).toPrecision(6), x, h - m.bottom + 7);
+  }
+  ctx.fillStyle = INK;
+  ctx.fillText(`Energy (${energyUnit()})`, m.left + pw / 2, h - m.bottom + 25);
+}
+
+function drawSpectrum() {
+  const g = setup(document.getElementById("spectrum"));
+  const { ctx, pw, ph, m, xOf } = g, meta = S.meta, states = visibleStates();
+  const bins = displayBinning(pw), { f, dw, j0, j1 } = bins;
+  const expo = exposureS(states) || 1, perS = 1 / expo;  // counts -> counts per second of measurement
+  const sumBase = sumAll(null, states), sumTotal = total(sumBase), sum = rebin(sumBase, f, j0, j1).map(v => v * perS);
+  const overlays = S.overlay.map(ch => {
+    const base = sumAll([ch], states), t = total(base), scale = t ? sumTotal / t : 0;
+    return { ch, data: rebin(base, f, j0, j1).map(v => v * scale * perS), factor: scale, n: t };
+  });
+  // each state on its own, per second spent in that state, so states of different lengths compare directly
+  // each state on its own: its counts over the seconds spent in it, with the Poisson ±1σ band (√n over the same seconds)
+  const perState = !S.eachState ? [] : states.map(st => {
+    const base = sumAll(null, [st]), secs = exposureS([st]), counts = rebin(base, f, j0, j1);
+    return { st, n: total(base), secs, data: counts.map(v => v / secs), sigma: counts.map(v => Math.sqrt(v) / secs) };
+  }).filter(c => c.secs > 0);
+  const yfloor = 0.5 * perS;  // half a count, as a rate: the bottom of the log axis
+  let ymax = 2 * yfloor;
+  for (const arr of [...(S.eachState ? [] : [sum]), ...overlays.map(o => o.data)]) for (const v of arr) ymax = Math.max(ymax, v);
+  // a state's rates set the axis only where they are measured to better than 1σ, so a lone count in a short state cannot stretch it
+  for (const c of perState) for (let k = 0; k < c.data.length; k++) ymax = Math.max(ymax, c.data[k] - c.sigma[k]);
+  ymax *= 1.15;
+  const yOf = v => m.top + ph * (1 - (S.log ? Math.log10(Math.max(v, yfloor) / yfloor) / Math.log10(ymax / yfloor) : v / ymax));
+  const eOf = j => meta.e_lo + j * dw;
+
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const yticks = S.log
+    ? Array.from({ length: 40 }, (_, k) => 10 ** (Math.ceil(Math.log10(yfloor)) + k)).filter(v => v <= ymax)
+    : niceTicks(0, ymax, 5);
+  for (const v of yticks) {
+    const y = yOf(v);
+    ctx.fillStyle = RULE; ctx.fillRect(m.left, y, pw, 1);
+    ctx.fillStyle = MUTED; ctx.fillText(fmtRate(v), m.left - 8, y);
+  }
+  ctx.save();
+  ctx.translate(m.left - 62, m.top + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = INK;
+  ctx.fillText(`Good pulses per second per ${fmtWidth(dw)} bin`, 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(m.left, m.top, pw, ph); ctx.clip();
+  const stepPath = arr => {
+    ctx.beginPath();
+    ctx.moveTo(xOf(eOf(j0)), yOf(0));
+    for (let k = 0; k < arr.length; k++) { const y = yOf(arr[k]); ctx.lineTo(xOf(eOf(j0 + k)), y); ctx.lineTo(xOf(eOf(j0 + k + 1)), y); }
+    ctx.lineTo(xOf(eOf(j1)), yOf(0));
+  };
+  const lastFit = S.fits?.fits?.at(-1);
+  if (lastFit) {  // the region the line fit uses
+    const xa = xOf(lastFit.roi_lo), xb = xOf(lastFit.roi_hi);
+    ctx.fillStyle = css("--lit-bg"); ctx.fillRect(xa, m.top, xb - xa, ph);
+    ctx.fillStyle = MUTED; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText("fit region", Math.max(xa + 3, m.left + 3), m.top + 3);
+  }
+  if (!S.eachState) {  // the sum; in "each in its colour" only the states themselves are drawn
+    stepPath(sum); ctx.fillStyle = css("--sum-fill"); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.25; ctx.stroke();
+  }
+  for (const c of perState) {  // the ±1σ band, then the rate
+    const lo = c.data.map((v, k) => v - c.sigma[k]), hi = c.data.map((v, k) => v + c.sigma[k]);
+    ctx.beginPath();
+    for (let k = 0; k < hi.length; k++) { const y = yOf(hi[k]); ctx[k ? "lineTo" : "moveTo"](xOf(eOf(j0 + k)), y); ctx.lineTo(xOf(eOf(j0 + k + 1)), y); }
+    for (let k = lo.length - 1; k >= 0; k--) { const y = yOf(lo[k]); ctx.lineTo(xOf(eOf(j0 + k + 1)), y); ctx.lineTo(xOf(eOf(j0 + k)), y); }
+    ctx.closePath(); ctx.globalAlpha = 0.18; ctx.fillStyle = stateColour(c.st); ctx.fill(); ctx.globalAlpha = 1;
+    stepPath(c.data); ctx.strokeStyle = stateColour(c.st); ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  for (const o of overlays) { stepPath(o.data); ctx.strokeStyle = overlayColour(o.ch); ctx.lineWidth = 1.5; ctx.stroke(); }
+  ctx.restore();
+  energyAxis(g);
+
+  const which = states.length === S.stateNames.length ? "all experiment states" : `states ${states.join(", ") || "none"}`;
+  document.getElementById("specDesc").textContent = S.eachState
+    ? `Good pulses from all ${S.channels.length} channels, each selected state in the colour of its button below, as pulses per second spent in that state `
+      + `(${perState.map(c => `${c.st === NO_STATE ? "before start" : c.st} ${fmtDuration(c.secs)}, ${fmt.int(c.n)} pulses`).join("; ") || "none selected"}), so states of different lengths compare directly. `
+      + `Each shaded band is ±1σ from counting statistics (√counts over the same seconds): wide for a short state. The counts axis covers what is measured to better than 1σ.`
+    : `Good pulses from all ${S.channels.length} channels, summed, ${which}: ${fmt.int(sumTotal)} pulses in ${fmtDuration(expo)} of measurement `
+      + `(${fmtRate(sumTotal / expo)} per second). Rates are per second of the original measurement, so playback speed does not change them.`;
+  const finest = f === 1;
+  document.getElementById("zoomInfo").innerHTML =
+    `Showing <b>${fmt.energy(S.view[0], bigEnergy())} to ${fmt.energy(S.view[1], bigEnergy())}</b> in <b>${fmtWidth(dw)}</b> bins`
+    + (finest ? ` — the finest available: the bin size used for resolution fits in the original analysis${meta.bin_source ? ` (${escapeHtml(meta.bin_source)})` : ""}.`
+              : `. Zoom in for finer bins, down to ${fmtWidth(meta.bin_width)}.`);
+  renderOverlayChips(overlays);
+  return { sum, overlays, perState, bins };
+}
+
+function renderOverlayChips(overlays) {
+  const box = document.getElementById("overlayChips");
+  box.replaceChildren();
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = overlays.length ? "Overlaid, each scaled to the sum's total:" : "Tap channels in the detector array to overlay them here.";
+  box.appendChild(label);
+  for (const o of overlays) {
+    const b = document.createElement("button");
+    b.className = "chip overlay";
+    b.style.setProperty("--swatch", overlayColour(o.ch));
+    b.setAttribute("aria-label", `Remove channel ${o.ch} from the overlay`);
+    b.innerHTML = `Ch ${o.ch} <span class="n">${fmt.int(o.n)} pulses, ×${o.factor.toFixed(1)}</span>`;
+    b.onclick = () => toggleOverlay(o.ch);
+    box.appendChild(b);
+  }
+}
+
+function toggleOverlay(ch) {
+  const k = S.overlay.indexOf(ch);
+  if (k >= 0) S.overlay.splice(k, 1);
+  else { if (S.overlay.length >= CHANNEL_COLOURS.length) S.overlay.shift(); S.overlay.push(ch); }
+  S.detail = ch;
+  render();
+}
+
+function drawWaterfall() {
+  const g = setup(document.getElementById("waterfall"));
+  const { ctx, pw, ph, m } = g, meta = S.meta, states = S.stateNames;  // every state: the chips choose the spectrum's only
+  const { len, rows: rowsAll } = timeRows();
+  const nShow = Math.max(1, Math.min(rowsAll.length, Math.floor(ph / 4)));
+  const rows = rowsAll.slice(-nShow).reverse();  // newest at the top
+  const bins = displayBinning(pw), { f, j0, j1 } = bins, nb = Math.max(1, j1 - j0), rowH = ph / nShow;
+  const first = S.status?.first_data_us ? S.status.first_data_us / 1e6 : -Infinity;
+  const latest = S.status?.latest_data_us ? S.status.latest_data_us / 1e6 : Infinity;
+
+  // ---- one piece per row: a row is in one state, coloured by its counts over its own seconds of data
+  const pieces = rows.map((r, k) => {
+    const a = Math.max(r.t, first), b = Math.min(r.end, latest);
+    return { a, b, st: r.st, row: k, secs: Math.max(0, b - a), live: r.live, y0: m.top + rowH * k, y1: m.top + rowH * (k + 1),
+      counts: rebin(r.sum, f, j0, j1) };
+  });
+
+  // ---- colour: good pulses per second in each bin, on a log scale spanning three decades below the highest
+  // average rate of any selected state. It depends on the states and the energy bins, never on the row length.
+  let top = 0;
+  for (const st of states) {
+    const secs = exposureS([st]);
+    if (secs) for (const v of rebin(sumAll(null, [st]), f, j0, j1)) top = Math.max(top, v / secs);
+  }
+  top = top || 1;
+  const lo = top / 1000, floor = Number(css("--ramp-floor")) || 0;
+  const colourOf = rate => rampAt(RAMP, floor + (1 - floor) * Math.min(1, Math.max(0, Math.log10(rate / lo) / 3)));
+  const drawn = pieces.filter(pc => pc.counts && pc.secs > 0);
+  if (drawn.length) {
+    const img = new ImageData(nb, drawn.length);
+    drawn.forEach((pc, i) => {
+      for (let k = 0; k < pc.counts.length; k++) {
+        if (!(pc.counts[k] > 0)) continue;
+        const [R, G, B] = colourOf(pc.counts[k] / pc.secs), p = 4 * (i * nb + k);
+        img.data[p] = R; img.data[p + 1] = G; img.data[p + 2] = B; img.data[p + 3] = 255;
+      }
+    });
+    const off = document.createElement("canvas");
+    off.width = nb; off.height = drawn.length;
+    off.getContext("2d").putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    // the first and last display bins may extend past the view; place each piece by bin edges
+    const x0 = g.xOf(meta.e_lo + j0 * bins.dw), x1 = g.xOf(meta.e_lo + j1 * bins.dw);
+    ctx.save(); ctx.beginPath(); ctx.rect(m.left, m.top, pw, ph); ctx.clip();
+    drawn.forEach((pc, i) => ctx.drawImage(off, 0, i, nb, 1, x0, pc.y0, x1 - x0, pc.y1 - pc.y0));
+    ctx.restore();
+  }
+  ctx.strokeStyle = RULE; ctx.strokeRect(m.left + 0.5, m.top + 0.5, pw - 1, ph - 1);
+  document.getElementById("heatKey").innerHTML =
+    `${fmtRate(lo)} <i></i> ${fmtRate(top)} good pulses/s per ${fmtWidth(bins.dw)} bin`;
+
+  // ---- experiment-state column, one block per piece, with names written in, and state changes marked across the plot
+  const sx = m.left - m.state - 6;
+  const segs = [];
+  for (const pc of pieces) {
+    const lastSeg = segs[segs.length - 1];
+    if (lastSeg && lastSeg.st === pc.st && Math.abs(lastSeg.y1 - pc.y0) < 0.5) lastSeg.y1 = pc.y1;
+    else segs.push({ st: pc.st, y0: pc.y0, y1: pc.y1 });
+  }
+  for (const sg of segs) {
+    const col = stateColour(sg.st);
+    ctx.fillStyle = col; ctx.fillRect(sx, sg.y0, m.state, sg.y1 - sg.y0 + 0.5);
+    if (sg.y1 - sg.y0 >= m.font + 4) {
+      const c = col.match(/\w\w/g).map(h => parseInt(h, 16));
+      ctx.fillStyle = inkOn(c); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = `600 ${m.font}px system-ui, sans-serif`;
+      const name = sg.st === NO_STATE ? "before start" : sg.st;
+      ctx.fillText(name, sx + m.state / 2, (sg.y0 + sg.y1) / 2, m.state - 6);
+      ctx.font = `${m.font}px system-ui, sans-serif`;
+    }
+  }
+  // state changes: a dashed line across the heatmap where a row's state differs from the row below, labelled with the new state
+  ctx.setLineDash([4, 3]);
+  for (let k = 0; k + 1 < rows.length; k++) {
+    if (rows[k].st === rows[k + 1].st) continue;
+    const y = m.top + rowH * (k + 1), label = rows[k].st;
+    ctx.strokeStyle = INK; ctx.globalAlpha = 0.7;
+    ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(m.left + pw, y); ctx.stroke();
+    ctx.globalAlpha = 1;
+    const text = `${label === NO_STATE ? "before start" : label} begins ${fmt.clock(rows[k].t)}`;
+    const tw = ctx.measureText(text).width;
+    ctx.fillStyle = PANEL; ctx.fillRect(m.left + pw - tw - 10, y - m.font - 4, tw + 8, m.font + 4);
+    ctx.fillStyle = INK; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+    ctx.fillText(text, m.left + pw - 6, y - 2);
+  }
+  ctx.setLineDash([]);
+  for (let k = 0; k < rows.length; k++) if (rows[k].live) {
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+    ctx.strokeRect(m.left + 0.75, m.top + rowH * k + 0.75, pw - 1.5, rowH - 1.5);
+    ctx.lineWidth = 1;
+  }
+
+  // ---- column headers and time labels
+  ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.font = `600 ${m.font}px system-ui, sans-serif`;
+  ctx.fillText("State", sx + m.state / 2, m.top - 6);
+  ctx.textAlign = "right";
+  ctx.fillText(m.narrow ? "Start" : "Row start", sx - 6, m.top - 6);
+  ctx.textAlign = "left";
+  ctx.fillText(`Good pulses per second; rows of up to ${fmtDuration(len)}, a new row at each state change →`, m.left, m.top - 6);
+  ctx.font = `${m.font}px system-ui, sans-serif`;
+  ctx.fillStyle = MUTED; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const every = Math.max(1, Math.ceil((m.font + 8) / rowH));
+  rows.forEach((r, k) => {
+    if (k % every) return;
+    ctx.fillText(r.live ? (m.narrow ? "now" : "now (filling)") : fmt.clock(r.t), sx - 6, m.top + rowH * (k + 0.5), m.tickw);
+  });
+  energyAxis(g);
+
+  document.getElementById("fallDesc").textContent =
+    `Each row is up to ${fmtDuration(len)} of data, newest at the top. A new row starts at each experiment state change, so every row is in one state; a state's last row, if under half a row, joins the one before it. `
+    + `Colour is good pulses per second in each ${fmtWidth(bins.dw)} bin, all channels, every state (the state buttons choose the spectrum's states only): `
+    + `the row's counts over its own seconds, on a log scale set by the states' average spectra, so a colour means the same rate at every row length. `
+    + `The outlined top row is still filling; the State column shows each row's state, and dashed lines mark each change.`;
+  return { rows, pieces, rowH, bins, len };
+}
+
+// ---- which states the spectrum, the map, the time plot and the line fit include. On the live server this is
+// one selection shared by every viewer (the fit is one process); a recording keeps it in the page.
+let pendingSelection;  // the hidden states sent to the server and not yet seen back from it
+const selectionKey = hidden => JSON.stringify([...hidden].sort());
+function followSelection(hidden) {  // the server keeps the states turned off; every other state shows, new ones too
+  if (pendingSelection !== undefined) {
+    if (selectionKey(hidden) !== pendingSelection) return;  // a poll that left before our change
+    pendingSelection = undefined;
+  }
+  S.hiddenStates = new Set(hidden);
+}
+function setHiddenStates(hidden) {
+  S.hiddenStates = new Set(hidden);
+  if (!REPLAY) sendSelection([...S.hiddenStates]);
+  render();
+}
+// One request at a time, newest selection last, so quick clicks can never reach the server out of order.
+let sending = false, toSend;
+async function sendSelection(hidden) {
+  pendingSelection = selectionKey(hidden);
+  toSend = { hidden };
+  if (sending) return;
+  sending = true;
+  while (toSend) {
+    const body = JSON.stringify(toSend);
+    toSend = undefined;
+    try { await fetch("api/states", { method: "POST", headers: { "Content-Type": "application/json" }, body }); } catch (e) { /* the next poll shows what the server has */ }
+  }
+  sending = false;
+}
+
+function renderStateChips() {
+  const box = document.getElementById("stateChips");
+  box.querySelectorAll("button").forEach(b => b.remove());
+  for (const st of S.stateNames) {
+    const n = total(sumAll(null, [st]));
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.style.setProperty("--swatch", stateColour(st));
+    b.setAttribute("aria-pressed", !S.hiddenStates.has(st));
+    b.innerHTML = `${escapeHtml(st === NO_STATE ? "before start" : st)} <span class="n">${fmt.int(n)}</span>`;
+    b.title = REPLAY ? "Include or exclude this state's pulses in the spectrum, the time plot and the detector map"
+      : "Include or exclude this state's pulses in the spectrum, the line fit, the time plot and the detector map, for everyone viewing";
+    b.onclick = () => setHiddenStates(S.hiddenStates.has(st) ? [...S.hiddenStates].filter(x => x !== st) : [...S.hiddenStates, st]);
+    box.appendChild(b);
+  }
+  if (S.hiddenStates.size) {
+    const all = document.createElement("button");
+    all.textContent = "Include all states";
+    all.onclick = () => setHiddenStates([]);
+    box.appendChild(all);
+  }
+}
+
+function renderArray() {
+  const L = layout(), grid = document.getElementById("grid"), states = visibleStates();
+  const xs = Object.values(L).map(p => p.x), ys = Object.values(L).map(p => p.y);
+  const nx = Math.max(...xs) + 1, ny = Math.max(...ys) + 1;
+  grid.style.gridTemplateColumns = `repeat(${nx}, minmax(0, 1fr))`;
+  const counts = Object.fromEntries(Object.keys(L).map(ch => [ch, total(sumAll([ch], states))]));  // every pixel, counted or not yet
+  const expo = exposureS(states) || 1, rate = ch => counts[ch] / expo;
+  const cmax = Math.max(1, ...Object.values(counts));
+  const cfrac = n => n / cmax;  // from zero: channels with nearly equal rates look nearly equal
+  const floor = Number(css("--ramp-floor")) || 0;
+  grid.replaceChildren();
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    const ch = Object.keys(L).find(c => L[c].x === x && L[c].y === y);
+    const b = document.createElement("button");
+    b.className = "pixel";
+    if (!ch) { b.disabled = true; b.style.visibility = "hidden"; grid.appendChild(b); continue; }
+    const p = L[ch], colour = rampAt(RAMP, floor + (1 - floor) * cfrac(counts[ch])), value = `${fmtRate(rate(ch))}/s`;
+    b.style.setProperty("--cell", rgb(colour));
+    b.style.setProperty("--cell-ink", inkOn(colour));
+    b.style.setProperty("--sel", S.overlay.includes(ch) ? overlayColour(ch) : "transparent");
+    b.dataset.real = p.copy_of == null;
+    b.setAttribute("aria-pressed", S.overlay.includes(ch));
+    b.setAttribute("aria-label", `Channel ${ch}, ${p.copy_of == null ? "real" : `copy of ${p.copy_of}`}. ${value}.`);
+    b.innerHTML = `<span class="ch">${ch}</span><span class="v">${value}</span>`;
+    b.onclick = () => toggleOverlay(ch);
+    grid.appendChild(b);
+  }
+  const key = document.getElementById("gridKey"), note = document.getElementById("metricNote");
+  key.innerHTML = `<span>0</span><i style="background:linear-gradient(90deg,${[0, .25, .5, .75, 1].map(f => rgb(rampAt(RAMP, floor + (1 - floor) * f))).join(",")})"></i><span>${fmtRate(cmax / expo)} good pulses/s</span>`;
+  note.textContent = "Good pulses per second of measurement for each channel, in the states selected above the spectrum. "
+    + "Copies at a different gain differ slightly from the channel they copy: a few pulses fall on the other side of their recipe's cuts or the energy range.";
+  renderDetail(counts);
+}
+
+function renderDetail(counts) {
+  const box = document.getElementById("pixelDetail"), ch = S.detail, L = layout();
+  if (!ch || !L[ch]) { box.innerHTML = `<span class="muted">Tap a channel to see its details here.</span>`; return; }
+  const p = L[ch];
+  const kind = p.copy_of == null ? "Real detector channel" : `Simulated copy of channel ${p.copy_of}`;
+  box.innerHTML = `<dl>
+    <dt>Channel</dt><dd><b>${ch}</b> at column ${p.x + 1}, row ${p.y + 1}</dd>
+    <dt>What it is</dt><dd>${kind}${p.copy_of == null ? "" : p.gain === 1 ? `, analysed with channel ${p.copy_of}'s recipe` : ", analysed with a recipe learned from its own pulses"}</dd>
+    <dt>Good pulses</dt><dd>${fmt.int(counts[ch])} (${fmtRate(counts[ch] / (exposureS(visibleStates()) || 1))} per second)</dd>
+    ${p.copy_of == null ? "" : `<dt>Simulated gain</dt><dd>${fmt.pct(100 * (p.gain - 1))} in pulse height</dd>`}
+  </dl>`;
+}
+
+// ======================================================================================
+// Line fit: refitted by mass2-live-hist, shown here as mass2's plotm image plus a trend
+let shownPng = null;
+function renderFit() {
+  const panel = document.getElementById("fitPanel"), F = S.fits;
+  panel.hidden = !F;
+  if (!F) return;
+  const fits = F.fits || [], last = fits.at(-1), roi = F.roi || {};
+  const big = bigEnergy(), e = v => fmt.energy(v, big);
+  const hid = F.hidden_states ?? [], which = hid.length ? `all states but ${hid.join(", ")}` : "all states";
+  document.getElementById("fitTitle").textContent = `Line fit: ${roi.label ?? "region of interest"}, all channels summed`;
+  document.getElementById("fitDesc").textContent =
+    `The same fit as the original analysis (${roi.source || "linefit"}), but on all channels summed, ${which}`
+    + (REPLAY ? " (a recording keeps the fits it was made with). " : ", as selected above the spectrum; a new selection is fitted at once. ")
+    + `It is redone at most every ${F.every_s ?? 10} s by mass2-live-hist, from the histograms it already holds.`;
+  const params = document.getElementById("fitParams");
+  if (!last) { params.innerHTML = `<dt>Status</dt><dd>Waiting for enough counts in the fit region.</dd>`; return; }
+  const pm = ([v, err], f) => err == null ? f(v) : `${f(v)} ± ${f(err)}`;
+  params.innerHTML = `
+    <dt>Resolution (FWHM)</dt><dd class="big">${pm([last.fwhm, last.fwhm_err], v => `${v.toFixed(big ? 1 : 2)} eV`)}</dd>
+    <dt>Peak position</dt><dd>${pm([last.peak, last.peak_err], v => `${v.toFixed(big ? 1 : 2)} eV`)}</dd>
+    <dt>Counts in fit region</dt><dd>${fmt.int(last.counts_in_roi)} (${e(last.roi_lo)} to ${e(last.roi_hi)})</dd>
+    <dt>Reduced χ²</dt><dd>${last.redchi.toFixed(2)}</dd>
+    <dt>This fit</dt><dd>number ${fmt.int(fits.length)}, at ${fmt.clock(last.t)}, from ${fmt.int(last.slices)} slices; fit ${fmt.ms(last.fit_ms)}, plot ${fmt.ms(last.plot_ms)}</dd>`;
+  const src = last.png || `fits/latest.png?n=${fits.length}`;
+  if (src !== shownPng) { document.getElementById("fitImg").src = src; shownPng = src; }
+  drawFitTrend(fits);
+}
+
+function drawFitTrend(fits) {
+  const canvas = document.getElementById("fitTrend"), dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = "11px system-ui, sans-serif";
+  const m = { left: 54, right: 8, top: 8, bottom: 34 }, pw = w - m.left - m.right, ph = h - m.top - m.bottom;
+  const pts = fits.filter(f => f.fwhm > 0);
+  if (!pts.length) return;
+  const lo = Math.min(...pts.map(f => f.fwhm - (f.fwhm_err ?? 0))), hi = Math.max(...pts.map(f => f.fwhm + (f.fwhm_err ?? 0)));
+  const pad = 0.1 * (hi - lo || 1), y0 = Math.max(0, lo - pad), y1 = hi + pad;
+  const t0 = pts[0].t, t1 = Math.max(pts.at(-1).t, t0 + 1);
+  const xOf = t => m.left + pw * (t - t0) / (t1 - t0), yOf = v => m.top + ph * (1 - (v - y0) / (y1 - y0));
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const v of niceTicks(y0, y1, 4)) { ctx.fillStyle = RULE; ctx.fillRect(m.left, yOf(v), pw, 1); ctx.fillStyle = MUTED; ctx.fillText(v.toFixed(v < 10 ? 2 : 1), m.left - 6, yOf(v)); }
+  ctx.fillStyle = MUTED; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText(fmt.clock(t0), m.left + 24, h - m.bottom + 4);
+  if (pts.length > 1) ctx.fillText(fmt.clock(t1), m.left + pw - 24, h - m.bottom + 4);
+  ctx.fillStyle = INK;
+  ctx.fillText("Time of fit", m.left + pw / 2, h - m.bottom + 18);
+  ctx.save(); ctx.translate(12, m.top + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle";
+  ctx.fillText("FWHM (eV)", 0, 0); ctx.restore();
+  ctx.strokeStyle = INK; ctx.fillStyle = INK; ctx.lineWidth = 1.25;
+  ctx.globalAlpha = 0.35;
+  ctx.beginPath(); pts.forEach((f, k) => { const x = xOf(f.t), y = yOf(f.fwhm); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  ctx.globalAlpha = 1;
+  for (const f of pts) {
+    const x = xOf(f.t), err = f.fwhm_err ?? 0;
+    ctx.beginPath(); ctx.moveTo(x, yOf(f.fwhm - err)); ctx.lineTo(x, yOf(f.fwhm + err)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, yOf(f.fwhm), 3, 0, 2 * Math.PI); ctx.fill();
+  }
+}
+
+document.getElementById("fitZoom").onclick = () => {
+  const last = S.fits?.fits?.at(-1);
+  if (last) setView(last.roi_lo, last.roi_hi);
+};
+
+// ======================================================================================
+// Pipeline view: the same numbers as the counters, arranged as files and steps
+function setFile(id, statsHtml) { document.querySelector(`#${id} .stats`).innerHTML = statsHtml; }
+
+function renderPipeline() {
+  const st = S.status, meta = S.meta;
+  if (!st || !meta) return;
+  const L = layout(), real = Object.values(L).filter(p => p.copy_of == null).length, n = S.channels.length;
+  const src = meta.source_bytes ?? {}, ljh = Object.keys(src).filter(name => name.endsWith(".ljh")).sort();
+  document.querySelector("#f-ljh .name").textContent = ljh.length > 0 ? ljh.join(", ") : "*.ljh";
+  setFile("f-ljh", `<span><b>${real}</b> real channels</span>`);
+  document.querySelector("#f-recipe .name").textContent = meta.recipe_file ?? "recipe.pkl";
+  setFile("f-recipe", `<span><b>${(meta.recipe_channels || []).length}</b> channel recipes</span><span><b>${(meta.recipe_steps || []).length}</b> steps each</span>`);
+  document.querySelector("#p-sim .what").textContent =
+    `Replays the LJH pulses with their original timestamps, at ${currentSpeed()}× real time, as a live DAQ would, a chunk of records at a time, `
+    + `adding ${n - real} gain-adjusted copies to make a ${n}-channel array, and appends the experiment states to pulses_experiment_state.txt as it goes.`;
+  setFile("f-input", `<span><b>${fmt.int(st.records)}</b> records</span>`);
+  setFile("f-statesfile", `<span><b>${fmt.int(S.timeline.length)}</b> state change${S.timeline.length === 1 ? "" : "s"}</span>`);
+  document.getElementById("applyWhat").textContent =
+    REPLAY ? `This recording plays back the slices mass2-live-hist finished as their data time passes. Copies at a different gain use recipes of their own; exact copies use their real channel's.`
+           : `Polls the stream every 0.5 s. Copies at a different gain use recipes of their own; exact copies use their real channel's.`;
+  document.getElementById("recipeSteps").textContent =
+    `Run the saved steps on each channel's new pulses: ${(meta.recipe_steps || []).map(s => s.replace(/Step$/, "")).join(" → ")}, `
+    + `giving ${meta.energy_col} and a good/bad flag.`;
+  const lp = { new_records: st.records - (S.prev?.records ?? 0) };
+  for (const li of document.querySelectorAll("#steps li")) li.querySelector(".m").textContent = `${fmt.int(lp.new_records)} records`;  // this poll
+  setFile("f-output", `<span><b>${fmt.int(st.records)}</b> records</span>`);
+  setFile("f-hist", `<span><b>${fmt.int(S.nSlices)}</b> finished slices of ${fmtDuration(meta.slice_s)}</span>`);
+  setFile("f-current", `<span><b>${fmt.int(S.openGood)}</b> good pulses so far</span>`);
+  const fits = S.fits?.fits || [], lastFit = fits.at(-1);
+  document.getElementById("fitWhat").textContent =
+    `Keeps a running sum of the finished slices over all channels and refits ${S.fits?.roi?.label ?? "the line"} `
+    + `at most every ${S.fits?.every_s ?? 10} s, then draws it with plotm.`;
+  setFile("f-fits", `<span><b>${fmt.int(fits.length)}</b> fit${fits.length === 1 ? "" : "s"}</span>`
+    + (lastFit ? `<span>FWHM <b>${lastFit.fwhm.toFixed(2)} eV</b></span><span>last fit ${fmt.ms(lastFit.fit_ms)}</span>` : ""));
+  // each file's size on disk, from the server; a recording knows only the two streams' sizes
+  const FB = S.fileBytes || {};
+  const sum = (...xs) => xs.some(x => x != null) ? xs.reduce((a, x) => a + (x ?? 0), 0) : null;
+  const sizes = {
+    "f-ljh": sum(...Object.entries(src).filter(([name]) => name.endsWith(".ljh")).map(([, b]) => b)),
+    "f-recipe": src[meta.recipe_file] ?? null,
+    "f-input": FB["pulses.arrows"] ?? (REPLAY ? st.input_bytes : null),
+    "f-statesfile": FB["pulses_experiment_state.txt"] ?? null,
+    "f-output": FB["analyzed.arrows"] ?? (REPLAY ? st.output_bytes : null),
+    "f-hist": FB["hist/histograms.arrows"] ?? null,
+    "f-current": FB["hist/histograms_current.arrows"] ?? null,
+    "f-fits": FB["hist/fits.arrows"] ?? null,
+  };
+  for (const [id, b] of Object.entries(sizes)) if (b != null) document.querySelector(`#${id} .stats`).insertAdjacentHTML("beforeend", `<span><b>${fmtGB(b)}</b></span>`);
+  document.getElementById("viewWhat").textContent = REPLAY
+    ? "Plays the recording back as its data time passes, as if reading the files above."
+    : `Asks the viewer server every ${POLL_MS / 1000} s for what it draws, and keeps nothing between answers but your choices.`;
+}
+
+// Light the loop's steps in order, and the files each step writes; then where the data go next: mass2-live-hist
+// and the files it wrote, the server, and this page.
+const STEP_FILES = { read: ["f-input"], write: ["f-output"] };
+function flash(ids, ms) {
+  for (const id of ids) {
+    const el = document.getElementById(id), cls = el.classList.contains("proc") ? "running" : "written";
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms);
+  }
+}
+function animateLoop(lp) {
+  const dot = document.getElementById("loopDot");
+  dot.classList.remove("on"); void dot.offsetWidth; dot.classList.add("on");
+  if (!lp) return;
+  const steps = lp.new_records > 0 ? ["read", "recipe", "write"] : ["read"];
+  const lis = Object.fromEntries([...document.querySelectorAll("#steps li")].map(li => [li.dataset.step, li]));
+  const gap = REDUCED_MOTION ? 0 : Math.min(140, (POLL_MS - 300) / steps.length);
+  document.getElementById("p-apply").classList.add("running");
+  steps.forEach((k, i) => setTimeout(() => {
+    lis[k].classList.add("lit");
+    for (const f of STEP_FILES[k] || []) document.getElementById(f).classList.add("written");
+    setTimeout(() => {
+      lis[k].classList.remove("lit");
+      for (const f of STEP_FILES[k] || []) document.getElementById(f).classList.remove("written");
+    }, gap * 1.5 + 60);
+  }, gap * i));
+  setTimeout(() => document.getElementById("p-apply").classList.remove("running"), gap * steps.length + 200);
+  const hist = ["p-hist", "f-current", ...(lp.new_slices > 0 ? ["f-hist"] : []), ...(lp.new_fits > 0 ? ["f-fits"] : [])];
+  [hist, ["p-server"], ["p-view"]].forEach((ids, i) => setTimeout(() => flash(ids, gap * 1.5 + 60), gap * (steps.length + i)));
+}
+
+// ======================================================================================
+// Rendering and interaction
+let geometry = null;
+// ---- resident memory (RSS) of each process involved, sampled by the server every 2 s (live server only)
+const fmtGB = b => b >= 1e6 ? `${(b / 1e9).toFixed(b >= 1e8 ? 2 : 3)} GB` : "< 0.001 GB";
+const PROC_BOX = { "mass2-live-sim": "p-sim", "mass2-live-apply": "p-apply", "mass2-live-hist": "p-hist", "mass2-live-demo": "p-server", "mass2-live-view": "p-server" };
+function renderMemory() {
+  const el = document.getElementById("memory"), P = S.processes;
+  el.hidden = !P?.length;
+  if (P?.length) {
+    const sum = P.reduce((a, p) => a + p.rss_bytes, 0);
+    el.innerHTML = `Memory in use (resident): ${P.map(p => `${escapeHtml(p.name)} <b>${fmt.bytes(p.rss_bytes)}</b>`).join(" · ")} · total <b>${fmt.bytes(sum)}</b>`;
+  }
+  for (const id of new Set(Object.values(PROC_BOX))) {
+    const box = document.querySelector(`#${id} .name`), p = P?.find(q => PROC_BOX[q.name.split(" ")[0]] === id);
+    let tag = box.querySelector(".mem");
+    if (!p) { tag?.remove(); continue; }
+    if (!tag) { tag = document.createElement("span"); tag.className = "mem"; box.append(tag); }
+    tag.textContent = ` · ${fmt.bytes(p.rss_bytes)} in memory`;
+  }
+}
+
+function render() {
+  if (!S.meta) return;
+  renderExplain();
+  renderCounters();
+  renderMemory();
+  if (S.tab === "spectra") {
+    geometry = { spec: drawSpectrum(), fall: drawWaterfall() };
+    renderFit();
+    renderStateChips();
+    renderArray();
+  } else {
+    renderPipeline();
+  }
+}
+
+for (const [id, tab] of [["tab-spectra", "spectra"], ["tab-pipeline", "pipeline"]]) {
+  document.getElementById(id).onclick = () => {
+    S.tab = tab;
+    document.getElementById("tab-spectra").setAttribute("aria-selected", tab === "spectra");
+    document.getElementById("tab-pipeline").setAttribute("aria-selected", tab === "pipeline");
+    document.getElementById("view-spectra").hidden = tab !== "spectra";
+    document.getElementById("view-pipeline").hidden = tab !== "pipeline";
+    render();
+  };
+}
+const setLog = log => {
+  S.log = log;
+  document.getElementById("logBtn").setAttribute("aria-pressed", log);
+  document.getElementById("linBtn").setAttribute("aria-pressed", !log);
+  render();
+};
+// ---- time-plot row length: Auto follows the playback speed; or a fixed length of data time
+const ROW_CHOICES = [[null, "Auto"], [60, "1 min"], [120, "2 min"], [300, "5 min"], [600, "10 min"], [900, "15 min"]];
+function setupRowChoice() {
+  const seg = document.getElementById("rowSeg");
+  for (const [secs, label] of ROW_CHOICES) {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.title = secs == null ? "Rows fill in about 12 s of wall time at the current playback speed" : `Each row holds ${label} of data`;
+    b.onclick = () => { S.rowChoice = secs; showRowChoice(); poll(); };  // rows of the new length, now
+    seg.append(b);
+  }
+  showRowChoice();
+}
+function showRowChoice() {
+  document.querySelectorAll("#rowSeg button").forEach((b, k) => b.setAttribute("aria-pressed", ROW_CHOICES[k][0] === S.rowChoice));
+}
+setupRowChoice();
+
+const setEachState = each => {
+  S.eachState = each;
+  document.getElementById("sumBtn").setAttribute("aria-pressed", !each);
+  document.getElementById("eachBtn").setAttribute("aria-pressed", each);
+  render();
+};
+document.getElementById("sumBtn").onclick = () => setEachState(false);
+document.getElementById("eachBtn").onclick = () => setEachState(true);
+document.getElementById("logBtn").onclick = () => setLog(true);
+document.getElementById("linBtn").onclick = () => setLog(false);
+
+function eAt(canvas, clientX) {
+  const m = margins(canvas.id), rect = canvas.getBoundingClientRect(), pw = rect.width - m.left - m.right;
+  return S.view[0] + (clientX - rect.left - m.left) / pw * (S.view[1] - S.view[0]);
+}
+
+function readout(canvas, e) {
+  if (!S.meta || !geometry) return;
+  const E = eAt(canvas, e.clientX), meta = S.meta, m = margins(canvas.id);
+  const geo = canvas.id === "spectrum" ? geometry.spec : geometry.fall, { dw, j0 } = geo.bins;
+  const j = Math.floor((E - meta.e_lo) / dw), k = j - j0;
+  if (k < 0 || k >= (canvas.id === "spectrum" ? geo.sum.length : geo.bins.j1 - geo.bins.j0)) return;
+  const big = bigEnergy(), binTxt = `${fmt.energy(meta.e_lo + j * dw, big)} to ${fmt.energy(meta.e_lo + (j + 1) * dw, big)}`;
+  if (canvas.id === "spectrum") {
+    let text = geo.perState.length ? `Bin ${binTxt}, good pulses per second in each state (all channels)` : `Bin ${binTxt}: ${fmtRate(geo.sum[k])} good pulses per second (all channels)`;
+    for (const c of geo.perState) text += `${c === geo.perState[0] ? ": " : "; "}${c.st === NO_STATE ? "before start" : c.st}: ${fmtRate(c.data[k])} ± ${fmtRate(c.sigma[k])}/s`;
+    for (const o of geo.overlays) text += `; ch ${o.ch} scaled: ${fmtRate(o.data[k])}/s`;
+    document.getElementById("specReadout").textContent = text;
+  } else {
+    const y = e.clientY - canvas.getBoundingClientRect().top;
+    const pc = geo.pieces.find(p => y >= p.y0 && y < p.y1);
+    if (!pc) return;
+    const name = pc.st === NO_STATE ? "before start" : pc.st;
+    document.getElementById("fallReadout").textContent = `Bin ${binTxt}, ${name} from ${fmt.clock(pc.a)} to ${fmt.clock(pc.b)} (${fmtDuration(pc.secs)}): `
+        + `${fmtRate(pc.counts[k] / pc.secs)} good pulses per second (${fmt.int(pc.counts[k])} pulses)`;
+  }
+}
+
+// ---- zooming the energy axis (both plots share it). The narrowest view is 30 of the finest bins.
+function setView(lo, hi) {
+  const m = S.meta, minSpan = 30 * m.bin_width, full = m.e_hi - m.e_lo;
+  let span = Math.min(full, Math.max(minSpan, hi - lo)), mid = (lo + hi) / 2;
+  lo = Math.min(Math.max(m.e_lo, mid - span / 2), m.e_hi - span);
+  S.view = [lo, lo + span];
+  document.getElementById("specReadout").textContent = "";
+  document.getElementById("fallReadout").textContent = "";
+  scheduleRender();
+}
+const zoomAt = (E, factor) => setView(E - (E - S.view[0]) * factor, E + (S.view[1] - E) * factor);
+const centre = () => (S.view[0] + S.view[1]) / 2;
+let pending = false;
+function scheduleRender() { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; render(); }); } }
+
+document.getElementById("zoomIn").onclick = () => S.meta && zoomAt(centre(), 0.5);
+document.getElementById("zoomOut").onclick = () => S.meta && zoomAt(centre(), 2);
+document.getElementById("panLeft").onclick = () => { if (S.meta) { const d = 0.25 * (S.view[1] - S.view[0]); setView(S.view[0] - d, S.view[1] - d); } };
+document.getElementById("panRight").onclick = () => { if (S.meta) { const d = 0.25 * (S.view[1] - S.view[0]); setView(S.view[0] + d, S.view[1] + d); } };
+document.getElementById("resetBtn").onclick = () => S.meta && setView(S.meta.e_lo, S.meta.e_hi);
+
+let drag = null;
+const touches = new Map();  // pointerId -> clientX, for pinch
+for (const id of ["spectrum", "waterfall"]) {
+  const c = document.getElementById(id);
+  c.addEventListener("pointerdown", e => {
+    if (!S.meta) return;
+    touches.set(e.pointerId, e.clientX);
+    if (touches.size === 2) {  // a pinch starts: remember the span between the fingers
+      drag = null;
+      const [a, b] = [...touches.values()];
+      c.pinch = { d0: Math.abs(a - b) || 1, view0: [...S.view], E: eAt(c, (a + b) / 2) };
+    } else {
+      drag = { canvas: c, e0: eAt(c, e.clientX), x0: e.clientX, y0: e.clientY };
+    }
+    readout(c, e);
+  });
+  c.addEventListener("pointermove", e => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, e.clientX);
+    if (c.pinch && touches.size === 2) {
+      const [a, b] = [...touches.values()], scale = c.pinch.d0 / (Math.abs(a - b) || 1);
+      const [v0, v1] = c.pinch.view0, E = c.pinch.E;
+      setView(E - (E - v0) * scale, E + (v1 - E) * scale);
+      return;
+    }
+    readout(c, e);
+  });
+  const end = e => { touches.delete(e.pointerId); if (touches.size < 2) c.pinch = null; };
+  c.addEventListener("pointerup", end);
+  c.addEventListener("pointercancel", end);
+  c.addEventListener("dblclick", () => document.getElementById("resetBtn").click());
+  c.addEventListener("wheel", e => {  // trackpad pinch arrives as ctrl + wheel; plain scrolling still scrolls the page
+    if (!S.meta || !e.ctrlKey) return;
+    e.preventDefault();
+    zoomAt(eAt(c, e.clientX), Math.exp(e.deltaY * 0.01));
+  }, { passive: false });
+}
+window.addEventListener("pointerup", e => {
+  if (!drag) return;
+  const { canvas, e0, x0, y0 } = drag;
+  drag = null;
+  if (Math.abs(e.clientX - x0) < 12 || Math.abs(e.clientY - y0) > Math.abs(e.clientX - x0)) return;  // a tap or a scroll
+  const e1 = eAt(canvas, e.clientX);
+  setView(Math.min(e0, e1), Math.max(e0, e1));
+});
+window.addEventListener("pointercancel", () => { drag = null; });
+window.addEventListener("resize", render);
+poll();
+
+// ---- click a file, or an arrow into one, for its columns with their types and its first rows (the live server
+// reads them; a recording has no files to read)
+const PEEK = document.getElementById("peek");
+document.body.classList.toggle("replay", !!REPLAY);
+PEEK.querySelector("button").onclick = () => PEEK.close();
+PEEK.addEventListener("click", e => { if (e.target === PEEK) PEEK.close(); });  // a click on the backdrop
+document.querySelectorAll("[data-file]").forEach(el => el.addEventListener("click", async () => {
+  if (REPLAY) return;  // a recording has no files to read
+  const file = el.dataset.file;
+  PEEK.querySelector("h4").textContent = file;
+  PEEK.querySelector("header .muted").textContent = "reading…";
+  PEEK.querySelector(".scroll").replaceChildren();
+  PEEK.showModal();
+  try {
+    const res = await fetch(`api/peek?file=${encodeURIComponent(file)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const p = await res.json();
+    PEEK.querySelector("header .muted").textContent = p.note ?? `${p.columns.length} columns · ${p.rows.length} rows from the first batch`;
+    const table = document.createElement("table");
+    const head = table.createTHead().insertRow();
+    for (const c of p.columns) {
+      const th = document.createElement("th");
+      th.append(c.name, Object.assign(document.createElement("small"), { textContent: c.type }));
+      head.append(th);
+    }
+    const body = table.createTBody();
+    for (const row of p.rows) { const tr = body.insertRow(); for (const v of row) tr.insertCell().textContent = v; }
+    PEEK.querySelector(".scroll").replaceChildren(table);
+  } catch (e) {
+    PEEK.querySelector("header .muted").textContent = `cannot read it: ${e.message}`;
+  }
+}));
+</script>
+</body>
+</html>
