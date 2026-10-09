@@ -51,6 +51,7 @@ def find_local_maxima(pulse_heights: ArrayLike, gaussian_fwhm: float) -> tuple[N
     # The above ensures that lo & hi are floats, so that (lo-hi)/n is always a float in python2
     sigma = gaussian_fwhm / (np.sqrt(np.log(2) * 2) * 2)
     tbw = 1.0 / sigma / (np.pi * 2)
+    pulse_heights = np.asarray(pulse_heights)
     lo = np.min(pulse_heights) - 3 * gaussian_fwhm
     hi = np.max(pulse_heights) + 3 * gaussian_fwhm
     hist, bins = np.histogram(pulse_heights, np.linspace(lo, hi, n + 1))
@@ -299,6 +300,7 @@ def singlefit(
     nbins = (hi - lo) / binsize_ph
     if nbins > 5000:
         raise ValueError("too damn many bins, dont like running out of memory")
+    ph = np.asarray(ph)
     counts, bin_edges = np.histogram(ph, np.arange(lo, hi, binsize_ph))
     e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
     model = get_model(name)

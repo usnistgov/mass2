@@ -63,7 +63,9 @@ def initialize_hci_composite_model(
         The new composite line
     """
 
-    composite_model: GenericLineModel = np.sum(individual_models)
+    composite_model: GenericLineModel = individual_models[0]
+    for m in individual_models[1:]:
+        composite_model += m
     composite_model.name = composite_name
     if has_linear_background:
         composite_model = add_bg_model(composite_model)

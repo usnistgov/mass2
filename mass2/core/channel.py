@@ -1269,13 +1269,14 @@ class Channel:
         prms = df["pulse_rms"].to_numpy()
         promptness = df["promptness"].to_numpy()
         poly = np.poly1d(np.polyfit(prms, promptness, 1))
-        df = df.with_columns(promptshifted=(promptness - poly(prms)))
+        pshifted = promptness - poly(prms)
+        df = df.with_columns(promptshifted=pshifted)
 
         # Rescale promptness quadratically to span approximately [-0.5, +0.5], dropping any pulses with abs(t) > 0.45.
         x, y, z = np.percentile(df["promptshifted"], [10, 50, 90])
         A = np.array([[x * x, x, 1], [y * y, y, 1], [z * z, z, 1]])
         param = np.linalg.solve(A, [-0.4, 0, +0.4])
-        ATime = np.poly1d(param)(df["promptshifted"])
+        ATime = np.poly1d(param)(pshifted)
         df = df.with_columns(ATime=ATime).filter(np.abs(ATime) < 0.45).drop("promptshifted")
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
