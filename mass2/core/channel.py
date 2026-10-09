@@ -4,9 +4,9 @@ Data structures and methods for handling a single microcalorimeter channel's pul
 
 from dataclasses import dataclass, field, replace
 import dataclasses
-from typing import Any
+from typing import Any, TypeAlias
 from numpy.typing import ArrayLike, NDArray
-from collections.abc import Callable, Iterable, Collection
+from collections.abc import Callable, Iterable, Collection, Sequence
 import os
 import lmfit
 import polars as pl
@@ -35,6 +35,9 @@ from .recipe import Recipe, RecipeStep, SummarizeStep
 from .noise_channel import NoiseChannel
 
 _local_timezone_name = tzlocal.get_localzone_name()
+
+# Define an alias for one or more spectral lines to anchor a calibration, whether by name or line energy
+AnchorLine: TypeAlias = str | float | Collection[str | float]
 
 
 @dataclass(frozen=True)
@@ -813,6 +816,52 @@ class Channel:
             n_extra_peaks,
             acceptable_rms_residual_e,
         )
+        return self.with_step(step)
+
+    def stepwise_cal(
+        self,
+        plan: Sequence[tuple[AnchorLine, float | None, float | None]],
+        uncalibrated_col: str = "filtValue",
+        calibrated_col: str | None = None,
+        fwhm_pulse_height_units: float = 75,
+        use_expr: pl.Expr = pl.lit(True),
+    ) -> "Channel":
+        """Learn a rough calibration from a stepwise heuristic.
+        A sequence of (sets of) lines are named, and identified with the N most intense lines in a given energy range.
+        At each step, "energy range" is based on a calibration that comes from lines found in all previous steps.
+        For the first step, before any calibration, "energy range" refers to raw uncalibrated units (so it often makes
+        sense to choose no energy range for that step, if you can identify the brightest line across all energies).
+
+        Parameters
+        ----------
+        plan : Sequence[tuple[AnchorLine, float  |  None, float  |  None]]
+            A sequence (list or tuple) of values of the form (`lines`, minE, maxE), where
+            lines is one of:
+                A line name (string), which must be a key to the `mass2.STANDARD_FEATURES` dictionary
+                A line energy (integer or float)
+                A list/tuple of names and/or energies
+            minE is the minimum approximate energy to check for peaks, or None if no minimum is needed
+            maxE is the maximum approximate energy to check for peaks, or None if no maximum is needed
+
+            If the plan contains N>1 line names and/or energies, then they are assumed to be the N most intense
+            lines in the energy range defined by [minE, maxE].
+        uncalibrated_col : str
+            Name of the uncalibrated data to be extracted from `ch.df`
+        calibrated_col : str | None, optional
+            Name of the energy-calibrated data to be added to `ch.df`, by default None.
+            If None, then the calibrated column will be the uncalibrated name, with "energy_" prepended.
+        fwhm_pulse_height_units : float, optional
+            The smearing (initially in pulse height units) to use for peak-finding, by default 75
+        use_expr : pl.Expr, optional
+            A use-data expression, by default pl.lit(True). Often an expression like `pl.col("state_label")="MyCal"`
+            would make sense.
+
+        Returns
+        -------
+        Channel
+            This channel, with the calibration step included
+        """
+        step = mass2.core.StepwiseCalStep.learn(self, plan, uncalibrated_col, calibrated_col, fwhm_pulse_height_units, use_expr)
         return self.with_step(step)
 
     def with_step(self, step: RecipeStep) -> "Channel":
@@ -1869,7 +1918,7 @@ class Channel:
             plt.subplot(len(plottables), 2, 2 + i * 2)
             contents, _, _ = plt.hist(y, 200, range=limits, log=log, histtype="stepfilled", fc=color, alpha=0.5)
             if log:
-                plt.ylim(ymin=contents.min())
+                plt.ylim(ymin=np.min(contents))
         print(f"Plotting {len(y)} out of {self.npulses} data points")
 
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:

@@ -539,7 +539,7 @@ class Channels:
             ch2s[ch_num] = ch.with_experiment_state_df(df_es)
         return Channels(ch2s, self.description)
 
-    def with_experiment_state_by_path(self, experiment_state_path: str | None = None) -> "Channels":
+    def with_experiment_state_by_path(self, experiment_state_path: str | Path | None = None) -> "Channels":
         """Return a copy of this Channels object with experiment state information added to each Channel.
 
         Parameters
@@ -678,9 +678,7 @@ class Channels:
             combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
             sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
             header = dataclasses.replace(ch.header, data_source=None, pulse_data_sources=sources)
-            new_ch = dataclasses.replace(
-                ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer
-            )
+            new_ch = dataclasses.replace(ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer)
             new_channels[ch_num] = new_ch
         return mass2.Channels(new_channels, self.description + other_data.description)
 
@@ -843,6 +841,7 @@ class Channels:
             Channel
                 The Channel `ch` but with `ch.df` updated, including any raw data backed by an LJH file
             """
+
             def _reload_leaf_chan(data_source: str | None) -> Channel | None:
                 """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
                 if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):

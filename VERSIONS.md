@@ -4,6 +4,7 @@
 
 **2.1.1** August 21, 2026 -
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).
+* New stepwise calibration works from a sequence of heuristics (issue 178).
 
 **2.1.0** August 21, 2026
 * Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).

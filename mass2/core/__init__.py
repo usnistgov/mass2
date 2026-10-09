@@ -36,5 +36,5 @@ from . import rough_cal
 from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
 from .truebq_bin import TrueBqBin
 from .channels import Channels
-from .rough_cal import RoughCalibrationStep
+from .rough_cal import RoughCalibrationStep, StepwiseCalStep
 from . import phase_correct_steps
