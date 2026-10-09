@@ -141,7 +141,7 @@ class CubicSpline:
         if x.size == 0:
             return np.array([])
         elif x.size == 1:
-            x.shape = (1,)
+            x = x.reshape((1,))
         result = np.zeros_like(x, dtype=float)
 
         # Find which interval 0,...self._n-2 contains the points (or extrapolates to the points)
