@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 import os
 import mass2
-from mass2.calibration import EnergyCalibrationMaker, Curvetypes
+from mass2.calibration import EnergyCalibrationMaker, EnergyCalibration, Curvetypes
 
 
 def basic_nonlinearity(e: np.ndarray | float) -> np.ndarray:
@@ -363,3 +363,13 @@ def test_loggain_calibration():
         cal = maker.make_calibration(curvename=ct, approximate=True)
         cal_uncert = cal.energy2uncertainty(e2)
         assert np.abs(cal_uncert).mean() > dph.mean() * 0.2
+
+
+def test_trivial_calibrator():
+    """Test for EnergyCalibration.trivial_calibrator"""
+    cal = EnergyCalibration.trivial_calibrator()
+    rng = np.random.default_rng()
+
+    x = rng.uniform(0.0, 10000.0, size=30)
+    y = cal(x)
+    assert np.all(x == y)
