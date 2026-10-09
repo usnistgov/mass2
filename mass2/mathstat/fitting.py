@@ -145,7 +145,7 @@ def fit_kink_model(x: ArrayLike, y: ArrayLike, kbounds: tuple[float, float] | No
         kbounds = (x.min(), x.max())
     elif kbounds[0] < x.min() or kbounds[1] > x.max():
         raise ValueError(f"kbounds ({kbounds}) must be within the range of x data")
-    optimum = sp.optimize.minimize_scalar(penalty, args=(x, y), method="Bounded", bounds=kbounds)
+    optimum = sp.optimize.minimize_scalar(penalty, args=(x, y), method="bounded", bounds=kbounds)
     kbest = optimum.x
     model, abc, X2 = kink_model(kbest, x, y)
     return model, np.hstack([kbest, abc]), X2

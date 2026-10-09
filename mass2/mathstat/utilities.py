@@ -126,4 +126,4 @@ def find_svd_randomly(A: ArrayLike, nl: int, q: int = 2) -> tuple[NDArray, NDArr
     B = Q.T @ A
     SVD_B = np.linalg.svd(B, full_matrices=False)
     u = Q @ SVD_B.U
-    return SVD_B._replace(U=u)
+    return (u, SVD_B.S, SVD_B.Vh)

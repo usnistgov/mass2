@@ -142,6 +142,7 @@ def laplace_entropy_approx(x: ArrayLike, w: float = 1.0) -> float:
     BINS_PER_W = 20
     KERNEL_WIDTH_IN_WS = 15.0
 
+    x = np.asarray(x)
     xmin = np.min(x) - EXTEND_DATA
     xmax = np.max(x) + EXTEND_DATA
     nbins = int(0.5 + (xmax - xmin) * BINS_PER_W / w)
@@ -443,6 +444,8 @@ def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> 
     BINS_PER_W = 20
     KERNEL_WIDTH_IN_WS = 15.0
 
+    x = np.asarray(x)
+    y = np.asarray(y)
     xmin = min(np.min(x), np.min(y)) - EXTEND_DATA
     xmax = max(np.max(x), np.max(y)) + EXTEND_DATA
     nbins = int(0.5 + (xmax - xmin) * BINS_PER_W / w)

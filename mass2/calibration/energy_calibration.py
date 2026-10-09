@@ -403,7 +403,7 @@ class EnergyCalibrationMaker:
             else:
                 internal_spline = CubicSpline(x * [1, 2], y * [1, 1])
         elif approximate:
-            internal_spline: CubicSpline = GPRSpline(x, y, dy, dx)
+            internal_spline = GPRSpline(x, y, dy, dx)
         else:
             internal_spline = CubicSpline(x, y)
 

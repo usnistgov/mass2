@@ -150,9 +150,13 @@ def calc_autocorrelation_times(n: int, dt: float) -> NDArray:
     return np.arange(n) * dt
 
 
-def noise_psd_periodogram(data: ndarray, dt: float, window: ArrayLike | str = "boxcar", detrend: bool = False) -> "NoiseResult":
+def noise_psd_periodogram(
+    data: ndarray,
+    dt: float,
+    window: ndarray | str = "boxcar",
+) -> "NoiseResult":
     """Compute the noise power spectral density using scipy's periodogram function and the autocorrelation."""
-    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=detrend)
+    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=False)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
     Pxx_mean = np.mean(Pxx, axis=0)
