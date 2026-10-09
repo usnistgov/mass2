@@ -24,6 +24,7 @@ from .misc import alwaysTrue, PulseDataFramer
 
 # from . import rough_cal
 from mass2.calibration.algorithms import line_names_and_energies
+from mass2.calibration import EnergyCalibration
 
 
 def rank_3peak_assignments(
@@ -1015,40 +1016,53 @@ class StepwiseCalStep(RecipeStep):
         if calibrated_col is None:
             calibrated_col = f"energy_{uncalibrated_col}"
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
-        med_uncal = np.median(uncalibrated)
-        fwhm_energy_units = fwhm_pulse_height_units
-        e = uncalibrated.copy()
-        calmaker = mass2.calibration.EnergyCalibrationMaker.init()
-        cal = mass2.calibration.EnergyCalibration.trivial_calibrator()
-        for iteration, step in enumerate(plan):
-            lines = step[0]
-            if isinstance(lines, str) or isinstance(lines, float) or isinstance(lines, int):
-                lines = [lines]
-            Npk = len(lines)
-            energies: list[float] = []
-            for L in lines:
-                if isinstance(L, str):
-                    energies.append(mass2.STANDARD_FEATURES[L])
-                else:
-                    assert isinstance(L, float) or isinstance(L, int)
-                    energies.append(L)
-            if step[1]:
-                e = e[e > step[1]]
-            if step[2]:
-                e = e[e < step[2]]
-            pfresult = peakfind_local_maxima_of_smoothed_hist(e, fwhm_pulse_height_units=fwhm_energy_units)
-            esort = np.argsort(energies)
-            ipeaks = pfresult.inds_sorted_by_peak_height()[:Npk][esort]
-            peaks = pfresult.bin_centers[ipeaks]
-            if iteration > 0:
-                peaks = cal.energy2ph(peaks)
-            for i in range(Npk):
-                calmaker = calmaker.add_cal_point(peaks[i], energies[i], name=str(lines[i]))
-            cal = calmaker.make_calibration_gain()
-            e = cal(uncalibrated)
-            fwhm_energy_units = cal.ph2dedph(med_uncal) * fwhm_pulse_height_units
+        cal = learn_stepwise_cal(uncalibrated, plan, fwhm_pulse_height_units)
         success = True
         ph2energy = cal.ph2energy
         return cls(
             [uncalibrated_col], [calibrated_col], ch.good_expr, use_expr, plan, fwhm_pulse_height_units, cal, ph2energy, success
         )
+
+
+def learn_stepwise_cal(
+    uncalibrated: NDArray, plan: Sequence[tuple[AnchorLine, float | None, float | None]], fwhm_pulse_height_units: float = 75
+) -> EnergyCalibration:
+    med_uncal = float(np.median(uncalibrated))
+    fwhm_energy_units = fwhm_pulse_height_units
+
+    e = uncalibrated.copy()
+    calmaker = mass2.calibration.EnergyCalibrationMaker.init()
+    cal = mass2.calibration.EnergyCalibration.trivial_calibrator()
+    for iteration, step in enumerate(plan):
+        lines = step[0]
+        if isinstance(lines, str) or isinstance(lines, float) or isinstance(lines, int):
+            lines = [lines]
+        Npk = len(lines)
+        energies: list[float] = []
+        for L in lines:
+            if isinstance(L, str):
+                energies.append(mass2.STANDARD_FEATURES[L])
+            else:
+                assert isinstance(L, float) or isinstance(L, int)
+                energies.append(L)
+        if step[1]:
+            e = e[e > step[1]]
+        if step[2]:
+            e = e[e < step[2]]
+        pfresult = peakfind_local_maxima_of_smoothed_hist(e, fwhm_pulse_height_units=fwhm_energy_units)
+
+        esort = np.argsort(energies)
+        ipeaks = pfresult.inds_sorted_by_peak_height()[:Npk]
+        ipeaks.sort()  # Sort by energy, not intensity
+        ipeaks = ipeaks[esort]  # Now resort to match the order of the energy values
+        linenames = [str(lines[i]) for i in esort]  # type: ignore
+        peaks = pfresult.bin_centers[ipeaks]
+        if iteration > 0:
+            peaks = cal.energy2ph(peaks)
+        for pk, energy, name in zip(peaks, energies, linenames):
+            calmaker = calmaker.add_cal_point(pk, energy, name)
+        cal = calmaker.make_calibration_gain(approximate=False)
+        e = cal(uncalibrated)
+        dedp = float(cal.ph2dedph(med_uncal)[0])
+        fwhm_energy_units = dedp * fwhm_pulse_height_units
+    return cal
