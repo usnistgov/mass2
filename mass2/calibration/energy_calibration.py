@@ -345,20 +345,26 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_gain
             x = self.ph
             y = self.ph / self.energy
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         elif curvename == Curvetypes.INVGAIN:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_invgain
             x = self.ph
             y = self.energy / self.ph
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         elif curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO}:
             input_transform = EnergyCalibration._ecal_input_identity
@@ -380,20 +386,26 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_loggain
             x = self.ph
             y = np.log(self.ph / self.energy)
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         else:
             raise ValueError(f"curvename='{curvename}' not recognized")
 
-        if approximate:
+        if len(x) == 1:
+            if curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO, Curvetypes.LOGLOG}:
+                internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
+            else:
+                internal_spline = CubicSpline(x * [1, 2], y * [1, 1])
+        elif approximate:
             internal_spline: CubicSpline = GPRSpline(x, y, dy, dx)
-        elif len(x) > 1:
-            internal_spline = CubicSpline(x, y)
         else:
-            internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
+            internal_spline = CubicSpline(x, y)
 
         ph_samplepoints = EnergyCalibrationMaker.heuristic_samplepoints(self.ph)
         E_samplepoints = output_transform(ph_samplepoints, internal_spline(input_transform(ph_samplepoints)))
