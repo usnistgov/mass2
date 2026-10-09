@@ -511,6 +511,30 @@ class EnergyCalibration:
         """Make a copy of this object, optionally changing some attributes."""
         return dataclasses.replace(self, **changes)
 
+    @classmethod
+    def trivial_calibrator(cls) -> EnergyCalibration:
+        N = 3
+        x = np.linspace(0, 5000, N)
+
+        def donothing(x: ArrayLike, der: int = 0) -> NDArray[np.float64]:
+            if der > 0:
+                return np.zeros_like(x)
+            return np.asarray(x)
+
+        return cls(
+            x,
+            x,
+            x * 1e-3,
+            x * 1e-3,
+            [f"dummy{d}" for d in range(N)],
+            Curvetypes.GAIN,
+            False,
+            donothing,
+            donothing,
+            donothing,
+            donothing,
+        )
+
     @property
     def npts(self) -> int:
         """Return the number of calibration anchor points."""
