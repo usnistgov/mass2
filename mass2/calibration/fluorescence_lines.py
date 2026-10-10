@@ -113,7 +113,7 @@ class SpectralLine:
         """Find the peak energy of the line shape assuming ideal instrument resolution."""
         try:
             peak_energy = sp.optimize.brent(
-                lambda x: -self.pdf(x, instrument_gaussian_fwhm=0), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
+                lambda x: -float(self.pdf(x, instrument_gaussian_fwhm=0)), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
             )
         except ValueError:
             peak_energy = self.nominal_peak_energy
@@ -137,6 +137,8 @@ class SpectralLine:
 
         if self.reference_amplitude_type == AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY:
             return self.reference_amplitude
+
+        assert NotImplementedError(f"{self.reference_amplitude_type=} unknown")
 
     @cached_property
     def normalized_lorentzian_integral_intensity(self) -> NDArray:
@@ -239,7 +241,7 @@ class SpectralLine:
         # to self.rvs().
         not_positive = results <= 0.0
         if np.any(not_positive):
-            Nbad = not_positive.sum()
+            Nbad = int(not_positive.sum())
             results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm)
         return results
 

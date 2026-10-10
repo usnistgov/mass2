@@ -345,20 +345,26 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_gain
             x = self.ph
             y = self.ph / self.energy
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * self.energy - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         elif curvename == Curvetypes.INVGAIN:
             input_transform = EnergyCalibration._ecal_input_identity
             output_transform = EnergyCalibration._ecal_output_invgain
             x = self.ph
             y = self.energy / self.ph
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * self.ph / y + 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         elif curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO}:
             input_transform = EnergyCalibration._ecal_input_identity
@@ -380,20 +386,26 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_loggain
             x = self.ph
             y = np.log(self.ph / self.energy)
-            # Estimate spline uncertainties using slope of best-fit line
-            slope = np.polyfit(x, y, 1)[0]
-            dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
             dx = dph
+            if self.npts == 1:
+                dy = y * dph / x
+            else:
+                # Estimate spline uncertainties using slope of best-fit line
+                slope = np.polyfit(x, y, 1)[0]
+                dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         else:
             raise ValueError(f"curvename='{curvename}' not recognized")
 
-        if approximate:
-            internal_spline: CubicSpline = GPRSpline(x, y, dy, dx)
-        elif len(x) > 1:
-            internal_spline = CubicSpline(x, y)
+        if len(x) == 1:
+            if curvename in {Curvetypes.LINEAR, Curvetypes.LINEAR_PLUS_ZERO, Curvetypes.LOGLOG}:
+                internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
+            else:
+                internal_spline = CubicSpline(x * [1, 2], y * [1, 1])
+        elif approximate:
+            internal_spline = GPRSpline(x, y, dy, dx)
         else:
-            internal_spline = CubicSpline(x * [1, 2], y * [1, 2])
+            internal_spline = CubicSpline(x, y)
 
         ph_samplepoints = EnergyCalibrationMaker.heuristic_samplepoints(self.ph)
         E_samplepoints = output_transform(ph_samplepoints, internal_spline(input_transform(ph_samplepoints)))
@@ -510,6 +522,30 @@ class EnergyCalibration:
     def copy(self, **changes: Any) -> EnergyCalibration:
         """Make a copy of this object, optionally changing some attributes."""
         return dataclasses.replace(self, **changes)
+
+    @classmethod
+    def trivial_calibrator(cls) -> EnergyCalibration:
+        N = 3
+        x = np.linspace(0, 5000, N)
+
+        def donothing(x: ArrayLike, der: int = 0) -> NDArray[np.float64]:
+            if der > 0:
+                return np.zeros_like(x)
+            return np.asarray(x)
+
+        return cls(
+            x,
+            x,
+            x * 1e-3,
+            x * 1e-3,
+            [f"dummy{d}" for d in range(N)],
+            Curvetypes.GAIN,
+            False,
+            donothing,
+            donothing,
+            donothing,
+            donothing,
+        )
 
     @property
     def npts(self) -> int:
@@ -748,11 +784,12 @@ class EnergyCalibration:
     ) -> None:
         """Plot the calibration curve, with options."""
         # Plot smooth curve
-        minph, maxph = self.ph.min() * 0.9, self.ph.max() * 1.1
+        minph = float(self.ph.min()) * 0.9
+        maxph = float(self.ph.min()) * 1.1
         if min_energy is not None:
-            minph = self.energy2ph(min_energy)
+            minph = float(self.energy2ph(min_energy))
         if max_energy is not None:
-            maxph = self.energy2ph(max_energy)
+            maxph = float(self.energy2ph(max_energy))
         phplot = np.linspace(minph, maxph, 1000)
         eplot = self(phplot)
         gplot = phplot / eplot

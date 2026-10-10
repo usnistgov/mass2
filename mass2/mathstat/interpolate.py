@@ -141,7 +141,7 @@ class CubicSpline:
         if x.size == 0:
             return np.array([])
         elif x.size == 1:
-            x.shape = (1,)
+            x = x.reshape((1,))
         result = np.zeros_like(x, dtype=float)
 
         # Find which interval 0,...self._n-2 contains the points (or extrapolates to the points)
@@ -444,6 +444,7 @@ class NaturalBsplineBasis:
             coef[0] = self.coef_b[id]
         elif id >= self.Nk - 2:
             coef[-1] = self.coef_e[self.Nk - id - 1]
+        x = np.asarray(x, dtype=float)  # careful: FORTRAN in splev expects floats, not ints
         return splev(x, (self.padknots, coef, 3), der=der)
 
     def values_matrix(self, der: int = 0) -> NDArray:
@@ -497,7 +498,7 @@ class SmoothingSpline:
             dx = np.zeros_like(err)
         else:
             roughfit = np.polyfit(self.x, self.y, 2)
-            slope = np.poly1d(np.polyder(roughfit, 1))(x)
+            slope = np.poly1d(np.polyder(roughfit, 1))(self.x)
             err = np.sqrt((np.asarray(dx) * slope) ** 2 + self.dy**2)
 
         self.xscale = (self.x**2).mean() ** 0.5
@@ -549,11 +550,11 @@ class SmoothingSpline:
         lhs = NTDinv @ self.N0
         rhs = self.N0.T @ (Dinv * self.y)
 
-        def best_params(p: NDArray) -> NDArray:
+        def best_params(p: float) -> NDArray:
             """Return the best-fit parameters for a given curvature penalty p."""
             return np.linalg.solve(p * (lhs - self.Omega) + self.Omega, p * rhs)
 
-        def chisq_difference(p: NDArray, target_chisq: float) -> float:
+        def chisq_difference(p: float, target_chisq: float) -> float:
             """Return the difference between the chi-squared for curvature penalty p
             and the target chi-squared."""
             # If curvature is too small, the computation can become singular.

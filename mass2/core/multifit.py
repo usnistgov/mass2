@@ -224,7 +224,7 @@ class MultiFit:
             return ph / gain
 
         e_predicted = ph2energy(peaks_uncalibrated)
-        rms_residual_energy = mass2.misc.root_mean_squared(e_predicted - peaks_in_energy_reference)
+        rms_residual_energy = float(mass2.misc.root_mean_squared(e_predicted - peaks_in_energy_reference))
         return pfit_gain, rms_residual_energy
 
     def to_mass_cal(

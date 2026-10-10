@@ -81,7 +81,7 @@ def _smear_exponential_tail(
     rawspectrum = cleanspectrum_fn(x_wide)
     ft = np.fft.rfft(rawspectrum)
 
-    filter_effect_fourier = np.ones_like(ft) - P_tailfrac
+    filter_effect_fourier = np.ones_like(ft, dtype=np.complex128) - P_tailfrac
     P_tailfrac_hi = P_tailfrac * P_tailshare_hi
     P_tailfrac_lo = P_tailfrac - P_tailfrac_hi
     if P_tailfrac_lo > 1e-6:

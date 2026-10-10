@@ -214,7 +214,7 @@ class HistogramSmoother:
 
     def __call__(self, values: ArrayLike) -> NDArray:
         """Return a smoothed histogram of the data vector <values>"""
-        contents, _ = np.histogram(values, bins=self.nbins, range=self.limits)
+        contents, _ = np.histogram(np.asarray(values), bins=self.nbins, range=self.limits)
         ftc = np.fft.rfft(contents)
         csmooth = np.fft.irfft(self.kernel_ft * ftc)
         csmooth[csmooth < 0] = 0
@@ -524,13 +524,13 @@ def time_drift_correct(  # noqa: PLR0914
     LOG.info("Using %2d degrees for %6d photons (after %d downsample)", ndeg, N, downsample)
     LOG.info("That's %6.1f photons per degree, and %6.1f seconds per degree.", N / float(ndeg), dtime / ndeg)
 
-    def model1(param_i: NDArray, i: int, param: NDArray, basis: NDArray) -> NDArray:
+    def model1(param_i: float, i: int, param: NDArray, basis: NDArray) -> NDArray:
         "The model function, with one parameter pi varied, others fixed."
         pcopy = np.array(param)
         pcopy[i] = param_i
         return 1 + pcopy @ basis
 
-    def cost1(pi: NDArray, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
+    def cost1(pi: float, i: int, param: NDArray, y: NDArray, w: float, basis: NDArray) -> float:
         "The cost function (spectral entropy), with one parameter pi varied, others fixed."
         return laplace_entropy(y * model1(pi, i, param, basis), w=w)
 
@@ -539,11 +539,11 @@ def time_drift_correct(  # noqa: PLR0914
     basis = np.vstack([sp.special.legendre(i + 1)(xnorm) for i in range(ndeg)])
 
     fc = 0
-    model: Callable = np.poly1d([0])
+    model = np.poly1d([0])
     info["coefficients"] = np.zeros(ndeg, dtype=float)
     for i in range(ndeg):
         result, _fval, _iter, funcalls = sp.optimize.brent(
-            cost1, (i, param, uncorrected, w, basis), [-0.001, 0.001], tol=1e-5, full_output=True
+            cost1, (i, param, uncorrected, w, basis), brack=(-0.001, 0.001), tol=1e-5, full_output=True
         )
         param[i] = result
         fc += funcalls
@@ -556,14 +556,16 @@ def time_drift_correct(  # noqa: PLR0914
     H1 = laplace_entropy(uncorrected, w=w)
     H2 = laplace_entropy(uncorrected * (1 + model(xnorm)), w=w)
     H3 = laplace_entropy(uncorrected * (1 + model2(xnorm)), w=w)
+
+    end_model: Callable = model
     if H2 <= 0 or H2 - H1 > 0.0:
-        model = np.poly1d([0])
+        end_model = np.poly1d([0])
     elif H3 <= 0 or H3 - H2 > 0.00001:
-        model = model2
+        end_model = model2
 
     def safe_model(x: NDArray) -> NDArray:
         "Return the TDC model, but enforcing no adjustment for times outside the range we learned on"
-        y = model(x)
+        y = end_model(x)
         y[x < -1] = 0
         y[x > +1] = 0
         return y

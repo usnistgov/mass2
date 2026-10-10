@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 import os
 import mass2
-from mass2.calibration import EnergyCalibrationMaker, Curvetypes
+from mass2.calibration import EnergyCalibrationMaker, EnergyCalibration, Curvetypes
 
 
 def basic_nonlinearity(e: np.ndarray | float) -> np.ndarray:
@@ -363,3 +363,24 @@ def test_loggain_calibration():
         cal = maker.make_calibration(curvename=ct, approximate=True)
         cal_uncert = cal.energy2uncertainty(e2)
         assert np.abs(cal_uncert).mean() > dph.mean() * 0.2
+
+
+def test_trivial_calibrator():
+    """Test for EnergyCalibration.trivial_calibrator"""
+    cal = EnergyCalibration.trivial_calibrator()
+    rng = np.random.default_rng()
+
+    x = rng.uniform(0.0, 10000.0, size=30)
+    y = cal(x)
+    assert np.all(x == y)
+
+
+def test_stepwise_cal():
+    ph = np.load("tests/calibration/example_uncalibrated_data.npy")
+    plan = [("NiLAlpha1", None, None), ("FeLAlpha1", 650, 800), ("OKAlpha", 450, 600), (("NKAlpha", "CKAlpha"), 200, 450)]
+
+    cal = mass2.core.rough_cal.learn_stepwise_cal(ph, plan, fwhm_pulse_height_units=10)
+    expectedPH = np.array([2296, 2992.8, 3658.7, 4372.3, 4814.0])
+    assert np.allclose(expectedPH, cal.ph, atol=0.06)
+    expectedE = np.array([277, 392.4, 524.9, 704.8, 851.47])
+    assert np.allclose(expectedE, cal.energy, atol=0.06)

@@ -259,21 +259,30 @@ class CategorizeStep(RecipeStep):
         def categorize_df(df: pl.DataFrame, category_condition_dict: dict[str, pl.Expr], output_col: str) -> pl.DataFrame:
             """returns a series showing which category each pulse is in
             pulses will be assigned to the last category for which the condition evaluates to True"""
-            dtype = pl.Enum(category_condition_dict.keys())
-            physical = np.zeros(len(df), dtype=int)
-            for category_int, (category_str, condition_expr) in enumerate(category_condition_dict.items()):
-                if condition_expr is True or condition_expr.meta.eq(pl.lit(True)):
-                    in_category = np.ones(len(df), dtype=bool)
-                else:
-                    in_category = df.select(condition_expr).fill_null(False).to_numpy().flatten()
-                assert in_category.dtype == bool
-                physical[in_category] = category_int
-            series = pl.Series(name=output_col, values=physical).cast(dtype)
-            df = pl.DataFrame({output_col: series})
-            return df
+            categories = list(category_condition_dict.keys())
+            dtype = pl.Enum(categories)
 
-        df2 = categorize_df(df, self.category_condition_dict, output_col).with_columns(df)
-        return df2
+            # 1. Reverse items to have "last match overwrites" logic, because polars when-then uses first-match logic
+            reversed_items = list(category_condition_dict.items())[::-1]
+            first_cat, first_cond_expr = reversed_items[0]
+
+            # 2. Build the when/then chain dynamically
+            expr: Any = None
+            for cat_str, cond_expr in reversed_items:
+                cond = pl.lit(True) if cond_expr is True else cond_expr.fill_null(False)
+
+                if expr is None:
+                    expr = pl.when(cond).then(pl.lit(cat_str))
+                else:
+                    expr = expr.when(cond).then(pl.lit(cat_str))
+
+            # 3. Default unmatched rows to 0 (the first category)
+            final_expr = expr.otherwise(pl.lit(categories[0]))
+
+            # 4. Execute the entire mapping and cast to Enum in a single Rust multi-threaded pass
+            return df.with_columns(final_expr.cast(dtype).alias(output_col))
+
+        return categorize_df(df, self.category_condition_dict, output_col).with_columns(df)
 
 
 @dataclass(frozen=True)
