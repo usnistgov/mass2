@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.1.1** August 21, 2026 -
+**2.1.1** October 10, 2026
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).
 * New stepwise calibration works from a sequence of heuristics (issue 178).
 
