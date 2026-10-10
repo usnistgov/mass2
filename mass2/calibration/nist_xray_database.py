@@ -188,7 +188,7 @@ class NISTXrayDBFile:
         "LG1": "L2N4",
     }
 
-    def get_lines_by_type(self, linetype: str) -> tuple["NISTXrayLine"]:
+    def get_lines_by_type(self, linetype: str) -> tuple["NISTXrayLine", ...]:
         """Return a tuple containing all lines of a certain type, e.g., "KL3".
         See self.LINE_NICKNAMES for some known line "nicknames"."""
         linetype = linetype.upper()
