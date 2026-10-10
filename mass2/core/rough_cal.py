@@ -618,7 +618,7 @@ def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -
         assignment_inds = np.array(indices)
         ph_assigned = np.array(ph[assignment_inds])
         residual_e, pfit_gain = find_pfit_gain_residual(ph_assigned, e)
-        rms_residual = mass2.misc.root_mean_squared(residual_e)
+        rms_residual = float(mass2.misc.root_mean_squared(residual_e))
         if rms_residual < best_rms_residual:
             best_rms_residual = rms_residual
             best_ph_assigned = ph_assigned
@@ -733,7 +733,7 @@ def eval_3peak_assignment_pfit_gain(
     if any(np.iscomplex(pfit_gain.roots())):
         # well formed calibrations have real roots
         return np.inf, "pfit_gain should not have complex roots"
-    rms_residual_e = mass2.misc.root_mean_squared(residual_e)
+    rms_residual_e = float(mass2.misc.root_mean_squared(residual_e))
     result = BestAssignmentPfitGainResult(
         rms_residual_e,
         ph_assigned=df["possible_ph"].to_numpy(),

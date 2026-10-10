@@ -444,6 +444,7 @@ class NaturalBsplineBasis:
             coef[0] = self.coef_b[id]
         elif id >= self.Nk - 2:
             coef[-1] = self.coef_e[self.Nk - id - 1]
+        x = np.asarray(x, dtype=float)  # careful: FORTRAN in splev expects floats, not ints
         return splev(x, (self.padknots, coef, 3), der=der)
 
     def values_matrix(self, der: int = 0) -> NDArray:
@@ -497,7 +498,7 @@ class SmoothingSpline:
             dx = np.zeros_like(err)
         else:
             roughfit = np.polyfit(self.x, self.y, 2)
-            slope = np.poly1d(np.polyder(roughfit, 1))(x)
+            slope = np.poly1d(np.polyder(roughfit, 1))(self.x)
             err = np.sqrt((np.asarray(dx) * slope) ** 2 + self.dy**2)
 
         self.xscale = (self.x**2).mean() ** 0.5

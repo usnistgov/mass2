@@ -241,7 +241,7 @@ class SpectralLine:
         # to self.rvs().
         not_positive = results <= 0.0
         if np.any(not_positive):
-            Nbad = not_positive.sum()
+            Nbad = int(not_positive.sum())
             results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm)
         return results
 
