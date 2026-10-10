@@ -784,11 +784,12 @@ class EnergyCalibration:
     ) -> None:
         """Plot the calibration curve, with options."""
         # Plot smooth curve
-        minph, maxph = self.ph.min() * 0.9, self.ph.max() * 1.1
+        minph = float(self.ph.min()) * 0.9
+        maxph = float(self.ph.min()) * 1.1
         if min_energy is not None:
-            minph = self.energy2ph(min_energy)
+            minph = float(self.energy2ph(min_energy))
         if max_energy is not None:
-            maxph = self.energy2ph(max_energy)
+            maxph = float(self.energy2ph(max_energy))
         phplot = np.linspace(minph, maxph, 1000)
         eplot = self(phplot)
         gplot = phplot / eplot
