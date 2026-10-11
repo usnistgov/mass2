@@ -444,8 +444,8 @@ class NaturalBsplineBasis:
             coef[0] = self.coef_b[id]
         elif id >= self.Nk - 2:
             coef[-1] = self.coef_e[self.Nk - id - 1]
-        x = np.asarray(x)
-        return np.asarray(splev(x, (self.padknots, coef, 3), der=der))
+        x = np.asarray(x, dtype=float)  # careful: FORTRAN in splev expects floats, not ints
+        return splev(x, (self.padknots, coef, 3), der=der)
 
     def values_matrix(self, der: int = 0) -> NDArray:
         """Return matrix M where M_ij = value at knot i for basis function j.

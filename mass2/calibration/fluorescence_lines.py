@@ -139,6 +139,8 @@ class SpectralLine:
             return self.reference_amplitude
         raise NotImplementedError("unknown {self.reference_amplitude_type=}")
 
+        assert NotImplementedError(f"{self.reference_amplitude_type=} unknown")
+
     @cached_property
     def normalized_lorentzian_integral_intensity(self) -> NDArray:
         """Return (and cache) computed integrated intensities of the Lorentzian components, normalized so sum=1."""
@@ -240,7 +242,7 @@ class SpectralLine:
         # to self.rvs().
         not_positive = results <= 0.0
         if np.any(not_positive):
-            Nbad = int(np.count_nonzero(not_positive))
+            Nbad = int(not_positive.sum())
             results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm)
         return results
 

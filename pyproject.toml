@@ -26,8 +26,8 @@ dependencies = [
     "numba",
     "numpy>=2.0",
     "packaging",
-    # A test_truebq_bin.py error came up with polars 1.40. Forbid for now.
-    "polars != 1.40",
+    # A test_truebq_bin.py error came up with polars 1.40. Require newer.
+    "polars>1.40",
     "progress",
     "pulsedata @ git+https://github.com/ggggggggg/pulsedata",
     "pyarrow",

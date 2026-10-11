@@ -649,7 +649,7 @@ class Channels:
             ch2s[ch_num] = ch.with_experiment_state_df(df_es)
         return Channels(ch2s, self.description)
 
-    def with_experiment_state_by_path(self, experiment_state_path: str | None = None) -> "Channels":
+    def with_experiment_state_by_path(self, experiment_state_path: str | Path | None = None) -> "Channels":
         """Return a copy of this Channels object with experiment state information added to each Channel.
 
         Parameters

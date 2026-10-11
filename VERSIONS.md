@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.1.1** August 21, 2026-
+**2.1.2** August 21, 2026-
 * Reorganize the `Channel` object so that instead of owning a full `NoiseChannel` object (optional), it can own
   an (optional) `NoiseResult` object. To look at noise traces will now require a separate `Channel` (issue 175).
 * Add ability to convert LJH raw pulse files into Arrow IPC or Parquet formats (issue 164)
@@ -10,7 +10,10 @@
 * Add first draft of MASSASSIN, MAD-COW, and MAD-Dash for online analysis (issue 177).
 * Read `*_configuration.toml` file in the Arrow directory.
 * Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
+
+**2.1.1** October 10, 2026
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).
+* New stepwise calibration works from a sequence of heuristics (issue 178).
 
 **2.1.0** August 21, 2026
 * Remove raw pulse storage from the primary `Channel.df` dataframe (issue 126).

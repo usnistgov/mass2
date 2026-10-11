@@ -34,12 +34,21 @@ See especially the script `ljh2apache`
 
 @dataclass(frozen=True)
 class PulseDataFromArrow(PulseDataFramer):
+    """PulseDataFramer for Arrow IPC Feather files"""
+
     lf: pl.LazyFrame
     path: Path
 
     @property
     def df(self) -> pl.DataFrame:
-        return pl.read_ipc(self.path, memory_map=True)
+        """Instantiate all data in the IPC Feather file as a DataFrame
+
+        Returns
+        -------
+        pl.DataFrame
+            The full contents of the lazy frame
+        """
+        return self.lf.collect()
 
     @functools.cached_property
     def npulses(self) -> int:
@@ -61,9 +70,37 @@ class PulseDataFromArrow(PulseDataFramer):
         return self.df[s].select("pulse")
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        """Load a single raw pulse
+
+        Parameters
+        ----------
+        id : int
+            Pulse number to read
+        extra_fields : Iterable[str], optional
+            Additional fields to read from the raw data, by default []
+
+        Returns
+        -------
+        pl.DataFrame
+            A one-row data frame containing the requested pulse
+        """
         return self.df.select("pulse").slice(id, 1)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        """Load multiple raw pulses
+
+        Parameters
+        ----------
+        ids : Iterable[int]
+            Pulse numbers to read
+        extra_fields : Iterable[str], optional
+            Additional fields to read from the raw data, by default []
+
+        Returns
+        -------
+        pl.DataFrame
+            A data frame containing the requested pulses
+        """
         return self.df.select("pulse").with_row_index("idx").filter(pl.col("idx").is_in(list(ids)))
 
     def load_timing(self) -> pl.DataFrame:
@@ -81,6 +118,18 @@ class PulseDataFromArrow(PulseDataFramer):
 
     @classmethod
     def open(cls, path: str | Path) -> "PulseDataFromArrow":
+        """Open a new Arrow IPC file
+
+        Parameters
+        ----------
+        path : str | Path
+            _description_
+
+        Returns
+        -------
+        PulseDataFromArrow
+            _description_
+        """
         lf = pl.scan_ipc(path)
         return cls(lf, Path(path))
 
