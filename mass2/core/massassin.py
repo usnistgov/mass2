@@ -280,7 +280,7 @@ class MassassinDirectory:
             File path for writing the output dataframe, as Parquet.
         """
         print(f"Analzying single-channel {ipc_file.name}")
-        df_in = pl.read_ipc(ipc_file, memory_map=True)
+        df_in = pl.read_ipc(ipc_file)
         df = run_recipe(recipe, df_in)
         df = add_expt_state(df, self.expt_state_df)
         df.write_parquet(output)

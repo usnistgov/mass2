@@ -40,8 +40,7 @@ def test_conversion_arrow_parquet(tmp_path):
     pulse = rng.integers(0, 65535, size=(Npulse, Nsamp), dtype=np.uint16)
     timestamp = rng.integers(0, 1000000, size=Npulse).cumsum() + 1734567890
     subframecount = rng.integers(0, 100000, size=Npulse).cumsum()
-    df = pl.DataFrame().with_columns(subframecount=subframecount, timestamp=timestamp, pulse=pulse)
-
+    df = pl.DataFrame({"subframecount": subframecount, "timestamp": timestamp, "pulse": pulse})
     df.write_parquet(tmp_path / "data_parquet_chan1.parquet")
     df.write_ipc(tmp_path / "data_arrow_chan1.arrow")
 
