@@ -57,6 +57,7 @@ on different data segments, though honestly that would be really weird.
 from numpy.typing import ArrayLike, NDArray
 from typing import Any
 from collections.abc import Callable
+import copy
 import numpy as np
 import pylab as plt
 
@@ -84,13 +85,8 @@ class PowerSpectrum:
             self.dt = dt
 
     def copy(self) -> "PowerSpectrum":
-        """Return a copy of the object.
-
-        Handy when coding and you don't want to recompute everything, but
-        you do want to update the method definitions."""
-        c = PowerSpectrum(self.m, dt=self.dt)
-        c.__dict__.update(self.__dict__)
-        return c
+        """Return an independent copy of the object, of the same class."""
+        return copy.deepcopy(self)
 
     def addDataSegment(self, data: NDArray, window: Callable | NDArray | None = None) -> None:
         """Process a data segment of length 2m using the window function
@@ -106,9 +102,10 @@ class PowerSpectrum:
         elif window is None:
             w = np.ones(self.m2)
         elif callable(window):
-            w = window(self.m2)
+            w = np.asarray(window(self.m2), dtype=float)
         else:
-            raise TypeError("Window not understood")
+            w = np.asarray(window, dtype=float)
+            assert len(w) == self.m2
         wksp = w * data
         sum_window = (w**2).sum()
 
@@ -138,7 +135,7 @@ class PowerSpectrum:
         if nbins > self.m:
             raise ValueError(f"Cannot rebin into more than m={self.m} bins")
 
-        newbin = np.asarray(0.5 + np.arange(self.m + 1, dtype=float) / (self.m + 1) * nbins, dtype=int)
+        newbin = np.asarray(0.5 + np.arange(self.m + 1, dtype=float) / self.m * nbins, dtype=int)
         result = np.zeros(nbins + 1, dtype=float)
         for i in range(nbins + 1):
             result[i] = self.specsum[newbin == i].mean()
@@ -265,7 +262,7 @@ def hamming(n: int) -> NDArray:
 # Convenience functions
 def computeSpectrum(
     data: ArrayLike, segfactor: int = 1, dt: float | None = None, window: Callable | ArrayLike | None = None
-) -> tuple[NDArray, NDArray]:
+) -> NDArray | tuple[NDArray, NDArray]:
     """Convenience function to compute the power spectrum of a single data array.
 
     Args:
@@ -295,7 +292,8 @@ def computeSpectrum(
     elif callable(window):
         w = window(window_length)
     else:
-        raise TypeError("Window not understood")
+        w = np.asarray(window, dtype=float)
+        assert len(w) == window_length
 
     if segfactor == 1:
         spec = PowerSpectrum(M, dt=dt)
@@ -307,7 +305,7 @@ def computeSpectrum(
             spec.addDataSegment(data[i * M : (i + 1) * M], window=w)
 
     if dt is None:
-        return np.zeros(M), spec.spectrum()
+        return spec.spectrum()
     else:
         return spec.frequencies(), spec.spectrum()
 
