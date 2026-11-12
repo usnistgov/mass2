@@ -319,7 +319,7 @@ class EnergyCalibrationMaker:
             """Replace negative uncertainties with the minimum non-negative uncertainty, or zero."""
             if not np.any(x < 0):
                 return x
-            target = max(0.0, x.min())
+            target = x[x >= 0].min() if np.any(x >= 0) else 0.0
             x = x.copy()
             x[x < 0] = target
             return x
@@ -392,7 +392,7 @@ class EnergyCalibrationMaker:
             else:
                 # Estimate spline uncertainties using slope of best-fit line
                 slope = np.polyfit(x, y, 1)[0]
-                dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
+                dy = (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         else:
             raise ValueError(f"curvename='{curvename}' not recognized")
@@ -412,9 +412,9 @@ class EnergyCalibrationMaker:
         energy2ph = CubicSpline(E_samplepoints, ph_samplepoints)
 
         if approximate:
-            dspline = internal_spline.variance(ph_samplepoints) ** 0.5
+            dspline = internal_spline.variance(input_transform(ph_samplepoints)) ** 0.5
             if curvename == Curvetypes.LOGLOG:
-                de_samplepoints = dspline * internal_spline(input_transform(ph_samplepoints))
+                de_samplepoints = dspline * E_samplepoints
             elif curvename == Curvetypes.GAIN:
                 de_samplepoints = dspline * E_samplepoints**2 / ph_samplepoints
             elif curvename == Curvetypes.INVGAIN:
