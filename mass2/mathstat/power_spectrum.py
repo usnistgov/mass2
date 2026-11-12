@@ -303,7 +303,7 @@ def computeSpectrum(
         spec.addDataSegment(data[: 2 * M], window=w)
     else:
         spec = PowerSpectrumOverlap(M, dt=dt)
-        for i in range(2 * segfactor - 1):
+        for i in range(2 * segfactor):
             spec.addDataSegment(data[i * M : (i + 1) * M], window=w)
 
     if dt is None:
