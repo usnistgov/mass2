@@ -96,11 +96,9 @@ class EnergyCalibrationMaker:
         # First sort according to energy of the calibration point
         if not np.all(np.diff(self.energy) > 0):
             sortkeys = np.argsort(self.energy)
-            self.ph[:] = self.ph[sortkeys]
-            self.energy[:] = self.energy[sortkeys]
-            self.dph[:] = self.dph[sortkeys]
-            self.de[:] = self.de[sortkeys]
-            self.names[:] = [self.names[i] for i in sortkeys]
+            for f in ("ph", "energy", "dph", "de"):
+                object.__setattr__(self, f, np.asarray(getattr(self, f))[sortkeys])
+            object.__setattr__(self, "names", [self.names[i] for i in sortkeys])
 
         # Then confirm that the pulse heights are also in order
         order_ph = self.ph.argsort()
@@ -215,10 +213,10 @@ class EnergyCalibrationMaker:
             new_de = np.hstack((self.de, e_error))
             new_names = self.names + [name]
         else:  # Replace an existing calibration anchor point.
-            new_ph = self.ph.copy()
-            new_energy = self.energy.copy()
-            new_dph = self.dph.copy()
-            new_de = self.de.copy()
+            new_ph = self.ph.astype(float)
+            new_energy = self.energy.astype(float)
+            new_dph = self.dph.astype(float)
+            new_de = self.de.astype(float)
             new_names = self.names.copy()
             new_ph[update_index] = ph
             new_energy[update_index] = energy
@@ -243,6 +241,7 @@ class EnergyCalibrationMaker:
             _description_
         """
         anchors = np.asarray(anchors)
+        anchors = anchors[anchors > 0]
         # Prescription is 50 points up to lowest anchor (but exclude 0):
         x = [np.linspace(0, anchors.min(), 51)[1:]]
         # Then one points, plus one extra per 1% spacing between (and at) each anchor

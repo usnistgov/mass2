@@ -206,9 +206,12 @@ class TestJoeStyleEnergyCalibration:
         ph = basic_nonlinearity(energy)
         dph = ph * 1e-3
         de = energy * 1e-3
-        names = len(ph) * [""]
+        names = [str(e) for e in energy]
+        energy.flags.writeable = False
         factory = EnergyCalibrationMaker(ph, energy, dph, de, names)
         assert np.all(np.diff(factory.ph) > 0)
+        assert factory.names == [str(e) for e in np.sort(energy)]
+        assert energy[0] == 6000 and ph[0] == basic_nonlinearity(6000.0) and names[0] == "6000.0"
         cal1 = factory.make_calibration(Curvetypes.GAIN, True)
         cal1(np.array([2200, 4200, 4400], dtype=float))
 
