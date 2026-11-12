@@ -661,7 +661,7 @@ class FilterMaker:
         if variance <= 0:
             vdv = np.inf
         else:
-            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+            vdv = abs(peak) / (8 * np.log(2) * variance) ** 0.5
         return Filter1Lag(
             filt_noconst,
             peak,
@@ -786,7 +786,7 @@ class FilterMaker:
         if variance <= 0:
             vdv = np.inf
         else:
-            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+            vdv = abs(peak) / (8 * np.log(2) * variance) ** 0.5
         return Filter5Lag(
             filt_noconst,
             peak,
@@ -956,7 +956,7 @@ class FilterMaker:
         else:
             ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)
-        vdv = peak / (8 * np.log(2) * variance_fourier) ** 0.5
+        vdv = abs(peak) / (8 * np.log(2) * variance_fourier) ** 0.5
         return Filter5Lag(
             filt_fourier,
             peak,
@@ -1051,7 +1051,7 @@ class FilterMaker:
         filt_dt = filt[1]
         filt_baseline = filt[2]
 
-        vdv = peak / (np.log(2) * 8 * variance) ** 0.5
+        vdv = abs(peak) / (np.log(2) * 8 * variance) ** 0.5
         return FilterATS(
             filt_noconst,
             peak,
@@ -1112,9 +1112,10 @@ class FilterMaker:
         ValueError
             If negative numbers of samples are to be cut, or the entire record is to be cut.
         """
-        avg_signal = np.array(self.signal_model)
+        avg_signal = np.array(self.signal_model, dtype=float)
         ns = len(avg_signal)
-        pre_avg = avg_signal[cut_pre : self.n_pretrigger - 1].mean()
+        pre_start = cut_pre if cut_pre < self.n_pretrigger - 1 else 0
+        pre_avg = avg_signal[pre_start : max(self.n_pretrigger - 1, 1)].mean()
 
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
@@ -1137,7 +1138,8 @@ class FilterMaker:
         # avg_signal: normalize to have unit peak
         avg_signal -= pre_avg
 
-        rescale = 1 / np.max(avg_signal)
+        lo, hi = np.min(avg_signal), np.max(avg_signal)
+        rescale = 1 / (lo if -lo > hi else hi)
         avg_signal *= rescale
         avg_signal[: self.n_pretrigger] = 0.0
         avg_signal = avg_signal[cut_pre : ns - cut_post]
