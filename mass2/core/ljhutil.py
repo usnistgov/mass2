@@ -71,7 +71,7 @@ def find_ljh_files(
     Returns
     -------
     list[str]
-        A list of paths to .ljh files.
+        A list of paths to .ljh files, sorted by channel number.
 
     Raises
     ------
@@ -97,7 +97,7 @@ def find_ljh_files(
                     continue
                 if include_ch_nums is None or (ch_num in include_ch_nums):
                     ljh_files.append(os.path.join(dirpath, filename))
-    return ljh_files
+    return ljh_sort_filenames_numerically(ljh_files)
 
 
 def extract_channel_number(file_path: str) -> int:

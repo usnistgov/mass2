@@ -144,3 +144,8 @@ def test_find_ljh_files(tmp_path):
         if incl is not None:
             compute_expected.intersection_update(incl)
         assert compute_expected == result
+
+    for i in (12, 100):
+        (tmp_path / f"test_chan{i}.ljh").touch()
+    chnums = [extract_channel_number(f) for f in find_ljh_files(strpath)]
+    assert chnums == sorted(chnums)
