@@ -81,7 +81,7 @@ class FilterStack:
             ax = fig.add_subplot(111)
 
         ax.plot(xray_energies_eV, efficiency * 100.0, label="total", lw=2)
-        ax.set_xlabel("Energy (keV)")
+        ax.set_xlabel("Energy (eV)")
         ax.set_ylabel("Efficiency (%)")
         ax.set_title(self.name)
         ax.set_title(f"{self.name} Efficiency")

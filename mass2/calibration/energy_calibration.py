@@ -787,7 +787,7 @@ class EnergyCalibration:
         """Plot the calibration curve, with options."""
         # Plot smooth curve
         minph = float(self.ph.min()) * 0.9
-        maxph = float(self.ph.min()) * 1.1
+        maxph = float(self.ph.max()) * 1.1
         if min_energy is not None:
             minph = float(self.energy2ph(min_energy))
         if max_energy is not None:
@@ -847,7 +847,7 @@ class EnergyCalibration:
             if self.approximating:
                 dyplot = self.ph2uncertainty(phplot) / eplot
             y = np.log(gains)
-            ylabel = "Log Gain: log(eV/PH)"
+            ylabel = "Log Gain: log(PH/eV)"
             axis.set_title("Energy calibration curve, log gain")
         elif plottype == "loglog":
             yplot = np.log(eplot)
@@ -873,7 +873,9 @@ class EnergyCalibration:
             axis.plot(xplot, yplot - dyplot, color=color, alpha=0.35)
 
         # Plot and label cal points
-        dy = ((self.de / self.energy) ** 2 + (self.dph / self.ph) ** 2) ** 0.5 * y
+        dy = ((self.de / self.energy) ** 2 + (self.dph / self.ph) ** 2) ** 0.5
+        if plottype not in {"loggain", "loglog"}:
+            dy *= np.abs(y)
         axis.errorbar(x, y - slope * x, yerr=dy, xerr=xerr, fmt="o", mec="black", mfc=markercolor, capsize=0)
         axis.grid(True)
         if removeslope:
