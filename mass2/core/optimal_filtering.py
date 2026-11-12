@@ -453,7 +453,7 @@ class Filter1Lag(Filter):
         assert nsamp == len(self.values)
         dotproduct = x @ self.values
 
-        peak_x = np.zeros_like(x)
+        peak_x = np.zeros_like(dotproduct)
         peak_y = dotproduct
         return peak_y, peak_x
 
