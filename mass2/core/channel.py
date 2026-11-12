@@ -31,7 +31,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
 from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep, ChangeTimeZoneStep
 from .noise_channel import NoiseChannel
 
 _local_timezone_name = tzlocal.get_localzone_name()
@@ -866,13 +866,16 @@ class Channel:
 
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
+        existing = set(step.output) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"step outputs {sorted(existing)} already exist")
         t_start = time.time()
         df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
             df=df2,
-            good_expr=step.good_expr,
+            good_expr=self.good_expr if isinstance(step, ChangeTimeZoneStep) else step.good_expr,
             df_history=self.df_history + [self.df],
             steps=self.steps.with_step(step),
             steps_elapsed_s=self.steps_elapsed_s + [elapsed_s],

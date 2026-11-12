@@ -652,6 +652,24 @@ def test_change_time_zone():
     assert ch.df["timestamp"].dtype != df2["timestamp"].dtype
 
 
+def test_change_time_zone_keeps_good_expr():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    ch = mass2.Channel.from_ljh(str(p.pulse_folder / "20230626_run0001_chan4109.ljh"), max_pulses=200).summarize_pulses()
+    ch = ch.with_good_expr(pl.col("pretrig_rms") < pl.col("pretrig_rms").median())
+    n_good = len(ch.good_df(["pretrig_rms"]))
+    assert n_good < len(ch.df)
+    ch2 = ch.with_step(mass2.core.ChangeTimeZoneStep.new("Pacific/Fiji"))
+    assert len(ch2.good_df(["pretrig_rms"])) == n_good
+
+
+def test_replay_after_good_expr_replaced_by_true():
+    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_good_expr(pl.col("x") > 5)
+    ch = ch.with_column_map_step("x", "a", lambda v: 2 * v).with_good_expr(pl.lit(True), replace=True)
+    ch = ch.with_column_map_step("x", "b", lambda v: 3 * v)
+    replayed = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_steps(ch.steps)
+    assert len(replayed.good_df()) == len(ch.good_df()) == 10
+
+
 def test_experiment_state_naive_channel_timestamps():
     t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
     ch = dummy_channel(npulses=10).with_columns(timestamp=t)
