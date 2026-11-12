@@ -21,6 +21,18 @@ def test_ljh_to_polars():
     _df, _header_df = ljh.to_polars()
 
 
+def test_transform_raw_applies_to_noise():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = p.pulse_folder / "20230626_run0001_chan4102.ljh"
+    noise_path = p.noise_folder / "20230626_run0000_chan4102.ljh"
+    v_over_dv = []
+    for transform in (None, lambda raw: 2.0 * np.asarray(raw, dtype=float)):
+        ch = mass2.Channel.from_ljh(pulse_path, noise_path, max_pulses=2000, transform_raw=transform)
+        ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv().filter5lag(f_3db=10e3)
+        v_over_dv.append(ch.last_v_over_dv)
+    assert v_over_dv[1] == pytest.approx(v_over_dv[0], rel=1e-6)
+
+
 def dummy_dataframe(npulses: int) -> pl.DataFrame:
     """Generate a dataframe with `npulses` rows. The Python API requires keeping a column in it, or it will
     have zero rows."""
