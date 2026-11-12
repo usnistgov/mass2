@@ -9,6 +9,7 @@ import numpy as np
 import pylab as plt
 import polars as pl
 import dill
+import os
 import pathlib
 import subprocess
 import sys
@@ -101,15 +102,15 @@ def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
     d = np.diff(x)
     step_size = float(d[0])
     assert np.allclose(d, step_size, atol=1e-9), f"{d=}"
-    return x[:-1] + step_size, step_size
+    return x[:-1] + 0.5 * step_size, step_size
 
 
 def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, NDArray]:
     """Return the bin centers and counts of a histogram of the given Series using the given bin edges."""
     bin_edges = np.asarray(bin_edges)
     bin_centers, _ = midpoints_and_step_size(bin_edges)
-    counts = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
-    return bin_centers, counts.to_numpy().T[0]
+    counts, _ = np.histogram(series.drop_nulls().to_numpy(), bin_edges)
+    return bin_centers, counts
 
 
 def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes | None = None, **plotkwarg: dict) -> plt.Axes:
@@ -119,7 +120,7 @@ def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes 
         axis = plt.gca()
     bin_edges = np.asarray(bin_edges)
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    hist = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
+    hist, _ = np.histogram(series.drop_nulls().to_numpy(), bin_edges)
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
@@ -141,7 +142,7 @@ def launch_examples() -> None:
     """Launch marimo edit in the examples folder."""
     examples_folder = pathlib.Path(__file__).parent.parent.parent / "examples"
     # use relative path to avoid this bug: https://github.com/marimo-team/marimo/issues/1895
-    examples_folder_relative = str(examples_folder.relative_to(pathlib.Path.cwd()))
+    examples_folder_relative = os.path.relpath(examples_folder, pathlib.Path.cwd())
     # Prepare the command
     command = ["marimo", "edit", examples_folder_relative] + sys.argv[1:]
 
@@ -189,14 +190,13 @@ def merge_dicts_ordered_by_keys(dict1: dict[int, Any], dict2: dict[int, Any]) ->
 def concat_dfs_with_concat_state(df1: pl.DataFrame, df2: pl.DataFrame, concat_state_col: str = "concat_state") -> pl.DataFrame:
     """Concatenate two DataFrames vertically, adding a column `concat_state` (or named according to `concat_state_col`)
     to indicate which DataFrame each row came from."""
-    if concat_state_col in df1.columns:
-        # Continue incrementing from the last known concat_state
-        max_state = df1[concat_state_col][-1]
-        df2 = df2.with_columns(pl.lit(max_state + 1).alias(concat_state_col))
-    else:
-        # Fresh concat: label first as 0, second as 1
+    if concat_state_col not in df1.columns:
         df1 = df1.with_columns(pl.lit(0).alias(concat_state_col))
-        df2 = df2.with_columns(pl.lit(1).alias(concat_state_col))
+    next_state = df1.select(pl.col(concat_state_col).max().fill_null(0) + 1).item()
+    if concat_state_col in df2.columns:
+        df2 = df2.with_columns(pl.col(concat_state_col) - pl.col(concat_state_col).min() + next_state)
+    else:
+        df2 = df2.with_columns(pl.lit(next_state).alias(concat_state_col))
 
     df_out = pl.concat([df1, df2], how="vertical")
     return df_out
@@ -359,7 +359,7 @@ class PulseDataFromNumpy(PulseDataFramer):
         return pl.DataFrame({"pulse": self.pulses[s]})
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return pl.DataFrame({"pulse": self.pulses[id]})
+        return pl.DataFrame({"pulse": self.pulses[[id]]})
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
         return pl.DataFrame({"pulse": self.pulses[list(ids)]})

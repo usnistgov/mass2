@@ -142,7 +142,7 @@ class NISTXrayDBFile:
         files downloaded using NISTXrayDBRetrieve. If the list is empty (the
         default), then the file named by self.DEFAULT_FILENAME will be used."""
 
-        self.lines = {}
+        self.lines: dict[str, NISTXrayLine] = {}
         self.alllines = set()
 
         if not filenames:
@@ -159,13 +159,15 @@ class NISTXrayDBFile:
 
             while True:
                 line = fp.readline()
-                if "Theory" in line and "Blend" in line and "Ref." in line:
+                if not line or ("Theory" in line and "Blend" in line and "Ref." in line):
                     break
 
             for textline in fp.readlines():
                 try:
                     xrayline = NISTXrayLine(textline)
-                    self.lines[xrayline.name] = xrayline
+                    old = self.lines.get(xrayline.name)
+                    if old is None or xrayline.peak_unc < old.peak_unc:
+                        self.lines[xrayline.name] = xrayline
                     self.alllines.add(xrayline)
                 except Exception:
                     continue
@@ -198,7 +200,7 @@ class NISTXrayDBFile:
             linetype = linetype.replace("BETA", "B")
         elif "GAMMA" in linetype:
             linetype = linetype.replace("GAMMA", "G")
-        linetype = self.LINE_NICKNAMES.get(linetype, linetype)
+        linetype = {k.upper(): v for k, v in self.LINE_NICKNAMES.items()}.get(linetype, linetype)
         lines = []
         for element in ELEMENTS:
             linename = f"{element} {linetype}"
@@ -230,12 +232,10 @@ class NISTXrayDBFile:
         key = f"{element} {line}"
         if key in self.lines:
             return self.lines[key]
-        lcline = line.lower()
-        lcline = lcline.replace("alpha", "a")
-        lcline = lcline.replace("beta", "b")
-        lcline = lcline.replace("gamma", "g")
-        if lcline in self.LINE_NICKNAMES:
-            key = f"{element} {self.LINE_NICKNAMES[lcline]}"
+        nicknames = {k.upper(): v for k, v in self.LINE_NICKNAMES.items()}
+        line = line.replace("ALPHA", "A").replace("BETA", "B").replace("GAMMA", "G")
+        if line in nicknames:
+            key = f"{element} {nicknames[line]}"
             return self.lines[key]
         raise KeyError(f"{key} is not a known line or line nickname")
 

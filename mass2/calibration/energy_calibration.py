@@ -96,11 +96,9 @@ class EnergyCalibrationMaker:
         # First sort according to energy of the calibration point
         if not np.all(np.diff(self.energy) > 0):
             sortkeys = np.argsort(self.energy)
-            self.ph[:] = self.ph[sortkeys]
-            self.energy[:] = self.energy[sortkeys]
-            self.dph[:] = self.dph[sortkeys]
-            self.de[:] = self.de[sortkeys]
-            self.names[:] = [self.names[i] for i in sortkeys]
+            for f in ("ph", "energy", "dph", "de"):
+                object.__setattr__(self, f, np.asarray(getattr(self, f))[sortkeys])
+            object.__setattr__(self, "names", [self.names[i] for i in sortkeys])
 
         # Then confirm that the pulse heights are also in order
         order_ph = self.ph.argsort()
@@ -215,10 +213,10 @@ class EnergyCalibrationMaker:
             new_de = np.hstack((self.de, e_error))
             new_names = self.names + [name]
         else:  # Replace an existing calibration anchor point.
-            new_ph = self.ph.copy()
-            new_energy = self.energy.copy()
-            new_dph = self.dph.copy()
-            new_de = self.de.copy()
+            new_ph = self.ph.astype(float)
+            new_energy = self.energy.astype(float)
+            new_dph = self.dph.astype(float)
+            new_de = self.de.astype(float)
             new_names = self.names.copy()
             new_ph[update_index] = ph
             new_energy[update_index] = energy
@@ -243,6 +241,7 @@ class EnergyCalibrationMaker:
             _description_
         """
         anchors = np.asarray(anchors)
+        anchors = anchors[anchors > 0]
         # Prescription is 50 points up to lowest anchor (but exclude 0):
         x = [np.linspace(0, anchors.min(), 51)[1:]]
         # Then one points, plus one extra per 1% spacing between (and at) each anchor
@@ -319,7 +318,7 @@ class EnergyCalibrationMaker:
             """Replace negative uncertainties with the minimum non-negative uncertainty, or zero."""
             if not np.any(x < 0):
                 return x
-            target = max(0.0, x.min())
+            target = x[x >= 0].min() if np.any(x >= 0) else 0.0
             x = x.copy()
             x[x < 0] = target
             return x
@@ -392,7 +391,7 @@ class EnergyCalibrationMaker:
             else:
                 # Estimate spline uncertainties using slope of best-fit line
                 slope = np.polyfit(x, y, 1)[0]
-                dy = y * (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
+                dy = (((slope * x - 1) * dph / x) ** 2 + (de / self.energy) ** 2) ** 0.5
 
         else:
             raise ValueError(f"curvename='{curvename}' not recognized")
@@ -412,9 +411,9 @@ class EnergyCalibrationMaker:
         energy2ph = CubicSpline(E_samplepoints, ph_samplepoints)
 
         if approximate:
-            dspline = internal_spline.variance(ph_samplepoints) ** 0.5
+            dspline = internal_spline.variance(input_transform(ph_samplepoints)) ** 0.5
             if curvename == Curvetypes.LOGLOG:
-                de_samplepoints = dspline * internal_spline(input_transform(ph_samplepoints))
+                de_samplepoints = dspline * E_samplepoints
             elif curvename == Curvetypes.GAIN:
                 de_samplepoints = dspline * E_samplepoints**2 / ph_samplepoints
             elif curvename == Curvetypes.INVGAIN:
@@ -735,6 +734,8 @@ class EnergyCalibration:
         cal_group["de"] = self.de
         cal_group.attrs["curvetype"] = self.curvename.name
         cal_group.attrs["approximate"] = self.approximating
+        if self.curvename == Curvetypes.LOGLOG and len(self.ph) == 1:
+            cal_group.attrs["powerlaw"] = float(1 / np.squeeze(self.spline(np.log(self.ph[0]), der=1)))
 
     @staticmethod
     def load_from_hdf5(hdf5_group: h5py.Group, name: str) -> EnergyCalibration:
@@ -747,11 +748,11 @@ class EnergyCalibration:
             ctype = ctype.decode("utf-8")
         curvetype = Curvetypes[str(ctype)]
 
-        maker = EnergyCalibrationMaker(
-            cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], cal_group["name"][:]
-        )
+        names = [n.decode() for n in cal_group["name"][:]]
+        maker = EnergyCalibrationMaker(cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], names)
         approximate = cal_group.attrs["approximate"]
-        return maker.make_calibration(curvetype, approximate=approximate)
+        powerlaw = float(cal_group.attrs.get("powerlaw", 1.15))
+        return maker.make_calibration(curvetype, approximate=approximate, powerlaw=powerlaw)
 
     def plotgain(self, **kwargs: Any) -> None:
         """Plot the calibration curve as gain (PH/eV) vs pulse height."""
@@ -785,7 +786,7 @@ class EnergyCalibration:
         """Plot the calibration curve, with options."""
         # Plot smooth curve
         minph = float(self.ph.min()) * 0.9
-        maxph = float(self.ph.min()) * 1.1
+        maxph = float(self.ph.max()) * 1.1
         if min_energy is not None:
             minph = float(self.energy2ph(min_energy))
         if max_energy is not None:
@@ -845,7 +846,7 @@ class EnergyCalibration:
             if self.approximating:
                 dyplot = self.ph2uncertainty(phplot) / eplot
             y = np.log(gains)
-            ylabel = "Log Gain: log(eV/PH)"
+            ylabel = "Log Gain: log(PH/eV)"
             axis.set_title("Energy calibration curve, log gain")
         elif plottype == "loglog":
             yplot = np.log(eplot)
@@ -871,7 +872,9 @@ class EnergyCalibration:
             axis.plot(xplot, yplot - dyplot, color=color, alpha=0.35)
 
         # Plot and label cal points
-        dy = ((self.de / self.energy) ** 2 + (self.dph / self.ph) ** 2) ** 0.5 * y
+        dy = ((self.de / self.energy) ** 2 + (self.dph / self.ph) ** 2) ** 0.5
+        if plottype not in {"loggain", "loglog"}:
+            dy *= np.abs(y)
         axis.errorbar(x, y - slope * x, yerr=dy, xerr=xerr, fmt="o", mec="black", mfc=markercolor, capsize=0)
         axis.grid(True)
         if removeslope:

@@ -152,9 +152,10 @@ class BestAssignmentPfitGainResult:
         # and given that we've selected for well formed calibrations,
         # we know which root we want
         cba = self.pfit_gain.convert().coef
-        c, bb, a = cba * np.asarray(energy)
+        cba = np.pad(cba, (0, 3 - len(cba)))
+        c, bb, a = np.multiply.outer(cba, np.asarray(energy))
         b = bb - 1
-        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+        ph = 2 * c / (-b + np.sqrt(b**2 - 4 * a * c))
         return ph
 
     def _energy2ph_deg1(self, energy: ArrayLike) -> NDArray:
@@ -695,6 +696,7 @@ def eval_3peak_assignment_pfit_gain(
         return ph / gain
 
     cba = pfit_gain_3peak.convert().coef
+    cba = np.pad(cba, (0, 3 - len(cba)))
 
     def energy2ph(energy: NDArray) -> NDArray:
         "Invert the gain curve to convert energy to pulse height."
@@ -706,7 +708,7 @@ def eval_3peak_assignment_pfit_gain(
         # we know which root we want
         c, bb, a = cba * energy
         b = bb - 1
-        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+        ph = 2 * c / (-b + np.sqrt(b**2 - 4 * a * c))
         return ph
 
     predicted_ph = [energy2ph(_e) for _e in line_energies]
@@ -1036,7 +1038,7 @@ def learn_stepwise_cal(
     cal = mass2.calibration.EnergyCalibration.trivial_calibrator()
     for iteration, step in enumerate(plan):
         lines = step[0]
-        if isinstance(lines, str) or isinstance(lines, float) or isinstance(lines, int):
+        if isinstance(lines, (str, float, int, np.integer, np.floating)):
             lines = [lines]
         Npk = len(lines)
         energies: list[float] = []
@@ -1044,8 +1046,8 @@ def learn_stepwise_cal(
             if isinstance(L, str):
                 energies.append(mass2.STANDARD_FEATURES[L])
             else:
-                assert isinstance(L, float) or isinstance(L, int)
-                energies.append(L)
+                assert isinstance(L, (float, int, np.integer, np.floating))
+                energies.append(float(L))
         if step[1]:
             e = e[e > step[1]]
         if step[2]:
@@ -1055,8 +1057,8 @@ def learn_stepwise_cal(
         esort = np.argsort(energies)
         ipeaks = pfresult.inds_sorted_by_peak_height()[:Npk]
         ipeaks.sort()  # Sort by energy, not intensity
-        ipeaks = ipeaks[esort]  # Now resort to match the order of the energy values
-        linenames = [str(lines[i]) for i in esort]  # type: ignore
+        ipeaks = ipeaks[np.argsort(esort)]  # Now resort to match the order of the energy values
+        linenames = [str(L) for L in lines]
         peaks = pfresult.bin_centers[ipeaks]
         if iteration > 0:
             peaks = cal.energy2ph(peaks)

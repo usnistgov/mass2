@@ -238,7 +238,7 @@ def test_noise_autocorr():
     noise_ch = mass2.NoiseChannel(df_noise, header_df, frametime_s, PulseDataFromNumpy(noise_traces))
     assert len(noise_ch.df) == 250
     assert noise_ch.pulseframer is not None
-    assert len(noise_ch.pulseframer.load_raw_pulse(0)["pulse"]) == 500
+    assert noise_ch.pulseframer.load_raw_pulse(0)["pulse"].to_numpy().shape == (1, 500)
     noise_autocorr_mass = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
     assert len(noise_autocorr_mass) == 500
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
@@ -365,6 +365,12 @@ def test_concat_dfs_with_concat_state():
     assert df_concat["concat_state"].to_list() == [0] * 3 + [1] * 2
     df_concat2 = mass2.core.misc.concat_dfs_with_concat_state(df_concat, df2)
     assert df_concat2.shape == (7, 2)
+    df_concat3 = mass2.core.misc.concat_dfs_with_concat_state(df_concat.reverse(), df2)
+    assert df_concat3["concat_state"].to_list()[-2:] == [2, 2]
+    df_nested = mass2.core.misc.concat_dfs_with_concat_state(df2, df_concat)
+    assert df_nested["concat_state"].to_list() == [0] * 2 + [1] * 3 + [2] * 2
+    df_empty_first = mass2.core.misc.concat_dfs_with_concat_state(df1.clear(), df2)
+    assert df_empty_first["concat_state"].to_list() == [1] * 2
 
 
 def test_col_map_step():
@@ -684,3 +690,10 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_plot_hists_without_groups():
+    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0), state_label=pl.lit(None, dtype=pl.String))
+    edges = np.arange(11.0)
+    centers, counts = ch.plot_hists("x", edges, "state_label")
+    assert np.allclose(centers, edges[:-1] + 0.5) and counts == {}

@@ -7,7 +7,7 @@ import mass2.materials
 import pylab as plt
 
 
-found_xraydb = "xraydb" in mass2.materials.__dict__
+found_xraydb = "xraydb" in mass2.materials.efficiency_models.__dict__
 
 
 def test_dict():
@@ -39,6 +39,23 @@ def test_ensure_uncertain():
     assert d[1].std_dev == 0.1
     assert len(d) == 5
 
+    e = uncertainties_helpers.ensure_uncertain(2)
+    assert e.nominal_value == 2
+    assert e.std_dev == 2
+    f = uncertainties_helpers.with_fractional_uncertainty(np.int64(100), 0.03)
+    assert f.nominal_value == 100
+    assert f.std_dev == 3
+
+    g = uncertainties_helpers.ensure_uncertain(np.float32(2.0))
+    assert g.nominal_value == 2
+    assert g.std_dev == 2
+    h = uncertainties_helpers.with_fractional_uncertainty(np.float32(100.0), 0.5)
+    assert h.nominal_value == 100
+    assert h.std_dev == 50
+
+    mixed = np.array([100.0, uncertainties.ufloat(200, 10)], dtype=object)
+    assert uncertainties_helpers.ensure_uncertain(mixed) is mixed
+
 
 def test_filter():
     """Make sure we can compute composite filter QE and that results are reasonable."""
@@ -56,24 +73,26 @@ def test_filter():
     def remove_whitespace(s):
         for k in " \n\r\t":
             s = s.replace(k, "")
+        return s
 
     expect = """<class 'mass2.materials.efficiency_models.FilterStack'>(
-Electroplated Au Absorber: <class 'mass2.materials.efficiency_models.Film'>
-    (Au 0.00186+/-0.00186 g/cm^2, fill_fraction=1.000+/-0, absorber=True)
-50mK Filter: <class 'mass2.materials.efficiency_models.AlFilmWithOxide'>(Al 0.00135+/-0.00135 g/cm^2,
-    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-1.000, absorber=False)
-3K Filter: <class 'mass2.materials.efficiency_models.AlFilmWithOxide'>(Al 0.00135+/-0.00135 g/cm^2,
-    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-1.000, absorber=False)
-50K Filter: <class 'mass2.materials.efficiency_models.AlFilmWithOxide'>(Al 0.00343+/-0.00343 g/cm^2,
-    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-1.000, absorber=False)
-Luxel Window TES: <class 'mass2.materials.efficiency_models.LEX_HT'>(
-    LEX_HT Film: <class 'mass2.materials.efficiency_models.Film'>(C (6.70+/-0.20)e-05 g/cm^2,
+Electroplated Au Absorber: <class 'mass2.materials.efficiency_models.Filter'>
+    (Au 0.00186+/-0.00186 g/cm^2, fill_fraction=1.000+/-0.000, absorber=True)
+50mK Filter: <class 'mass2.materials.efficiency_models.Filter'>(Al 0.00135+/-0.00135 g/cm^2,
+    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-0.000, absorber=False)
+3K Filter: <class 'mass2.materials.efficiency_models.Filter'>(Al 0.00135+/-0.00135 g/cm^2,
+    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-0.000, absorber=False)
+50K Filter: <class 'mass2.materials.efficiency_models.Filter'>(Al 0.00343+/-0.00343 g/cm^2,
+    Al (1.27+/-1.27)e-06 g/cm^2, O (1.13+/-1.13)e-06 g/cm^2, fill_fraction=1.000+/-0.000, absorber=False)
+Luxel Window TES: <class 'mass2.materials.efficiency_models.FilterStack'>(
+    LEX_HT Film: <class 'mass2.materials.efficiency_models.Filter'>(C (6.70+/-0.20)e-05 g/cm^2,
         H (2.60+/-0.08)e-06 g/cm^2, N (7.20+/-0.22)e-06 g/cm^2, O (1.70+/-0.05)e-05 g/cm^2,
-        Al (1.70+/-0.05)e-05 g/cm^2, fill_fraction=1.000+/-0, absorber=False)
-    LEX_HT Mesh: <class 'mass2.materials.efficiency_models.Film'>(Fe 0.0564+/-0.0011 g/cm^2,
+        Al (1.70+/-0.05)e-05 g/cm^2, fill_fraction=1.000+/-0.000, absorber=False)
+    LEX_HT Mesh: <class 'mass2.materials.efficiency_models.Filter'>(Fe 0.0564+/-0.0011 g/cm^2,
         Cr 0.0152+/-0.0003 g/cm^2, Ni 0.00720+/-0.00014 g/cm^2, Mn 0.000800+/-0.000016 g/cm^2,
         Si 0.000400+/-0.000008 g/cm^2, fill_fraction=0.190+/-0.010, absorber=False)
-))"""
+)
+)"""
     assert remove_whitespace(repr(m)) == remove_whitespace(expect)
 
     x = np.linspace(1000, 10000, 100)

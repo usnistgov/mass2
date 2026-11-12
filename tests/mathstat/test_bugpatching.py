@@ -2,7 +2,7 @@ import numpy as np
 import pylab as plt
 
 
-def TestNumpyHistogramPrecisionBug():
+def test_numpy_histogram_precision_bug():
     """There was a bug in numpy 1.13 (and earlier?) that can arise when
     one passes float32 data to np.histogram, and a value is just below the
     lowest bin edge but appears to be equal to the edge if tested as a float32.

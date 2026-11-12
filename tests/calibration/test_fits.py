@@ -179,6 +179,7 @@ class Test_gaussian_basic:
 
     def generate_data(self, N, fwhm=1.0, ctr=0.0, nbins=100, expected_bg=0):
         n_signal = rng.poisson(N)
+        self.n_signal = n_signal
         n_bg = rng.poisson(expected_bg)
 
         data = rng.standard_normal(size=n_signal) * fwhm / np.sqrt(8 * np.log(2))
@@ -211,13 +212,13 @@ class Test_gaussian_basic:
 
             assert result.params["fwhm"] == approx(fwhm, rel=5 / N**0.5)
             assert result.params["peak_ph"] == approx(ctr, abs=3 * fwhm / N**0.5)
-            assert result.params["integral"] == approx(N, abs=3 * N**0.5)
+            assert result.params["integral"] == approx(self.n_signal, abs=3 * N**0.5)
             assert result.params["fwhm"].stderr < 2 * fwhm / N**0.5
             assert result.params["peak_ph"].stderr < 2 * fwhm / N**0.5
             assert result.params["integral"].stderr < 2 * N**0.5
             if N_bg > 0:
-                assert result.params["background"] == approx(N_bg / nbins, abs=10 * N**0.5)
-                assert result.params["background"].stderr < 10 * N**0.5
+                assert result.params["background"] == approx(N_bg / nbins, abs=1.0)
+                assert result.params["background"].stderr < 0.5
 
     def test_gauss(self):
         "Run 30 fits apiece with 3 background levels; verify consistent parameters"
@@ -257,8 +258,8 @@ class Test_Gaussian:
         result = self.model.fit(self.y, self.params, bin_centers=self.x)
         param = result.best_values
         assert result.success
-        assert param["fwhm"] == approx(self.fwhm, abs=1)
-        assert param["peak_ph"] == approx(self.center, abs=1)
+        assert param["fwhm"] == approx(self.fwhm, rel=1e-3)
+        assert param["peak_ph"] == approx(self.center, abs=1e-3)
         assert param["integral"] == approx(self.integral, abs=1)
 
     def test_fit_offset(self):
@@ -266,8 +267,8 @@ class Test_Gaussian:
         result = self.model.fit(self.y, self.params, bin_centers=self.x - self.center)
         param = result.best_values
         assert result.success
-        assert param["fwhm"] == approx(self.fwhm, abs=1)
-        assert param["peak_ph"] == approx(0, abs=1)
+        assert param["fwhm"] == approx(self.fwhm, rel=1e-3)
+        assert param["peak_ph"] == approx(0, abs=1e-3)
         assert param["integral"] == approx(self.integral, abs=1)
 
     def test_fit_zero_bg(self):
@@ -276,8 +277,8 @@ class Test_Gaussian:
         result = self.model.fit(self.y, self.params, bin_centers=self.x)
         param = result.best_values
         assert result.success
-        assert param["fwhm"] == approx(self.fwhm, abs=1)
-        assert param["peak_ph"] == approx(self.center, abs=1)
+        assert param["fwhm"] == approx(self.fwhm, rel=1e-3)
+        assert param["peak_ph"] == approx(self.center, abs=1e-3)
         assert param["integral"] == approx(self.integral, abs=1)
 
     def test_negative_background_issue126(self):
@@ -325,7 +326,7 @@ class TestMnKA_fitter:
         # histogram
         counts, _ = np.histogram(values, bin_edges)
         if bg > 0:
-            counts += rng.poisson(lam=bg, size=len(counts))
+            counts += self.rng.poisson(lam=bg, size=len(counts))
         bin_width = bin_edges[1] - bin_edges[0]
         bin_centers = 0.5 * bin_width + bin_edges[:-1]
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
@@ -344,7 +345,7 @@ class TestMnKA_fitter:
             "peak_ph": (line.peak_energy + shift_peak_ev, 3.3 * n**-0.5),
             "integral": (n, n**0.5),
             "bg_slope": (0, 0.5),
-            "background": (bg, 60 * n**-0.5),
+            "background": (bg, max(bg, 4) ** 0.5 / 7),
         }
         for param_name, (expected_value, expected_error) in expect.items():
             inflated_error = expected_error
@@ -353,7 +354,7 @@ class TestMnKA_fitter:
             if vary_bg_slope:  # we really want to increase all allowed errors if bg slope is varied?
                 inflated_error *= 10
 
-            if not vary_bg_slope and not param_name.startswith("b"):
+            if expect_good_redchi:
                 assert expected_value == approx(result.params[param_name].value, abs=2 * inflated_error)
             if not vary_tail and not vary_bg_slope and not param_name.startswith("b"):
                 assert expected_error == approx(result.params[param_name].stderr, abs=0.5 * inflated_error)
@@ -386,9 +387,7 @@ def test_MnKA_float32():
     params = model.guess(sim, bin_centers=bctr, dph_de=1)
     params["peak_ph"].set(value=5899)
     result = model.fit(sim, params, bin_centers=bctr)
-    val1 = params["peak_ph"].value
-    val2 = result.params["peak_ph"].value
-    assert val1 != approx(val2, abs=0.1)
+    assert result.params["peak_ph"].value == approx(line.peak_energy, abs=0.1)
 
 
 def test_MnKA_narrowbins():
@@ -565,11 +564,13 @@ def test_BackgroundMLEModel():
     test_background = 127.3
     test_background_error = np.sqrt(test_background)
     test_bg_slope = 0.17
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(4589)
     y_data = np.zeros_like(x_data) + test_background + rng.normal(scale=test_background_error, size=len(x_data))
     y_data += test_bg_slope * np.arange(len(x_data))
     y_data[y_data < 0] = 0
-    test_model.fit(y_data, test_params, bin_centers=x_data)
+    result = test_model.fit(y_data, test_params, bin_centers=x_data)
+    assert result.params["p1_background"].value == approx(test_background, abs=4 * result.params["p1_background"].stderr)
+    assert result.params["p1_bg_slope"].value == approx(test_bg_slope, abs=4 * result.params["p1_bg_slope"].stderr)
 
 
 def test_negatives():
