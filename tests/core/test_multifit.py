@@ -125,6 +125,17 @@ def test_quadratic_gain_energy2ph_nearly_linear(a):
         assert step.ph2energy(ph) == pytest.approx(energy, rel=1e-13)
 
 
+def test_to_pfit_gain_two_lines_is_linear(monkeypatch):
+    monkeypatch.setattr(mass2.calibration.line_models, "VALIDATE_BIN_SIZE", False)
+    rng = np.random.default_rng(1)
+    e = np.hstack([mass2.spectra[name].rvs(5000, 4, rng=rng) for name in ("MnKAlpha", "CuKAlpha")])
+    mf = mass2.MultiFit(default_fit_width=80, default_bin_size=0.5).with_line("MnKAlpha").with_line("CuKAlpha")
+    mf = mf.fit_series_without_use_expr(pl.Series("energy_rough", e))
+    pfit_gain, _ = mf.to_pfit_gain(lambda x: 2.0 * np.asarray(x))
+    assert pfit_gain.convert().degree() <= 1
+    assert pfit_gain(np.array([14000.0, 24000.0])) == pytest.approx(2.0, rel=1e-3)
+
+
 @pytest.mark.parametrize("method", ["multifit_mass_cal", "multifit_quadratic_gain_cal"])
 def test_multifit_cal_applies_use_expr(monkeypatch, method):
     monkeypatch.setattr(mass2.calibration.line_models, "VALIDATE_BIN_SIZE", False)

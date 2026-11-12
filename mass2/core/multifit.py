@@ -209,14 +209,14 @@ class MultiFit:
         return axes
 
     def to_pfit_gain(self, previous_energy2ph: Callable) -> tuple[np.polynomial.Polynomial, float]:
-        """Return a best-fit 2nd degree polynomial for gain (ph/energy) vs uncalibrated ph,
+        """Return a best-fit polynomial of degree min(number of lines - 1, 2) for gain (ph/energy) vs uncalibrated ph,
         and the rms residual in energy after applying that gain correction."""
         multifit_df = self.results_params_as_df()
         peaks_in_energy_rough_cal = multifit_df["peak_ph"].to_numpy()
         peaks_uncalibrated = np.array([previous_energy2ph(e) for e in peaks_in_energy_rough_cal]).ravel()
         peaks_in_energy_reference = multifit_df["peak_energy_ref"].to_numpy()
         gain = peaks_uncalibrated / peaks_in_energy_reference
-        pfit_gain = np.polynomial.Polynomial.fit(peaks_uncalibrated, gain, deg=2)
+        pfit_gain = np.polynomial.Polynomial.fit(peaks_uncalibrated, gain, deg=min(len(gain) - 1, 2))
 
         def ph2energy(ph: NDArray) -> NDArray:
             "Given an array `ph` of pulse heights, return the corresponding energies as an array."
