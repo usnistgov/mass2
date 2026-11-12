@@ -320,13 +320,13 @@ class Channel:
 
         # Plot a histogram for each group
         counts_dict: dict[str, NDArray] = {}
+        bin_centers, step_size = misc.midpoints_and_step_size(bin_edges)
         for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
-            _, step_size = misc.midpoints_and_step_size(bin_edges)
-            bin_centers, counts = misc.hist_of_series(values, bin_edges)
+            _, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
             ax.step(bin_centers, counts, where="mid", label=group_name_str)
@@ -1872,12 +1872,12 @@ class Channel:
         use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
-            downsample = self.npulses // 10000
+            downsample = -(-self.npulses // 10000)
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
         df = df.with_columns(
-            ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
+            ((pl.col("peak_index").cast(pl.Int64) - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
             (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
 

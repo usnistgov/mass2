@@ -690,3 +690,10 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_plot_hists_without_groups():
+    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0), state_label=pl.lit(None, dtype=pl.String))
+    edges = np.arange(11.0)
+    centers, counts = ch.plot_hists("x", edges, "state_label")
+    assert np.allclose(centers, edges[:-1] + 0.5) and counts == {}
