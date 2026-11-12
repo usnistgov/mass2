@@ -455,6 +455,17 @@ def test_filtering_steps():
     assert np.allclose(ch.df["1lagx"].to_numpy().mean(), 0)
 
 
+def test_filter_output_not_replaced_by_peak_columns():
+    t = np.arange(-25, 25)
+    signal = 10000 * (np.exp(-t / 12.0) - np.exp(-t / 3.0))
+    signal[t < 0] = 0
+    ch = dummy_channel(npulses=100, signal=signal)
+    ref = ch.filter1lag(f_3db=20000)
+    ch = ch.filter5lag(f_3db=20000, peak_x_col="peak_x", peak_y_col="peak_y").filter1lag(f_3db=20000)
+    assert np.array_equal(ch.df["1lagy"].to_numpy(), ref.df["1lagy"].to_numpy())
+    assert "peak_y" in ch.df.columns
+
+
 def test_categorize_step():
     ch = dummy_channel(npulses=10)
     n = len(ch.df)
