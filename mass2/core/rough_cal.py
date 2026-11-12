@@ -302,7 +302,7 @@ class SmoothedLocalMaximaResult:
 def smooth_hist_with_gauassian_by_fft(hist: ndarray, fwhm_in_bin_number_units: float) -> ndarray:
     """Smooth a histogram by convolution with a Gaussian, using FFTs."""
     kernel = smooth_hist_with_gauassian_by_fft_compute_kernel(len(hist), fwhm_in_bin_number_units)
-    y = np.fft.irfft(np.fft.rfft(hist) * kernel)
+    y = np.fft.irfft(np.fft.rfft(hist) * kernel, n=len(hist))
     return y
 
 

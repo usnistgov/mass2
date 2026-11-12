@@ -131,6 +131,7 @@ class TestToeplitzSolver_512:
 
 
 def test_triangular_toeplitz():
+    rng = np.random.default_rng(6823)
     N = 40
     nvec = 10
     vec = rng.standard_exponential(N)
@@ -230,3 +231,23 @@ def test_symmetric_toep():
 
     X = S.solve(B)
     assert np.allclose(B, S @ X)
+
+
+def test_symmetric_toep_complex_and_int_vectors():
+    r = np.array([4.0, 2.0, 1.0, 0.5, 0.2])
+    S = SymmetricToeplitz.fromFirstCol(r)
+    R = linalg.toeplitz(r)
+    x = np.arange(5) + 1j * np.arange(5, 10)
+    assert np.allclose(S @ x, R @ x)
+    assert np.allclose(S @ x, S.tomatrix() @ x)
+    xi = np.arange(5)
+    y = S @ xi
+    assert y.dtype == np.float64
+    assert np.allclose(y, R @ xi)
+
+
+def test_unsigned_matmul():
+    r = np.array([300, 200, 100], dtype=np.uint16)
+    rf = r.astype(float)
+    assert np.allclose(SymmetricToeplitz.fromFirstCol(r) @ r, linalg.toeplitz(rf) @ rf)
+    assert np.allclose(UpperTriangularToeplitz(r) @ r, np.triu(linalg.toeplitz(rf)) @ rf)

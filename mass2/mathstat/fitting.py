@@ -53,14 +53,14 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     ValueError
         if k doesn't satisfy x.min() < k < x.max()
     """
-    x = np.asarray(x)
+    x = np.asarray(x, dtype=float)
     y = np.asarray(y)
     xi = x[x < k]
     yi = y[x < k]
     xj = x[x >= k]
     yj = y[x >= k]
     N = len(x)
-    if len(xi) == 0 or len(xj) == 0:
+    if len(xi) == 0 or len(xj) == 0 or not (x.min() < k < x.max()):
         xmin = x.min()
         xmax = x.max()
         raise ValueError(f"k={k:g} should be in range [xmin,xmax], or [{xmin:g},{xmax:g}].")
@@ -74,7 +74,7 @@ def kink_model(k: float, x: ArrayLike, y: ArrayLike) -> tuple[NDArray, NDArray, 
     A = np.array([[N, si, sj], [si, si2, 0], [sj, 0, sj2]])
     v = np.array([y.sum(), (yi * dxi).sum(), (yj * dxj).sum()])
     abc = np.linalg.solve(A, v)
-    model = np.hstack([abc[0] + abc[1] * dxi, abc[0] + abc[2] * dxj])
+    model = np.where(x < k, abc[0] + abc[1] * (x - k), abc[0] + abc[2] * (x - k))
     X2 = ((model - y) ** 2).sum()
     return model, abc, X2
 

@@ -151,7 +151,9 @@ class UpperTriangularToeplitz:
         Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
         """
         assert len(vec) == self.N
-        return correlate(vec, self.toprow, mode="full", method="fft")[self.N - 1 :]
+        toprow = np.asarray(self.toprow)
+        dt = np.result_type(vec, toprow, float)
+        return correlate(vec.astype(dt), toprow.astype(dt), mode="full", method="fft")[self.N - 1 :]
 
     def _matmul(self, other: np.ndarray) -> np.ndarray:
         """Implement the `self @ other` syntax, taking the dot product of self with a matrix `other`.
@@ -341,11 +343,13 @@ class SymmetricToeplitz:
         Not for API use, as it assumes `x` is already checked for being 1-dimensional and is a np.ndarray.
         """
         N = len(x)
-        y = np.zeros_like(x)
-        y[0] = self.firstcol @ x
+        dt = np.result_type(self.firstcol, x, float)
+        fc, x = self.firstcol.astype(dt), x.astype(dt)
+        y = np.zeros(N, dtype=dt)
+        y[0] = fc @ x
         for i in range(1, N):
-            y[i] = self.firstcol[:-i] @ x[i:]
-            y[i] += self.firstcol[1 : 1 + i] @ x[i - 1 :: -1]
+            y[i] = fc[:-i] @ x[i:]
+            y[i] += fc[1 : 1 + i] @ x[i - 1 :: -1]
         return y
 
     def solve(self, other: ArrayLike) -> np.ndarray:
@@ -550,7 +554,7 @@ class ToeplitzSolver:
         x = np.asarray(x)
         N = len(x)
         assert N == self.n
-        y = np.zeros_like(x)
+        y = np.zeros_like(x, dtype=float)
         y[0] = self.T @ x
         for i in range(1, N):
             y[i] = self.T[:-i] @ x[i:]

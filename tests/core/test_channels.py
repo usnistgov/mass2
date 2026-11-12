@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.signal
 import os
 import pytest
 import polars as pl
@@ -19,6 +20,18 @@ def test_ljh_to_polars():
     _df_noise, _header_df_noise = ljh_noise.to_polars()
     ljh = mass2.LJHFile.open(p.pulse_folder / "20230626_run0001_chan4102.ljh")
     _df, _header_df = ljh.to_polars()
+
+
+def test_transform_raw_applies_to_noise():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = p.pulse_folder / "20230626_run0001_chan4102.ljh"
+    noise_path = p.noise_folder / "20230626_run0000_chan4102.ljh"
+    v_over_dv = []
+    for transform in (None, lambda raw: 2.0 * np.asarray(raw, dtype=float)):
+        ch = mass2.Channel.from_ljh(pulse_path, noise_path, max_pulses=2000, transform_raw=transform)
+        ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv().filter5lag(f_3db=10e3)
+        v_over_dv.append(ch.last_v_over_dv)
+    assert v_over_dv[1] == pytest.approx(v_over_dv[0], rel=1e-6)
 
 
 def dummy_dataframe(npulses: int) -> pl.DataFrame:
@@ -295,7 +308,9 @@ def test_noise_psd():
     psd = noise_ch.spectrum()
     assert len(psd.frequencies) == 251
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
-    assert np.allclose(psd_raw.psd, psd.psd)
+    psd_discontinuous = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
+    assert np.allclose(psd_discontinuous.psd, psd.psd)
+    assert np.allclose(psd_discontinuous.psd[1:-1], expect[1:-1], atol=0.15)
 
 
 def test_get_pulses_2d():
@@ -438,6 +453,17 @@ def test_filtering_steps():
     for field in ("5lagy", "5lagx", "1lagy", "ats_x", "ats_y"):
         assert not (np.allclose(ch.df[field].to_numpy().mean(), 0))
     assert np.allclose(ch.df["1lagx"].to_numpy().mean(), 0)
+
+
+def test_filter_output_not_replaced_by_peak_columns():
+    t = np.arange(-25, 25)
+    signal = 10000 * (np.exp(-t / 12.0) - np.exp(-t / 3.0))
+    signal[t < 0] = 0
+    ch = dummy_channel(npulses=100, signal=signal)
+    ref = ch.filter1lag(f_3db=20000)
+    ch = ch.filter5lag(f_3db=20000, peak_x_col="peak_x", peak_y_col="peak_y").filter1lag(f_3db=20000)
+    assert np.array_equal(ch.df["1lagy"].to_numpy(), ref.df["1lagy"].to_numpy())
+    assert "peak_y" in ch.df.columns
 
 
 def test_categorize_step():
@@ -684,3 +710,12 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_noise_psd_discontinuous_records_not_straddled():
+    """Discontinuous records with different baselines must not leak steps into the PSD."""
+    rng = np.random.default_rng(2)
+    traces = rng.standard_normal((400, 64)) + rng.normal(0, 5, (400, 1))
+    result = mass2.core.noise_algorithms.calc_noise_result(traces, continuous=False, dt=0.5)
+    _, periodogram = scipy.signal.periodogram(traces, fs=2.0, axis=-1, detrend=False)
+    assert np.allclose(result.psd[1:-1], periodogram.mean(axis=0)[1:-1])

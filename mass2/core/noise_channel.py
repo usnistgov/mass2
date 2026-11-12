@@ -3,6 +3,7 @@ Hold a class to represent a channel with noise data only, and to analyze its noi
 """
 
 from typing import Any
+from collections.abc import Callable
 from numpy.typing import NDArray
 from pathlib import Path
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ class NoiseChannel:
     header_df: pl.DataFrame  # DO NOT MUTATE THIS!!
     frametime_s: float
     pulseframer: PulseDataFramer | None = None
+    transform_raw: Callable | None = None
 
     # @functools.cache
     def calc_max_excursion(
@@ -34,6 +36,8 @@ class NoiseChannel:
 
         assert self.pulseframer is not None
         noise_traces = self.pulseframer.load_raw_chunk(0, n_limit)[trace_col_name]
+        if self.transform_raw is not None:
+            noise_traces = pl.Series(trace_col_name, self.transform_raw(noise_traces.to_numpy()))
         excursion = excursion2d(noise_traces.to_numpy())
         max_excursion = mass2.misc.outlier_resistant_nsigma_above_mid(excursion, nsigma=excursion_nsigma)
         df_noise2 = self.df.limit(n_limit).with_columns(excursion=excursion).with_columns(noise_traces)

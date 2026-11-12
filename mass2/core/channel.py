@@ -591,7 +591,7 @@ class Channel:
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
         assert self.pulseframer is not None
-        test_df = self.pulseframer.load_raw_pulse(0)
+        test_df = self.pulseframer.load_raw_pulses([0])
         pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
@@ -658,15 +658,17 @@ class Channel:
         df = lf.select(("Record #", "pretrig_mean")).collect()
         idx = df["Record #"]
         ptmean = df["pretrig_mean"]
-        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field].to_numpy()
+        if self.transform_raw is not None:
+            pulses = self.transform_raw(pulses)
         N = len(idx)
         for i in range(N):
-            pulse = pulses[i].to_numpy()
+            pulse = pulses[i]
             color = cmap(i / N)
             if subtract_baseline:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
-                pulse = np.hstack((0, np.diff(pulse)))
+                pulse = np.hstack((0, np.diff(np.asarray(pulse, dtype=float))))
             axis.plot(sample_x, pulse, color=color)
         plot_zoomable()
 
@@ -1053,6 +1055,8 @@ class Channel:
         assert self.pulseframer is not None
         idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
+        if self.transform_raw is not None:
+            pulses = self.transform_raw(pulses)
         avg_pulse = pulses.mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
@@ -1112,7 +1116,8 @@ class Channel:
                 f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
             )
 
-        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        noise = replace(self.noise, transform_raw=self.transform_raw)
+        noiseresult = noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
         if not fourier:
             assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
             Nac = len(noiseresult.autocorr_vec)
@@ -1203,7 +1208,8 @@ class Channel:
                 f"Autocorrelation not computed for records exceeding {longest_autocorr_filter}; {suggest}"
             )
 
-        noiseresult = self.noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
+        noise = replace(self.noise, transform_raw=self.transform_raw)
+        noiseresult = noise.spectrum(skip_autocorr_if_length_over=longest_autocorr_filter)
         if not fourier:
             assert noiseresult.autocorr_vec is not None, f"Autocorrelation not computed; {suggest}"
             Nac = len(noiseresult.autocorr_vec)
@@ -1282,6 +1288,8 @@ class Channel:
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         idx = df["Record #"]
         pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
+        if self.transform_raw is not None:
+            pulse = self.transform_raw(pulse)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
@@ -1323,7 +1331,7 @@ class Channel:
         use = use_expr.and_(np.abs(pl.col("pulse_rms") / mprms - 1.0) < 0.3)
         limit = 4000
         avg_pulse, dt_model = self.compute_ats_model(pulse_col, use, limit)
-        noiseresult = self.noise.spectrum()
+        noiseresult = replace(self.noise, transform_raw=self.transform_raw).spectrum()
         filter_maker = FilterMaker(
             signal_model=avg_pulse,
             dt_model=dt_model,
@@ -1809,6 +1817,7 @@ class Channel:
             subframediv=self.subframediv,
             noise=self.noise,
             good_expr=self.good_expr,
+            transform_raw=self.transform_raw,
             pulseframer=combined_pulseframer,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
@@ -1925,7 +1934,10 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         assert self.pulseframer is not None
-        pulse = self.pulseframer.load_raw_pulse(index)[col].to_numpy()
+        pulse = self.pulseframer.load_raw_pulses([index])[col].to_numpy()
+        if self.transform_raw is not None:
+            pulse = self.transform_raw(pulse)
+        pulse = pulse[0]
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")
