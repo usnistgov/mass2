@@ -735,6 +735,8 @@ class EnergyCalibration:
         cal_group["de"] = self.de
         cal_group.attrs["curvetype"] = self.curvename.name
         cal_group.attrs["approximate"] = self.approximating
+        if self.curvename == Curvetypes.LOGLOG and len(self.ph) == 1:
+            cal_group.attrs["powerlaw"] = float(1 / np.squeeze(self.spline(np.log(self.ph[0]), der=1)))
 
     @staticmethod
     def load_from_hdf5(hdf5_group: h5py.Group, name: str) -> EnergyCalibration:
@@ -747,11 +749,11 @@ class EnergyCalibration:
             ctype = ctype.decode("utf-8")
         curvetype = Curvetypes[str(ctype)]
 
-        maker = EnergyCalibrationMaker(
-            cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], cal_group["name"][:]
-        )
+        names = [n.decode() for n in cal_group["name"][:]]
+        maker = EnergyCalibrationMaker(cal_group["ph"][:], cal_group["energy"][:], cal_group["dph"][:], cal_group["de"][:], names)
         approximate = cal_group.attrs["approximate"]
-        return maker.make_calibration(curvetype, approximate=approximate)
+        powerlaw = float(cal_group.attrs.get("powerlaw", 1.15))
+        return maker.make_calibration(curvetype, approximate=approximate, powerlaw=powerlaw)
 
     def plotgain(self, **kwargs: Any) -> None:
         """Plot the calibration curve as gain (PH/eV) vs pulse height."""
