@@ -48,7 +48,7 @@ class FitSpec:
         """Return a reasonable guess at the parameters given the spectrum to be fit."""
         params = self.model.make_params()
         params = self.model.guess(counts, bin_centers=bin_centers, dph_de=1)
-        params["dph_de"].set(1.0, vary=False)
+        params[self.model.prefix + "dph_de"].set(1.0, vary=False)
         params = params.update(self.params_update)
         return params
 
@@ -100,7 +100,7 @@ class MultiFit:
         params_update: lmfit.Parameters | None = None,
     ) -> "MultiFit":
         """Return a copy of this MultiFit with an additional FitSpec for the given line."""
-        model = get_model(line)
+        model = line if isinstance(line, GenericLineModel) else get_model(line)
         peak_energy = model.spect.peak_energy
         dlo = handle_none(dlo, self.default_fit_width / 2)
         dhi = handle_none(dhi, self.default_fit_width / 2)
@@ -124,8 +124,7 @@ class MultiFit:
     def results_params_as_df(self) -> pl.DataFrame:
         """Return a DataFrame made from the fit parameters from the results."""
         assert self.results is not None
-        result = self.results[0]
-        param_names = result.params.keys()
+        param_names = list(dict.fromkeys(k.removeprefix(r.model.prefix) for r in self.results for k in r.params))
         d: dict[str, list] = {}
         d["line"] = [fitspec.model.spect.shortname for fitspec in self.fitspecs]
         d["peak_energy_ref"] = [fitspec.model.spect.peak_energy for fitspec in self.fitspecs]
@@ -139,8 +138,9 @@ class MultiFit:
                 v = fitspec.model.spect.position_uncertainty
             d["peak_energy_ref_err"].append(v)
         for param_name in param_names:
-            d[param_name] = [result.params[param_name].value for result in self.results]
-            d[param_name + "_stderr"] = [result.params[param_name].stderr for result in self.results]
+            params = [r.params.get(r.model.prefix + param_name) for r in self.results]
+            d[param_name] = [None if p is None else float(p.value) for p in params]
+            d[param_name + "_stderr"] = [None if p is None or p.stderr is None else float(p.stderr) for p in params]
         return pl.DataFrame(d)
 
     def fit_series_without_use_expr(self, series: pl.Series) -> "MultiFit":
@@ -253,6 +253,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
     pfit_gain: np.polynomial.Polynomial
     multifit: MultiFit | None
     rms_residual_energy: float
+    previous_energy2ph: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calibrate energy and return a new DataFrame with results."""
@@ -265,13 +266,13 @@ class MultiFitQuadraticGainStep(RecipeStep):
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         """Plot the fit results and gain curve for debugging purposes."""
-        if self.multifit is not None:
-            self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.energy2ph)
+        if self.multifit is not None and self.previous_energy2ph is not None:
+            self.multifit.plot_results_and_pfit(uncalibrated_name=self.inputs[0], previous_energy2ph=self.previous_energy2ph)
         return plt.gca()
 
     def drop_debug(self) -> "MultiFitQuadraticGainStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return dataclasses.replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None, previous_energy2ph=None)
 
     def ph2energy(self, ph: ArrayLike) -> NDArray:
         "The quadratic gain calibration curve: ph -> energy"
@@ -322,6 +323,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
             pfit_gain,
             multifit_with_results,
             rms_residual_energy,
+            previous_cal_step.energy2ph,
         )
         return step
 
@@ -332,6 +334,7 @@ class MultiFitMassCalibrationStep(RecipeStep):
 
     cal: EnergyCalibration
     multifit: MultiFit | None
+    previous_energy2ph: Callable | None = None
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calibrate energy and return a new DataFrame with results."""
@@ -344,14 +347,15 @@ class MultiFitMassCalibrationStep(RecipeStep):
 
     def drop_debug(self) -> "MultiFitMassCalibrationStep":
         "For slimmer object pickling, return a copy of self with the fat debugging info removed"
-        return dataclasses.replace(self, multifit=None)
+        return dataclasses.replace(self, multifit=None, previous_energy2ph=None)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:
         "Plot the fit results and gain curve for debugging purposes."
         assert self.multifit is not None
+        assert self.previous_energy2ph is not None
         axes = self.multifit.plot_results_and_pfit(
             uncalibrated_name=self.inputs[0],
-            previous_energy2ph=self.energy2ph,
+            previous_energy2ph=self.previous_energy2ph,
         )
         return axes
 
@@ -390,5 +394,6 @@ class MultiFitMassCalibrationStep(RecipeStep):
             use_expr,
             cal,
             multifit_with_results,
+            previous_cal_step.energy2ph,
         )
         return step
