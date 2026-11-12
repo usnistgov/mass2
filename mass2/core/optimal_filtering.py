@@ -73,17 +73,17 @@ class ToeplitzWhitener:
     def __call__(self, v: ArrayLike) -> np.ndarray:
         "Return whitened vector (or matrix of column vectors) Wv"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be an array of dimension 1 or 2")
         elif v.ndim == 2:
-            w = np.zeros_like(v)
+            w = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 w[:, i] = self(v[:, i])
             return w
 
         # Multiply by the Toeplitz AR matrix to make the MA*w vector.
         N = len(v)
-        y = self.phi[0] * v
+        y = self.phi[0] * v.astype(float)
         for i in range(1, 1 + self.p):
             y[i:] += self.phi[i] * v[:-i]
 
@@ -96,7 +96,7 @@ class ToeplitzWhitener:
             for j in range(i):
                 y[i] -= y[j] * self.theta[i - j]
             y[i] /= self.theta[0]
-        for i in range(self.q, N):
+        for i in range(max(self.q, 1), N):
             for j in range(i - self.q, i):
                 y[i] -= y[j] * self.theta[i - j]
             y[i] /= self.theta[0]
@@ -105,17 +105,17 @@ class ToeplitzWhitener:
     def solveW(self, v: ArrayLike) -> np.ndarray:
         "Return unwhitened vector (or matrix of column vectors) inv(W)*v"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.solveW(v[:, i])
             return r
 
         # Multiply by the Toeplitz MA matrix to make the AR*w vector.
         N = len(v)
-        y = self.theta[0] * v
+        y = self.theta[0] * v.astype(float)
         for i in range(1, 1 + self.q):
             y[i:] += self.theta[i] * v[:-i]
 
@@ -128,7 +128,7 @@ class ToeplitzWhitener:
             for j in range(i):
                 y[i] -= y[j] * self.phi[i - j]
             y[i] /= self.phi[0]
-        for i in range(self.p, N):
+        for i in range(max(self.p, 1), N):
             for j in range(i - self.p, i):
                 y[i] -= y[j] * self.phi[i - j]
             y[i] /= self.phi[0]
@@ -137,16 +137,16 @@ class ToeplitzWhitener:
     def solveWT(self, v: ArrayLike) -> np.ndarray:
         "Return vector (or matrix of column vectors) inv(W')*v"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.solveWT(v[:, i])
             return r
 
         N = len(v)
-        y = np.array(v)
+        y = np.array(v, dtype=float)
         y[N - 1] /= self.phi[0]
         for i in range(N - 2, -1, -1):
             f = min(self.p + 1, N - i)
@@ -157,16 +157,16 @@ class ToeplitzWhitener:
     def applyWT(self, v: ArrayLike) -> np.ndarray:
         """Return vector (or matrix of column vectors) W'v"""
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.applyWT(v[:, i])
             return r
 
         N = len(v)
-        y = np.array(v)
+        y = np.array(v, dtype=float)
         y[N - 1] /= self.theta[0]
         for i in range(N - 2, -1, -1):
             f = min(self.q + 1, N - i)

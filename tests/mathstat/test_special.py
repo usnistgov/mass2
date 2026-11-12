@@ -64,3 +64,9 @@ class TestVoigtWidth:
             vhalf = special.voigt(x=vaf * 0.5, xctr=0, hwhm=0.5 * lor_width, sigma=sigma)
             vpeak = special.voigt(x=0.0, xctr=0.0, hwhm=0.5 * lor_width, sigma=sigma)
             assert 0.5 == pytest.approx(vhalf / vpeak, abs=1e-3)
+
+
+def test_voigt_unsigned():
+    x = np.arange(10, dtype=np.uint16)
+    for hwhm, sigma in ((1.0, 1.0), (0.0, 1.0), (1.0, 0.0)):
+        assert np.allclose(special.voigt(x, 5, hwhm, sigma), special.voigt(x.astype(float), 5, hwhm, sigma))

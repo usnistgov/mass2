@@ -56,7 +56,7 @@ def voigt(x: ArrayLike, xctr: float, hwhm: float, sigma: float) -> NDArray:
         Voigt function values, as 1d array of same size as x.
     """
 
-    x = np.asarray(x)
+    x = np.asarray(x, dtype=float)
 
     # Handle the pure Gaussian limit by itself
     if hwhm == 0.0:
