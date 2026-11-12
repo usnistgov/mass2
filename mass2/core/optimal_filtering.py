@@ -901,6 +901,10 @@ class FilterMaker:
         # Make sure we have either a noise PSD or an autocorrelation or a whitener
         if self.noise_psd is None:
             raise ValueError("FilterMaker must have noise_psd to generate a Fourier filter")
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+        if self.sample_time_sec <= 0 and self.noise_autocorr is None:
+            raise ValueError("FilterMaker must have a sample_time_sec to compute the variance from noise_psd")
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
 
@@ -915,25 +919,19 @@ class FilterMaker:
         reduction = 2 * shorten + (cut_pre + cut_post)
 
         truncated_avg_signal = avg_signal[shorten:-shorten]
-        len_reduced_psd = len(noise_psd) - (reduction + 1) // 2
         window = 1.0
         sig_ft = np.fft.rfft(truncated_avg_signal * window)
 
-        if len(sig_ft) != len_reduced_psd:
-            raise ValueError(f"signal real DFT and noise PSD are not the same length ({len(sig_ft)} and {len_reduced_psd})")
+        if len(noise_psd) != len(self.signal_model) // 2 + 1:
+            raise ValueError(f"noise PSD has length {len(noise_psd)}, but records have length {len(self.signal_model)}")
 
-        # Careful with PSD: "shorten" it by converting into a real space autocorrelation,
-        # truncating the middle, and going back to Fourier space
         if reduction > 0:
-            noise_autocorr = np.fft.irfft(noise_psd)
-            noise_autocorr = np.hstack((noise_autocorr[: len_reduced_psd - 1], noise_autocorr[-len_reduced_psd:]))
-            noise_psd = np.abs(np.fft.rfft(noise_autocorr))
+            noise_psd = np.interp(np.fft.rfftfreq(len(truncated_avg_signal)), np.fft.rfftfreq(len(self.signal_model)), noise_psd)
         sig_ft_weighted = sig_ft / noise_psd
 
         # Band-limit
         if fmax is not None or f_3db is not None:
-            f_nyquist = 0.5 / self.sample_time_sec
-            freq = np.linspace(0, f_nyquist, len_reduced_psd, dtype=float)
+            freq = np.fft.rfftfreq(len(truncated_avg_signal), d=self.sample_time_sec)
             if fmax is not None:
                 sig_ft_weighted[freq > fmax] = 0.0
             if f_3db is not None:
@@ -948,9 +946,13 @@ class FilterMaker:
 
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
         if self.noise_autocorr is None:
-            noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
-            kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()
-            variance_fourier = 1.0 / float(kappa)
+            filt_ft = np.fft.rfft(filt_fourier[cut_pre : len(filt_fourier) - cut_post])
+            weight = np.full(len(noise_psd), 2.0)
+            weight[0] = 1.0
+            if len(truncated_avg_signal) % 2 == 0:
+                weight[-1] = 1.0
+            variance_fourier = float(np.sum(weight * np.abs(filt_ft) ** 2 * noise_psd))
+            variance_fourier /= 2 * len(truncated_avg_signal) * self.sample_time_sec
         else:
             ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)
@@ -1003,7 +1005,7 @@ class FilterMaker:
             raise ValueError("FilterMaker must have noise_autocorr or whitener arguments to generate ATS filters")
         if self.dt_model is None:
             raise ValueError("FilterMaker must have dt_model to generate ATS filters")
-        if self.sample_time_sec is None and not (fmax is None and f_3db is None):
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
             raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
 
         noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
