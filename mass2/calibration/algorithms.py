@@ -157,7 +157,7 @@ def build_fit_ranges(
     slopes_de_dph = []
 
     for e in e_e:
-        slope_de_dph = cast(float, approx_ecal.energy2dedph(e))
+        slope_de_dph = float(np.squeeze(approx_ecal.energy2dedph(e)))
         if any(all_e < e):
             nearest_below = all_e[all_e < e][-1]
         else:
@@ -260,7 +260,7 @@ def multifit(
         lo, hi = fit_lo_hi[i]
         dP_dE = 1 / slopes_de_dph[i]
         binsize_ph = binsize_ev[i] * dP_dE
-        result = singlefit(ph, name, lo, hi, binsize_ph, dP_dE)
+        result = singlefit(ph, name if name in STANDARD_FEATURES else e_e[i], lo, hi, binsize_ph, dP_dE)
         results.append(result)
         peak_ph.append(result.best_values["peak_ph"])
         eres.append(result.best_values["fwhm"])
@@ -303,10 +303,9 @@ def singlefit(
     ph = np.asarray(ph)
     counts, bin_edges = np.histogram(ph, np.arange(lo, hi, binsize_ph))
     e = bin_edges[:-1] + 0.5 * (bin_edges[1] - bin_edges[0])
-    model = get_model(name)
+    model = name if isinstance(name, GenericLineModel) else get_model(name)
     guess_params = model.guess(counts, bin_centers=e, dph_de=approx_dP_dE)
-    if "Gaussian" not in model.name:
-        guess_params["dph_de"].set(approx_dP_dE, vary=False)
+    guess_params[model.prefix + "dph_de"].set(approx_dP_dE, vary=False)
     result = model.fit(counts, guess_params, bin_centers=e, minimum_bins_per_fwhm=1.5)
     result.energies = e
     return result

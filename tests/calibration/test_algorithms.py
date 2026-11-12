@@ -2,6 +2,7 @@
 Test code for mass2.calibration.algorithms.
 """
 
+import pytest
 from pytest import approx
 import numpy as np
 import mass2
@@ -62,6 +63,17 @@ def test_build_fit_ranges():
     assert hi == approx(3025)
 
 
+@pytest.mark.parametrize("curve", ["loglog", "gain", "invgain", "loggain", "linear"])
+def test_build_fit_ranges_slopes_are_floats(curve):
+    known_energies = np.array([1000.0, 2000.0, 3000.0])
+    maker = EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
+    cal = getattr(maker, f"make_calibration_{curve}")()
+    _, _, slopes_de_dph = build_fit_ranges(known_energies, [], cal, 100)
+    for slope in slopes_de_dph:
+        assert isinstance(slope, float)
+        assert slope == approx(10, rel=1e-6)
+
+
 def test_build_fit_ranges_ph():
     known_energies = np.array([1000, 2000, 2050, 3000])
     factory = EnergyCalibrationMaker.init(0.1 * known_energies, known_energies)
@@ -114,3 +126,22 @@ def test_complete():
     binsize_ev = 1.0
     results = multifit(ph, line_names, fit_lo_hi, np.ones_like(slopes_de_dph) * binsize_ev, slopes_de_dph, hide_deprecation=True)
     assert results is not None
+
+
+def test_multifit_gaussian_lines():
+    r = np.random.default_rng(1)
+    gain, e0 = 0.5, mass2.STANDARD_FEATURES["CaKAlpha"]
+    ph = gain * (e0 + r.normal(0, 6.0 / np.sqrt(8 * np.log(2)), 20000))
+    ref = np.std(ph / gain) * np.sqrt(8 * np.log(2))
+    for line in ("CaKAlpha", e0):
+        out = multifit(ph, [line], [(gain * (e0 - 50), gain * (e0 + 50))], [0.5], [1 / gain])
+        assert out["eres"][0] == approx(ref, abs=0.1)
+
+
+def test_singlefit_keeps_given_model():
+    line = mass2.spectra["MnKAlpha"]
+    ph = 0.5 * line.rvs(20000, 4, rng=np.random.default_rng(2))
+    model = line.model(has_tails=True, prefix="mn_")
+    result = mass2.calibration.algorithms.singlefit(ph, model, 0.5 * 5700, 0.5 * 5960, 0.25, 0.5)
+    assert "mn_tail_frac" in result.params
+    assert result.params["mn_dph_de"].value == 0.5 and not result.params["mn_dph_de"].vary
