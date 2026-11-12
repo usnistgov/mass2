@@ -940,7 +940,7 @@ class FilterMaker:
                 sig_ft_weighted /= 1 + (freq * 1.0 / f_3db) ** 2
 
         sig_ft_weighted[0] = 0.0
-        filt_fourier = np.fft.irfft(sig_ft_weighted) / window
+        filt_fourier = np.fft.irfft(sig_ft_weighted, n=len(truncated_avg_signal)) / window
         self._normalize_5lag_filter(filt_fourier, avg_signal)
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
