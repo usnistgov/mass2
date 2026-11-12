@@ -369,7 +369,7 @@ class LJHFile(PulseDataFramer):
         npulses : int
             Number of pulse records to write
         """
-        npulses = max(npulses, self.npulses)
+        npulses = min(npulses, self.npulses)
         with open(filename, "wb") as f:
             f.write(self.header_string.encode("utf-8"))
             f.write(self._mmap[:npulses].tobytes())

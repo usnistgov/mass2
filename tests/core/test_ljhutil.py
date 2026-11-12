@@ -1,24 +1,49 @@
 import pytest
-import os
 import numpy as np
 
 import pulsedata
 from mass2 import LJHFile
-from mass2.core.ljhutil import ljh_truncate, find_ljh_files, extract_channel_number
+from mass2.core.ljhutil import ljh_truncate, ljh_merge, ljh_append_traces, find_ljh_files, extract_channel_number
 
 # ruff: noqa: PLR0914
 
 
 def test_ljh_truncate_wrong_format(tmp_path):
     # First a file using LJH format 2.1.0 - should raise an exception
-    src_name = os.path.join("tests", "regression_test", "regress_chan1.ljh")
-    destfile = tmp_path / "xyz_chan1.ljh"
-    dest_name = str(destfile.name)
+    src_name = str(pulsedata.pulse_noise_ljh_pairs["regression"].pulse_folder / "20150813_regression_pulse_chan1.ljh")
+    dest_name = str(tmp_path / "xyz_chan1.ljh")
 
-    def func():
+    with pytest.raises(Exception, match="Don't know how to truncate"):
         ljh_truncate(src_name, dest_name, n_pulses=100)
 
-    pytest.raises(Exception, func)
+
+def test_ljh_merge_pre_2_2(tmp_path):
+    src_name = str(pulsedata.pulse_noise_ljh_pairs["regression"].noise_folder / "20150813_regression_noise_chan1.ljh")
+    dest_name = str(tmp_path / "merged_chan1.ljh")
+    ljh_merge(dest_name, [src_name, src_name], overwrite=True)
+    src = LJHFile.open(src_name)
+    dest = LJHFile.open(dest_name)
+    assert dest.npulses == 2 * src.npulses
+    assert np.array_equal(dest._mmap[src.npulses :], src._mmap)
+
+
+@pytest.mark.parametrize("src_offset", [b"1565016958.937494", b"1565009758.937494", b"1564998958.937494"])
+def test_ljh_append_traces_pre_2_2_other_offset(tmp_path, src_offset):
+    orig = pulsedata.pulse_noise_ljh_pairs["regression"].pulse_folder / "20150813_regression_pulse_chan1.ljh"
+    raw = orig.read_bytes()
+    dest_name, src_name = str(tmp_path / "dest_chan1.ljh"), str(tmp_path / "src_chan1.ljh")
+    (tmp_path / "dest_chan1.ljh").write_bytes(raw)
+    (tmp_path / "src_chan1.ljh").write_bytes(raw.replace(b"1565013358.937494", src_offset))
+    src = LJHFile.open(src_name)
+    if src_offset == b"1564998958.937494":
+        with pytest.raises(ValueError, match="fall outside"):
+            ljh_append_traces(src_name, dest_name, range(5))
+        assert LJHFile.open(dest_name).npulses == src.npulses
+        return
+    ljh_append_traces(src_name, dest_name, range(5))
+    dest = LJHFile.open(dest_name)
+    assert np.array_equal(dest.datatimes_raw[src.npulses :], src.datatimes_raw[:5])
+    assert np.array_equal(dest._mmap["pulse"][src.npulses :], src._mmap["pulse"][:5])
 
 
 def run_test_ljh_truncate_timestamp(tpf, src_name, n_pulses_expected, timestamp):

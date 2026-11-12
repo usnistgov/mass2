@@ -237,8 +237,9 @@ def helper_write_pulse(dest: BinaryIO, src: LJHFile, i: int) -> None:
 
 
 def ljh_append_traces(src_name: str, dest_name: str, pulses: range | None = None) -> None:
-    """Append traces from one LJH file onto another. The destination file is
-    assumed to be version 2.2.0.
+    """Append traces from one LJH file onto another. If the destination file is older than version 2.2.0,
+    the source must have the same record format; its records are then copied with their timestamps
+    re-encoded relative to the destination's "Timestamp offset (s)" (ValueError if a record precedes it).
 
     Can be used to grab specific traces from some other ljh file, and append them onto an existing ljh file.
 
@@ -249,11 +250,30 @@ def ljh_append_traces(src_name: str, dest_name: str, pulses: range | None = None
     """
 
     src = LJHFile.open(src_name)
+    dest = LJHFile.open(dest_name)
+    if src.nsamples != dest.nsamples:
+        raise ValueError(f"Can't append {src.nsamples}-sample records onto {dest.nsamples}-sample file '{dest_name}'")
+    copy_records = dest.ljh_version < Version("2.2.0")
+    if copy_records and src.dtype != dest.dtype:
+        raise ValueError(f"Can't append LJH version {src.ljh_version} records onto version {dest.ljh_version} file '{dest_name}'")
     if pulses is None:
         pulses = range(src.npulses)
+    if copy_records:
+        relative_usec = src.datatimes_raw - round(dest.header["Timestamp offset (s)"] * 1e6)
+        relative_ms = relative_usec[list(pulses)] // 1000
+        if np.any(relative_ms < 0) or np.any(relative_ms > np.iinfo(src.dtype["internal_ms"]).max):
+            raise ValueError(f"Records of '{src_name}' fall outside the time range '{dest_name}' can represent")
+    os.truncate(dest_name, dest.header_size + dest.npulses * dest.pulse_size_bytes)
     with open(dest_name, "ab") as dest_fp:
         for i in pulses:
-            helper_write_pulse(dest_fp, src, i)
+            if copy_records:
+                record = src._mmap[i].copy()
+                record["internal_ms"] = relative_usec[i] // 1000
+                if "internal_us" in record.dtype.names:
+                    record["internal_us"] = (relative_usec[i] % 1000) // 4
+                dest_fp.write(record.tobytes())
+            else:
+                helper_write_pulse(dest_fp, src, i)
 
 
 def ljh_truncate(input_filename: str, output_filename: str, n_pulses: int | None = None, timestamp: float | None = None) -> None:
@@ -295,7 +315,7 @@ def ljh_truncate(input_filename: str, output_filename: str, n_pulses: int | None
         # Write pulses.
         if n_pulses is None:
             n_pulses = infile.npulses
-        for i in range(n_pulses):
+        for i in range(min(n_pulses, infile.npulses)):
             if timestamp is not None and infile.datatimes_float[i] > timestamp:
                 break
             prefix = struct.pack("<Q", np.uint64(infile.subframecount[i]))
