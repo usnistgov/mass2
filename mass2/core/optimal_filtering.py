@@ -1034,6 +1034,12 @@ class FilterMaker:
             filt = np.linalg.solve(A, Rinv_model.T)
 
         band_limit(filt.T, self.sample_time_sec, fmax, f_3db)
+        filt = np.linalg.solve(filt @ MT.T, filt)
+        if len(noise_autocorr) > 0:
+            variance = bracketR(filt[0], noise_autocorr)
+        else:
+            assert self.whitener is not None
+            variance = np.sum(self.whitener.solveWT(filt[0]) ** 2)
 
         if cut_pre > 0 or cut_post > 0:
             nfilt = filt.shape[0]
@@ -1043,7 +1049,6 @@ class FilterMaker:
         filt_dt = filt[1]
         filt_baseline = filt[2]
 
-        variance = bracketR(filt_noconst, noise_autocorr)
         vdv = peak / (np.log(2) * 8 * variance) ** 0.5
         return FilterATS(
             filt_noconst,
