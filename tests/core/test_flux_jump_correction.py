@@ -120,3 +120,10 @@ class TestBothAlgorithms:
 
             new_vals = correct_flux_jumps(corrupted_vals, g, 2**12)
             self.verify(vals_orig, new_vals, g)
+
+
+def test_unwrap_n_leading_masked_records():
+    """Records before the first good one must be unwrapped relative to it, not to 0."""
+    data = np.array([60, 61, 62, 2, 3, 1], dtype=float)
+    mask = np.array([False, True, True, True, True, True])
+    assert np.array_equal(unwrap_n(data, 60.0, mask), [60, 61, 62, 62, 63, 61])

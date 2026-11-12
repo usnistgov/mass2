@@ -425,6 +425,7 @@ def unwrap_n(data: NDArray, period: float, mask: ArrayLike, n: int = 3) -> NDArr
     nprior = 0
     firstgoodidx = np.argmax(mask)
     priorvalues = np.full(n, udata[firstgoodidx])
+    avg = float(udata[firstgoodidx])
     for i in range(len(data)):
         # Take the average of the previous n data points (only those with mask[i]==True).
         # Offset the data point by the most reasonable multiple of period (make this point closest to the running average).
