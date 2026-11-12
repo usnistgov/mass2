@@ -1691,7 +1691,7 @@ class Channel:
         assert output_control.require_last or output_control.require_next
         subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
 
-        df_subframe = df.select("subframecount")
+        df_subframe = df.select("subframecount").with_row_index("_record").sort("subframecount")
         if output_control.require_last:
             df_subframe = df_subframe.join_asof(
                 df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig"
@@ -1711,7 +1711,7 @@ class Channel:
             df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
         if output_control.ms_nearest_trig:
             df_subframe = df_subframe.with_columns(
-                pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                pl.when((pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig")) | pl.col("dsf_next_ext_trig").is_null())
                 .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
                 .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
                 .alias("ms_nearest_ext_trig")
@@ -1719,12 +1719,16 @@ class Channel:
 
         # Drop columns that the user doesn't want
         if not output_control.absolute_sfs:
-            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
+            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig", strict=False)
         if not output_control.sf_last_trig:
-            df_subframe = df_subframe.drop("dsf_last_ext_trig")
+            df_subframe = df_subframe.drop("dsf_last_ext_trig", strict=False)
         if not output_control.sf_next_trig:
-            df_subframe = df_subframe.drop("dsf_next_ext_trig")
+            df_subframe = df_subframe.drop("dsf_next_ext_trig", strict=False)
 
+        df_subframe = df_subframe.sort("_record").drop("_record")
+        existing = (set(df_subframe.columns) - {"subframecount"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"external trigger columns {sorted(existing)} already exist")
         df2 = self.df.with_columns(df_subframe)
         return self.with_replacement_df(df2)
 
