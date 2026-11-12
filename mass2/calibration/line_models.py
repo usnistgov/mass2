@@ -312,13 +312,8 @@ class GenericLineModel(MLEModel):
                 def cleanspectrum_fn(x: ArrayLike) -> NDArray:
                     return self.spect.pdf(x, instrument_gaussian_fwhm=fwhm)
 
-                # tail_tau* is in energy units but has to be converted to the same units as `bin_centers`
-                tail_arbs_lo = tail_tau * dph_de
-                tail_arbs_hi = tail_tau_hi * dph_de
-                spectrum = _smear_exponential_tail(
-                    cleanspectrum_fn, energy, fwhm, tail_frac, tail_arbs_lo, tail_share_hi, tail_arbs_hi
-                )
-                scale_factor = integral * bin_width * dph_de
+                spectrum = _smear_exponential_tail(cleanspectrum_fn, energy, fwhm, tail_frac, tail_tau, tail_share_hi, tail_tau_hi)
+                scale_factor = integral * bin_width / dph_de
                 r = _scale_add_bg(spectrum, scale_factor, background, bg_slope)
                 if any(np.isnan(r)) or any(r < 0):
                     raise ValueError("some entry in r is nan or negative")
