@@ -224,6 +224,8 @@ class SpectralLine:
         """The CDF and PPF (cumulative distribution and percentile point functions) are hard to
         compute.  But it's easy enough to generate the random variates themselves, so we
         override that method."""
+        if size is None:
+            return self.rvs(1, instrument_gaussian_fwhm, rng=rng)[0]
         if rng is None:
             rng = _rng
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
@@ -241,7 +243,7 @@ class SpectralLine:
         not_positive = results <= 0.0
         if np.any(not_positive):
             Nbad = int(not_positive.sum())
-            results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm)
+            results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm, rng=rng)
         return results
 
     @property
