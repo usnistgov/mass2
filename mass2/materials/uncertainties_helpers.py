@@ -50,10 +50,10 @@ def ensure_uncertain(x: Any) -> Any:
         If type of `x` is unsupported
     """
     if isinstance(x, np.ndarray):
-        if is_uncertain_scalar(x[0]):
+        if any(is_uncertain_scalar(v) for v in x.flat):
             return x
         return unp.uarray(x, x)
-    if isinstance(x, float):
+    if isinstance(x, (float, int, np.integer, np.floating)):
         return uncertainties.ufloat(x, x)
     if is_uncertain_scalar(x):
         return x
@@ -81,7 +81,7 @@ def with_fractional_uncertainty(x: Any, fractional_uncertainty: float) -> Any:
     ValueError
         If type of `x` is unsupported
     """
-    if isinstance(x, float):
+    if isinstance(x, (float, int, np.integer, np.floating)):
         return uncertainties.ufloat(x, x * fractional_uncertainty)
     if isinstance(x, np.ndarray):
         return unp.uarray(x, x * fractional_uncertainty)

@@ -245,8 +245,8 @@ def AlFilmWithPolymer(
 
     arbE = 5000.0  # an arbitrary energy (5 keV) is used to get answers from material_mu_components()
     oxide_dict = xraydb.material_mu_components("sapphire", arbE)
-    oxide_thickness_nm = num_oxidized_surfaces * 3.0  # assume 3 nm per oxidized surface
     oxide_material = oxide_dict["elements"]
+    oxide_thickness_nm = np.repeat(num_oxidized_surfaces * 3.0, len(oxide_material))
     oxide_mass_fractions = np.array([oxide_dict[x][0] * oxide_dict[x][1] / oxide_dict["mass"] for x in oxide_material])
     if oxide_density_g_per_cm3 is None:
         oxide_density_g_per_cm3 = oxide_dict["density"] * np.ones(len(oxide_material))
