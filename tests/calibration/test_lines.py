@@ -144,3 +144,8 @@ class TestFitterBehavior:
         model.fit(sim, params, bin_centers=e, weights=None)
         with pytest.raises(Exception):
             model.fit(sim, params, bin_centers=e, weights=sim**1.5)
+
+
+def test_standard_features_u_kalpha_isotope():
+    assert mass2.STANDARD_FEATURES["UKAlpha1"] == 98431.58
+    assert mass2.STANDARD_FEATURES["UKAlpha2"] == 94650.84
