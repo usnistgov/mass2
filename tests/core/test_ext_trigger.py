@@ -1,5 +1,8 @@
 import os
 
+import polars as pl
+import pytest
+
 import mass2
 import pulsedata
 
@@ -51,3 +54,14 @@ def test_external_trigger_LJH_issue101():
     for cnum, bc in data2.bad_channels.items():
         print(f"Chan {cnum:4d} bad: {bc.error_msg}")
     assert len(data2.bad_channels) == 0
+    ch = data2.ch0
+    df_ext = pl.DataFrame({"subframecount": ch.df["subframecount"].cast(pl.Int64)})
+    with pytest.raises(ValueError, match="already exist"):
+        ch.with_external_trigger_df(df_ext, mass2.core.ExtTriggerControl())
+
+
+def test_off_subframediv_from_dastard_header():
+    p = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"].pulse_folder / "20240727_run0002_chan4220.off"
+    off = mass2.core.OffFile(str(p))
+    assert off.header["ReadoutInfo"]["SubframeDivisions"] == 64
+    assert off.subframediv == 64

@@ -3,6 +3,7 @@ Define RecipeStep and Recipe classes for processing pulse data in a sequence of 
 """
 
 from abc import ABC, abstractmethod
+import dataclasses
 from dataclasses import dataclass
 from typing import Any, overload
 from collections.abc import Iterable, Callable, Sequence
@@ -10,7 +11,7 @@ import polars as pl
 import numpy as np
 import pylab as plt
 from . import pulse_algorithms
-from .misc import PulseDataFramer
+from .misc import PulseDataFramer, extract_column_names_from_polars_expr
 
 
 @dataclass(frozen=True)
@@ -299,6 +300,15 @@ class SelectStep(RecipeStep):
         return df2
 
 
+def _exprs_in(value: Any) -> list[pl.Expr]:
+    """Return the polars expressions held directly by a step field (an expression or a dict of them)."""
+    if isinstance(value, pl.Expr):
+        return [value]
+    if isinstance(value, dict):
+        return [v for v in value.values() if isinstance(v, pl.Expr)]
+    return []
+
+
 @dataclass(frozen=True)
 class Recipe(Sequence[RecipeStep]):
     """A sequence of RecipeStep objects to be applied in order to a DataFrame."""
@@ -312,7 +322,7 @@ class Recipe(Sequence[RecipeStep]):
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
         for step in self.steps:
-            df = step.calc_from_df(df, pulseframer).with_columns(df)
+            df = step.calc_from_df(df, pulseframer)
         return df
 
     @classmethod
@@ -362,7 +372,9 @@ class Recipe(Sequence[RecipeStep]):
         ----------
         required_fields : Iterable[str] | str | None
             Steps will be preserved if any of their outputs are among `required_fields`, or if their outputs are
-            found recursively among the inputs to any such steps. If a string, treat as a list of that one string.
+            found recursively among the inputs to (or the columns used in the `good_expr` of) any such steps.
+            Steps without outputs (they modify existing columns in place) are always preserved.
+            If a string, treat as a list of that one string.
             If None, preserve all steps.
 
         drop_debug : bool
@@ -385,13 +397,19 @@ class Recipe(Sequence[RecipeStep]):
             required[:] = True
         else:
             all_fields_out: set[str] = set(required_fields)
+            keep_all_earlier = False
             for istep in range(nsteps - 1, -1, -1):
                 step = self[istep]
-                for field in step.output:
-                    if field in all_fields_out:
-                        required[istep] = True
-                        all_fields_out.update(step.inputs)
-                        break
+                if keep_all_earlier or not step.output or any(field in all_fields_out for field in step.output):
+                    required[istep] = True
+                    all_fields_out.update(step.inputs)
+                    good_expr_names = extract_column_names_from_polars_expr(step.good_expr)
+                    all_fields_out.update(good_expr_names)
+                    if not good_expr_names and not step.good_expr.meta.is_literal():
+                        keep_all_earlier = True
+                    step_exprs = [e for f in dataclasses.fields(step) for e in _exprs_in(getattr(step, f.name))]
+                    if any(e.meta.has_multiple_outputs() for e in step_exprs):
+                        keep_all_earlier = True
 
         if not np.any(required):
             # If this error ever because a problem, where user _acutally_ wants an empty series of steps
