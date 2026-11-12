@@ -36,7 +36,8 @@ def write_asd_pickle(inputFilename: str, outputFilename: str) -> None:
             if line.startswith(createTableString):
                 match = re.search(valueSearchString, line)
                 if match is not None:
-                    fieldNamesDict[match.groups()[0]] = []
+                    tableName = match.groups()[0]
+                    fieldNamesDict[tableName] = []
             elif tableName and line.strip().startswith("`"):
                 match = re.search(valueSearchString, line)
                 if match is not None:
@@ -83,7 +84,7 @@ def parseLine(
     formattedLine : str
         _description_
     """
-    lineAsArray = np.array(ast.literal_eval(formattedLine))
+    lineAsArray = np.array(ast.literal_eval(formattedLine), ndmin=2)
     for iEntry in lineAsArray:
         element = iEntry[fieldNamesDict["ASD_Levels"].index("element")]
         spectr_charge = int(iEntry[fieldNamesDict["ASD_Levels"].index("spectr_charge")])
