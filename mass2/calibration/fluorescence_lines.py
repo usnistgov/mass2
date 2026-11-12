@@ -694,7 +694,7 @@ addline(
     nominal_peak_energy=1739.986,
     energies=np.array((1739.39, 1739.986, 1752.0)),
     lorentzian_fwhm=np.array((0.539, 0.524, 5)),
-    reference_amplitude=np.array((3.134e2, 6.121e3, 8e2)),
+    reference_amplitude=np.array((3.134e3, 6.121e3, 8e2)),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     ka12_energy_diff=0.6,
     position_uncertainty=0.040,
@@ -773,7 +773,7 @@ addline(
     nominal_peak_energy=4090.735,
     energies=np.array((4090.745, 4089.452, 4087.782, 4093.547, 4085.941, 4083.976)),  # Table I C_i
     lorentzian_fwhm=np.array((1.17, 2.65, 1.41, 2.09, 1.53, 3.49)),  # Table I W_i
-    reference_amplitude=np.array((8175, 878, 232, 287, 4290, 119)),  # Table I A_i
+    reference_amplitude=np.array((8175, 878, 232, 387, 4290, 119)),  # Table I A_i
     reference_amplitude_type=AmplitudeType.VOIGT_PEAK_HEIGHT,
     ka12_energy_diff=5.1,
     position_uncertainty=0.019,  # table 3
@@ -1464,7 +1464,7 @@ addline(
     reference_short="Zschornack",
     nominal_peak_energy=36026.71,
     energies=np.array([35550.59, 36026.71]),
-    lorentzian_fwhm=np.array([19.08, 1887]),
+    lorentzian_fwhm=np.array([19.08, 18.87]),
     reference_amplitude=np.array([4.15, 7.57]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     ka12_energy_diff=36026.71 - 35550.59,
@@ -1594,7 +1594,7 @@ addline(
     linetype="KBeta",
     reference_short="Zschornack",
     nominal_peak_energy=48696.9,
-    energies=np.array([48555.8, 49696.9]),
+    energies=np.array([48555.8, 48696.9]),
     lorentzian_fwhm=np.array([29.5, 30.0]),
     reference_amplitude=np.array([1.10, 2.13]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
@@ -1625,7 +1625,7 @@ addline(
     nominal_peak_energy=50382.9,
     energies=np.array([50229.8, 50382.9]),
     lorentzian_fwhm=np.array([31.7, 31.8]),
-    reference_amplitude=np.array([1.15, 2.33]),
+    reference_amplitude=np.array([1.15, 2.23]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     reference_plot_instrument_gaussian_fwhm=None,
 )
