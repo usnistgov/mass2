@@ -232,11 +232,14 @@ class MultiFit:
     ) -> EnergyCalibration:
         """Return a calibration object made from the fit results in this MultiFit."""
         df = self.results_params_as_df()
+        peak = df["peak_ph"].to_numpy()
+        h = 1e-4 * np.abs(peak)
+        slope = np.array([(previous_energy2ph(x + d) - previous_energy2ph(x - d)) / (2 * d) for x, d in zip(peak, h)]).ravel()
         maker = EnergyCalibrationMaker(
-            ph=np.array([previous_energy2ph(x) for x in df["peak_ph"].to_numpy()]),
+            ph=np.array([previous_energy2ph(x) for x in peak]).ravel(),
             energy=df["peak_energy_ref"].to_numpy(),
-            dph=df["peak_ph_stderr"].to_numpy(),
-            de=df["peak_energy_ref_err"].to_numpy(),
+            dph=df["peak_ph_stderr"].to_numpy() * slope,
+            de=np.nan_to_num(df["peak_energy_ref_err"].to_numpy()),
             names=[name for name in df["line"]],
         )
         cal = maker.make_calibration(curvename=curvetype, approximate=approximate)
