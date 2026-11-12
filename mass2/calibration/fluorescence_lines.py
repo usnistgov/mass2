@@ -148,7 +148,7 @@ class SpectralLine:
     @cached_property
     def lorentz_amplitude(self) -> NDArray:
         """Return (and cache) computed Lorentzian peak heights of the components."""
-        return self.lorentzian_integral_intensity / self.lorentzian_fwhm
+        return self.lorentzian_integral_intensity / (0.5 * np.pi * self.lorentzian_fwhm)
 
     def __call__(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Make the class callable, returning the same value as the self.pdf method."""
@@ -169,7 +169,7 @@ class SpectralLine:
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
         components = []
-        for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm, self.lorentzian_integral_intensity):
+        for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm, self.normalized_lorentzian_integral_intensity):
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
