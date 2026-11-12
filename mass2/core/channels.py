@@ -773,6 +773,25 @@ class Channels:
         if os.path.exists(zip_path) and not overwrite:
             raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")
 
+        def raw_location(framer: mass2.core.misc.PulseDataFramer, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
+            """Return the leaf source index and the row within that source for each of `rows`, and the number of leaves."""
+            if isinstance(framer, mass2.core.misc.ReindexedPulseDataFramer):
+                return raw_location(framer.base, framer.indices[rows])
+            if isinstance(framer, mass2.core.misc.ConcatPulseDataFramer):
+                offsets = framer._offsets
+                part = np.searchsorted(offsets, rows, side="right") - 1
+                source = np.zeros_like(rows)
+                raw = np.zeros_like(rows)
+                nleaves = 0
+                for i, p in enumerate(framer.parts):
+                    mask = part == i
+                    s, r, n = raw_location(p, rows[mask] - offsets[i])
+                    source[mask] = s + nleaves
+                    raw[mask] = r
+                    nleaves += n
+                return source, raw, nleaves
+            return np.zeros_like(rows), rows, 1
+
         def store_dataframe_to_parquet_and_return_pickleable_channel(ch: Channel, zf: ZipFile, parquet_path: str) -> Channel:
             """Store the `ch.df` to a parquet file of the given name in the ZipFile (open for writing).
             Prepare `ch` for pickling by removing its dataframe and dataframe history, and stripping debug info from `steps`
@@ -796,6 +815,9 @@ class Channels:
                 df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
             else:
                 df = ch.df.drop("pulse", strict=False)
+            if ch.pulseframer is not None and "_raw_row" not in df.columns:
+                source, raw, _ = raw_location(ch.pulseframer, np.arange(len(df)))
+                df = df.with_columns(_raw_source=source, _raw_row=raw)
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
@@ -851,27 +873,43 @@ class Channels:
 
             def _reload_leaf_chan(data_source: str | None) -> Channel | None:
                 """Reopen a single leaf raw-data path, if it's a file type mass2 knows how to reload."""
-                if data_source is not None and (data_source.endswith(".ljh") or data_source.endswith(".noi")):
+                if data_source is not None and data_source.endswith((".ljh", ".noi")) and os.path.exists(data_source):
                     return Channel.from_ljh(data_source)
                 return None
 
             pulseframer = None
+            raw_source = df["_raw_source"].to_numpy() if "_raw_source" in df else None
+            raw_row = df["_raw_row"].to_numpy() if "_raw_row" in df else None
+            df_with_raw_location = df
+            df = df.drop("_raw_source", "_raw_row", strict=False)
             sources = ch.header.pulse_data_sources
             if sources is not None:
                 restored_parts = [_reload_leaf_chan(src) for src in sources]
                 found_parts = [part for part in restored_parts if part is not None]
                 if restored_parts and len(found_parts) == len(restored_parts):
                     raw_df = pl.concat([part.df for part in found_parts], how="vertical")
-                    df = df.with_columns(raw_df)
                     pulseframer = mass2.core.misc.concat_pulseframers([part.pulseframer for part in found_parts])
+                    if raw_source is not None and raw_row is not None:
+                        offsets = np.cumsum([0] + [len(part.df) for part in found_parts])
+                        rows = offsets[raw_source] + raw_row
+                        raw_df = raw_df[rows]
+                        pulseframer = pulseframer.select_rows(rows) if pulseframer is not None else None
+                    df = df.with_columns(raw_df.select(pl.exclude(df.columns)))
             else:
                 ljh_backed_chan = _reload_leaf_chan(ch.header.data_source)
                 if ljh_backed_chan is not None:
-                    df = df.with_columns(ljh_backed_chan.df)
+                    raw_df = ljh_backed_chan.df
                     pulseframer = ljh_backed_chan.pulseframer
+                    if raw_row is not None:
+                        raw_df = raw_df[raw_row]
+                        pulseframer = pulseframer.select_rows(raw_row) if pulseframer is not None else None
+                    df = df.with_columns(raw_df.select(pl.exclude(df.columns)))
+            reloadable = any(src is not None and src.endswith((".ljh", ".noi")) for src in ch.header.leaf_data_sources())
+            if pulseframer is None and reloadable:
+                df = df_with_raw_location
             df_history = [df] * len(ch.steps)
             noise = None
-            if ch.header.noise_data_source is not None:
+            if ch.header.noise_data_source is not None and os.path.exists(ch.header.noise_data_source):
                 noise = mass2.NoiseChannel.from_ljh(ch.header.noise_data_source)
             return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer, noise=noise)
 

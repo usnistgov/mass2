@@ -623,6 +623,16 @@ def test_save_analysis_with_ljh(tmpdir):
     assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
 
 
+def test_load_analysis_keeps_saved_timestamp(tmpdir):
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    ch = mass2.Channel.from_ljh(str(p.pulse_folder / "20230626_run0001_chan4109.ljh"), max_pulses=200)
+    ch = ch.with_step(mass2.core.ChangeTimeZoneStep.new("Pacific/Fiji"))
+    savefile = pathlib.Path(tmpdir) / "test_save.zip"
+    mass2.Channels({ch.ch_num: ch}, description="tz").save_analysis(savefile)
+    restored_ch = mass2.Channels.load_analysis(savefile).channels[ch.ch_num]
+    assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
+
+
 def test_change_time_zone():
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     filename = p.pulse_folder / "20230626_run0001_chan4109.ljh"
