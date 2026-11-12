@@ -117,12 +117,16 @@ class BestAssignmentPfitGainResult:
 
     def phzerogain(self) -> float:
         """Find the pulse height where the gain goes to zero.
-        Quadratic fits should have two roots, we want the positive one; if they are complex, choose the real part."""
+        Quadratic fits should have two roots, we want the positive one; if they are complex, return inf."""
         # the pulse height at which the gain is zero
         # for now I'm counting on the roots being ordered, we want the positive root where gain goes zero
         # since our function is invalid outside that range
         if self.pfit_gain.degree() == 2:
-            return np.real(self.pfit_gain.roots()[1])
+            roots = self.pfit_gain.roots()
+            if np.iscomplexobj(roots):
+                return np.inf
+            positive = roots[np.real(roots) > 0]
+            return positive[0] if len(positive) > 0 else roots[1]
         elif self.pfit_gain.degree() == 1:
             return self.pfit_gain.roots()[0]
         else:
