@@ -384,3 +384,24 @@ def test_stepwise_cal():
     assert np.allclose(expectedPH, cal.ph, atol=0.06)
     expectedE = np.array([277, 392.4, 524.9, 704.8, 851.47])
     assert np.allclose(expectedE, cal.energy, atol=0.06)
+
+
+def test_stepwise_cal_numpy_energies():
+    ph = np.load("tests/calibration/example_uncalibrated_data.npy")
+    plan = [("NiLAlpha1", None, None), ("FeLAlpha1", 650, 800), ("OKAlpha", 450, 600), (("NKAlpha", "CKAlpha"), 200, 450)]
+    expected = mass2.core.rough_cal.learn_stepwise_cal(ph, plan, fwhm_pulse_height_units=10)
+    for t in (np.int64, np.float32):
+        e = t(mass2.STANDARD_FEATURES["NiLAlpha1"])
+        cal = mass2.core.rough_cal.learn_stepwise_cal(ph, [(e, None, None)] + plan[1:], fwhm_pulse_height_units=10)
+        assert np.allclose(expected.ph, cal.ph, atol=0.5)
+
+
+def test_explicit_zero_anchor():
+    x = np.array([0.0, 1000, 2000, 3000])
+    y = np.array([0.0, 1100, 2400, 3900])
+    maker = EnergyCalibrationMaker.init(x, y, dph=[1.0] * 4, de=[0.1] * 4, names=["zero", "a", "b", "c"])
+    q = np.array([500.0, 1500.0, 2500.0])
+    for addzero in (False, True):
+        cal = maker.make_calibration_linear(addzero=addzero)
+        assert cal(q) == pytest.approx([535.0, 1720.0, 3135.0])
+        assert cal.energy2ph(cal(q)) == pytest.approx(q, abs=1e-3)

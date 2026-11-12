@@ -1036,7 +1036,7 @@ def learn_stepwise_cal(
     cal = mass2.calibration.EnergyCalibration.trivial_calibrator()
     for iteration, step in enumerate(plan):
         lines = step[0]
-        if isinstance(lines, str) or isinstance(lines, float) or isinstance(lines, int):
+        if isinstance(lines, (str, float, int, np.integer, np.floating)):
             lines = [lines]
         Npk = len(lines)
         energies: list[float] = []
@@ -1044,8 +1044,8 @@ def learn_stepwise_cal(
             if isinstance(L, str):
                 energies.append(mass2.STANDARD_FEATURES[L])
             else:
-                assert isinstance(L, float) or isinstance(L, int)
-                energies.append(L)
+                assert isinstance(L, (float, int, np.integer, np.floating))
+                energies.append(float(L))
         if step[1]:
             e = e[e > step[1]]
         if step[2]:
@@ -1055,8 +1055,8 @@ def learn_stepwise_cal(
         esort = np.argsort(energies)
         ipeaks = pfresult.inds_sorted_by_peak_height()[:Npk]
         ipeaks.sort()  # Sort by energy, not intensity
-        ipeaks = ipeaks[esort]  # Now resort to match the order of the energy values
-        linenames = [str(lines[i]) for i in esort]  # type: ignore
+        ipeaks = ipeaks[np.argsort(esort)]  # Now resort to match the order of the energy values
+        linenames = [str(L) for L in lines]
         peaks = pfresult.bin_centers[ipeaks]
         if iteration > 0:
             peaks = cal.energy2ph(peaks)
