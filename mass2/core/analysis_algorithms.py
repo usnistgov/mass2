@@ -27,7 +27,6 @@ LOG = logging.getLogger("mass")
 # Pulse summary quantities
 
 
-@njit
 def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> NDArray:
     """Computes the rise time of timeseries <pulse_data>, where the time steps are <timebase>.
     <pulse_data> can be a 2D array where each row is a different pulse record, in which case
@@ -221,7 +220,6 @@ class HistogramSmoother:
         return csmooth
 
 
-@njit
 def make_smooth_histogram(values: ArrayLike, smooth_sigma: float, limit: float, upper_limit: float | None = None) -> NDArray:
     """Convert a vector of arbitrary <values> info a smoothed histogram by
     histogramming it and smoothing.
@@ -307,7 +305,6 @@ def drift_correct(
     return best_slope, drift_correct_info
 
 
-@njit
 def filter_signal_lowpass(sig: NDArray, fs: float, fcut: float) -> NDArray:
     """Tophat lowpass filter using an FFT
 
