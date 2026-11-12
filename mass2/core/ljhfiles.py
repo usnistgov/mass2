@@ -456,7 +456,7 @@ class LJHFile_2_2(LJHFile):
             return False
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
-        return np.max(np.diff(subframe)) <= expected_subframe_diff
+        return bool(np.all(np.diff(subframe.astype(np.int64)) == expected_subframe_diff))
 
 
 class LJHFile_2_1(LJHFile):
