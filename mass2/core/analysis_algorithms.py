@@ -56,7 +56,7 @@ def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> N
     if ndim > 2 or ndim < 1:
         raise ValueError("input pulse_data should be a 1d or 2d array.")
     if ndim == 1:
-        pulse_data.shape = (1, pulse_data.shape[0])
+        pulse_data = pulse_data.reshape(1, -1)
 
     # The following requires a lot of numpy foo to read. Sorry!
     if nPretrig >= 4:
@@ -81,11 +81,8 @@ def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> N
 
     pulsenum = np.arange(npulses)
     y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
-    y_diff[y_diff < timebase] = timebase
     time_diff = timebase * (last_idx - first_idx)
-    rise_time = time_diff / y_diff
-    rise_time[y_diff <= 0] = -9.9e-6
-    return rise_time
+    return np.divide(time_diff, y_diff, out=np.full(npulses, -9.9e-6), where=y_diff > 0)
 
 
 def compute_max_deriv(
@@ -120,14 +117,14 @@ def compute_max_deriv(
     if ndim > 2 or ndim < 1:
         raise ValueError("input pulse_data should be a 1d or 2d array.")
     if ndim == 1:
-        pulse_data.shape = (1, pulse_data.shape[0])
+        pulse_data = pulse_data.reshape(1, -1)
     pulse_view = pulse_data[:, ignore_leading:]
     NPulse = pulse_view.shape[0]
     NSamp = pulse_view.shape[1]
 
     # The default filter:
     filter_coef = np.array([+0.2, +0.1, 0, -0.1, -0.2])
-    if kernel == "SG":
+    if isinstance(kernel, str) and kernel == "SG":
         # This filter is the Savitzky-Golay filter of n_L=1, n_R=3 and M=3, to use the
         # language of Numerical Recipes 3rd edition.  It amounts to least-squares fitting
         # of an M=3rd order polynomial to the five points [-1,+3] and
@@ -317,10 +314,10 @@ def filter_signal_lowpass(sig: NDArray, fs: float, fcut: float) -> NDArray:
     """
     N = sig.shape[0]
     SIG = np.fft.fft(sig)
-    freqs = (fs / N) * np.concatenate((np.arange(0, N / 2 + 1), np.arange(N / 2 - 1, 0, -1)))
+    freqs = np.abs(np.fft.fftfreq(N, 1 / fs))
     filt = np.zeros_like(SIG)
     filt[freqs < fcut] = 1.0
-    sig_filt = np.fft.ifft(SIG * filt)
+    sig_filt = np.fft.ifft(SIG * filt).real
     return sig_filt
 
 
@@ -572,7 +569,6 @@ def time_drift_correct(  # noqa: PLR0914
     return info
 
 
-@njit
 def resample_pulses(pulses: NDArray, shifts: ArrayLike | float | int) -> NDArray:
     """Resample multiple pulses (in place). The data will be modified and returned.
 
@@ -614,7 +610,6 @@ def resample_pulses(pulses: NDArray, shifts: ArrayLike | float | int) -> NDArray
     return pulses
 
 
-@njit
 def resample_one_pulse(pulse: NDArray, shift: float | int) -> NDArray:
     """Resample one pulses (in place). The data will be modified and returned.
 
@@ -645,7 +640,8 @@ def resample_one_pulse(pulse: NDArray, shift: float | int) -> NDArray:
         if fullshift > 0:
             pulse[fullshift:] = pulse[:-fullshift]
         # linear interpolation for the fraction
-        pulse[fullshift + 1 :] = np.rint((1.0 - fracshift) * pulse[fullshift + 1 :] + fracshift * pulse[fullshift:-1])
+        interp = (1.0 - fracshift) * pulse[fullshift + 1 :] + fracshift * pulse[fullshift:-1]
+        pulse[fullshift + 1 :] = np.rint(interp) if np.issubdtype(pulse.dtype, np.integer) else interp
         # fill the initial values
         pulse[:fullshift] = pulse[fullshift]
 
@@ -656,9 +652,8 @@ def resample_one_pulse(pulse: NDArray, shift: float | int) -> NDArray:
         if fullshift < 0:
             pulse[:fullshift] = pulse[-fullshift:]
         # linear interpolation for the fraction
-        pulse[: Nsamples + fullshift - 1] = np.rint(
-            (1 - fracshift) * pulse[: Nsamples + fullshift - 1] + fracshift * pulse[1 : Nsamples + fullshift]
-        )
+        interp = (1 - fracshift) * pulse[: Nsamples + fullshift - 1] + fracshift * pulse[1 : Nsamples + fullshift]
+        pulse[: Nsamples + fullshift - 1] = np.rint(interp) if np.issubdtype(pulse.dtype, np.integer) else interp
         # fill the final values
         pulse[Nsamples + fullshift :] = pulse[-1]
     # Edge case of shift == 0.0 is a no-op and can be ignored.

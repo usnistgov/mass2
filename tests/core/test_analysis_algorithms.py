@@ -1,5 +1,6 @@
-from mass2.core.analysis_algorithms import resample_one_pulse, resample_pulses
+from mass2.core.analysis_algorithms import estimateRiseTime, resample_one_pulse, resample_pulses
 import numpy as np
+import pytest
 
 
 def test_resample_pulses():
@@ -29,3 +30,22 @@ def test_resample_pulses():
     resample_pulses(pulses, shifts)
     for (_, expected), p in zip(tests, pulses):
         assert np.all(p == expected)
+
+
+def test_resample_float_pulse_and_scalar_shift():
+    "Float pulses are interpolated without rounding, and a scalar shift applies to every pulse."
+    raw = np.linspace(0, 1, 6)
+    x = np.arange(len(raw))
+    for shift in (0.5, -0.5, 1.25, -2.75):
+        assert np.allclose(resample_one_pulse(raw.copy(), shift), np.interp(x - shift, x, raw))
+    pulses = resample_pulses(np.tile(raw, (3, 1)), 1.5)
+    assert np.allclose(pulses, np.interp(x - 1.5, x, raw))
+
+
+def test_estimateRiseTime_timebase_units():
+    """A linear ramp over 20 samples rises in 20 samples, whatever the unit of timebase."""
+    pulse = np.zeros(100)
+    pulse[10:31] = np.linspace(0, 1000, 21)
+    pulse[31:] = 1000 * np.exp(-np.arange(69) / 50)
+    for timebase in [1e-6, 1.0, 2.0]:
+        assert estimateRiseTime(pulse, timebase, 8)[0] == pytest.approx(20 * timebase)
