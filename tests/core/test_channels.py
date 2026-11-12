@@ -800,3 +800,12 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_pretrig_mean_jump_fix_without_subframecount():
+    ptm = np.arange(20.0) * 30 % 256 + 1000
+    for col in ("framecount", "timestamp"):
+        df = pl.DataFrame({"pretrig_mean": ptm, col: np.arange(20)})
+        ch = mass2.Channel(df, mass2.ChannelHeader("", None, 1, 1e-5, 100, 200, pl.DataFrame()), 20)
+        out = ch.correct_pretrig_mean_jumps(period=256).df["ptm_jf"].to_numpy()
+        assert np.allclose(out, np.unwrap(ptm % 256, period=256))
