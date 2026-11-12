@@ -27,3 +27,29 @@ def test_basic(tmpdir):
     assert all(ch_mem.df["framecount"].to_numpy() == pulse_start_inds[1:-1])
     assert all(ch_mmap.df["framecount"].to_numpy() == pulse_start_inds[1:-1])
     # assert all(ch_summ.df["framecount"].to_numpy() == pulse_start_inds[1:-1])
+
+
+def test_trigger_cache_key_separates_threshold_and_length(tmp_path):
+    data = np.random.default_rng(3).normal(0, 4, 200_000).astype(np.int16)
+    filt = np.r_[-np.ones(5), np.ones(5)] / 5
+    bin_path = tmp_path / "x.bin"
+    truebq_bin._fasttrig_filter_trigger_with_cache(data, filt, 2.0, 123456, bin_path, verbose=False)
+    cached = truebq_bin._fasttrig_filter_trigger_with_cache(data, filt, 2.01, 23456, bin_path, verbose=False)
+    direct = truebq_bin.fasttrig_filter_trigger(data[:23456].copy(), filt, 2.01, False)
+    assert np.array_equal(cached, direct)
+
+
+def test_fasttrig_filter_trigger_short_data():
+    data = np.zeros(80, dtype=np.int16)
+    data[10] = -50
+    data[20] = 100
+    inds = truebq_bin.fasttrig_filter_trigger(data, np.array([-1.0, 1.0]), 10.0, False)
+    assert inds.tolist() == [11]
+
+
+def test_truebq_bin_channel_number(tmp_path):
+    expected = {"dev2_ai2": 2, "dev2_ai12": 12, "2A": 4, "3d": 11}
+    for folder, channel_number in expected.items():
+        bin_path = tmp_path / folder / "x.bin"
+        truebq_bin.write_truebq_bin_file(bin_path, np.zeros(100, np.int16), sample_rate_hz=1e5)
+        assert truebq_bin.TrueBqBin.load(bin_path).channel_number == channel_number

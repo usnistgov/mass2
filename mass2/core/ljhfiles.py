@@ -69,9 +69,9 @@ class LJHFile(PulseDataFramer):
         npresamples = header_dict["Presamples"]
         client = header_dict.get("Software Version", "UNKNOWN")
         subframediv: int | None = None
-        if "Subframe divisions" in header_dict:
+        if header_dict["Subframe divisions"] > 0:
             subframediv = header_dict["Subframe divisions"]
-        elif "Number of rows" in header_dict:
+        elif header_dict["Number of rows"] > 0:
             subframediv = header_dict["Number of rows"]
 
         ljh_version = Version(header_dict["Save File Format Version"])
@@ -369,7 +369,7 @@ class LJHFile(PulseDataFramer):
         npulses : int
             Number of pulse records to write
         """
-        npulses = max(npulses, self.npulses)
+        npulses = min(npulses, self.npulses)
         with open(filename, "wb") as f:
             f.write(self.header_string.encode("utf-8"))
             f.write(self._mmap[:npulses].tobytes())
@@ -456,7 +456,7 @@ class LJHFile_2_2(LJHFile):
             return False
         expected_subframe_diff = self.nsamples * self.subframediv
         subframe = self._mmap["subframecount"]
-        return np.max(np.diff(subframe)) <= expected_subframe_diff
+        return bool(np.all(np.diff(subframe.astype(np.int64)) == expected_subframe_diff))
 
 
 class LJHFile_2_1(LJHFile):
@@ -494,7 +494,7 @@ class LJHFile_2_1(LJHFile):
         mmap = self._mmap["internal_us"]
         while first < self.npulses:
             last = min(first + MAXSEGMENT, self.npulses)
-            usec[first:last] += mmap[first:last] * 4
+            usec[first:last] += mmap[first:last].astype(np.int64) * 4
             first = last
 
         return usec
@@ -566,4 +566,7 @@ class LJHFile_2_0(LJHFile):
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Define what gets unpickled (you have to re-open the file, or attempt to)."""
         # Because it is frozen, you must use object.__setattr__ to restore the file handlers
-        pass
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(self.npulses,))
+        object.__setattr__(self, "_mmap", mmap)
