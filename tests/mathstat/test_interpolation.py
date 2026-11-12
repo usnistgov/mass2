@@ -8,6 +8,7 @@ Joe Fowler
 """
 
 import numpy as np
+import pytest
 import mass2
 from mass2.mathstat.interpolate import k_spline, GPRSpline
 

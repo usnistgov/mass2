@@ -146,6 +146,7 @@ class CubicSpline:
 
         # Find which interval 0,...self._n-2 contains the points (or extrapolates to the points)
         position = np.searchsorted(self._x, x) - 1
+        position[x == self._x[0]] = 0
 
         # Here, position == -1 means extrapolate below the first interval.
         extrap_low = position < 0
@@ -190,7 +191,7 @@ class CubicSpline:
             elif der == 2:
                 result[interp] = a * self._y2[klo] + b * self._y2[khi]
             elif der == 3:
-                result[interp] = (-self._y2[klo] + self._y2[khi]) * dx
+                result[interp] = (-self._y2[klo] + self._y2[khi]) / dx
             elif der > 3:
                 result[interp] = 0.0
 
@@ -442,7 +443,7 @@ class NaturalBsplineBasis:
         coef[id + 1] = 1.0
         if id < 2:
             coef[0] = self.coef_b[id]
-        elif id >= self.Nk - 2:
+        if id >= self.Nk - 2:
             coef[-1] = self.coef_e[self.Nk - id - 1]
         x = np.asarray(x, dtype=float)  # careful: FORTRAN in splev expects floats, not ints
         return splev(x, (self.padknots, coef, 3), der=der)
