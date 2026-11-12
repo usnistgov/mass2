@@ -154,7 +154,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise, pulseframer=misc.PulseDataFromNumpy(df["pulse"].to_numpy()))
         return ch
 
     def to_channel_mmap(
@@ -194,7 +194,7 @@ class TriggerResult:
             npre + npost,
             self.data_source.header_df,
         )
-        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise)
+        ch = Channel(df, ch_header, npulses=len(pulses), noise=noise, pulseframer=misc.PulseDataFromNumpy(df["pulse"].to_numpy()))
         return ch
 
     # def to_summarized_channel(
@@ -280,7 +280,8 @@ class TrueBqBin:
         bin_path = Path(bin_path)
         try:
             # for when it's named like dev2_ai6
-            channel_number = int(str(bin_path.parent)[-1])
+            folder = bin_path.parent.name
+            channel_number = int(folder[len(folder.rstrip("0123456789")) :])
         except ValueError:
             # for when it's named like 2A
             def bay2int(bay: str) -> int:
@@ -420,7 +421,7 @@ def fasttrig_filter_trigger(data: NDArray, filter_in: NDArray, threshold: float,
     c = cache @ filter
     j = 2
     ready = False
-    prog_step = jmax // 100
+    prog_step = max(jmax // 100, 1)
     prog_ticks = 0
     while j <= jmax:
         if j % prog_step == 0:
@@ -513,7 +514,7 @@ def filter_and_residual_rms(
     template /= np.linalg.norm(template)
     for i in range(len(trig_inds)):
         j = trig_inds[i]
-        pulse = data[j - npre : j + nsamples - npre] * polarity
+        pulse = data[j - npre : j + nsamples - npre] * float(polarity)
         pulse -= pulse.mean()
         filt_value[i] = chosen_filter @ pulse
         filt_value_template[i] = template @ pulse
@@ -567,7 +568,8 @@ def _fasttrig_filter_trigger_with_cache(
     """Apply a filter to the data and return trigger indices where the filter output crosses the threshold, using a cache."""
     bin_full_path = Path(bin_path).absolute()
     actual_n_samples = min(len(data), limit_samples)
-    to_hash_str = str(filter_in) + str(threshold) + str(actual_n_samples) + str(bin_full_path)
+    filter_hash = hashlib.sha256(np.asarray(filter_in, dtype=np.float64).tobytes()).hexdigest()
+    to_hash_str = "|".join([filter_hash, repr(float(threshold)), str(actual_n_samples), str(bin_full_path)])
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_trigger_cache.npy"
     cache_dir_path = bin_full_path.parent / "_truebq_bin_cache"
