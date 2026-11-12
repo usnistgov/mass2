@@ -10,7 +10,8 @@ Created on Feb 9, 2012
 
 import pytest
 import numpy as np
-from mass2.mathstat.robust import shorth_range, high_median, Qscale
+import scipy as sp
+from mass2.mathstat.robust import shorth_range, high_median, Qscale, bisquare_weighted_mean, huber_weighted_mean
 
 
 class Test_Shorth:
@@ -127,6 +128,12 @@ class Test_Qscale:
         assert Qscale(x) == pytest.approx(2.0 * 2.2219 * 0.844, abs=1e-3)
 
     @staticmethod
+    def test_consistent_for_gaussian_sigma():
+        n = 20001
+        x = np.sqrt(2) * sp.special.erfinv(2 * (np.arange(n) + 0.5) / n - 1)
+        assert Qscale(x) == pytest.approx(1.0, abs=3e-4)
+
+    @staticmethod
     def test_inplace():
         _ = Qscale([1, 2, 3, 4], sort_inplace=False)
         pytest.raises(ValueError, Qscale, [1, 2, 3, 4], sort_inplace=True)
@@ -138,15 +145,22 @@ class Test_Qscale:
         assert x[3] == 4, "Qscale did not sort data when asked to sort."
 
     @staticmethod
+    def test_unsigned():
+        x = np.array([1000, 1003, 1001, 1010, 1002, 1005, 1004, 1007], dtype=np.uint16)
+        expected = Qscale(x.astype(float))
+        assert Qscale(x) == pytest.approx(expected)
+        assert Qscale(x.copy(), sort_inplace=True) == pytest.approx(expected)
+
+    @staticmethod
     def Qslow(x):
         """Compute Q the simple, slow way, an O(n^2) calculation to verify the fast one."""
         x = np.array(x)
         x.sort()
         n = len(x)
 
-        prefactor = 2.2219
+        prefactor = 2.219144
         if n <= 9:
-            prefactor *= [0, 0, 0.399, 0.994, 0.512, 0.844, 0.611, 0.857, 0.669, 0.872][n]
+            prefactor = 2.2219 * [0, 0, 0.399, 0.994, 0.512, 0.844, 0.611, 0.857, 0.669, 0.872][n]
         elif n % 2 == 1:
             prefactor *= n / (n + 1.4)
         else:
@@ -170,3 +184,20 @@ class Test_Qscale:
             assert qs is not None
             assert qf is not None
             assert qs == pytest.approx(qf, abs=1e-5)
+
+    def test_rounded_ties(self):
+        """Ties of non-dyadic floats, where x[i] + (x[j] - x[i]) != x[j]."""
+        rng = np.random.default_rng(6)
+        for _ in range(200):
+            data = np.round(rng.standard_normal(size=int(rng.integers(6, 60))) * 3, 1)
+            assert Qscale(data) == pytest.approx(self.Qslow(data), rel=1e-12)
+        data = np.repeat([0.1, 0.3], 4)
+        assert Qscale(data) == pytest.approx(self.Qslow(data), rel=1e-12)
+
+
+def test_weighted_means_zero_mad():
+    """More than half the values identical (MAD 0) must still converge."""
+    x = np.array([1.0, 1, 1, 1, 2, 5])
+    assert bisquare_weighted_mean(x, 3.0) == pytest.approx(1.177157, abs=1e-4)
+    with np.errstate(divide="ignore"):
+        assert huber_weighted_mean(x, 1.0) == pytest.approx(1.4, abs=1e-4)
