@@ -112,9 +112,8 @@ class SpectralLine:
     def peak_energy(self) -> float:
         """Find the peak energy of the line shape assuming ideal instrument resolution."""
         try:
-            peak_energy = sp.optimize.brent(
-                lambda x: -float(self.pdf(x, instrument_gaussian_fwhm=0)), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
-            )
+            e = self.energies[np.argmax(self.pdf(self.energies, instrument_gaussian_fwhm=0))]
+            peak_energy = sp.optimize.brent(lambda x: -float(self.pdf(x, instrument_gaussian_fwhm=0)), brack=(e, e + 0.01))
         except ValueError:
             peak_energy = self.nominal_peak_energy
         return peak_energy
