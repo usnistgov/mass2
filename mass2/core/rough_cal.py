@@ -773,7 +773,7 @@ class RoughCalibrationStep(RecipeStep):
 
     def drop_debug(self) -> "RoughCalibrationStep":
         """Return a copy of this step with debug information removed."""
-        return dataclasses.replace(self, pfresult=None, assignment_result=None)
+        return dataclasses.replace(self, pfresult=None)
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> None:
         """Create diagnostic plots of the rough calibration step."""
@@ -976,6 +976,10 @@ class StepwiseCalStep(RecipeStep):
         out = self.ph2energy(inputs_np[0])
         df2 = pl.DataFrame({self.output[0]: out}).with_columns(df)
         return df2
+
+    def energy2ph(self, energy: ArrayLike) -> NDArray:
+        """Convert energy to pulse height using the stepwise calibration."""
+        return self.calibration.energy2ph(energy)
 
     @classmethod
     def learn(
