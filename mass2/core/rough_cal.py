@@ -661,7 +661,8 @@ def drift_correct_entropy(
 ) -> float:
     """Calculate the entropy of a histogram of drift-corrected pulse heights."""
     corrected = uncorrected * (1 + indicator_zero_mean * slope)
-    smoothed_counts, bin_edges, _counts = hist_smoothed(corrected, fwhm_in_bin_number_units, bin_edges)
+    step = bin_edges[1] - bin_edges[0]
+    smoothed_counts, bin_edges, _counts = hist_smoothed(corrected, fwhm_in_bin_number_units * step, bin_edges)
     w = smoothed_counts > 0
     return -(np.log(smoothed_counts[w]) * smoothed_counts[w]).sum()
 
