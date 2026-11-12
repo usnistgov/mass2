@@ -101,15 +101,15 @@ def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
     d = np.diff(x)
     step_size = float(d[0])
     assert np.allclose(d, step_size, atol=1e-9), f"{d=}"
-    return x[:-1] + step_size, step_size
+    return x[:-1] + 0.5 * step_size, step_size
 
 
 def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, NDArray]:
     """Return the bin centers and counts of a histogram of the given Series using the given bin edges."""
     bin_edges = np.asarray(bin_edges)
     bin_centers, _ = midpoints_and_step_size(bin_edges)
-    counts = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
-    return bin_centers, counts.to_numpy().T[0]
+    counts, _ = np.histogram(series.drop_nulls().to_numpy(), bin_edges)
+    return bin_centers, counts
 
 
 def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes | None = None, **plotkwarg: dict) -> plt.Axes:
@@ -119,7 +119,7 @@ def plot_hist_of_series(series: pl.Series, bin_edges: ArrayLike, axis: plt.Axes 
         axis = plt.gca()
     bin_edges = np.asarray(bin_edges)
     bin_centers, step_size = midpoints_and_step_size(bin_edges)
-    hist = series.rename("count").hist(list(bin_edges), include_category=False, include_breakpoint=False)
+    hist, _ = np.histogram(series.drop_nulls().to_numpy(), bin_edges)
     axis.plot(bin_centers, hist, label=series.name, **plotkwarg)
     axis.set_xlabel(series.name)
     axis.set_ylabel(f"counts per {step_size:.2f} unit bin")
