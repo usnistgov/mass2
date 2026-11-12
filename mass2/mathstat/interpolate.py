@@ -252,10 +252,11 @@ class GPRSpline(CubicSpline):
         sigmaf : float | None, optional
             Allowed function variance, or None to maximize the data likelihood, by default None
         """
-        self.x = np.array(x)
+        self.x = np.array(x, dtype=float)
         self.y = np.array(y)
         self.dy = np.array(dy)
         self.Nk = len(self.x)
+        self.xoff = 2 * np.min(self.x) - np.max(self.x)
         assert self.Nk == len(self.y)
         assert self.Nk == len(self.dy)
 
@@ -278,9 +279,9 @@ class GPRSpline(CubicSpline):
         K = np.zeros((self.Nk, self.Nk), dtype=float)
         sf2 = sigmaf**2
         for i in range(self.Nk):
-            K[i, i] = sf2 * k_spline(self.x[i], self.x[i])
+            K[i, i] = sf2 * k_spline(self.x[i] - self.xoff, self.x[i] - self.xoff)
             for j in range(i + 1, self.Nk):
-                K[i, j] = K[j, i] = sf2 * k_spline(self.x[i], self.x[j])
+                K[i, j] = K[j, i] = sf2 * k_spline(self.x[i] - self.xoff, self.x[j] - self.xoff)
         Ky = K + np.diag(self.err**2)
         L = np.linalg.cholesky(Ky)
         LH = np.linalg.solve(L, H.T)
@@ -325,9 +326,9 @@ class GPRSpline(CubicSpline):
         K = np.zeros((self.Nk, self.Nk), dtype=float)
         sf2 = sigmaf**2
         for i in range(self.Nk):
-            K[i, i] = sf2 * k_spline(self.x[i], self.x[i])
+            K[i, i] = sf2 * k_spline(self.x[i] - self.xoff, self.x[i] - self.xoff)
             for j in range(i + 1, self.Nk):
-                K[i, j] = K[j, i] = sf2 * k_spline(self.x[i], self.x[j])
+                K[i, j] = K[j, i] = sf2 * k_spline(self.x[i] - self.xoff, self.x[j] - self.xoff)
         Ky = K + np.diag(self.err**2)
         L = np.linalg.cholesky(Ky)
         LH = np.linalg.solve(L, H.T)
@@ -346,27 +347,26 @@ class GPRSpline(CubicSpline):
         This equals the diagonal of `self.covariance(xtest)`, but for large test sets,
         this method computes only the diagonal and should therefore be faster."""
         v = []
-        xtest = np.asarray(xtest)
-        for x in np.asarray(xtest):
-            Ktest = self.sigmaf**2 * k_spline(x, self.x)
+        for x in np.atleast_1d(xtest):
+            Ktest = self.sigmaf**2 * k_spline(x - self.xoff, self.x - self.xoff)
             LinvKtest = np.linalg.solve(self.L, Ktest)
-            cov_ftest = self.sigmaf**2 * k_spline(x, x) - (LinvKtest**2).sum()
+            cov_ftest = self.sigmaf**2 * k_spline(x - self.xoff, x - self.xoff) - (LinvKtest**2).sum()
             R = np.array((1, x)) - self.KinvHT.T @ Ktest
             result1 = np.linalg.solve(self.A, R)
             v.append(cov_ftest + R @ result1)
-        if np.isscalar(xtest):
+        if np.ndim(xtest) == 0:
             return v[0]
         return np.array(v)
 
     def covariance(self, xtest: ArrayLike) -> NDArray:
         """Returns the covariance between function evaluations at the test points `xtest`."""
-        if np.isscalar(xtest):
+        if np.ndim(xtest) == 0:
             return self.variance(xtest)
         xtest = np.asarray(xtest)
 
-        Ktest = self.sigmaf**2 * np.vstack([k_spline(x, self.x) for x in xtest]).T
+        Ktest = self.sigmaf**2 * np.vstack([k_spline(x - self.xoff, self.x - self.xoff) for x in xtest]).T
         LinvKtest = np.linalg.solve(self.L, Ktest)
-        cov_ftest = self.sigmaf**2 * np.vstack([k_spline(x, xtest) for x in xtest])
+        cov_ftest = self.sigmaf**2 * np.vstack([k_spline(x - self.xoff, xtest - self.xoff) for x in xtest])
         cov_ftest -= LinvKtest.T @ LinvKtest
         R = np.vstack((np.ones(len(xtest)), xtest))
         R -= self.KinvHT.T @ Ktest
@@ -491,19 +491,22 @@ class SmoothingSpline:
         (weighted) least squares fit of a line to the data meets the maxchisq
         constraint, then the actual chi-squared will be less than maxchisq.
         """
-        self.x = np.array(x)  # copy
-        self.y = np.array(y)
-        self.dy = np.array(dy)
+        order = np.argsort(x, kind="stable")
+        self.x = np.array(x, dtype=float)[order]
+        self.y = np.array(y)[order]
+        self.dy = np.broadcast_to(dy, self.x.shape)[order]
         if dx is None:
-            err = np.array(np.abs(dy))
+            err = np.array(np.abs(self.dy), dtype=float)
             dx = np.zeros_like(err)
         else:
+            dx = np.broadcast_to(dx, self.x.shape)[order]
             roughfit = np.polyfit(self.x, self.y, 2)
             slope = np.poly1d(np.polyder(roughfit, 1))(self.x)
-            err = np.sqrt((np.asarray(dx) * slope) ** 2 + self.dy**2)
+            err = np.sqrt((dx * slope) ** 2 + self.dy**2)
 
-        self.xscale = (self.x**2).mean() ** 0.5
-        self.x /= self.xscale
+        self.xoffset = self.x.mean()
+        self.xscale = ((self.x - self.xoffset) ** 2).mean() ** 0.5
+        self.x = (self.x - self.xoffset) / self.xscale
         self.dx = np.array(dx) / self.xscale
         self.err = err
         self.Nk = len(self.x)
@@ -568,15 +571,20 @@ class SmoothingSpline:
             chisq = np.sum(((self.y - ys) / self.err) ** 2)
             return chisq - target_chisq
 
-        mincurvature = 1e-20
-        pbest = sp.optimize.brentq(chisq_difference, mincurvature, 1, args=(chisq,))
-        beta = best_params(pbest)
+        H = np.vstack((np.ones_like(self.x), self.x)).T
+        line = H @ np.linalg.solve(H.T @ (Dinv[:, None] * H), H.T @ (Dinv * self.y))
+        if np.sum(Dinv * (self.y - line) ** 2) <= chisq:
+            beta = np.linalg.solve(self.N0, line)
+        else:
+            mincurvature = 1e-20
+            pbest = sp.optimize.brentq(chisq_difference, mincurvature, 1, args=(chisq,))
+            beta = best_params(pbest)
         self.coeff = self.basis.expand_coeff(beta)
         ys = self.N0 @ beta
         self.actualchisq = np.sum(((self.y - ys) / self.err) ** 2)
 
         # Store the linear extrapolation outside the knotted region.
-        endpoints = np.array([self.x[0], self.x[-1]]) * self.xscale
+        endpoints = np.array([self.x[0], self.x[-1]]) * self.xscale + self.xoffset
         val = self.__eval(endpoints, 0, allow_extrapolate=False)
         slope = self.__eval(endpoints, 1, allow_extrapolate=False) * self.xscale
         self.lowline = np.poly1d([slope[0], val[0]])
@@ -586,8 +594,7 @@ class SmoothingSpline:
         """Return the value of (the `der`th derivative of) the smoothing spline
         at data points `x`."""
         scalar = np.isscalar(x)
-        x = np.asarray(x)
-        x /= self.xscale
+        x = (np.array(x, dtype=float) - self.xoffset) / self.xscale
         splresult = splev(x, (self.basis.padknots, self.coeff, 3), der=der)
         low = x < self.x[0]
         high = x > self.x[-1]
@@ -595,14 +602,14 @@ class SmoothingSpline:
             if der == 0:
                 splresult[low] = self.lowline(x[low] - self.x[0])
             elif der == 1:
-                splresult[low] = self.lowline.coeffs[0]
+                splresult[low] = self.lowline.deriv()(0.0)
             elif der >= 2:
                 splresult[low] = 0.0
         if np.any(high) and allow_extrapolate:
             if der == 0:
                 splresult[high] = self.highline(x[high] - self.x[-1])
             elif der == 1:
-                splresult[high] = self.highline.coeffs[0]
+                splresult[high] = self.highline.deriv()(0.0)
             elif der >= 2:
                 splresult[high] = 0.0
         if der > 0:
@@ -665,4 +672,9 @@ class SmoothingSplineLog:
         NDArray
             Smoothing spline values (or derivative values) at `x`.
         """
-        return np.exp(self.linear_model(np.log(x), der=der))
+        y = np.exp(self.linear_model(np.log(x)))
+        if der == 0:
+            return y
+        if der == 1:
+            return y * self.linear_model(np.log(x), der=1) / x
+        raise NotImplementedError("SmoothingSplineLog supports only der=0 or 1")

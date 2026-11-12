@@ -51,6 +51,36 @@ class Test_SmoothingSpline:
         # At time of issue #74, this crashed on next line for Galen, but not for Joe.
         cal.drop_one_errors()
 
+    @staticmethod
+    def test_three_points():
+        """With 3 knots the spline must still be natural and match its reported chi-squared."""
+        x, y = np.array([1.0, 2, 4]), np.array([0.0, 5, 1])
+        ss = mass2.mathstat.interpolate.SmoothingSpline(x, y, np.ones(3))
+        assert ss.actualchisq == pytest.approx(3.0)
+        assert np.sum((y - ss(x)) ** 2) == pytest.approx(3.0)
+        assert ss(4.0, der=2) == pytest.approx(0.0, abs=1e-12)
+
+    @staticmethod
+    def test_unsorted_and_integer_x():
+        """Integer and unsorted x give the same spline as sorted float x."""
+        x = np.arange(1, 11)
+        y = np.sin(x)
+        dy = np.full(10, 0.1)
+        perm = np.random.default_rng(1).permutation(10)
+        xtest = np.linspace(0, 12, 30)
+        ref = mass2.mathstat.interpolate.SmoothingSpline(x.astype(float), y, dy)(xtest)
+        assert np.allclose(mass2.mathstat.interpolate.SmoothingSpline(x, y, dy)(xtest), ref)
+        assert np.allclose(mass2.mathstat.interpolate.SmoothingSpline(x[perm] * 1.0, y[perm], dy[perm])(xtest), ref)
+
+    @staticmethod
+    def test_line_meets_chisq():
+        """When the weighted line meets maxchisq, the spline is that line, also when extrapolated."""
+        x = np.arange(1.0, 11.0)
+        for dy in (1.0, 1e-9):
+            ss = mass2.mathstat.interpolate.SmoothingSpline(x, np.full(10, 5.0), np.full(10, dy))
+            assert np.allclose(ss(np.array([-5.0, 5.0, 20.0])), 5.0)
+            assert np.allclose(ss(np.array([-5.0, 5.0, 20.0]), der=1), 0.0)
+
 
 class Test_GPR:
     @staticmethod
@@ -90,3 +120,33 @@ class Test_GPR:
         allowed_diff = 2 * np.sqrt(var)
         for x, ad in zip(xtest, allowed_diff):
             assert abs(spl(x) - actualf(x)) < ad
+
+    @staticmethod
+    def test_gprspline_scalar_variance():
+        x = np.linspace(2, 10, 9)
+        g = GPRSpline(x, 25 - 10 * x + x * x + np.sin(7 * x), np.ones(9))
+        assert g.variance(5.0) == g.variance([5.0])[0]
+        assert g.covariance(5.0) == g.variance([5.0])[0]
+
+    @staticmethod
+    def test_gprspline_shift_invariant():
+        x = np.linspace(2, 10, 9)
+        y = 25 - 10 * x + x * x + np.sin(7 * x)
+        g = GPRSpline(x, y, np.ones(9), sigmaf=1.0)
+        h = GPRSpline(x - 20, y, np.ones(9), sigmaf=1.0)
+        xtest = np.array([1.0, 4.5, 11.0])
+        assert np.allclose(h(xtest - 20), g(xtest), rtol=0, atol=1e-8)
+        assert np.allclose(h.covariance(xtest - 20), g.covariance(xtest), rtol=0, atol=1e-8)
+        k = GPRSpline(x + 1e5, y, np.ones(9), sigmaf=1.0)
+        assert np.allclose(k(xtest + 1e5), g(xtest), rtol=0, atol=1e-6)
+        assert np.allclose(k.covariance(xtest + 1e5), g.covariance(xtest), rtol=0, atol=1e-6)
+
+    @staticmethod
+    def test_gprspline_unsigned_knots():
+        x = np.array([1000, 2000, 3500, 5000, 6400, 8000], dtype=np.uint16)
+        y = np.array([1.0, 2.1, 3.4, 5.2, 6.1, 8.3])
+        g = GPRSpline(x.astype(float), y, 0.1 * np.ones(6), sigmaf=0.01)
+        h = GPRSpline(x, y, 0.1 * np.ones(6), sigmaf=0.01)
+        xtest = np.array([1500.0, 4000.0, 7000.0])
+        assert np.allclose(h(xtest), g(xtest))
+        assert np.allclose(h.variance(xtest), g.variance(xtest))
