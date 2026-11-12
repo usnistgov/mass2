@@ -265,9 +265,9 @@ def drift_correct(
     passed in as <indicator>.)
     """
     uncorrected = np.asarray(uncorrected)
-    indicatorA: NDArray = np.array(indicator)
-    ptm_offset = np.median(indicatorA)
-    indicatorA -= ptm_offset
+    indicator = np.asarray(indicator)
+    ptm_offset = np.median(indicator)
+    indicatorA: NDArray = indicator - ptm_offset
     # Require that the slope never be so positive or so negative as to make the gain go negative when the indicator
     # takes on its minimum or maximum values, respectively. Fixes #176.
     assert max_correction >= 0
