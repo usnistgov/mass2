@@ -105,3 +105,16 @@ if __name__ == "__main__":
     # Run the function to generate and fit fake data
     test_multifit_and_saving_and_loading_steps_in_channel()
     test_multifit_and_saving_and_loading_steps_in_channels()
+    mp = pytest.MonkeyPatch()
+    test_multifit_and_saving_and_loading_steps_in_channel(mp)
+    test_multifit_and_saving_and_loading_steps_in_channels(mp)
+
+
+@pytest.mark.parametrize("a", [-1e-17, 0.0])
+def test_quadratic_gain_energy2ph_nearly_linear(a):
+    pfit_gain = np.polynomial.Polynomial([0.5, -2e-6, a])
+    step = mass2.core.MultiFitQuadraticGainStep(["x"], ["y"], pl.lit(True), pl.lit(True), pfit_gain, None, 0.0)
+    rough = mass2.core.rough_cal.BestAssignmentPfitGainResult(0.0, None, None, None, pfit_gain, None, None, None)
+    energy = np.array([2000.0, 4000.0, 8000.0])
+    for ph in (step.energy2ph(energy), rough.energy2ph(energy)):
+        assert step.ph2energy(ph) == pytest.approx(energy, rel=1e-13)

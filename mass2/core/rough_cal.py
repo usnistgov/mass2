@@ -152,9 +152,10 @@ class BestAssignmentPfitGainResult:
         # and given that we've selected for well formed calibrations,
         # we know which root we want
         cba = self.pfit_gain.convert().coef
-        c, bb, a = cba * np.asarray(energy)
+        cba = np.pad(cba, (0, 3 - len(cba)))
+        c, bb, a = np.multiply.outer(cba, np.asarray(energy))
         b = bb - 1
-        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+        ph = 2 * c / (-b + np.sqrt(b**2 - 4 * a * c))
         return ph
 
     def _energy2ph_deg1(self, energy: ArrayLike) -> NDArray:
@@ -695,6 +696,7 @@ def eval_3peak_assignment_pfit_gain(
         return ph / gain
 
     cba = pfit_gain_3peak.convert().coef
+    cba = np.pad(cba, (0, 3 - len(cba)))
 
     def energy2ph(energy: NDArray) -> NDArray:
         "Invert the gain curve to convert energy to pulse height."
@@ -706,7 +708,7 @@ def eval_3peak_assignment_pfit_gain(
         # we know which root we want
         c, bb, a = cba * energy
         b = bb - 1
-        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+        ph = 2 * c / (-b + np.sqrt(b**2 - 4 * a * c))
         return ph
 
     predicted_ph = [energy2ph(_e) for _e in line_energies]

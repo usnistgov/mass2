@@ -289,10 +289,11 @@ class MultiFitQuadraticGainStep(RecipeStep):
         # we know which root we want
         energy = np.asarray(energy)
         cba = self.pfit_gain.convert().coef
-        c, bb, a = cba * energy
+        cba = np.pad(cba, (0, 3 - len(cba)))
+        c, bb, a = np.multiply.outer(cba, energy)
         b = bb - 1
-        ph = (-b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
-        assert math.isclose(self.ph2energy(ph), energy, rel_tol=1e-6, abs_tol=1e-3)
+        ph = 2 * c / (-b + np.sqrt(b**2 - 4 * a * c))
+        assert np.allclose(self.ph2energy(ph), energy, rtol=1e-6, atol=1e-3)
         return ph
 
     @classmethod
