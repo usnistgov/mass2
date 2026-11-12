@@ -105,6 +105,14 @@ def test_combine_channels():
     assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleA")) == N1
     assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleB")) == N2
 
+    bad = {99: mass2.core.channel.BadChannel(ch1, None, "bad for test", None)}
+    data1_bad = dataclasses.replace(data1, bad_channels=bad)
+    assert list(mass2.Channels.combine_channels("samplecode", {"a": data1_bad, "b": data2}).bad_channels) == [99]
+    assert list(data1_bad.concat_data(data2).bad_channels) == [99]
+    data2_bad = dataclasses.replace(data2, channels={}, bad_channels={ch2.ch_num: mass2.core.channel.BadChannel(ch2, None, "", None)})
+    combined = mass2.Channels.combine_channels("samplecode", {"a": data1, "b": data2_bad})
+    assert list(combined.channels) == [] and list(combined.bad_channels) == [ch2.ch_num]
+
 
 def test_ljh_fractional_record(tmp_path):
     "Verify that it's allowed to open an LJH file with an non-integer # of binary records"
@@ -530,6 +538,34 @@ def test_steps():
 
     with pytest.raises(ValueError):
         steps.trim_dead_ends("this field doesn't exist")
+
+
+def test_trim_dead_ends_keeps_good_expr_columns():
+    ch0 = dummy_channel(npulses=20).with_columns(a=np.arange(20))
+    ch = ch0.with_select_step({"b": pl.col("a") * 2}).with_good_expr(pl.col("b") < 10)
+    ch = ch.with_select_step({"c": pl.col("a") + 1})
+    trim_steps = ch.steps.trim_dead_ends(["c"])
+    assert len(trim_steps) == 2
+    assert len(ch0.with_steps(trim_steps).good_df(["c"])) == 5
+
+
+def test_trim_dead_ends_keeps_change_time_zone():
+    start, end = pl.datetime(2025, 1, 1, 10, time_zone="UTC"), pl.datetime(2025, 1, 1, 10, 0, 9, time_zone="UTC")
+    t = pl.datetime_range(start, end, "1s", eager=True)
+    ch0 = dummy_channel(npulses=10).with_columns(timestamp=t)
+    ch = ch0.with_step(mass2.core.ChangeTimeZoneStep.new("Asia/Tokyo"))
+    ch = ch.with_select_step({"hour": pl.col("timestamp").dt.hour()})
+    trimmed = ch0.with_steps(ch.steps.trim_dead_ends("hour"))
+    assert trimmed.df["hour"].to_list() == ch.df["hour"].to_list() == [19] * 10
+
+
+def test_with_more_channels_new_overrule_good_and_bad():
+    a = mass2.Channels({n: dummy_channel(npulses=5, ch_num=n) for n in (1, 2)}, "A").set_bad(1, "dead")
+    b = mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "B")
+    c = a.with_more_channels(b)
+    assert sorted(c.channels) == [1, 2] and not c.bad_channels
+    d = b.with_more_channels(mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "D").set_bad(1, "dead"))
+    assert not d.channels and sorted(d.bad_channels) == [1]
 
 
 def test_save_analysis(tmpdir):

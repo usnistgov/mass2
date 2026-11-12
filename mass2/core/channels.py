@@ -58,9 +58,9 @@ class Channels:
         Channels
             The replacement
         """
-        channels = self.channels.copy()
+        channels = {k: v for k, v in self.channels.items() if k not in more.bad_channels}
         channels.update(more.channels)
-        bad = self.bad_channels.copy()
+        bad = {k: v for k, v in self.bad_channels.items() if k not in more.channels}
         bad.update(more.bad_channels)
         descr = self.description + more.description + "\nWarning! created by with_more_channels()"
         return dataclasses.replace(self, channels=channels, bad_channels=bad, description=descr)
@@ -378,6 +378,7 @@ class Channels:
                 new_bad_channels[key] = channel.as_bad(None, msg, None)
             else:
                 new_channels[key] = channel
+        new_bad_channels = mass2.misc.merge_dicts_ordered_by_keys(self.bad_channels, new_bad_channels)
         return Channels(new_channels, self.description, bad_channels=new_bad_channels)
 
     def linefit_joblib(self, line: str, col: str, prefer: str = "threads", n_jobs: int = 4) -> LineModelResult:
@@ -537,7 +538,7 @@ class Channels:
         ch2s = {}
         for ch_num, ch in self.channels.items():
             ch2s[ch_num] = ch.with_experiment_state_df(df_es)
-        return Channels(ch2s, self.description)
+        return dataclasses.replace(self, channels=ch2s)
 
     def with_experiment_state_by_path(self, experiment_state_path: str | Path | None = None) -> "Channels":
         """Return a copy of this Channels object with experiment state information added to each Channel.
@@ -680,7 +681,8 @@ class Channels:
             header = dataclasses.replace(ch.header, data_source=None, pulse_data_sources=sources)
             new_ch = dataclasses.replace(ch, header=header, df=combined_df, npulses=len(combined_df), pulseframer=combined_pulseframer)
             new_channels[ch_num] = new_ch
-        return mass2.Channels(new_channels, self.description + other_data.description)
+        bad = mass2.misc.merge_dicts_ordered_by_keys(self.bad_channels, other_data.bad_channels)
+        return mass2.Channels(new_channels, self.description + other_data.description, bad_channels=bad)
 
     @classmethod
     def from_oneChannel(cls, ch: Channel) -> "Channels":
@@ -708,9 +710,14 @@ class Channels:
         base = next(iter(constituents.values()))
         chdict: dict[int, mass2.Channel] = {}
         for chnum in base.channels.keys():
+            if not all(chnum in v.channels for v in constituents.values()):
+                continue
             d = {k: v.channels[chnum] for (k, v) in constituents.items()}
             chdict[chnum] = mass2.Channel.combine_channels(sourcename=sourcename, constituents=d)
-        return Channels(chdict, base.description)
+        bad: dict[int, BadChannel] = {}
+        for v in constituents.values():
+            bad = mass2.misc.merge_dicts_ordered_by_keys(bad, v.bad_channels)
+        return Channels(chdict, base.description, bad_channels=bad)
 
     @classmethod
     def from_df(
