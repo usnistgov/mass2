@@ -158,7 +158,7 @@ def noise_psd_periodogram(
     window: ndarray | str = "boxcar",
 ) -> "NoiseResult":
     """Compute the noise power spectral density using scipy's periodogram function and the autocorrelation."""
-    f, Pxx = sp.signal.periodogram(data, fs=1 / dt, window=window, axis=-1, detrend=False)
+    f, Pxx = sp.signal.periodogram(data - np.mean(data), fs=1 / dt, window=window, axis=-1, detrend=False)
     # len(f) = data.shape[1]//2+1
     # Pxx[i, j] is the PSD at frequency f[j] for the i‑th trace data[i, :]
     Pxx_mean = np.mean(Pxx, axis=0)
@@ -194,7 +194,15 @@ def calc_noise_result(
     data = np.asarray(data)
     data_zeromean = data - np.mean(data)
     (n_pulses, nsamples) = data_zeromean.shape
-    f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window)
+    if continuous:
+        f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(
+            data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window
+        )
+    else:
+        spec = mass2.mathstat.power_spectrum.PowerSpectrum(nsamples // 2, dt=dt)
+        for record in data_zeromean:
+            spec.addDataSegment(record[: 2 * (nsamples // 2)], window=window)
+        f_mass, psd_mass = spec.frequencies(), spec.spectrum()
     if nsamples <= skip_autocorr_if_length_over:
         if continuous:
             autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples)

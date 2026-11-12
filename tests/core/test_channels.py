@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.signal
 import os
 import pytest
 import polars as pl
@@ -307,7 +308,9 @@ def test_noise_psd():
     psd = noise_ch.spectrum()
     assert len(psd.frequencies) == 251
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
-    assert np.allclose(psd_raw.psd, psd.psd)
+    psd_discontinuous = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
+    assert np.allclose(psd_discontinuous.psd, psd.psd)
+    assert np.allclose(psd_discontinuous.psd[1:-1], expect[1:-1], atol=0.15)
 
 
 def test_get_pulses_2d():
@@ -696,3 +699,12 @@ def test_flux_jump_correction_non_time_ordered_data():
     ch3 = ch2.correct_pretrig_mean_jumps(period=PERIOD)
     sort_idx = ch3.df["subframecount"].to_numpy().argsort()
     assert np.all(ch3.df["ptm_jf"].to_numpy()[sort_idx] == ptm_correct)
+
+
+def test_noise_psd_discontinuous_records_not_straddled():
+    """Discontinuous records with different baselines must not leak steps into the PSD."""
+    rng = np.random.default_rng(2)
+    traces = rng.standard_normal((400, 64)) + rng.normal(0, 5, (400, 1))
+    result = mass2.core.noise_algorithms.calc_noise_result(traces, continuous=False, dt=0.5)
+    _, periodogram = scipy.signal.periodogram(traces, fs=2.0, axis=-1, detrend=False)
+    assert np.allclose(result.psd[1:-1], periodogram.mean(axis=0)[1:-1])
