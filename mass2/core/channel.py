@@ -1654,6 +1654,9 @@ class Channel:
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+        existing = (set(df_es.columns) - {"timestamp"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"experiment state columns {sorted(existing)} already exist")
 
         # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
         times = df_es["timestamp"]
@@ -1663,18 +1666,20 @@ class Channel:
         assert isinstance(self_time_type, Datetime)
         desired_time_zone = self_time_type.time_zone
         if desired_time_zone is None:
-            desired_time_zone = _local_timezone_name
-        if expt_state_time_type.time_zone != desired_time_zone:
+            if expt_state_time_type.time_zone is not None:
+                times = times.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+                df_es = df_es.with_columns(timestamp=times)
+        elif expt_state_time_type.time_zone != desired_time_zone:
             times = times.dt.convert_time_zone(desired_time_zone)
             df_es = df_es.with_columns(timestamp=times)
+        df_es = df_es.with_columns(pl.col("timestamp").dt.cast_time_unit(self_time_type.time_unit))
 
-        if not self.df["timestamp"].is_sorted():
-            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
-            # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
-            # print("This is likely a BUG in DASTARD.")
+        if force_timestamp_monotonic:
+            df = self.df.with_columns(pl.col("timestamp").cum_max())
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         else:
-            df = self.df
-        df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
+            df = self.df.with_row_index("_record").sort("timestamp")
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward").sort("_record").drop("_record")
         return self.with_replacement_df(df2)
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":

@@ -642,6 +642,32 @@ def test_change_time_zone():
     assert ch.df["timestamp"].dtype != df2["timestamp"].dtype
 
 
+def test_experiment_state_naive_channel_timestamps():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    t_es = pl.Series([t[0], t[5]]).dt.replace_time_zone("UTC").dt.convert_time_zone("Pacific/Fiji")
+    df_es = pl.DataFrame({"timestamp": t_es, "state_label": ["A", "B"]})
+    labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
+    assert labels == ["A"] * 5 + ["B"] * 5
+
+
+def test_experiment_state_ns_time_unit():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    df_es = pl.DataFrame({"timestamp": pl.Series([t[0], t[5]]).dt.cast_time_unit("ns"), "state_label": ["A", "B"]})
+    labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
+    assert labels == ["A"] * 5 + ["B"] * 5
+
+
+def test_experiment_state_twice_raises():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    df_es = pl.DataFrame({"timestamp": [t[0], t[5]], "state_label": ["A", "B"]})
+    ch = ch.with_experiment_state_df(df_es)
+    with pytest.raises(ValueError, match="state_label"):
+        ch.with_experiment_state_df(df_es)
+
+
 def test_channel_mismatched_n_samples():
     ch = dummy_channel()
     assert ch.pulseframer is not None
