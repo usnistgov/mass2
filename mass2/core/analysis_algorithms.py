@@ -68,25 +68,24 @@ def estimateRiseTime(pulse_data: ArrayLike, timebase: float, nPretrig: int) -> N
     idx_last_pk = pulse_data.argmax(axis=1).max()
 
     npulses = pulse_data.shape[0]
+    rising_data = (pulse_data[:, nPretrig : idx_last_pk + 1] - baseline_value[:, np.newaxis]) / value_at_peak[:, np.newaxis]
+    # Find the last and first indices at which the data are in (0.1, 0.9] times the
+    # peak value. Then make sure last is at least 1 past first.
     try:
-        rising_data = (pulse_data[:, nPretrig : idx_last_pk + 1] - baseline_value[:, np.newaxis]) / value_at_peak[:, np.newaxis]
-        # Find the last and first indices at which the data are in (0.1, 0.9] times the
-        # peak value. Then make sure last is at least 1 past first.
         last_idx = (rising_data > MAXTHRESH).argmax(axis=1) - 1
         first_idx = (rising_data > MINTHRESH).argmax(axis=1)
-        last_idx[last_idx < first_idx] = first_idx[last_idx < first_idx] + 1
-        last_idx[last_idx == rising_data.shape[1]] = rising_data.shape[1] - 1
-
-        pulsenum = np.arange(npulses)
-        y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
-        y_diff[y_diff < timebase] = timebase
-        time_diff = timebase * (last_idx - first_idx)
-        rise_time = time_diff / y_diff
-        rise_time[y_diff <= 0] = -9.9e-6
-        return rise_time
-
     except ValueError:
         return -9.9e-6 + np.zeros(npulses, dtype=float)
+    last_idx[last_idx < first_idx] = first_idx[last_idx < first_idx] + 1
+    last_idx[last_idx == rising_data.shape[1]] = rising_data.shape[1] - 1
+
+    pulsenum = np.arange(npulses)
+    y_diff = np.asarray(rising_data[pulsenum, last_idx] - rising_data[pulsenum, first_idx], dtype=float)
+    y_diff[y_diff < timebase] = timebase
+    time_diff = timebase * (last_idx - first_idx)
+    rise_time = time_diff / y_diff
+    rise_time[y_diff <= 0] = -9.9e-6
+    return rise_time
 
 
 def compute_max_deriv(
