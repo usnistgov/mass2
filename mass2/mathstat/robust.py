@@ -54,7 +54,7 @@ def bisquare_weighted_mean(x: ArrayLike, k: float, center: float | None = None, 
 
     The answer is found iteratively, revised until it changes by less than <tol>.  If
     <tol> is None (the default), then <tol> will use 1e-5 times the median absolute
-    deviation of <x> about its median.
+    deviation of <x> about its median, or 1e-5 times <k> if that deviation is zero.
 
     Data values a distance of more than <k> from the weighted mean are given no weight.
     """
@@ -63,7 +63,7 @@ def bisquare_weighted_mean(x: ArrayLike, k: float, center: float | None = None, 
     if center is None:
         center = float(np.median(x))
     if tol is None:
-        tol = 1e-5 * median_abs_dev(x, normalize=True)
+        tol = 1e-5 * (median_abs_dev(x, normalize=True) or k)
 
     for _iteration in range(100):
         weights = (1 - ((x - center) / k) ** 2.0) ** 2.0
@@ -95,7 +95,7 @@ def huber_weighted_mean(x: ArrayLike, k: float, center: float | None = None, tol
 
     The answer is found iteratively, revised until it changes by less than <tol>.  If
     <tol> is None (the default), then <tol> will use 1e-5 times the median absolute
-    deviation of <x> about its median.
+    deviation of <x> about its median, or 1e-5 times <k> if that deviation is zero.
 
     Data values a distance of more than <k> from the weighted mean are given no weight.
     """
@@ -104,7 +104,7 @@ def huber_weighted_mean(x: ArrayLike, k: float, center: float | None = None, tol
     if center is None:
         center = float(np.median(x))
     if tol is None:
-        tol = 1e-5 * median_abs_dev(x, normalize=True)
+        tol = 1e-5 * (median_abs_dev(x, normalize=True) or k)
 
     for _iteration in range(100):
         weights = np.asarray((1.0 * k) / np.abs(x - center))
@@ -143,7 +143,7 @@ def median_abs_dev(x: ArrayLike, normalize: bool = False) -> float:
     x = np.asarray(x)
     mad = float(np.median(np.abs(x - np.median(x))))
     if normalize:
-        return mad / 0.674480  # Half of the normal distribution has abs(x-mu) < 0.674480*sigma
+        return mad / 0.674490  # Half of the normal distribution has abs(x-mu) < 0.674490*sigma
     return mad
 
 
@@ -161,7 +161,7 @@ def shorth_range(
     Args:
         x (array): The data set under study.  Must be a sequence of values.
         normalize (bool): If False (default), then return the actual range b-a.  If True, then the
-            range will be divided by 1.348960, which normalizes the range to be a consistent estimator
+            range will be divided by 1.348980, which normalizes the range to be a consistent estimator
             of the parameter sigma in the case of an exact Gaussian distribution.  (A small correction
             of order 1/N is applied, too, which mostly corrects for bias at modest values of the sample
             size N.)
@@ -199,10 +199,10 @@ def shorth_range(
     shorth_range = b - a
 
     if normalize:
-        shorth_range /= 2 * 0.674480
-        # Asymptotic expectation for normal data: sigma*2*0.674480
-        # The value 2*0.674480 is twice the inverse cumulative normal distribution at 0.75. That is,
-        # the middle 50% of a normal distribution are within ±0.674480*sigma of the mean.
+        shorth_range /= 2 * 0.674490
+        # Asymptotic expectation for normal data: sigma*2*0.674490
+        # The value 2*0.674490 is twice the inverse cumulative normal distribution at 0.75. That is,
+        # the middle 50% of a normal distribution are within ±0.674490*sigma of the mean.
 
         # The small-n corrections depend on n mod 4.  See Rousseeuw & Lerow 1988.
         # These are not at all clear from the text of the paper (see table on p. 115
@@ -267,14 +267,16 @@ def Qscale(x: ArrayLike, sort_inplace: bool = False) -> float:
         sort_inplace: Whether it is okay for the function to reorder the set <x>.
             If True, <x> must be a np.ndarray (or ValueError is raised).
 
-    Q is defined as d_n * 2.2219 * {|xi-xj|; i<j}_k, where
+    Q is defined as d_n * 2.219144 * {|xi-xj|; i<j}_k, where
 
         {a}_k means the kth order-statistic of the set {a},
         this set is that of the distances between all (n 2) possible pairs of data in {x}
         n=# of observations in set {x},
         k = (n choose 2)/4,
-        2.2219 makes Q consistent for sigma in normal distributions as n-->infinity,
-        and d_n is a correction factor to the 2.2219 when n is not large.
+        2.219144 = 1/(sqrt(2) Phi^-1(5/8)) makes Q consistent for sigma in normal distributions
+        as n-->infinity, and d_n is a correction factor to it when n is not large. For n <= 9,
+        the tabulated d_n of Croux & Rousseeuw were computed with their rounded constant 2.2219,
+        so that constant is used there.
 
     This function does apply the correction factors to make Q consistent with sigma for a
     Gaussian distribution.
@@ -299,9 +301,9 @@ def Qscale(x: ArrayLike, sort_inplace: bool = False) -> float:
     target_k = h * (h - 1) // 2 - 1  # -1 so that order count can start at 0 instead of conventional 1,2,3...
 
     # Compute the n-dependent prefactor to make Q consistent with sigma of a Gaussian.
-    prefactor = 2.2219
+    prefactor = 2.219144
     if n <= 9:
-        prefactor *= [0, 0, 0.399, 0.994, 0.512, 0.844, 0.611, 0.857, 0.669, 0.872][n]
+        prefactor = 2.2219 * [0, 0, 0.399, 0.994, 0.512, 0.844, 0.611, 0.857, 0.669, 0.872][n]
     elif n % 2 == 1:
         prefactor *= n / (n + 1.4)
     else:
@@ -319,7 +321,7 @@ def Qscale(x: ArrayLike, sort_inplace: bool = False) -> float:
         dist.sort()
         return dist[target_k] * prefactor
 
-    q, npasses = _Qscale_subroutine(x, n, target_k)
+    q, npasses = _Qscale_subroutine(np.asarray(x, dtype=np.float64), n, target_k)
 
     if npasses > n:
         raise RuntimeError(f"Qscale tried {npasses} distances, which is too many")
@@ -353,7 +355,7 @@ def _high_median(sort_idx: NDArray, weights: ArrayLike, n: int) -> int:
             trial_right_weight += weights[sort_idx[i]]
 
         if left_weight + trial_left_weight > half_weight:  # j < itrial
-            right_weight += trial_right_weight
+            right_weight += trial_right_weight + weights[sort_idx[itrial]]
             imax = itrial
         elif right_weight + trial_right_weight >= half_weight:  # j > itrial
             left_weight += trial_left_weight
@@ -398,6 +400,21 @@ def _choose_trial_val(left: NDArray, right: NDArray, x: ArrayLike, n: int) -> tu
 
 
 @njit
+def _count_row_below(x: np.ndarray, i: int, distance: float, inclusive: bool) -> int:
+    """Count j > i with x[j] - x[i] < distance (or <= distance if `inclusive`), for sorted `x`."""
+    lo = i + 1
+    hi = len(x)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        diff = x[mid] - x[i]
+        if diff < distance or (inclusive and diff == distance):
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo - (i + 1)
+
+
+@njit
 def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int]:
     """Subroutine to compute the Q statistic.
 
@@ -428,15 +445,10 @@ def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int
     for i in range(n - 1):
         right[i] = n - 1
 
-    per_row_value = np.zeros(n - 1, dtype=np.float64)
-
     # In this loop, we close in on the Q that we seek by doing a bisection search of each row,
     # with left and right representing the smallest and largest column #s still in the running.
     for counter in range(n + 10):
         trial_distance, trial_q_row, trial_q_col = _choose_trial_val(left, right, x, n)
-        for i in range(n - 1):
-            per_row_value[i] = trial_distance + x[i]
-
         # In each row i, find the highest index trial_column such that x[tc]-x[i] < trial_distance
         # If such an index is out of the candidate range, then let it be left-1 or right.
         # We must be extremely careful in this loop, because rounding errors can make
@@ -446,9 +458,7 @@ def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int
 
         # trial_column tracks the column in each row which is the highest column strictly less than
         # the trial distance.
-        for i in range(per_row_value.shape[0]):
-            trial_val = per_row_value[i]
-
+        for i in range(n - 1):
             # Test for if this is the row containing the trial Q-value.  If so, column is known.
             # Use this to avoid comparing exact equality of floats on the trial Q's (row,col).
             if i == trial_q_row:
@@ -457,17 +467,17 @@ def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int
 
             ia = left[i]
             ib = right[i]
-            if ia > ib or x[ia] >= trial_val:
+            if ia > ib or x[ia] - x[i] >= trial_distance:
                 trial_column[i] = ia - 1
                 continue
-            if x[ib] <= trial_val:
+            if x[ib] - x[i] <= trial_distance:
                 trial_column[i] = ib
                 continue
             while ib - ia > 1:
                 imiddle = (ib + ia) // 2
-                if x[imiddle] < trial_val:
+                if x[imiddle] - x[i] < trial_distance:
                     ia = imiddle
-                elif x[imiddle] > trial_val:
+                elif x[imiddle] - x[i] > trial_distance:
                     ib = imiddle
                 else:
                     ia = imiddle - 1
@@ -476,6 +486,13 @@ def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int
             trial_column[i] = ia
 
         candidates_below_trial_dist = np.sum(trial_column) - ((n - 2) * (n - 1)) / 2
+        n_below = 0
+        n_atmost = 0
+        for i in range(n - 1):
+            n_below += _count_row_below(x, i, trial_distance, False)
+            n_atmost += _count_row_below(x, i, trial_distance, True)
+        if n_below <= target_k < n_atmost:
+            return trial_distance, counter
 
         if candidates_below_trial_dist == target_k:
             return trial_distance, counter
@@ -486,7 +503,7 @@ def _Qscale_subroutine(x: np.ndarray, n: int, target_k: int) -> tuple[float, int
                     right[i] = n - 1
         else:
             for i in range(n - 1):
-                left[i] = trial_column[i] + 1
-            left[trial_q_row] += 1
+                left[i] = max(trial_column[i] + 1, i + 1 + _count_row_below(x, i, trial_distance, True))
+            left[trial_q_row] = trial_column[trial_q_row] + 2
 
     return trial_distance, counter

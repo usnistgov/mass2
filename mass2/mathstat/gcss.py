@@ -46,8 +46,8 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
     NDArray
         The indices of the selected columns
     """
-    A = np.asarray(A)
-    B = np.asarray(B)
+    A = np.asarray(A, dtype=float)
+    B = np.asarray(B, dtype=float)
     m, n = A.shape
     mb, r = B.shape
     assert m == mb, "A and B must have equal number of rows"
@@ -63,24 +63,23 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
     chosen: list[int] = []
     omega = np.zeros((ncol, n), dtype=float)
     v = np.zeros((ncol, r), dtype=float)
-    first_delta = 0.0
 
     for iter in range(ncol):
         # Tentatively choose to eliminate column p, the one with the biggest (f/g) ratio.
         # "Tentative" because we still have to check for numerical problems.
-        p = (f / g).argmax()
+        p = int(np.where(g > 0, f / np.where(g > 0, g, 1.0), -np.inf).argmax())
         delta = AtA[:, p].copy()
         gamma = BtA[:, p].copy()
-        if iter == 0:
-            first_delta = delta[p]
         for k in range(iter):
             delta -= omega[k, p] * omega[k]
             gamma -= omega[k, p] * v[k]
 
         # Test whether update rule is starting to fail: delta[p] should not be negative,
         # but in practice it gets so close as to cause numerical problems. Similarly, no surviving f should go negative.
-        numerical_problems = (delta[p] <= first_delta * 1e-15) or np.any((f < 0) & np.isfinite(g))
+        numerical_problems = (delta[p] <= AtA[p, p] * 1e-10) or np.any((f < 0) & np.isfinite(g))
         assert (p not in chosen) or numerical_problems
+        if numerical_problems and not chosen:
+            return np.arange(ncol)
         if numerical_problems:
             # Now that it is failing, we have to call gcss recursively with the chosen columns fully eliminated from
             # the source matrix and projected out of the data matrix. This might be inefficient, but I have no
@@ -89,8 +88,9 @@ def gcss(A: ArrayLike, B: ArrayLike, ncol: int) -> NDArray:  # noqa: PLR0914
             for c in chosen:
                 retained[c] = False
 
-            newA = A[:, retained]
             selected_col = A[:, ~retained]
+            newA = A[:, retained] - selected_col @ np.linalg.lstsq(selected_col, A[:, retained])[0]
+            newA[:, (newA**2).sum(axis=0) <= 1e-20 * (A[:, retained] ** 2).sum(axis=0)] = 0.0
             coef = np.linalg.lstsq(selected_col, B)[0]
             newB = B - selected_col @ coef
             subresult = gcss(newA, newB, ncol=ncol - len(chosen))
