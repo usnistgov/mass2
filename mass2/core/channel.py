@@ -1515,6 +1515,7 @@ class Channel:
         invert_data: bool = False,
         timestamps: bool = True,
         rescale: float = 1.0,
+        noise_continuous: bool = False,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1541,6 +1542,8 @@ class Channel:
             Whether to generate timestamp guesses, based on file creation time, by default True
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
+        noise_continuous: bool, optional
+            Whether the noise records form one continuous stream, by default False
 
         Returns
         -------
@@ -1554,7 +1557,7 @@ class Channel:
                 data = data[0, :, :]
             assert data.ndim == 2
             if invert_data:
-                data = -data
+                data = -np.asarray(data, dtype=np.result_type(data, 1.0))
             return data * rescale
 
         frametime_s = 1 / samplerate
@@ -1572,7 +1575,9 @@ class Channel:
             ns_per_us = 1000
             initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
             times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
-            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(
+                timestamp=pl.from_epoch("timestamp", "us").dt.convert_time_zone(_local_timezone_name)
+            )
 
         if noise_fname is None:
             nch = None
@@ -1582,7 +1587,7 @@ class Channel:
             noise_df = pl.DataFrame({"index": range(nnoise)})
             noise_header = pl.DataFrame({
                 "filename": noise_fname,
-                "continuous": True,
+                "continuous": noise_continuous,
                 "Presamples": npresamples,
             })
             framer = PulseDataFromNumpy(ndata.T)

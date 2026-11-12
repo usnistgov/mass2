@@ -708,6 +708,17 @@ def test_ch_from_numpy():
             assert np.all(raw_df2["pulse"][i].to_numpy() == raw[:, i])
 
 
+def test_ch_from_numpy_invert_unsigned():
+    raw = np.arange(1000, 1600, dtype=np.uint16).reshape(20, 30)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fname = os.path.join(tmpdir, "data.npy")
+        np.save(fname, raw)
+        ch = mass2.Channel.from_numpy(10000, 10, fname, invert_data=True, timestamps=False)
+        assert ch.pulseframer is not None
+        pulse = ch.pulseframer.load_raw_chunk(0, 1)["pulse"][0].to_numpy()
+        assert np.array_equal(pulse, -raw[:, 0].astype(float))
+
+
 def test_ch_from_numpy2():
     "Test that we can read actual pulse data from a numpy file"
     pulse_noise_pair = pulsedata.numpy["noise_limited_optical_tes"]
