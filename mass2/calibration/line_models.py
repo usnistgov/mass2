@@ -219,20 +219,6 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
     "Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation"
     """
 
-    def _residual(self, params: lmfit.Parameters, data: NDArray | None, weights: NDArray | None, **kwargs: Any) -> NDArray:
-        """Calculate the chi_MLE^2 value from Joe Fowler's Paper
-        doi:10.1007/s10909-014-1098-4 Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation
-        """
-        y = self.eval(params, **kwargs)
-        if data is None:
-            return y
-        r2 = y - data
-        nonzero = data > 0
-        r2[nonzero] += data[nonzero] * np.log((data / y)[nonzero])
-        vals = (2 * r2) ** 0.5
-        vals[y < data] *= -1
-        return vals
-
     def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """Sum of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
