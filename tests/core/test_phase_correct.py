@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import mass2
 
 
@@ -38,3 +39,26 @@ def test_phase_correct(plot=False):
     assert resolutions[1] <= 4.4
     assert resolutions[2] <= 4.0
     assert resolutions[3] <= 4.4
+
+
+def test_phase_correct_single_narrow_line():
+    rng = np.random.default_rng(3)
+    phase = rng.uniform(-0.5, 0.5, 5000)
+    ph = 1000 + 2 * phase + rng.normal(0, 0.5, len(phase))
+    corrected = mass2.core.phase_correct.phase_correct(phase, ph, ph_peaks=[1000])(phase, ph)
+    assert np.all(np.isfinite(corrected))
+    assert corrected.std() < 0.55
+
+
+def test_phase_correct_no_peaks_found():
+    with pytest.raises(ValueError, match="no peaks found"):
+        mass2.core.phase_correct.phase_correct(np.zeros(1000), np.full(1000, 5.0))
+
+
+def test_phase_correct_integer_pulse_heights():
+    rng = np.random.default_rng(1)
+    phase = rng.uniform(-0.5, 0.5, 5000)
+    ph = np.round(rng.choice([3000.0, 5000.0], len(phase)) + 20 * phase).astype(np.int64)
+    expected = mass2.core.phase_correct.phase_correct(phase, ph.astype(float), ph_peaks=[3000, 5000])(phase, ph.astype(float))
+    corrector = mass2.core.phase_correct.phase_correct(phase, ph, ph_peaks=[3000, 5000])
+    assert np.array_equal(corrector(phase, ph), expected)
