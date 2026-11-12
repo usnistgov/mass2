@@ -40,6 +40,8 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
         ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
         traces_used += 1
 
+    if traces_used == 0:
+        raise ValueError("Apparently all noise traces had large excursions from baseline, so no autocorrelation was computed")
     ac /= traces_used * nsamples
     # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
     # ac /= nsamples - np.arange(nsamples, dtype=float)
