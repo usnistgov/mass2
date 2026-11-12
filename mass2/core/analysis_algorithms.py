@@ -554,9 +554,9 @@ def time_drift_correct(  # noqa: PLR0914
     H3 = laplace_entropy(uncorrected * (1 + model2(xnorm)), w=w)
 
     end_model: Callable = model
-    if H2 <= 0 or H2 - H1 > 0.0:
+    if not np.isfinite(H2) or H2 - H1 > 0.0:
         end_model = np.poly1d([0])
-    elif H3 <= 0 or H3 - H2 > 0.00001:
+    elif np.isfinite(H3) and H3 - H2 <= 0.00001:
         end_model = model2
 
     def safe_model(x: NDArray) -> NDArray:
