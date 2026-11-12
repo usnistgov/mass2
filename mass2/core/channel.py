@@ -894,7 +894,11 @@ class Channel:
         of by replacing it entirely if `replace` is True."""
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
+        if good_expr is True:
+            good_expr = pl.lit(True)
+        if not replace:
+            if good_expr is True or good_expr.meta.eq(pl.lit(True)):
+                return self
             good_expr = good_expr.and_(self.good_expr)
         return dataclasses.replace(self, good_expr=good_expr)
 
@@ -1357,7 +1361,7 @@ class Channel:
 
     def bad_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
         """Return a Polars DataFrame of the given columns, filtered by the inverse of good_expr, and use_expr."""
-        bad_df = self.df.lazy().filter(self.good_expr.not_())
+        bad_df = self.df.lazy().filter(self.good_expr.fill_null(False).not_())
         if use_expr is not True:
             bad_df = bad_df.filter(use_expr)
         return bad_df.select(cols).collect()

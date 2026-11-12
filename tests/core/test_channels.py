@@ -470,6 +470,14 @@ def test_categorize_step():
         assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)
 
 
+def test_with_good_expr_true_keeps_cuts():
+    ch = dummy_channel(npulses=10).with_columns(a=np.arange(10))
+    ch = ch.with_good_expr(pl.col("a") < 4)
+    for extra in (pl.lit(True), True):
+        assert len(ch.with_good_expr(extra).good_df(["a"])) == 4
+    assert len(ch.with_good_expr(pl.lit(True), replace=True).good_df(["a"])) == 10
+
+
 def test_include_exclude():
     "Check that both the include and exclude lists work as intended"
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
@@ -694,6 +702,13 @@ def test_experiment_state_twice_raises():
     ch = ch.with_experiment_state_df(df_es)
     with pytest.raises(ValueError, match="state_label"):
         ch.with_experiment_state_df(df_es)
+
+
+def test_good_df_and_bad_df_partition_null_rows():
+    ch = dummy_channel(npulses=10).with_columns(label=pl.Series(["A"] * 4 + ["B"] * 3 + [None] * 3))
+    ch = ch.with_good_expr(pl.col("label") == "A")
+    assert len(ch.good_df()) == 4
+    assert len(ch.bad_df()) == 6
 
 
 def test_channel_mismatched_n_samples():
