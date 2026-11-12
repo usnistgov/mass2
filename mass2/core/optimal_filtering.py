@@ -636,23 +636,30 @@ class FilterMaker:
         avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
 
         n = len(avg_signal)
-        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
         pulse_model = np.vstack((avg_signal, np.ones_like(avg_signal)))
         if constraints is not None:
             pulse_model = np.vstack((pulse_model, constraints))
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
-        Rinv_model = NoiseR.solve(pulse_model.T)
-        A = pulse_model @ Rinv_model
-        all_filters = np.linalg.solve(A, Rinv_model.T)
+        if self.whitener is not None:
+            WM = self.whitener(pulse_model.T)
+            all_filters = np.linalg.solve(WM.T @ WM, self.whitener.applyWT(WM).T)
+        else:
+            assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(pulse_model.T)
+            A = pulse_model @ Rinv_model
+            all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
 
         self._normalize_filter(filt_noconst, avg_signal)
-        variance = bracketR(filt_noconst, noise_corr)
+        if self.whitener is not None and self.noise_autocorr is None:
+            variance = np.sum(self.whitener.solveWT(filt_noconst) ** 2)
+        else:
+            variance = bracketR(filt_noconst, noise_corr)
 
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
@@ -761,23 +768,30 @@ class FilterMaker:
         shorten = 2  # for 5-lag convolution
         truncated_signal = avg_signal[shorten:-shorten]
         n = len(truncated_signal)
-        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
         pulse_model = np.vstack((truncated_signal, np.ones_like(truncated_signal)))
         if constraints is not None:
             pulse_model = np.vstack((pulse_model, constraints))
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
-        Rinv_model = NoiseR.solve(pulse_model.T)
-        A = pulse_model @ Rinv_model
-        all_filters = np.linalg.solve(A, Rinv_model.T)
+        if self.whitener is not None:
+            WM = self.whitener(pulse_model.T)
+            all_filters = np.linalg.solve(WM.T @ WM, self.whitener.applyWT(WM).T)
+        else:
+            assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(pulse_model.T)
+            A = pulse_model @ Rinv_model
+            all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
 
         self._normalize_5lag_filter(filt_noconst, avg_signal)
-        variance = bracketR(filt_noconst, noise_corr)
+        if self.whitener is not None and self.noise_autocorr is None:
+            variance = np.sum(self.whitener.solveWT(filt_noconst) ** 2)
+        else:
+            variance = bracketR(filt_noconst, noise_corr)
 
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
