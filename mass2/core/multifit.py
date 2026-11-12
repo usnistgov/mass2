@@ -89,6 +89,7 @@ class MultiFit:
     default_params_update: dict = field(default_factory=lmfit.Parameters)
     fitspecs: list[FitSpec] = field(default_factory=list)
     results: list | None = None
+    max_fractional_shift: float = 0.02
 
     def with_line(
         self,
@@ -148,13 +149,42 @@ class MultiFit:
         results = [fitspec.fit_series_without_use_expr(series) for fitspec in self.fitspecs]
         return self.with_results(results)
 
+    def with_windows_aligned(self, values: ArrayLike) -> "MultiFit":
+        """Return a copy of this MultiFit with every fit window moved by one common factor, within
+        1 +- max_fractional_shift, chosen to put the most `values` near all the line peaks at once.
+
+        A rough calibration can be off by more than the fit windows allow (e.g., when the gain changed
+        since it was learned); then a window holds only the tail of its line or a neighboring line.
+        Requiring all lines to agree on one factor keeps a single misleading peak from winning."""
+        values = np.asarray(values, dtype=float)
+        values = np.sort(values[np.isfinite(values)])
+        if self.max_fractional_shift <= 0 or len(self.fitspecs) == 0 or len(values) == 0:
+            return self
+        peaks = np.array([fitspec.model.spect.peak_energy for fitspec in self.fitspecs])
+        halfwidths = np.array([(fitspec.bin_edges[-1] - fitspec.bin_edges[0]) / 8 for fitspec in self.fitspecs])
+        step = halfwidths.min() / (2 * peaks.max())
+        n = int(np.ceil(self.max_fractional_shift / step))
+        factors = 1 + step * np.arange(-n, n + 1)
+        factors = factors[np.argsort(np.abs(factors - 1), kind="stable")]
+        centers = np.outer(factors, peaks)
+        counts = np.searchsorted(values, centers + halfwidths) - np.searchsorted(values, centers - halfwidths)
+        factor = factors[np.argmax(counts.sum(axis=1))]
+        fitspecs = [
+            dataclasses.replace(fitspec, bin_edges=fitspec.bin_edges + (factor - 1) * peak)
+            for fitspec, peak in zip(self.fitspecs, peaks)
+        ]
+        return dataclasses.replace(self, fitspecs=fitspecs)
+
     def fit_df(self, df: pl.DataFrame, col: str, good_expr: pl.Expr) -> "MultiFit":
-        """Fit all the FitSpecs in this MultiFit to the given DataFrame column `col` after applying good_expr filter."""
+        """Fit all the FitSpecs in this MultiFit to the given DataFrame column `col` after applying good_expr filter.
+        The fit windows first follow a common gain shift of up to max_fractional_shift (see `with_windows_aligned`)."""
+        values = mass2.misc.good_series(df, col, good_expr, use_expr=self.default_use_expr).to_numpy()
+        multifit = self.with_windows_aligned(values)
         results = []
-        for fitspec in self.fitspecs:
+        for fitspec in multifit.fitspecs:
             result = fitspec.fit_df(df, col, good_expr)
             results.append(result)
-        return self.with_results(results)
+        return multifit.with_results(results)
 
     def fit_ch(self, ch: "Channel", col: str) -> "MultiFit":
         """Fit all the FitSpecs in this MultiFit to the given Channel's DataFrame column `col`
