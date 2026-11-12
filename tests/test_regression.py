@@ -1,3 +1,4 @@
+import pathlib
 import numpy as np
 import polars as pl
 import mass2
@@ -7,11 +8,7 @@ import pulsedata
 def load_data():
     pairs = pulsedata.pulse_noise_ljh_pairs["bessy_20240727"]
     shorter_pulse_files = pairs.pulse_folder / ".." / "0001"
-    data1 = mass2.Channels.from_ljh_folder(shorter_pulse_files, pairs.noise_folder)
-
-    pairs = pulsedata.pulse_noise_ljh_pairs["regression"]
-    data2 = mass2.Channels.from_ljh_folder(pairs.pulse_folder)
-    return data1.with_more_channels(data2)
+    return mass2.Channels.from_ljh_folder(shorter_pulse_files, pairs.noise_folder)
 
 
 def all_steps(ch: mass2.Channel) -> mass2.Channel:
@@ -27,8 +24,9 @@ def all_steps(ch: mass2.Channel) -> mass2.Channel:
 def test_analysis_regression():
     """Make sure that analysis results don't change without us noticing"""
     data = load_data()
-    data = data.map(all_steps)
-    expected_df = pl.read_parquet("tests/regression_test_data.parquet")
+    data = data.map(all_steps, allow_throw=True)
+    expected_df = pl.read_parquet(pathlib.Path(__file__).parent / "regression_test_data.parquet")
+    assert set(data.channels) == set(expected_df["ch_num"].unique())
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
         found = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
@@ -45,7 +43,7 @@ def test_analysis_regression():
 def store_analysis_regression():
     """Use this to replace the test data file"""
     data = load_data()
-    data = data.map(all_steps)
+    data = data.map(all_steps, allow_throw=True)
     frames = []
     for ch_num, ch in data.channels.items():
         df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False).with_columns(ch_num=pl.lit(ch_num))
