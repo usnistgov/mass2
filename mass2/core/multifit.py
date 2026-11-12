@@ -312,7 +312,7 @@ class MultiFitQuadraticGainStep(RecipeStep):
         rough_energy_col = previous_cal_step.output[0]
         uncalibrated_col = previous_cal_step.inputs[0]
 
-        multifit_with_results = multifit_spec.fit_ch(ch, col=rough_energy_col)
+        multifit_with_results = multifit_spec.fit_df(ch.df, rough_energy_col, ch.good_expr.and_(use_expr))
         # multifit_df = multifit_with_results.results_params_as_df()
         pfit_gain, rms_residual_energy = multifit_with_results.to_pfit_gain(previous_cal_step.energy2ph)
         step = cls(
@@ -385,7 +385,7 @@ class MultiFitMassCalibrationStep(RecipeStep):
         rough_energy_col = previous_cal_step.output[0]
         uncalibrated_col = previous_cal_step.inputs[0]
 
-        multifit_with_results = multifit_spec.fit_ch(ch, col=rough_energy_col)
+        multifit_with_results = multifit_spec.fit_df(ch.df, rough_energy_col, ch.good_expr.and_(use_expr))
         cal = multifit_with_results.to_mass_cal(previous_cal_step.energy2ph)
         step = cls(
             [uncalibrated_col],
