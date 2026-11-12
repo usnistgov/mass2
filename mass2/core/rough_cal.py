@@ -5,7 +5,7 @@ Tools for rough calibration of pulse heights to energies
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 from numpy.typing import NDArray, ArrayLike
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import dataclasses
 import numpy as np
 import pylab as plt  # type: ignore
@@ -20,7 +20,7 @@ import itertools
 import mass2
 from .channel import Channel, AnchorLine
 from .recipe import RecipeStep
-from .misc import alwaysTrue, PulseDataFramer
+from .misc import PulseDataFramer
 
 # from . import rough_cal
 from mass2.calibration.algorithms import line_names_and_energies
@@ -328,7 +328,7 @@ def hist_smoothed(
     pulse_heights = pulse_heights.astype(np.float64)
     # convert to float64 to avoid wrapping subtraction and platform specific behavior regarding uint16s
     # linux CI will throw errors, while windows does not, but maybe is just silently wrong?
-    assert len(pulse_heights > 10), "not enough pulses"
+    assert len(pulse_heights) > 10, "not enough pulses"
     if bin_edges is None:
         n = 128 * 1024
         lo = (np.min(pulse_heights) - 3 * fwhm_pulse_height_units).astype(np.float64)
@@ -367,7 +367,7 @@ def peakfind_local_maxima_of_smoothed_hist(
 ) -> SmoothedLocalMaximaResult:
     """Find local maxima in a smoothed histogram of pulse heights."""
     pulse_heights = pulse_heights.astype(np.float64)
-    assert len(pulse_heights > 10), "not enough pulses"
+    assert len(pulse_heights) > 10, "not enough pulses"
     smoothed_counts, bin_edges, counts = hist_smoothed(pulse_heights, fwhm_pulse_height_units, bin_edges)
     bin_centers, _step_size = mass2.misc.midpoints_and_step_size(bin_edges)
     local_maxima_inds, local_minima_inds = local_maxima(smoothed_counts)
@@ -517,7 +517,10 @@ def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str])
     """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
     and fit a polynomial gain curve to the result."""
     ph = np.asarray(ph)
-    e = np.asarray(e)
+    order = np.argsort(e, kind="stable")
+    e = np.asarray(e)[order]
+    line_names = list(line_names)
+    line_names = [line_names[i] for i in order]
     rms_e_residual, pha = find_optimal_assignment(ph, e)
     if e[0] == 0:
         raise ValueError("cannot use energy=0 points to learn gain based calibration")
@@ -546,9 +549,13 @@ def find_optimal_assignment2_height_info(
     """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
     while respecting constraints on which pulse heights can be assigned to which energies,
     and fit a polynomial gain curve to the result."""
+    order = np.argsort(e, kind="stable")
+    e = np.asarray(e)[order]
+    line_names = list(line_names)
+    line_names = [line_names[i] for i in order]
+    line_heights_allowed = [line_heights_allowed[i] for i in order]
     rms_e_residual, pha = find_optimal_assignment_height_info(ph, e, line_heights_allowed)
     ph = np.asarray(ph)
-    e = np.asarray(e)
     gain = pha / e
     deg = min(len(e) - 1, 2)
     if deg == 0:
@@ -589,6 +596,9 @@ def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, 
     and return the one with the lowest RMS residual in energy after fitting a 2nd degree polynomial gain curve.
     Return as a BestAssignmentPfitGainResult object.
     """
+    order = np.argsort(e, kind="stable")
+    e = np.asarray(e)[order]
+    names = [names[i] for i in order]
     (
         best_rms_residual,
         best_ph_assigned,
@@ -611,9 +621,11 @@ def find_best_residual_among_all_possible_assignments2(ph: ndarray, e: ndarray, 
 def find_best_residual_among_all_possible_assignments(ph: ndarray, e: ndarray) -> tuple[float, ndarray, ndarray, ndarray, Polynomial]:
     """Try all possible assignments of pulse heights to energies,
     and return the one with the lowest RMS residual in energy after fitting a 2nd degree polynomial gain curve.
+    The returned arrays follow ascending energy order.
     """
     assert len(ph) >= len(e)
     ph = np.sort(ph)
+    e = np.sort(e)
     assignments_inds = itertools.combinations(np.arange(len(ph)), len(e))
     best_rms_residual = np.inf
     best_ph_assigned = np.array([])
@@ -811,7 +823,7 @@ class RoughCalibrationStep(RecipeStep):
         calibrated_col: str,
         ph_smoothing_fwhm: float,
         n_extra: int,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "RoughCalibrationStep":
         """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
         and assigning them to known energies in a way that minimizes the RMS error in a local linearity test."""
@@ -851,7 +863,7 @@ class RoughCalibrationStep(RecipeStep):
         calibrated_col: str,
         ph_smoothing_fwhm: float,
         n_extra: int,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
     ) -> "RoughCalibrationStep":
         """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
         and assigning them to known energies in a way that minimizes the RMS error in a local linearity test,
@@ -888,7 +900,7 @@ class RoughCalibrationStep(RecipeStep):
         line_names: list[str | float],
         uncalibrated_col: str = "filtValue",
         calibrated_col: str | None = None,
-        use_expr: pl.Expr = field(default_factory=alwaysTrue),
+        use_expr: pl.Expr = pl.lit(True),
         max_fractional_energy_error_3rd_assignment: float = 0.1,
         min_gain_fraction_at_ph_30k: float = 0.25,
         fwhm_pulse_height_units: float = 75,

@@ -218,3 +218,25 @@ def test_find_optimal_assignment_height_info_two_lines() -> None:
     assert np.array_equal(pha, [2000.0, 3000.0])
     _, pha = mass2.core.rough_cal.find_optimal_assignment_height_info(ph, e, [[0, 1, 2], [0, 1, 2]])
     assert np.array_equal(pha, [2000.0, 5000.0])
+
+
+def test_find_optimal_assignment2_unsorted_energies() -> None:
+    ph = np.array([5964.4, 8920.0, 2991.06, 1234.0])
+    e = np.array([6000.0, 3000.0, 9000.0])
+    expected = np.array([3000.0, 6000.0, 9000.0])
+    result = mass2.core.rough_cal.find_optimal_assignment2(ph, e, ["b", "a", "c"])
+    assert np.allclose(result.ph2energy(np.array([2991.06, 5964.4, 8920.0])), expected, atol=1)
+    assert list(result.names_target) == ["a", "b", "c"]
+    result = mass2.core.rough_cal.find_optimal_assignment2_height_info(ph, e, ["b", "a", "c"], [[2], [1], [3]])
+    assert np.allclose(result.ph2energy(np.array([2991.06, 5964.4, 8920.0])), expected, atol=1)
+    assert list(result.names_target) == ["a", "b", "c"]
+
+
+def test_find_best_residual_among_all_possible_assignments2_unsorted_energies() -> None:
+    e_true = np.array([3000.0, 4500.0, 6000.0, 8000.0])
+    ph_true = 2 * e_true * (1 - e_true / 40000)
+    ph = np.hstack([ph_true, [1234.0, 20000.0]])
+    result = mass2.core.rough_cal.find_best_residual_among_all_possible_assignments2(ph, e_true[[2, 0, 3, 1]], ["c", "a", "d", "b"])
+    assert np.allclose(result.ph2energy(ph_true), e_true, atol=5)
+    assert list(result.names_target) == ["a", "b", "c", "d"]
+    assert np.allclose(result.ph_assigned, ph_true)
