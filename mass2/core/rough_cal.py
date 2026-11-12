@@ -466,7 +466,7 @@ def find_optimal_assignment(ph: ArrayLike, e: ArrayLike) -> tuple[float, NDArray
     return rms_e_residual[ind], pha[ind]
 
 
-def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_heights_allowed: ArrayLike) -> tuple[float, NDArray]:
+def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_heights_allowed: list[list[int]]) -> tuple[float, NDArray]:
     """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
     while respecting constraints on which pulse heights can be assigned to which energies."""
     # ph is a list of peak heights longer than e
@@ -476,15 +476,22 @@ def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_height
     # when given 3 or less energies to match, use the largest peaks in peak order
     ph = np.asarray(ph)
     e = np.asarray(e)
-    line_heights_allowed = np.asarray(line_heights_allowed)
     assert len(e) >= 1
     if len(e) <= 2:
-        return 0, np.array(sorted(ph[: len(e)]))
+        order = np.argsort(ph, kind="stable")
+        allowed = [
+            c
+            for c in itertools.combinations(range(len(ph)), len(e))
+            if all(c[j] in line_heights_allowed[j] for j in range(len(e)))
+        ]
+        if not allowed:
+            raise Exception("no assignment found satisfying peak height info")
+        best = min(allowed, key=lambda c: int(order[list(c)].sum()))
+        return 0, ph[order[list(best)]]
 
     rms_e_residual, pha, pha_inds = rank_assignments(ph, e)
     best_ind = None
     best_rms_residual = np.inf
-    print(f"{e=}")
     for i_assign in range(len(rms_e_residual)):
         rms_e_candidate = rms_e_residual[i_assign]
         # pha[i,:] is one choice of len(e) values from ph to assign to e
@@ -492,20 +499,13 @@ def find_optimal_assignment_height_info(ph: ArrayLike, e: ArrayLike, line_height
         if rms_e_candidate > best_rms_residual:
             continue
         # check if peaks mathch height info
-        print(f"{pha_inds_candidate=}")
-        print(f"{line_heights_allowed=}")
         failed_line_height_check = False
         for j in range(len(e)):
             if pha_inds_candidate[j] not in line_heights_allowed[j]:
                 failed_line_height_check = True
-                print("not allowed")
-                a = pha_inds_candidate[j]
-                b = line_heights_allowed[j]
-                print(f"{a=} {b=}")
                 break
         if failed_line_height_check:
             continue
-        print("is new best!")
         best_rms_residual = rms_e_candidate
         best_ind = i_assign
     if best_ind is None:
@@ -541,7 +541,7 @@ def find_optimal_assignment2(ph: ArrayLike, e: ArrayLike, line_names: list[str])
 
 
 def find_optimal_assignment2_height_info(
-    ph: ArrayLike, e: ArrayLike, line_names: list[str], line_heights_allowed: ArrayLike
+    ph: ArrayLike, e: ArrayLike, line_names: list[str], line_heights_allowed: list[list[int]]
 ) -> BestAssignmentPfitGainResult:
     """Find the optimal assignment of pulse heights to energies by minimizing the RMS error in a local linearity test,
     while respecting constraints on which pulse heights can be assigned to which energies,
@@ -856,6 +856,8 @@ class RoughCalibrationStep(RecipeStep):
         """Train a rough calibration step by finding peaks in a smoothed histogram of pulse heights,
         and assigning them to known energies in a way that minimizes the RMS error in a local linearity test,
         while respecting constraints on which pulse heights can be assigned to which energies."""
+        order = np.argsort([line_names_and_energies([name])[1][0] for name in line_names])
+        line_heights_allowed = [line_heights_allowed[i] for i in order]
         (names, ee) = line_names_and_energies(line_names)
         uncalibrated = ch.good_series(uncalibrated_col, use_expr=use_expr).to_numpy()
         assert len(uncalibrated) > 10, "not enough pulses"

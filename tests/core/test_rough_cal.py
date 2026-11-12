@@ -189,3 +189,32 @@ def test_two_peak_rough_cal_combinatoric() -> None:
     assert assignment.phzerogain() < 0
     df_good = ch.df.filter(ch.good_expr)
     assert len(df_good) > 0
+
+
+def test_find_optimal_assignment_height_info_ragged() -> None:
+    ph = np.array([1000.0, 1500.0, 2000.0, 1700.0])
+    e = np.array([2000.0, 3000.0, 4000.0])
+    _, pha = mass2.core.rough_cal.find_optimal_assignment_height_info(ph, e, [[0, 1], [1], [2, 3]])
+    assert np.array_equal(pha, [1000.0, 1500.0, 2000.0])
+
+
+def test_rough_cal_drop_debug_keeps_energy2ph() -> None:
+    signal = np.zeros(50, dtype=np.int16)
+    signal[25:] = 1000
+    chA = dummy_channel(signal=signal).summarize_pulses()
+    chB = dummy_channel(signal=signal * 2).summarize_pulses()
+    df = pl.concat([chA.df, chB.df])
+    ch = mass2.Channel(df, chA.header, npulses=len(df), noise=chA.noise)
+    ch = ch.rough_cal_combinatoric([100, 180], "pulse_average", calibrated_col="energy_pulse_average", ph_smoothing_fwhm=5)
+    step = ch.steps[-1]
+    assert np.isclose(step.drop_debug().energy2ph(150.0), step.energy2ph(150.0))
+    assert np.isclose(step.ph2energy(step.drop_debug().energy2ph(150.0)), 150.0)
+
+
+def test_find_optimal_assignment_height_info_two_lines() -> None:
+    ph = np.array([5000.0, 2000.0, 3000.0])
+    e = np.array([2000.0, 3000.0])
+    _, pha = mass2.core.rough_cal.find_optimal_assignment_height_info(ph, e, [[0], [1]])
+    assert np.array_equal(pha, [2000.0, 3000.0])
+    _, pha = mass2.core.rough_cal.find_optimal_assignment_height_info(ph, e, [[0, 1, 2], [0, 1, 2]])
+    assert np.array_equal(pha, [2000.0, 5000.0])
