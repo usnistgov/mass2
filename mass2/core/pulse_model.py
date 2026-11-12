@@ -70,7 +70,7 @@ class PulseModel:
 
     def toHDF5(self, hdf5_group: h5py.Group, save_inverted: bool) -> None:
         """Save the pulse model to an HDF5 group."""
-        projectors, basis = self.projectors[()], self.basis[()]
+        projectors, basis = self.projectors.copy(), self.basis.copy()
         if save_inverted:
             # flip every component except the mean component if data is being inverted
             basis[:, 1:] *= -1
@@ -175,7 +175,7 @@ class PulseModel:
         """Return a list of labels for the basis elements."""
         labels = ["const", "deriv", "pulse"]
         for i in range(self.n_basis - 3):
-            if i > self.n_basis - 3 - self.extra_n_basis_5lag:
+            if i >= self.n_basis - 3 - self.extra_n_basis_5lag:
                 labels += [f"5lag{i + 2 - self.extra_n_basis_5lag}"]
             else:
                 labels += [f"svd{i}"]
