@@ -4,9 +4,11 @@ import mass2
 import polars as pl
 import os
 import tempfile
+import pytest
 
 
 def generate_and_fit_fake_data(
+    monkeypatch,
     n_mn_counts=2000,
     mn_fwhm_ev=4,
     n_gaussian_counts=1000,
@@ -60,7 +62,7 @@ def generate_and_fit_fake_data(
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
     )
-    mass2.calibration.line_models.VALIDATE_BIN_SIZE = False
+    monkeypatch.setattr(mass2.calibration.line_models, "VALIDATE_BIN_SIZE", False)
     ch = ch.rough_cal_combinatoric(
         ["MnKAlpha", gaussian_centers_ev[0], gaussian_centers_ev[1]],
         ph_smoothing_fwhm=4,
@@ -70,11 +72,16 @@ def generate_and_fit_fake_data(
     )
     ch = ch.multifit_mass_cal(multifit, previous_cal_step_index=-1, calibrated_col="energy3")
 
+    energy = ch.df["energy"].to_numpy()
+    energy3 = ch.df["energy3"].to_numpy()
+    for center in [line.peak_energy, *gaussian_centers_ev]:
+        near = np.abs(energy - center) < 20
+        assert np.abs(energy3[near] - energy[near]).max() < 0.5
     return ch
 
 
-def test_multifit_and_saving_and_loading_steps_in_channel():
-    ch = generate_and_fit_fake_data()
+def test_multifit_and_saving_and_loading_steps_in_channel(monkeypatch):
+    ch = generate_and_fit_fake_data(monkeypatch)
     ch.step_plot(-1)
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
@@ -87,8 +94,8 @@ def test_multifit_and_saving_and_loading_steps_in_channel():
     plt.close()
 
 
-def test_multifit_and_saving_and_loading_steps_in_channels():
-    ch = generate_and_fit_fake_data()
+def test_multifit_and_saving_and_loading_steps_in_channels(monkeypatch):
+    ch = generate_and_fit_fake_data(monkeypatch)
     data = mass2.Channels({ch.header.ch_num: ch}, "for test_multifit_in_channels")
 
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
@@ -103,8 +110,6 @@ def test_multifit_and_saving_and_loading_steps_in_channels():
 
 if __name__ == "__main__":
     # Run the function to generate and fit fake data
-    test_multifit_and_saving_and_loading_steps_in_channel()
-    test_multifit_and_saving_and_loading_steps_in_channels()
     mp = pytest.MonkeyPatch()
     test_multifit_and_saving_and_loading_steps_in_channel(mp)
     test_multifit_and_saving_and_loading_steps_in_channels(mp)
