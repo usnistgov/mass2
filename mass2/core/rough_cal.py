@@ -355,6 +355,8 @@ def local_maxima(y: ndarray) -> tuple[ndarray, ndarray]:
             local_minima_inds.append(i)
             increasing = True
     # increasing starts false, so we always start with a miniumum
+    if not increasing and local_maxima_inds:
+        local_minima_inds.append(len(y) - 1)
     return np.array(local_maxima_inds), np.array(local_minima_inds)
 
 
