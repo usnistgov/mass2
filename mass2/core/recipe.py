@@ -312,7 +312,7 @@ class Recipe(Sequence[RecipeStep]):
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         "return a dataframe with all the newly calculated info"
         for step in self.steps:
-            df = step.calc_from_df(df, pulseframer).with_columns(df)
+            df = step.calc_from_df(df, pulseframer)
         return df
 
     @classmethod
