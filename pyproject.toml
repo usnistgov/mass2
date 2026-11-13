@@ -36,6 +36,7 @@ dependencies = [
     "tornado", # for matplotlib plots in Marimo
     "tzlocal",
     "uncertainties",
+    "six",
     "xraydb",
 ]
 
