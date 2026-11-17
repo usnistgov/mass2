@@ -65,8 +65,8 @@ def test_filter():
     e = np.linspace(4000, 9000, 6)
     qe = m(e, uncertain=True)
     maxQE = qe.max()
-    assert maxQE > 0.21, r"Horton filter model QE < 21% everywhere"
-    assert maxQE < 0.25, r"Horton filter model QE > 25% somewhere"
+    assert maxQE.n > 0.21, r"Horton filter model QE < 21% everywhere"
+    assert maxQE.n < 0.25, r"Horton filter model QE > 25% somewhere"
 
     assert np.abs(qe[0].nominal_value / 0.07742066727279993 - 1) < 0.001
 
