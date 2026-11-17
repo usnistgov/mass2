@@ -33,6 +33,14 @@ class Test_MnKA_distribution:
         assert 0 < values.min()
 
     @staticmethod
+    def test_seeded_redraws():
+        """Redraws of non-positive variates must use the given rng."""
+        line = mass2.calibration.fluorescence_lines.SpectralLine.quick_monochromatic_line("test", 50.0, 40.0, 0)
+        a = line.rvs(size=10000, instrument_gaussian_fwhm=20.0, rng=np.random.default_rng(1))
+        b = line.rvs(size=10000, instrument_gaussian_fwhm=20.0, rng=np.random.default_rng(1))
+        assert np.array_equal(a, b)
+
+    @staticmethod
     def test_quartiles():
         """Check that the quartiles of the generated energies are reasonable."""
         line = mass2.calibration.fluorescence_lines.MnKAlpha
@@ -144,3 +152,8 @@ class TestFitterBehavior:
         model.fit(sim, params, bin_centers=e, weights=None)
         with pytest.raises(Exception):
             model.fit(sim, params, bin_centers=e, weights=sim**1.5)
+
+
+def test_standard_features_u_kalpha_isotope():
+    assert mass2.STANDARD_FEATURES["UKAlpha1"] == 98431.58
+    assert mass2.STANDARD_FEATURES["UKAlpha2"] == 94650.84

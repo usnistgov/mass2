@@ -2,6 +2,16 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.1.3** November 17, 2026
+* Very many bug fixes by Claude Code 5.5 and @unger-daniel.
+* Fix line models, energy cal, and `MultiFit` (PR 194).
+* Refactor and fix code errors in tests (PR 193).
+* Allow the `MultiFit` object to shift gains in common by up to ~2% (PR 192).
+* Bugs in reading and merging LJH files and TrueBq files (PR 191).
+* Bugs in noise power spectra and autocorrelation and filters (PR 190).
+* Bugs in robust statistics, splines and generalized column subset selection (PR 189).
+* Bugs in Channel, Channels, recipes, and external triggers (PR 188).
+
 **2.1.2** November 17, 2026-
 * Add Kα and Kβ line models for Sn based on Zschornack book (PR 197).
 * Fix missing dependency on `six` (PR 195).

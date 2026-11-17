@@ -11,6 +11,7 @@ import numpy as np
 import xraydb
 import mass2
 from mass2.calibration.fluorescence_lines import spectra
+from mass2.calibration import hci_lines  # noqa: F401
 from mass2.calibration.line_models import GenericLineModel
 
 

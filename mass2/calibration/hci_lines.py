@@ -114,37 +114,34 @@ class NIST_ASD:
         levelsDict: dict = {}
         numLevels = 0
         for iLevel in list(self.NIST_ASD_Dict[element][spectralCharge].keys()):
-            try:
-                # Check to see if we reached maximum number of levels to return
-                if maxLevels is not None:
-                    if numLevels == maxLevels:
-                        return levelsDict
-                # If required, check to see if level matches search conf, term, JVal
-                includeTerm = False
-                includeJVal = False
-                conf, term, j_str = iLevel.split()
-                JVal = j_str.split("=")[1]
-                includeConf = (requiredConf is None) or conf == requiredConf
-                includeTerm = (requiredTerm is None) or term == requiredTerm
-                includeJVal = (requiredJVal is None) or JVal == requiredJVal
+            # Check to see if we reached maximum number of levels to return
+            if maxLevels is not None:
+                if numLevels == maxLevels:
+                    return levelsDict
+            # If required, check to see if level matches search conf, term, JVal
+            includeTerm = False
+            includeJVal = False
+            if "Limit" in iLevel or " J=" not in iLevel:
+                continue
+            rest, JVal = iLevel.rsplit(" J=", 1)
+            conf, _, term = rest.partition(" ")
+            includeConf = (requiredConf is None) or conf == requiredConf
+            includeTerm = (requiredTerm is None) or term == requiredTerm
+            includeJVal = (requiredJVal is None) or JVal == requiredJVal
 
-                # Include levels that match, in either cm-1 or eV
-                if includeConf and includeTerm and includeJVal:
-                    numLevels += 1
-                    if units == "cm-1":
-                        if getUncertainty:
-                            levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel]
-                        else:
-                            levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
-                    elif units == "eV":
-                        if getUncertainty:
-                            levelsDict[iLevel] = [
-                                iValue * INVCM_TO_EV for iValue in self.NIST_ASD_Dict[element][spectralCharge][iLevel]
-                            ]
-                        else:
-                            levelsDict[iLevel] = INVCM_TO_EV * self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
-            except ValueError:
-                f"Warning: cannot parse level: {iLevel}"
+            # Include levels that match, in either cm-1 or eV
+            if includeConf and includeTerm and includeJVal:
+                numLevels += 1
+                if units == "cm-1":
+                    if getUncertainty:
+                        levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel]
+                    else:
+                        levelsDict[iLevel] = self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
+                elif units == "eV":
+                    if getUncertainty:
+                        levelsDict[iLevel] = [iValue * INVCM_TO_EV for iValue in self.NIST_ASD_Dict[element][spectralCharge][iLevel]]
+                    else:
+                        levelsDict[iLevel] = INVCM_TO_EV * self.NIST_ASD_Dict[element][spectralCharge][iLevel][0]
         return levelsDict
 
     def getSingleLevel(
