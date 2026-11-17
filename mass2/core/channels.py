@@ -42,7 +42,7 @@ class Channels:
     def ch0(self) -> Channel:
         """Return a representative Channel object for convenient exploration (the one with the lowest channel number)."""
         assert len(self.channels) > 0, "channels must be non-empty"
-        return next(iter(self.channels.values()))
+        return self.channels[min(self.channels)]
 
     def with_more_channels(self, more: "Channels") -> "Channels":
         """Return a Channels object with additional Channels in it.

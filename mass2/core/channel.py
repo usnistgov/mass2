@@ -1459,8 +1459,8 @@ class Channel:
         else:
             noise_channel = NoiseChannel.from_ljh(noise_path)
         ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
-        df, header_df = ljh.to_polars(keep_posix_usec)
-        header = ChannelHeader.from_ljh_header_df(header_df)
+        df, header_df = ljh.to_polars(keep_posix_usec=keep_posix_usec)
+        header = dataclasses.replace(ChannelHeader.from_ljh_header_df(header_df), n_presamples=ljh.npresamples)
         if noise_path:
             header = dataclasses.replace(header, noise_data_source=str(noise_path))
         channel = cls(
