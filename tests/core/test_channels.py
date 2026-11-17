@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.signal
 import os
 import pytest
 import polars as pl
@@ -19,6 +20,18 @@ def test_ljh_to_polars():
     _df_noise, _header_df_noise = ljh_noise.to_polars()
     ljh = mass2.LJHFile.open(p.pulse_folder / "20230626_run0001_chan4102.ljh")
     _df, _header_df = ljh.to_polars()
+
+
+def test_transform_raw_applies_to_noise():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    pulse_path = p.pulse_folder / "20230626_run0001_chan4102.ljh"
+    noise_path = p.noise_folder / "20230626_run0000_chan4102.ljh"
+    v_over_dv = []
+    for transform in (None, lambda raw: 2.0 * np.asarray(raw, dtype=float)):
+        ch = mass2.Channel.from_ljh(pulse_path, noise_path, max_pulses=2000, transform_raw=transform)
+        ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv().filter5lag(f_3db=10e3)
+        v_over_dv.append(ch.last_v_over_dv)
+    assert v_over_dv[1] == pytest.approx(v_over_dv[0], rel=1e-6)
 
 
 def dummy_dataframe(npulses: int) -> pl.DataFrame:
@@ -104,6 +117,14 @@ def test_combine_channels():
     assert "samplecode" in data.ch0.df.columns
     assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleA")) == N1
     assert len(data.ch0.df.filter(pl.col("samplecode") == "sampleB")) == N2
+
+    bad = {99: mass2.core.channel.BadChannel(ch1, None, "bad for test", None)}
+    data1_bad = dataclasses.replace(data1, bad_channels=bad)
+    assert list(mass2.Channels.combine_channels("samplecode", {"a": data1_bad, "b": data2}).bad_channels) == [99]
+    assert list(data1_bad.concat_data(data2).bad_channels) == [99]
+    data2_bad = dataclasses.replace(data2, channels={}, bad_channels={ch2.ch_num: mass2.core.channel.BadChannel(ch2, None, "", None)})
+    combined = mass2.Channels.combine_channels("samplecode", {"a": data1, "b": data2_bad})
+    assert list(combined.channels) == [] and list(combined.bad_channels) == [ch2.ch_num]
 
 
 def test_ljh_fractional_record(tmp_path):
@@ -239,7 +260,7 @@ def test_noise_autocorr():
     noise_ch = mass2.NoiseChannel(df_noise, header, frametime_s, PulseDataFromNumpy(noise_traces))
     assert len(noise_ch.df) == 250
     assert noise_ch.pulseframer is not None
-    assert len(noise_ch.pulseframer.load_raw_pulse(0)["pulse"]) == 500
+    assert noise_ch.pulseframer.load_raw_pulse(0)["pulse"].to_numpy().shape == (1, 500)
     noise_autocorr_mass = mass2.core.noise_algorithms.calc_discontinuous_autocorrelation(noise_traces)
     assert len(noise_autocorr_mass) == 500
     assert noise_autocorr_mass[0] == pytest.approx(1, rel=1e-1)
@@ -296,7 +317,9 @@ def test_noise_psd():
     psd = noise_ch.spectrum()
     assert len(psd.frequencies) == 251
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
-    assert np.allclose(psd_raw.psd, psd.psd)
+    psd_discontinuous = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
+    assert np.allclose(psd_discontinuous.psd, psd.psd)
+    assert np.allclose(psd_discontinuous.psd[1:-1], expect[1:-1], atol=0.15)
 
 
 def test_get_pulses_2d():
@@ -363,6 +386,12 @@ def test_concat_dfs_with_concat_state():
     assert df_concat["concat_state"].to_list() == [0] * 3 + [1] * 2
     df_concat2 = mass2.core.misc.concat_dfs_with_concat_state(df_concat, df2)
     assert df_concat2.shape == (7, 2)
+    df_concat3 = mass2.core.misc.concat_dfs_with_concat_state(df_concat.reverse(), df2)
+    assert df_concat3["concat_state"].to_list()[-2:] == [2, 2]
+    df_nested = mass2.core.misc.concat_dfs_with_concat_state(df2, df_concat)
+    assert df_nested["concat_state"].to_list() == [0] * 2 + [1] * 3 + [2] * 2
+    df_empty_first = mass2.core.misc.concat_dfs_with_concat_state(df1.clear(), df2)
+    assert df_empty_first["concat_state"].to_list() == [1] * 2
 
 
 def test_col_map_step():
@@ -438,6 +467,17 @@ def test_filtering_steps():
     assert np.allclose(ch.df["1lagx"].to_numpy().mean(), 0)
 
 
+def test_filter_output_not_replaced_by_peak_columns():
+    t = np.arange(-25, 25)
+    signal = 10000 * (np.exp(-t / 12.0) - np.exp(-t / 3.0))
+    signal[t < 0] = 0
+    ch = dummy_channel(npulses=100, signal=signal)
+    ref = ch.filter1lag(f_3db=20000)
+    ch = ch.filter5lag(f_3db=20000, peak_x_col="peak_x", peak_y_col="peak_y").filter1lag(f_3db=20000)
+    assert np.array_equal(ch.df["1lagy"].to_numpy(), ref.df["1lagy"].to_numpy())
+    assert "peak_y" in ch.df.columns
+
+
 def test_categorize_step():
     n = 100
     ch = dummy_channel(npulses=n)
@@ -459,6 +499,14 @@ def test_categorize_step():
         steps2 = mass2.misc.unpickle_object(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)
+
+
+def test_with_good_expr_true_keeps_cuts():
+    ch = dummy_channel(npulses=10).with_columns(a=np.arange(10))
+    ch = ch.with_good_expr(pl.col("a") < 4)
+    for extra in (pl.lit(True), True):
+        assert len(ch.with_good_expr(extra).good_df(["a"])) == 4
+    assert len(ch.with_good_expr(pl.lit(True), replace=True).good_df(["a"])) == 10
 
 
 def test_include_exclude():
@@ -531,6 +579,34 @@ def test_steps():
         steps.trim_dead_ends("this field doesn't exist")
 
 
+def test_trim_dead_ends_keeps_good_expr_columns():
+    ch0 = dummy_channel(npulses=20).with_columns(a=np.arange(20))
+    ch = ch0.with_select_step({"b": pl.col("a") * 2}).with_good_expr(pl.col("b") < 10)
+    ch = ch.with_select_step({"c": pl.col("a") + 1})
+    trim_steps = ch.steps.trim_dead_ends(["c"])
+    assert len(trim_steps) == 2
+    assert len(ch0.with_steps(trim_steps).good_df(["c"])) == 5
+
+
+def test_trim_dead_ends_keeps_change_time_zone():
+    start, end = pl.datetime(2025, 1, 1, 10, time_zone="UTC"), pl.datetime(2025, 1, 1, 10, 0, 9, time_zone="UTC")
+    t = pl.datetime_range(start, end, "1s", eager=True)
+    ch0 = dummy_channel(npulses=10).with_columns(timestamp=t)
+    ch = ch0.with_step(mass2.core.ChangeTimeZoneStep.new("Asia/Tokyo"))
+    ch = ch.with_select_step({"hour": pl.col("timestamp").dt.hour()})
+    trimmed = ch0.with_steps(ch.steps.trim_dead_ends("hour"))
+    assert trimmed.df["hour"].to_list() == ch.df["hour"].to_list() == [19] * 10
+
+
+def test_with_more_channels_new_overrule_good_and_bad():
+    a = mass2.Channels({n: dummy_channel(npulses=5, ch_num=n) for n in (1, 2)}, "A").set_bad(1, "dead")
+    b = mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "B")
+    c = a.with_more_channels(b)
+    assert sorted(c.channels) == [1, 2] and not c.bad_channels
+    d = b.with_more_channels(mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "D").set_bad(1, "dead"))
+    assert not d.channels and sorted(d.bad_channels) == [1]
+
+
 def test_save_analysis(tmpdir):
     """Test save and load analysis features, including a bad channel, for dummy data."""
     ch_num = 94
@@ -586,6 +662,16 @@ def test_save_analysis_with_ljh(tmpdir):
     assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
 
 
+def test_load_analysis_keeps_saved_timestamp(tmpdir):
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    ch = mass2.Channel.from_ljh(str(p.pulse_folder / "20230626_run0001_chan4109.ljh"), max_pulses=200)
+    ch = ch.with_step(mass2.core.ChangeTimeZoneStep.new("Pacific/Fiji"))
+    savefile = pathlib.Path(tmpdir) / "test_save.zip"
+    mass2.Channels({ch.ch_num: ch}, description="tz").save_analysis(savefile)
+    restored_ch = mass2.Channels.load_analysis(savefile).channels[ch.ch_num]
+    assert_frame_equal(restored_ch.df, ch.df, check_column_order=False)
+
+
 def test_change_time_zone():
     p = pulsedata.pulse_noise_ljh_pairs["20230626"]
     filename = p.pulse_folder / "20230626_run0001_chan4109.ljh"
@@ -603,6 +689,57 @@ def test_change_time_zone():
     df2 = ch2.df
     assert (df1["timestamp"] == df2["timestamp"]).all()
     assert ch.df["timestamp"].dtype != df2["timestamp"].dtype
+
+
+def test_change_time_zone_keeps_good_expr():
+    p = pulsedata.pulse_noise_ljh_pairs["20230626"]
+    ch = mass2.Channel.from_ljh(str(p.pulse_folder / "20230626_run0001_chan4109.ljh"), max_pulses=200).summarize_pulses()
+    ch = ch.with_good_expr(pl.col("pretrig_rms") < pl.col("pretrig_rms").median())
+    n_good = len(ch.good_df(["pretrig_rms"]))
+    assert n_good < len(ch.df)
+    ch2 = ch.with_step(mass2.core.ChangeTimeZoneStep.new("Pacific/Fiji"))
+    assert len(ch2.good_df(["pretrig_rms"])) == n_good
+
+
+def test_replay_after_good_expr_replaced_by_true():
+    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_good_expr(pl.col("x") > 5)
+    ch = ch.with_column_map_step("x", "a", lambda v: 2 * v).with_good_expr(pl.lit(True), replace=True)
+    ch = ch.with_column_map_step("x", "b", lambda v: 3 * v)
+    replayed = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_steps(ch.steps)
+    assert len(replayed.good_df()) == len(ch.good_df()) == 10
+
+
+def test_experiment_state_naive_channel_timestamps():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    t_es = pl.Series([t[0], t[5]]).dt.replace_time_zone("UTC").dt.convert_time_zone("Pacific/Fiji")
+    df_es = pl.DataFrame({"timestamp": t_es, "state_label": ["A", "B"]})
+    labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
+    assert labels == ["A"] * 5 + ["B"] * 5
+
+
+def test_experiment_state_ns_time_unit():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    df_es = pl.DataFrame({"timestamp": pl.Series([t[0], t[5]]).dt.cast_time_unit("ns"), "state_label": ["A", "B"]})
+    labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
+    assert labels == ["A"] * 5 + ["B"] * 5
+
+
+def test_experiment_state_twice_raises():
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
+    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    df_es = pl.DataFrame({"timestamp": [t[0], t[5]], "state_label": ["A", "B"]})
+    ch = ch.with_experiment_state_df(df_es)
+    with pytest.raises(ValueError, match="state_label"):
+        ch.with_experiment_state_df(df_es)
+
+
+def test_good_df_and_bad_df_partition_null_rows():
+    ch = dummy_channel(npulses=10).with_columns(label=pl.Series(["A"] * 4 + ["B"] * 3 + [None] * 3))
+    ch = ch.with_good_expr(pl.col("label") == "A")
+    assert len(ch.good_df()) == 4
+    assert len(ch.bad_df()) == 6
 
 
 def test_channel_mismatched_n_samples():
@@ -631,6 +768,17 @@ def test_ch_from_numpy():
         raw_df1 = data.ch0.pulseframer.load_raw_chunk(0, npulses)
         for i in range(npulses):
             assert np.all(raw_df1["pulse"][i].to_numpy() == raw[:, i])
+
+
+def test_ch_from_numpy_invert_unsigned():
+    raw = np.arange(1000, 1600, dtype=np.uint16).reshape(20, 30)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fname = os.path.join(tmpdir, "data.npy")
+        np.save(fname, raw)
+        ch = mass2.Channel.from_numpy(10000, 10, fname, invert_data=True, timestamps=False)
+        assert ch.pulseframer is not None
+        pulse = ch.pulseframer.load_raw_chunk(0, 1)["pulse"][0].to_numpy()
+        assert np.array_equal(pulse, -raw[:, 0].astype(float))
 
 
 def test_ch_from_numpy2():
@@ -727,3 +875,28 @@ def test_pulses_in_dataframe():
     dfA = step.calc_from_df(ch.df, ch.pulseframer)
     dfB = step.calc_from_df(ch.df, pulseframer)
     assert_frame_equal(dfA, dfB)
+
+
+def test_plot_hists_without_groups():
+    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0), state_label=pl.lit(None, dtype=pl.String))
+    edges = np.arange(11.0)
+    centers, counts = ch.plot_hists("x", edges, "state_label")
+    assert np.allclose(centers, edges[:-1] + 0.5) and counts == {}
+
+
+def test_noise_psd_discontinuous_records_not_straddled():
+    """Discontinuous records with different baselines must not leak steps into the PSD."""
+    rng = np.random.default_rng(2)
+    traces = rng.standard_normal((400, 64)) + rng.normal(0, 5, (400, 1))
+    result = mass2.core.noise_algorithms.calc_noise_result(traces, continuous=False, dt=0.5)
+    _, periodogram = scipy.signal.periodogram(traces, fs=2.0, axis=-1, detrend=False)
+    assert np.allclose(result.psd[1:-1], periodogram.mean(axis=0)[1:-1])
+
+
+def test_pretrig_mean_jump_fix_without_subframecount():
+    ptm = np.arange(20.0) * 30 % 256 + 1000
+    for col in ("framecount", "timestamp"):
+        df = pl.DataFrame({"pretrig_mean": ptm, col: np.arange(20)})
+        ch = mass2.Channel(df, mass2.ChannelHeader("", None, 1, 1e-5, 100, 200, pl.DataFrame()), 20)
+        out = ch.correct_pretrig_mean_jumps(period=256).df["ptm_jf"].to_numpy()
+        assert np.allclose(out, np.unwrap(ptm % 256, period=256))

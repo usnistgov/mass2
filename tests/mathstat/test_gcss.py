@@ -48,3 +48,14 @@ def test_gcss_iterative():
         assert len(columns) == ncol
         assert columns.min() >= 0
         assert columns.max() < n
+
+
+def test_gcss_duplicate_column():
+    "A column parallel to a chosen one must not be selected."
+    rng0 = np.random.default_rng(0)
+    A = rng0.normal(size=(6, 5))
+    A[:, 1] = 2 * A[:, 0]
+    B = rng0.normal(size=(6, 2))
+    B[:, 0] += 5 * A[:, 0]
+    assert np.all(gcss(A, B, 3) == [0, 2, 3])
+    assert len(set(gcss(A[:, :3], B, 3))) == 3

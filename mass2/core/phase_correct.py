@@ -113,12 +113,13 @@ def phase_correct(
     """Create a PhaseCorrector object to correct for arrival-time bias in optimal filtering."""
     phase = np.asarray(phase)
     pheight = np.asarray(pheight)
+    if not np.issubdtype(pheight.dtype, np.floating):
+        pheight = pheight.astype(float)
     if ph_peaks is None:
         ph_peaks = _find_peaks_heuristic(pheight)
-    ph_peaks = np.asarray(ph_peaks)
+    ph_peaks = np.sort(np.asarray(ph_peaks))
     if len(ph_peaks) <= 0:
         raise ValueError("Could not phase_correct because no peaks found")
-    ph_peaks.sort()
 
     # Compute a correction function at each line in ph_peaks
     corrections = []
@@ -168,8 +169,8 @@ def phase_correct(
             phase_uniformifier_x = crazy_spline.get_knots()
             phase_uniformifier_y = crazy_spline(phase_uniformifier_x)
         else:
-            phase_uniformifier_x = np.array([0, 0, 0, 0])
-            phase_uniformifier_y = np.array([0, 0, 0, 0])
+            phase_uniformifier_x = np.array([0.0, 1.0])
+            phase_uniformifier_y = np.full(2, y[nonempty][0] if nonempty.any() else 0.0)
 
     return PhaseCorrector(phase_uniformifier_x, phase_uniformifier_y, corrections, indicatorName, uncorrectedName)
 
@@ -208,6 +209,11 @@ def _phasecorr_find_alignment(  # noqa: PLR0914
         bin_edge[0] -= dx
         bin_edge[-1] += dx
         bins = np.digitize(x, bin_edge) - 1
+        filled = np.isin(np.arange(NBINS), bins)
+        renumber = np.full(NBINS + 2, -1)
+        renumber[1:-1][filled] = np.arange(filled.sum())
+        bins = renumber[bins + 1]
+        NBINS = int(filled.sum())
 
         knots = np.zeros(NBINS, dtype=float)
         yknot = np.zeros(NBINS, dtype=float)
@@ -304,6 +310,8 @@ def _phase_corrected_filtvals(phase: NDArray, uncorrected: NDArray, corrections:
     assert NP == len(uncorrected)
     phase = np.asarray(phase)
     uncorrected = np.asarray(uncorrected)
+    if not np.issubdtype(uncorrected.dtype, np.floating):
+        uncorrected = uncorrected.astype(float)
 
     ph = np.hstack([0] + [c(0) for c in corrections])
     assert (ph[1:] > ph[:-1]).all()  # corrections should be sorted by PH
@@ -349,7 +357,7 @@ def _find_peaks_heuristic(phnorm: ArrayLike) -> NDArray:
     binctr = bins[1:] - 0.5 * (bins[1] - bins[0])
 
     # Scipy continuous wavelet transform
-    pk1 = np.array(sp.signal.find_peaks_cwt(hist, np.array([2, 4, 8, 12])))
+    pk1 = np.asarray(sp.signal.find_peaks_cwt(hist, np.array([2, 4, 8, 12])), dtype=int)
 
     # A peak must contain 0.5% of the data or 500 events, whichever is more,
     # but the requirement is not more than 5% of data (for meager data sets)
@@ -358,8 +366,10 @@ def _find_peaks_heuristic(phnorm: ArrayLike) -> NDArray:
     pk2 = pk1[hist[pk1] > MinCountsInPeak]
 
     # Now take peaks from highest to lowest, provided they are at least 40 bins from any neighbor
-    ordering = hist[pk2].argsort()
+    ordering = hist[pk2].argsort()[::-1]
     pk2 = pk2[ordering]
+    if len(pk2) == 0:
+        return np.array([])
     peaks = [pk2[0]]
 
     for pk in pk2[1:]:

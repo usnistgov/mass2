@@ -112,9 +112,8 @@ class SpectralLine:
     def peak_energy(self) -> float:
         """Find the peak energy of the line shape assuming ideal instrument resolution."""
         try:
-            peak_energy = sp.optimize.brent(
-                lambda x: -float(self.pdf(x, instrument_gaussian_fwhm=0)), brack=np.array((0.5, 1, 1.5)) * self.nominal_peak_energy
-            )
+            e = self.energies[np.argmax(self.pdf(self.energies, instrument_gaussian_fwhm=0))]
+            peak_energy = sp.optimize.brent(lambda x: -float(self.pdf(x, instrument_gaussian_fwhm=0)), brack=(e, e + 0.01))
         except ValueError:
             peak_energy = self.nominal_peak_energy
         return peak_energy
@@ -148,7 +147,7 @@ class SpectralLine:
     @cached_property
     def lorentz_amplitude(self) -> NDArray:
         """Return (and cache) computed Lorentzian peak heights of the components."""
-        return self.lorentzian_integral_intensity / self.lorentzian_fwhm
+        return self.lorentzian_integral_intensity / (0.5 * np.pi * self.lorentzian_fwhm)
 
     def __call__(self, x: ArrayLike, instrument_gaussian_fwhm: float) -> NDArray:
         """Make the class callable, returning the same value as the self.pdf method."""
@@ -169,7 +168,7 @@ class SpectralLine:
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
         x = np.asarray(x, dtype=float)
         components = []
-        for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm, self.lorentzian_integral_intensity):
+        for energy, fwhm, ampl in zip(self.energies, self.lorentzian_fwhm, self.normalized_lorentzian_integral_intensity):
             components.append(ampl * voigt(x, energy, hwhm=fwhm * 0.5, sigma=gaussian_sigma))
         return components
 
@@ -224,6 +223,8 @@ class SpectralLine:
         """The CDF and PPF (cumulative distribution and percentile point functions) are hard to
         compute.  But it's easy enough to generate the random variates themselves, so we
         override that method."""
+        if size is None:
+            return self.rvs(1, instrument_gaussian_fwhm, rng=rng)[0]
         if rng is None:
             rng = _rng
         gaussian_sigma = self._gaussian_sigma(instrument_gaussian_fwhm)
@@ -240,8 +241,8 @@ class SpectralLine:
         # to self.rvs().
         not_positive = results <= 0.0
         if np.any(not_positive):
-            Nbad = int(np.count_nonzero(not_positive))
-            results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm)
+            Nbad = int(not_positive.sum())
+            results[not_positive] = self.rvs(size=Nbad, instrument_gaussian_fwhm=instrument_gaussian_fwhm, rng=rng)
         return results
 
     @property
@@ -693,7 +694,7 @@ addline(
     nominal_peak_energy=1739.986,
     energies=np.array((1739.39, 1739.986, 1752.0)),
     lorentzian_fwhm=np.array((0.539, 0.524, 5)),
-    reference_amplitude=np.array((3.134e2, 6.121e3, 8e2)),
+    reference_amplitude=np.array((3.134e3, 6.121e3, 8e2)),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     ka12_energy_diff=0.6,
     position_uncertainty=0.040,
@@ -772,7 +773,7 @@ addline(
     nominal_peak_energy=4090.735,
     energies=np.array((4090.745, 4089.452, 4087.782, 4093.547, 4085.941, 4083.976)),  # Table I C_i
     lorentzian_fwhm=np.array((1.17, 2.65, 1.41, 2.09, 1.53, 3.49)),  # Table I W_i
-    reference_amplitude=np.array((8175, 878, 232, 287, 4290, 119)),  # Table I A_i
+    reference_amplitude=np.array((8175, 878, 232, 387, 4290, 119)),  # Table I A_i
     reference_amplitude_type=AmplitudeType.VOIGT_PEAK_HEIGHT,
     ka12_energy_diff=5.1,
     position_uncertainty=0.019,  # table 3
@@ -1457,13 +1458,42 @@ addline(
 
 
 addline(
+    element="Sn",
+    material="metal",
+    linetype="KAlpha",
+    reference_short="Zschornack",
+    nominal_peak_energy=25271.36,
+    energies=np.array([25044.04, 25271.36]),
+    lorentzian_fwhm=np.array([10.89, 10.68]),
+    reference_amplitude=np.array([2.080, 3.89]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=25271.36 - 25044.04,
+    reference_plot_instrument_gaussian_fwhm=None,
+)
+
+
+addline(
+    element="Sn",
+    material="metal",
+    linetype="KBeta",
+    reference_short="Zschornack",
+    nominal_peak_energy=28486.26,
+    energies=np.array([28444.43, 28486.26]),
+    lorentzian_fwhm=np.array([12.49, 12.83]),
+    reference_amplitude=np.array([0.372, 0.722]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    reference_plot_instrument_gaussian_fwhm=None,
+)
+
+
+addline(
     element="Pr",
     material="metal",
     linetype="KAlpha",
     reference_short="Zschornack",
     nominal_peak_energy=36026.71,
     energies=np.array([35550.59, 36026.71]),
-    lorentzian_fwhm=np.array([19.08, 1887]),
+    lorentzian_fwhm=np.array([19.08, 18.87]),
     reference_amplitude=np.array([4.15, 7.57]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     ka12_energy_diff=36026.71 - 35550.59,
@@ -1593,7 +1623,7 @@ addline(
     linetype="KBeta",
     reference_short="Zschornack",
     nominal_peak_energy=48696.9,
-    energies=np.array([48555.8, 49696.9]),
+    energies=np.array([48555.8, 48696.9]),
     lorentzian_fwhm=np.array([29.5, 30.0]),
     reference_amplitude=np.array([1.10, 2.13]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
@@ -1624,7 +1654,7 @@ addline(
     nominal_peak_energy=50382.9,
     energies=np.array([50229.8, 50382.9]),
     lorentzian_fwhm=np.array([31.7, 31.8]),
-    reference_amplitude=np.array([1.15, 2.33]),
+    reference_amplitude=np.array([1.15, 2.23]),
     reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
     reference_plot_instrument_gaussian_fwhm=None,
 )

@@ -33,7 +33,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
 from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep, ChangeTimeZoneStep
 from .noise_channel import NoiseChannel
 from .noise_algorithms import NoiseResult
 
@@ -299,13 +299,13 @@ class Channel:
 
         # Plot a histogram for each group
         counts_dict: dict[str, NDArray] = {}
+        bin_centers, step_size = misc.midpoints_and_step_size(bin_edges)
         for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
             # Get the data for the column to plot
             values = group_data[col]
-            _, step_size = misc.midpoints_and_step_size(bin_edges)
-            bin_centers, counts = misc.hist_of_series(values, bin_edges)
+            _, counts = misc.hist_of_series(values, bin_edges)
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
             ax.step(bin_centers, counts, where="mid", label=group_name_str)
@@ -570,7 +570,7 @@ class Channel:
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
         assert self.pulseframer is not None
-        test_df = self.pulseframer.load_raw_pulse(0)
+        test_df = self.pulseframer.load_raw_pulses([0])
         pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
             f"Cannot plot column '{pulse_field}' as pulse records: not a pl.Array or pl.List type"
@@ -637,15 +637,17 @@ class Channel:
         df = lf.select(("Record #", "pretrig_mean")).collect()
         idx = df["Record #"]
         ptmean = df["pretrig_mean"]
-        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field]
+        pulses = self.pulseframer.load_raw_pulses(idx)[pulse_field].to_numpy()
+        if self.transform_raw is not None:
+            pulses = self.transform_raw(pulses)
         N = len(idx)
         for i in range(N):
-            pulse = pulses[i].to_numpy()
+            pulse = pulses[i]
             color = cmap(i / N)
             if subtract_baseline:
                 pulse = pulse - ptmean[i]  # noqa: PLR6104
             if derivative:
-                pulse = np.hstack((0, np.diff(pulse)))
+                pulse = np.hstack((0, np.diff(np.asarray(pulse, dtype=float))))
             axis.plot(sample_x, pulse, color=color)
         plot_zoomable()
 
@@ -845,13 +847,16 @@ class Channel:
 
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
+        existing = set(step.output) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"step outputs {sorted(existing)} already exist")
         t_start = time.time()
         df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
             df=df2,
-            good_expr=step.good_expr,
+            good_expr=self.good_expr if isinstance(step, ChangeTimeZoneStep) else step.good_expr,
             df_history=self.df_history + [self.df],
             steps=self.steps.with_step(step),
             steps_elapsed_s=self.steps_elapsed_s + [elapsed_s],
@@ -870,7 +875,11 @@ class Channel:
         of by replacing it entirely if `replace` is True."""
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
+        if good_expr is True:
+            good_expr = pl.lit(True)
+        if not replace:
+            if good_expr is True or good_expr.meta.eq(pl.lit(True)):
+                return self
             good_expr = good_expr.and_(self.good_expr)
         return dataclasses.replace(self, good_expr=good_expr)
 
@@ -968,7 +977,7 @@ class Channel:
     ) -> "Channel":
         """Correct pretrigger mean jumps in the raw pulse data, writing to a new column."""
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
-            inputs=[uncorrected, "subframecount"],
+            inputs=[uncorrected, next(c for c in ("subframecount", "framecount", "timestamp") if c in self.df.columns)],
             output=[corrected],
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
@@ -1032,6 +1041,8 @@ class Channel:
         assert self.pulseframer is not None
         idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
+        if self.transform_raw is not None:
+            pulses = self.transform_raw(pulses)
         avg_pulse = pulses.mean(axis=0)
         avg_pulse -= avg_pulse[: self.n_presamples].mean()
         return avg_pulse
@@ -1261,6 +1272,8 @@ class Channel:
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         idx = df["Record #"]
         pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
+        if self.transform_raw is not None:
+            pulse = self.transform_raw(pulse)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
         dt_model = np.zeros(self.n_samples, dtype=float)
         for i in range(self.n_presamples, self.n_samples):
@@ -1333,7 +1346,7 @@ class Channel:
 
     def bad_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
         """Return a Polars DataFrame of the given columns, filtered by the inverse of good_expr, and use_expr."""
-        bad_df = self.df.lazy().filter(self.good_expr.not_())
+        bad_df = self.df.lazy().filter(self.good_expr.fill_null(False).not_())
         if use_expr is not True:
             bad_df = bad_df.filter(use_expr)
         return bad_df.select(cols).collect()
@@ -1397,9 +1410,7 @@ class Channel:
         bin_centers, counts = misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
-        print(f"before update {params=}")
         params = params.update(params_update)
-        print(f"after update {params=}")
         result = model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
         result.set_label_hints(
             binsize=bin_centers[1] - bin_centers[0],
@@ -1434,8 +1445,8 @@ class Channel:
     ) -> "Channel":
         """Load a Channel from an LJH file, optionally with a NoiseResult from a separate directory."""
         ljh = mass2.LJHFile.open(path, max_pulses=max_pulses)
-        df, header_df = ljh.to_polars(keep_posix_usec)
-        header = ChannelHeader.from_ljh_header_df(header_df)
+        df, header_df = ljh.to_polars(keep_posix_usec=keep_posix_usec)
+        header = dataclasses.replace(ChannelHeader.from_ljh_header_df(header_df), n_presamples=ljh.npresamples)
         if noise_directory:
             noise_result = NoiseResult.from_parquet(noise_directory, ljh.channum)
             header = dataclasses.replace(header, noise_data_source=str(noise_directory))
@@ -1461,15 +1472,14 @@ class Channel:
         transform_raw: Callable | None = None,
     ) -> "Channel":
         """Load a Channel from an Arrow IPC file, optionally with a NoiseResult from a separate directory."""
-        if not noise_directory:
-            noise_result = None
-        else:
+        if noise_directory:
             noise_result = NoiseResult.from_parquet(noise_directory, channum)
+            header = dataclasses.replace(header, noise_data_source=str(noise_directory))
+        else:
+            noise_result = None
 
         framer = PulseDataFromArrow.open(path)
         df = framer.load_timing()
-        if noise_directory:
-            header = dataclasses.replace(header, noise_data_source=str(noise_directory))
         channel = cls(
             df,
             header=header,
@@ -1525,6 +1535,7 @@ class Channel:
         invert_data: bool = False,
         timestamps: bool = True,
         rescale: float = 1.0,
+        noise_continuous: bool = False,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1551,6 +1562,8 @@ class Channel:
             Whether to generate timestamp guesses, based on file creation time, by default True
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
+        noise_continuous: bool, optional
+            Whether the noise records form one continuous stream, by default False
 
         Returns
         -------
@@ -1564,7 +1577,7 @@ class Channel:
                 data = data[0, :, :]
             assert data.ndim == 2
             if invert_data:
-                data = -data
+                data = -np.asarray(data, dtype=np.result_type(data, 1.0))
             return data * rescale
 
         frametime_s = 1 / samplerate
@@ -1582,7 +1595,9 @@ class Channel:
             ns_per_us = 1000
             initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
             times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
-            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(
+                timestamp=pl.from_epoch("timestamp", "us").dt.convert_time_zone(_local_timezone_name)
+            )
 
         if noise_fname is None:
             noise_result = None
@@ -1590,10 +1605,11 @@ class Channel:
             ndata = load(noise_fname)
             _, nnoise = ndata.shape
             noise_df = pl.DataFrame({"index": range(nnoise)})
-            noise_header = mass2.ChannelHeader(
-                data_source=str(noise_fname),
-                n_presamples=npresamples,
-            )
+            noise_header = pl.DataFrame({
+                "filename": noise_fname,
+                "continuous": noise_continuous,
+                "Presamples": npresamples,
+            })
             framer = PulseDataFromNumpy(ndata.T)
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
             noise_result = nch.spectrum()
@@ -1664,6 +1680,9 @@ class Channel:
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+        existing = (set(df_es.columns) - {"timestamp"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"experiment state columns {sorted(existing)} already exist")
 
         # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
         times = df_es["timestamp"]
@@ -1671,18 +1690,20 @@ class Channel:
         self_time_type = cast(Datetime, self.df["timestamp"].dtype)
         desired_time_zone = self_time_type.time_zone
         if desired_time_zone is None:
-            desired_time_zone = _local_timezone_name
-        if expt_state_time_type.time_zone != desired_time_zone:
+            if expt_state_time_type.time_zone is not None:
+                times = times.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+                df_es = df_es.with_columns(timestamp=times)
+        elif expt_state_time_type.time_zone != desired_time_zone:
             times = times.dt.convert_time_zone(desired_time_zone)
             df_es = df_es.with_columns(timestamp=times)
+        df_es = df_es.with_columns(pl.col("timestamp").dt.cast_time_unit(self_time_type.time_unit))
 
-        if not self.df["timestamp"].is_sorted():
-            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
-            # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
-            # print("This is likely a BUG in DASTARD.")
+        if force_timestamp_monotonic:
+            df = self.df.with_columns(pl.col("timestamp").cum_max())
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         else:
-            df = self.df
-        df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
+            df = self.df.with_row_index("_record").sort("timestamp")
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward").sort("_record").drop("_record")
         return self.with_replacement_df(df2)
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":
@@ -1699,7 +1720,7 @@ class Channel:
         assert output_control.require_last or output_control.require_next
         subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
 
-        df_subframe = df.select("subframecount")
+        df_subframe = df.select("subframecount").with_row_index("_record").sort("subframecount")
         if output_control.require_last:
             df_subframe = df_subframe.join_asof(
                 df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig"
@@ -1719,7 +1740,7 @@ class Channel:
             df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
         if output_control.ms_nearest_trig:
             df_subframe = df_subframe.with_columns(
-                pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                pl.when((pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig")) | pl.col("dsf_next_ext_trig").is_null())
                 .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
                 .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
                 .alias("ms_nearest_ext_trig")
@@ -1727,12 +1748,16 @@ class Channel:
 
         # Drop columns that the user doesn't want
         if not output_control.absolute_sfs:
-            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
+            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig", strict=False)
         if not output_control.sf_last_trig:
-            df_subframe = df_subframe.drop("dsf_last_ext_trig")
+            df_subframe = df_subframe.drop("dsf_last_ext_trig", strict=False)
         if not output_control.sf_next_trig:
-            df_subframe = df_subframe.drop("dsf_next_ext_trig")
+            df_subframe = df_subframe.drop("dsf_next_ext_trig", strict=False)
 
+        df_subframe = df_subframe.sort("_record").drop("_record")
+        existing = (set(df_subframe.columns) - {"subframecount"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"external trigger columns {sorted(existing)} already exist")
         df2 = self.df.with_columns(df_subframe)
         return self.with_replacement_df(df2)
 
@@ -1816,6 +1841,7 @@ class Channel:
             len(combined_df),
             noise=self.noise,
             good_expr=self.good_expr,
+            transform_raw=self.transform_raw,
             pulseframer=combined_pulseframer,
         )
         # we won't copy over df_history and steps. I don't think you should use this when those are filled in?
@@ -1879,12 +1905,12 @@ class Channel:
         use_expr = self.good_expr if use_expr_in is None else use_expr_in
 
         if downsample is None:
-            downsample = self.npulses // 10000
+            downsample = -(-self.npulses // 10000)
         downsample = max(downsample, 1)
 
         df = self.df.lazy().gather_every(downsample)
         df = df.with_columns(
-            ((pl.col("peak_index") - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
+            ((pl.col("peak_index").cast(pl.Int64) - self.n_presamples) * (1e6 * self.frametime_s)).alias("peak_time_µs"),
             (pl.col("rise_time") * 1e6).alias("rise_time_µs"),
         )
 
@@ -1932,7 +1958,10 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         assert self.pulseframer is not None
-        pulse = self.pulseframer.load_raw_pulse(index)[col].to_numpy()
+        pulse = self.pulseframer.load_raw_pulses([index])[col].to_numpy()
+        if self.transform_raw is not None:
+            pulse = self.transform_raw(pulse)
+        pulse = pulse[0]
         result = mass2.core.pulse_algorithms.fit_pulse_2exp_with_tail(pulse, npre=self.n_presamples, dt=self.frametime_s)
         if verbose:
             print(f"ch={self}")

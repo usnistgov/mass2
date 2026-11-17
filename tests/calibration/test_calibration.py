@@ -24,7 +24,7 @@ def basic_factory(npoints=10):
 
 
 def compare_curves(curvetype1, use_approximation1, curvetype2, use_approximation2, npoints=10):
-    factory = basic_factory()
+    factory = basic_factory(npoints)
     cal1 = factory.make_calibration(curvetype1, use_approximation1)
     cal2 = factory.make_calibration(curvetype2, use_approximation2)
 
@@ -51,7 +51,7 @@ class TestLineDatabase:
             assert e == E[name]
 
     @staticmethod
-    def check_elements():
+    def test_check_elements():
         """Check that elements appear in the list that were absent before 2017."""
         E = mass2.STANDARD_FEATURES
         for element in ("U", "Pr", "Ar", "Pt", "Au", "Hg"):
@@ -94,9 +94,9 @@ class TestJoeStyleEnergyCalibration:
     def test_loglog_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
             curvetype1=Curvetypes.LOGLOG,
-            use_approximation1=False,
+            use_approximation1=True,
             curvetype2=Curvetypes.LINEAR,
-            use_approximation2=False,
+            use_approximation2=True,
         )
         assert ph1 != ph2
         assert e1 != e2
@@ -118,9 +118,9 @@ class TestJoeStyleEnergyCalibration:
     def test_zerozero_approx_diff():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
             curvetype1=Curvetypes.LINEAR_PLUS_ZERO,
-            use_approximation1=False,
+            use_approximation1=True,
             curvetype2=Curvetypes.LINEAR,
-            use_approximation2=False,
+            use_approximation2=True,
         )
         assert ph1 != ph2
         assert e1 != e2
@@ -177,7 +177,7 @@ class TestJoeStyleEnergyCalibration:
     @staticmethod
     def test_gain_loglog_2pts():
         ph1, e1, (_drop1e, drop1err), ph2, e2, (_drop2e, drop2err), _cal1, _cal2 = compare_curves(
-            curvetype1=Curvetypes.GAIN, use_approximation1=True, curvetype2=Curvetypes.LOGLOG, use_approximation2=False, npoints=3
+            curvetype1=Curvetypes.GAIN, use_approximation1=False, curvetype2=Curvetypes.LOGLOG, use_approximation2=False, npoints=3
         )
         assert ph1 != ph2
         assert e1 != e2
@@ -206,9 +206,12 @@ class TestJoeStyleEnergyCalibration:
         ph = basic_nonlinearity(energy)
         dph = ph * 1e-3
         de = energy * 1e-3
-        names = len(ph) * [""]
+        names = [str(e) for e in energy]
+        energy.flags.writeable = False
         factory = EnergyCalibrationMaker(ph, energy, dph, de, names)
         assert np.all(np.diff(factory.ph) > 0)
+        assert factory.names == [str(e) for e in np.sort(energy)]
+        assert energy[0] == 6000 and ph[0] == basic_nonlinearity(6000.0) and names[0] == "6000.0"
         cal1 = factory.make_calibration(Curvetypes.GAIN, True)
         cal1(np.array([2200, 4200, 4400], dtype=float))
 
@@ -225,9 +228,9 @@ class TestJoeStyleEnergyCalibration:
             factory.make_calibration(curvename=Curvetypes.GAIN, approximate=True)
 
     @staticmethod
-    def test_save_and_load_to_hdf5():
+    def test_save_and_load_to_hdf5(tmp_path):
         factory = basic_factory()
-        fname = "to_be_deleted.hdf5"
+        fname = tmp_path / "cal.hdf5"
         for ctype in (Curvetypes.LOGLOG, Curvetypes.GAIN):
             cal1 = factory.make_calibration(curvename=ctype)
             with h5py.File(fname, "w") as h5:
@@ -236,7 +239,8 @@ class TestJoeStyleEnergyCalibration:
                 cal2 = mass2.calibration.EnergyCalibration.load_from_hdf5(grp, "cal1")
                 assert len(grp.keys()) == 1
             assert all(cal1.ph == cal2.ph)
-            assert all(cal2.energy == cal2.energy)
+            assert all(cal1.energy == cal2.energy)
+            assert cal1.names == cal2.names
             assert all(cal1.dph == cal2.dph)
             assert all(cal1.de == cal2.de)
             assert cal1.curvename == cal2.curvename
@@ -384,3 +388,24 @@ def test_stepwise_cal():
     assert np.allclose(expectedPH, cal.ph, atol=0.06)
     expectedE = np.array([277, 392.4, 524.9, 704.8, 851.47])
     assert np.allclose(expectedE, cal.energy, atol=0.06)
+
+
+def test_stepwise_cal_numpy_energies():
+    ph = np.load("tests/calibration/example_uncalibrated_data.npy")
+    plan = [("NiLAlpha1", None, None), ("FeLAlpha1", 650, 800), ("OKAlpha", 450, 600), (("NKAlpha", "CKAlpha"), 200, 450)]
+    expected = mass2.core.rough_cal.learn_stepwise_cal(ph, plan, fwhm_pulse_height_units=10)
+    for t in (np.int64, np.float32):
+        e = t(mass2.STANDARD_FEATURES["NiLAlpha1"])
+        cal = mass2.core.rough_cal.learn_stepwise_cal(ph, [(e, None, None)] + plan[1:], fwhm_pulse_height_units=10)
+        assert np.allclose(expected.ph, cal.ph, atol=0.5)
+
+
+def test_explicit_zero_anchor():
+    x = np.array([0.0, 1000, 2000, 3000])
+    y = np.array([0.0, 1100, 2400, 3900])
+    maker = EnergyCalibrationMaker.init(x, y, dph=[1.0] * 4, de=[0.1] * 4, names=["zero", "a", "b", "c"])
+    q = np.array([500.0, 1500.0, 2500.0])
+    for addzero in (False, True):
+        cal = maker.make_calibration_linear(addzero=addzero)
+        assert cal(q) == pytest.approx([535.0, 1720.0, 3135.0])
+        assert cal.energy2ph(cal(q)) == pytest.approx(q, abs=1e-3)

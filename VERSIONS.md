@@ -2,7 +2,7 @@
 
 ## Mass Version 2 (2025-present)
 
-**2.1.2** August 21, 2026-
+**2.2.0** August 21, 2026-
 * Reorganize the `Channel` object so that instead of owning a full `NoiseChannel` object (optional), it can own
   an (optional) `NoiseResult` object. To look at noise traces will now require a separate `Channel` (issue 175).
 * Add ability to convert LJH raw pulse files into Arrow IPC or Parquet formats (issue 164)
@@ -10,6 +10,21 @@
 * Add first draft of MASSASSIN, MAD-COW, and MAD-Dash for online analysis (issue 177).
 * Read `*_configuration.toml` file in the Arrow directory.
 * Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
+
+**2.1.3** November 17, 2026
+* Very many bug fixes by Claude Code 5.5 and @unger-daniel.
+* Fix line models, energy cal, and `MultiFit` (PR 194).
+* Refactor and fix code errors in tests (PR 193).
+* Allow the `MultiFit` object to shift gains in common by up to ~2% (PR 192).
+* Bugs in reading and merging LJH files and TrueBq files (PR 191).
+* Bugs in noise power spectra and autocorrelation and filters (PR 190).
+* Bugs in robust statistics, splines and generalized column subset selection (PR 189).
+* Bugs in Channel, Channels, recipes, and external triggers (PR 188).
+
+**2.1.2** November 17, 2026
+* Add Kα and Kβ line models for Sn based on Zschornack book (PR 197).
+* Fix missing dependency on `six` (PR 195).
+* Fix bug in misc function `midpoints_and_step_size`, which did not compute midpoints (PR 185).
 
 **2.1.1** October 10, 2026
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).

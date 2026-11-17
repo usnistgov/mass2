@@ -219,20 +219,6 @@ class CompositeMLEModel(MLEModel, lmfit.CompositeModel):
     "Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation"
     """
 
-    def _residual(self, params: lmfit.Parameters, data: NDArray | None, weights: NDArray | None, **kwargs: Any) -> NDArray:
-        """Calculate the chi_MLE^2 value from Joe Fowler's Paper
-        doi:10.1007/s10909-014-1098-4 Maximum-Likelihood Fits to Histograms for Improved Parameter Estimation
-        """
-        y = self.eval(params, **kwargs)
-        if data is None:
-            return y
-        r2 = y - data
-        nonzero = data > 0
-        r2[nonzero] += data[nonzero] * np.log((data / y)[nonzero])
-        vals = (2 * r2) ** 0.5
-        vals[y < data] *= -1
-        return vals
-
     def __add__(self, other: lmfit.Model) -> "CompositeMLEModel":
         """Sum of two models"""
         return CompositeMLEModel(self, other, lmfit.model.operator.add)
@@ -326,13 +312,8 @@ class GenericLineModel(MLEModel):
                 def cleanspectrum_fn(x: ArrayLike) -> NDArray:
                     return self.spect.pdf(x, instrument_gaussian_fwhm=fwhm)
 
-                # tail_tau* is in energy units but has to be converted to the same units as `bin_centers`
-                tail_arbs_lo = tail_tau * dph_de
-                tail_arbs_hi = tail_tau_hi * dph_de
-                spectrum = _smear_exponential_tail(
-                    cleanspectrum_fn, energy, fwhm, tail_frac, tail_arbs_lo, tail_share_hi, tail_arbs_hi
-                )
-                scale_factor = integral * bin_width * dph_de
+                spectrum = _smear_exponential_tail(cleanspectrum_fn, energy, fwhm, tail_frac, tail_tau, tail_share_hi, tail_tau_hi)
+                scale_factor = integral * bin_width / dph_de
                 r = _scale_add_bg(spectrum, scale_factor, background, bg_slope)
                 if any(np.isnan(r)) or any(r < 0):
                     raise ValueError("some entry in r is nan or negative")

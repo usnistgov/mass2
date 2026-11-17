@@ -84,7 +84,7 @@ class OffFile:
         with open(self.filename, "rb") as f:
             self.headerString = readJsonString(f)
             # self.headerStringLength = f.tell() # doesn't work on windows because readline uses a readahead buffer
-            self.headerStringLength = len(self.headerString)
+            self.headerStringLength = len(self.headerString.encode("utf-8"))
         self.header = json.loads(self.headerString)
         self.dtype = recordDtype(self.header["FileFormatVersion"], self.header["NumberOfBases"])
         self._dtype_non_descriptive = recordDtype(
@@ -97,7 +97,8 @@ class OffFile:
         # Otherwise, we don't know any way to estimate subframe divisions. (But add it if you think of any!)
         self.subframediv: int | None = None
         try:
-            self.subframediv = self.header["ReadoutInfo"]["Subframedivisions"]
+            ri = self.header["ReadoutInfo"]
+            self.subframediv = ri["SubframeDivisions"] if "SubframeDivisions" in ri else ri["Subframedivisions"]
         except KeyError:
             try:
                 if self.header["CreationInfo"]["SourceName"] == "Lancero":

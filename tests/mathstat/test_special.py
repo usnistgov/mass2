@@ -26,7 +26,7 @@ class TestVoigtWidth:
             sigma = gauss_width / (8 * np.log(2)) ** 0.5
             v = special.voigt(x, xctr=0, hwhm=0.0, sigma=sigma)
             for vi, xi in zip(v, x):
-                assert vi == pytest.approx(gaussian(xi, sigma=sigma), 7)
+                assert vi == pytest.approx(gaussian(xi, sigma=sigma), rel=1e-7)
 
     @staticmethod
     def test_voigt_lorentzian_limit():
@@ -39,7 +39,7 @@ class TestVoigtWidth:
         for hwhm in (0.01, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20):
             v = special.voigt(x, xctr=0, hwhm=hwhm, sigma=0.0)
             for vi, xi in zip(v, x):
-                assert vi == pytest.approx(lorentzian(xi, hwhm=hwhm), 7)
+                assert vi == pytest.approx(lorentzian(xi, hwhm=hwhm), rel=1e-7)
 
     # def test_general_voigt():
     #     """I'd love to test the Voigt profile at a generic point, but I don't know how! """
@@ -64,3 +64,9 @@ class TestVoigtWidth:
             vhalf = special.voigt(x=vaf * 0.5, xctr=0, hwhm=0.5 * lor_width, sigma=sigma)
             vpeak = special.voigt(x=0.0, xctr=0.0, hwhm=0.5 * lor_width, sigma=sigma)
             assert 0.5 == pytest.approx(vhalf / vpeak, abs=1e-3)
+
+
+def test_voigt_unsigned():
+    x = np.arange(10, dtype=np.uint16)
+    for hwhm, sigma in ((1.0, 1.0), (0.0, 1.0), (1.0, 0.0)):
+        assert np.allclose(special.voigt(x, 5, hwhm, sigma), special.voigt(x.astype(float), 5, hwhm, sigma))
