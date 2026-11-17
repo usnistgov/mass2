@@ -101,7 +101,7 @@ def midpoints_and_step_size(x: ArrayLike) -> tuple[NDArray, float]:
     d = np.diff(x)
     step_size = float(d[0])
     assert np.allclose(d, step_size, atol=1e-9), f"{d=}"
-    return x[:-1] + step_size, step_size
+    return x[:-1] + step_size / 2, step_size
 
 
 def hist_of_series(series: pl.Series, bin_edges: ArrayLike) -> tuple[NDArray, NDArray]:
