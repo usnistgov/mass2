@@ -138,7 +138,7 @@ states = ch.df["state_label"]
 print(states.dtype)
 print(states.unique(), states.unique_counts())
 assert states.unique()[-2] == "SCAN3"
-assert states.unique_counts()[-2] == 44870
+assert states.unique_counts()[-2] == 42433
 ```
 
 The output reads:
@@ -158,12 +158,12 @@ Series: 'state_label' [cat]
 ] shape: (6,)
 Series: 'state_label' [u32]
 [
-	1
 	4
-	11533
-	38197
-	44870
-	5395
+	4
+	11468
+	40854
+	42433
+	5237
 ]
 ```
 
