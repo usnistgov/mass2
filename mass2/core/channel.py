@@ -31,7 +31,7 @@ from .multifit import MultiFit, MultiFitQuadraticGainStep, MultiFitMassCalibrati
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker
 from .drift_correction import DriftCorrectStep, TimeDriftCorrectStep
-from .recipe import Recipe, RecipeStep, SummarizeStep
+from .recipe import Recipe, RecipeStep, SummarizeStep, ChangeTimeZoneStep
 from .noise_channel import NoiseChannel
 
 _local_timezone_name = tzlocal.get_localzone_name()
@@ -866,13 +866,16 @@ class Channel:
 
     def with_step(self, step: RecipeStep) -> "Channel":
         """Return a new Channel with the given step applied to generate new columns in the dataframe."""
+        existing = set(step.output) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"step outputs {sorted(existing)} already exist")
         t_start = time.time()
         df2 = step.calc_from_df(self.df, self.pulseframer)
         elapsed_s = time.time() - t_start
         ch2 = dataclasses.replace(
             self,
             df=df2,
-            good_expr=step.good_expr,
+            good_expr=self.good_expr if isinstance(step, ChangeTimeZoneStep) else step.good_expr,
             df_history=self.df_history + [self.df],
             steps=self.steps.with_step(step),
             steps_elapsed_s=self.steps_elapsed_s + [elapsed_s],
@@ -891,7 +894,11 @@ class Channel:
         of by replacing it entirely if `replace` is True."""
         # the default value of self.good_expr is pl.lit(True)
         # and_(True) will just add visual noise when looking at good_expr and not affect behavior
-        if not replace and good_expr is not True and not good_expr.meta.eq(pl.lit(True)):
+        if good_expr is True:
+            good_expr = pl.lit(True)
+        if not replace:
+            if good_expr is True or good_expr.meta.eq(pl.lit(True)):
+                return self
             good_expr = good_expr.and_(self.good_expr)
         return dataclasses.replace(self, good_expr=good_expr)
 
@@ -989,7 +996,7 @@ class Channel:
     ) -> "Channel":
         """Correct pretrigger mean jumps in the raw pulse data, writing to a new column."""
         step = mass2.core.recipe.PretrigMeanJumpFixStep(
-            inputs=[uncorrected, "subframecount"],
+            inputs=[uncorrected, next(c for c in ("subframecount", "framecount", "timestamp") if c in self.df.columns)],
             output=[corrected],
             good_expr=self.good_expr,
             use_expr=pl.lit(True),
@@ -1354,7 +1361,7 @@ class Channel:
 
     def bad_df(self, cols: list[str] | pl.Expr = pl.all(), use_expr: pl.Expr = pl.lit(True)) -> pl.DataFrame:
         """Return a Polars DataFrame of the given columns, filtered by the inverse of good_expr, and use_expr."""
-        bad_df = self.df.lazy().filter(self.good_expr.not_())
+        bad_df = self.df.lazy().filter(self.good_expr.fill_null(False).not_())
         if use_expr is not True:
             bad_df = bad_df.filter(use_expr)
         return bad_df.select(cols).collect()
@@ -1418,9 +1425,7 @@ class Channel:
         bin_centers, counts = misc.hist_of_series(df_small[col], _bin_edges)
         params = model.guess(counts, bin_centers=bin_centers, dph_de=1)
         params["dph_de"].set(1.0, vary=False)
-        print(f"before update {params=}")
         params = params.update(params_update)
-        print(f"after update {params=}")
         result = model.fit(counts, params, bin_centers=bin_centers, minimum_bins_per_fwhm=3)
         result.set_label_hints(
             binsize=bin_centers[1] - bin_centers[0],
@@ -1515,6 +1520,7 @@ class Channel:
         invert_data: bool = False,
         timestamps: bool = True,
         rescale: float = 1.0,
+        noise_continuous: bool = False,
     ) -> "Channel":
         """Create a Channel object from a numpy *.npy file representing pulse records.
         Assume shape is (nsamples x npulses). If there are 3 dimensions, as with optical TES data,
@@ -1541,6 +1547,8 @@ class Channel:
             Whether to generate timestamp guesses, based on file creation time, by default True
         rescale: float, optional
             Multiply the raw data by this value to get reasonable scaling, by default 1.0
+        noise_continuous: bool, optional
+            Whether the noise records form one continuous stream, by default False
 
         Returns
         -------
@@ -1554,7 +1562,7 @@ class Channel:
                 data = data[0, :, :]
             assert data.ndim == 2
             if invert_data:
-                data = -data
+                data = -np.asarray(data, dtype=np.result_type(data, 1.0))
             return data * rescale
 
         frametime_s = 1 / samplerate
@@ -1572,7 +1580,9 @@ class Channel:
             ns_per_us = 1000
             initial_time = os.stat(pulse_fname).st_ctime_ns // ns_per_us
             times = initial_time + np.asarray(np.arange(npulses) * int(nsamples * us_per_second / samplerate), dtype=np.int64)
-            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(timestamp=pl.from_epoch("timestamp", "us"))
+            pulse_df = pulse_df.with_columns(timestamp=times).with_columns(
+                timestamp=pl.from_epoch("timestamp", "us").dt.convert_time_zone(_local_timezone_name)
+            )
 
         if noise_fname is None:
             nch = None
@@ -1582,7 +1592,7 @@ class Channel:
             noise_df = pl.DataFrame({"index": range(nnoise)})
             noise_header = pl.DataFrame({
                 "filename": noise_fname,
-                "continuous": True,
+                "continuous": noise_continuous,
                 "Presamples": npresamples,
             })
             framer = PulseDataFromNumpy(ndata.T)
@@ -1654,6 +1664,9 @@ class Channel:
 
     def with_experiment_state_df(self, df_es: pl.DataFrame, force_timestamp_monotonic: bool = False) -> "Channel":
         """Add experiment states from an existing dataframe"""
+        existing = (set(df_es.columns) - {"timestamp"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"experiment state columns {sorted(existing)} already exist")
 
         # Make sure experiment state dataframe and self.df agree on time zones. If not, convert the former.
         times = df_es["timestamp"]
@@ -1663,18 +1676,20 @@ class Channel:
         assert isinstance(self_time_type, Datetime)
         desired_time_zone = self_time_type.time_zone
         if desired_time_zone is None:
-            desired_time_zone = _local_timezone_name
-        if expt_state_time_type.time_zone != desired_time_zone:
+            if expt_state_time_type.time_zone is not None:
+                times = times.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+                df_es = df_es.with_columns(timestamp=times)
+        elif expt_state_time_type.time_zone != desired_time_zone:
             times = times.dt.convert_time_zone(desired_time_zone)
             df_es = df_es.with_columns(timestamp=times)
+        df_es = df_es.with_columns(pl.col("timestamp").dt.cast_time_unit(self_time_type.time_unit))
 
-        if not self.df["timestamp"].is_sorted():
-            df = self.df.select(pl.col("timestamp").cum_max().alias("timestamp")).with_columns(self.df.select(pl.exclude("timestamp")))
-            # print("WARNING: in with_experiment_state_df, timestamp is not monotonic, forcing it to be")
-            # print("This is likely a BUG in DASTARD.")
+        if force_timestamp_monotonic:
+            df = self.df.with_columns(pl.col("timestamp").cum_max())
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
         else:
-            df = self.df
-        df2 = df.join_asof(df_es, on="timestamp", strategy="backward")
+            df = self.df.with_row_index("_record").sort("timestamp")
+            df2 = df.join_asof(df_es, on="timestamp", strategy="backward").sort("_record").drop("_record")
         return self.with_replacement_df(df2)
 
     def with_external_trigger_df(self, df_ext: pl.DataFrame, output_control: ExtTriggerControl) -> "Channel":
@@ -1691,7 +1706,7 @@ class Channel:
         assert output_control.require_last or output_control.require_next
         subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
 
-        df_subframe = df.select("subframecount")
+        df_subframe = df.select("subframecount").with_row_index("_record").sort("subframecount")
         if output_control.require_last:
             df_subframe = df_subframe.join_asof(
                 df_ext, on="subframecount", strategy="backward", coalesce=False, suffix="_prev_ext_trig"
@@ -1711,7 +1726,7 @@ class Channel:
             df_subframe = df_subframe.with_columns(ms_next_ext_trig=(pl.col("dsf_next_ext_trig") * subframe_time_ms))
         if output_control.ms_nearest_trig:
             df_subframe = df_subframe.with_columns(
-                pl.when(pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig"))
+                pl.when((pl.col("dsf_last_ext_trig") < pl.col("dsf_next_ext_trig")) | pl.col("dsf_next_ext_trig").is_null())
                 .then(pl.col("dsf_last_ext_trig") * subframe_time_ms)
                 .otherwise(-pl.col("dsf_next_ext_trig") * subframe_time_ms)
                 .alias("ms_nearest_ext_trig")
@@ -1719,12 +1734,16 @@ class Channel:
 
         # Drop columns that the user doesn't want
         if not output_control.absolute_sfs:
-            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig")
+            df_subframe = df_subframe.drop("subframecount_prev_ext_trig", "subframecount_next_ext_trig", strict=False)
         if not output_control.sf_last_trig:
-            df_subframe = df_subframe.drop("dsf_last_ext_trig")
+            df_subframe = df_subframe.drop("dsf_last_ext_trig", strict=False)
         if not output_control.sf_next_trig:
-            df_subframe = df_subframe.drop("dsf_next_ext_trig")
+            df_subframe = df_subframe.drop("dsf_next_ext_trig", strict=False)
 
+        df_subframe = df_subframe.sort("_record").drop("_record")
+        existing = (set(df_subframe.columns) - {"subframecount"}) & set(self.df.columns)
+        if existing:
+            raise ValueError(f"external trigger columns {sorted(existing)} already exist")
         df2 = self.df.with_columns(df_subframe)
         return self.with_replacement_df(df2)
 
