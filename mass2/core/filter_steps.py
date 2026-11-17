@@ -33,9 +33,8 @@ class OptimalFilterStep(RecipeStep):
             if self.transform_raw is not None:
                 raw = self.transform_raw(raw)
             peak_y, peak_x = self.filter.filter_records(raw)
-            dfs.append(pl.DataFrame({"peak_x": peak_x, "peak_y": peak_y}))
+            dfs.append(pl.DataFrame({self.output[0]: peak_x, self.output[1]: peak_y}))
         df2 = pl.concat(dfs).with_columns(df)
-        df2 = df2.rename({"peak_x": self.output[0], "peak_y": self.output[1]})
         return df2
 
     def dbg_plot(self, df_after: pl.DataFrame, **kwargs: Any) -> plt.Axes:

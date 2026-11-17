@@ -115,7 +115,8 @@ def laplace_entropy_array(x: ArrayLike, w: float = 1.0) -> float:
         dp = d[i + 1] * e[i]
         r1 = c[i] / d[i + 1]
         e2 = np.sqrt(e[i])
-        H += 4 * w * np.sqrt(c[i] * dp) * np.atan((e2 - 1.0 / e2) * r1**0.5 / (r1 + 1.0))
+        if e2 > 0.0:
+            H += 4 * w * np.sqrt(c[i] * dp) * np.atan((e2 - 1.0 / e2) * r1**0.5 / (r1 + 1.0))
         H += w * (dp - c[i]) * (np.log(c[i] + dp) - 1)
         A, B = d[i + 1], c[i] * e[i]
         H -= w * (A - B) * (np.log(A + B) - 1)
@@ -264,6 +265,8 @@ def laplace_KL_divergence(x: ArrayLike, y: ArrayLike, w: float = 1.0, approx_mod
                that, and using Simpson's rule on the PDF samples that result.
     ``size``   Uses "approx" if len(x)+len(y)>200000, or "exact" otherwise.
     """
+    if approx_mode == "size":
+        approx_mode = "exact" if np.size(x) + np.size(y) <= 200000 else "approx"
     return laplace_cross_entropy(x, y, w, approx_mode=approx_mode) - laplace_entropy(x, w, approx_mode=approx_mode)
 
 
@@ -411,13 +414,13 @@ def laplace_cross_entropy_arrays(x: ArrayLike, y: ArrayLike) -> float:  # noqa: 
     return H
 
 
-def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> float:
+def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> float:  # noqa: PLR0914
     """
     Approximate the cross-entropy H(P, Q) between two empirical distributions P and Q,
-    where P is estimated from data `x` and Q from data `y` using Laplace kernel-density
-    estimation and binned histograms.
+    where P is estimated from data `x` using a Laplace kernel and Q from data `y` using
+    the top-hat kernel with a floor of `laplace_cross_entropy_arrays`, on binned histograms.
 
-    This method uses histograms and convolution with a Laplace kernel to estimate the
+    This method uses histograms and convolution with these kernels to estimate the
     probability distributions, then computes the cross-entropy using numerical integration.
 
     Parameters
@@ -467,8 +470,11 @@ def laplace_cross_entropy_approx(x: ArrayLike, y: ArrayLike, w: float = 1.0) -> 
     norm = 1.0 / sp.integrate.simpson(kde, dx=db)
     p = kde * norm
 
-    kde = sp.signal.fftconvolve(cy, kernel, mode="full")[nx:-nx]
-    kde[kde < kernel.min()] = kernel.min()
-    norm = 1.0 / sp.integrate.simpson(kde, dx=db)
-    q = kde * norm
+    halfwidth = np.sqrt(6) * w
+    ny = int(0.5 + halfwidth / db)
+    tophat = np.ones(2 * ny + 1)
+    kde = sp.signal.fftconvolve(cy, tophat, mode="full")[ny:-ny]
+    Qmin_sum = 1.0 / np.sqrt(len(y) + 3)
+    qrange = max(np.max(x), np.max(y) + halfwidth) - min(np.min(x), np.min(y) - halfwidth) + 20 * w
+    q = Qmin_sum / qrange + (1.0 - Qmin_sum) * kde / (len(y) * tophat.sum() * db)
     return -sp.integrate.simpson(p * np.log(q), dx=db)
