@@ -17,9 +17,9 @@ result_dtype = np.dtype([
     ("promptness", np.float32),
     ("rise_time", np.float32),
     ("postpeak_deriv", np.float32),
-    ("peak_index", np.uint16),
-    ("peak_value", np.uint16),
-    ("min_value", np.uint16),
+    ("peak_index", np.uint32),
+    ("peak_value", np.float32),
+    ("min_value", np.float32),
     ("shift1", np.uint16),
 ])
 
@@ -34,15 +34,30 @@ ResultArrayType = NDArray
 
 
 # @memory.cache
-@njit
-def summarize_data_numba(  # noqa: PLR0914
-    rawdata: NDArray[np.uint16],
+def summarize_data_numba(
+    rawdata: NDArray,
     timebase: float,
     peak_samplenumber: int,
     pretrigger_ignore_samples: int,
     nPresamples: int,
 ) -> ResultArrayType:
     """Summarize one segment of the data file, loading it into cache."""
+    rawdata = np.asarray(rawdata)
+    is_integer = np.issubdtype(rawdata.dtype, np.integer)
+    if not is_integer:
+        rawdata = rawdata.astype(np.float64)
+    return _summarize_data(rawdata, timebase, peak_samplenumber, pretrigger_ignore_samples, nPresamples, is_integer)
+
+
+@njit
+def _summarize_data(  # noqa: PLR0914
+    rawdata: NDArray,
+    timebase: float,
+    peak_samplenumber: int,
+    pretrigger_ignore_samples: int,
+    nPresamples: int,
+    round_baseline: bool,
+) -> ResultArrayType:
     nPulses = rawdata.shape[0]
     nSamples = rawdata.shape[1]
 
@@ -58,9 +73,9 @@ def summarize_data_numba(  # noqa: PLR0914
         pulse_sum = 0.0
         pulse_rms_sum = 0.0
         promptness_sum = 0.0
-        peak_value = 0
+        peak_value = pulse[0]
         peak_index = 0
-        min_value = np.iinfo(np.uint16).max
+        min_value = pulse[0]
         s_prompt = nPresamples + 2
         e_prompt = nPresamples + 8
 
@@ -81,7 +96,7 @@ def summarize_data_numba(  # noqa: PLR0914
 
             if k == nPresamples - 1:
                 ptm = pretrig_sum / e_nPresamples
-                ptrms = np.sqrt(pretrig_rms_sum / e_nPresamples - ptm**2)
+                ptrms = np.sqrt(max(pretrig_rms_sum / e_nPresamples - ptm**2, 0.0))
                 if signal - ptm > 4.3 * ptrms:
                     e_prompt -= 1
                     s_prompt -= 1
@@ -95,8 +110,9 @@ def summarize_data_numba(  # noqa: PLR0914
 
         results["pretrig_mean"][j] = ptm
         results["pretrig_rms"][j] = ptrms
-        if ptm < peak_value:
-            peak_value -= int(ptm + 0.5)
+        baseline = np.floor(ptm + 0.5) if round_baseline else ptm
+        if baseline < peak_value:
+            peak_value -= baseline
             results["promptness"][j] = (promptness_sum / 6.0 - ptm) / peak_value
             results["peak_value"][j] = peak_value
             results["peak_index"][j] = peak_index
@@ -107,10 +123,10 @@ def summarize_data_numba(  # noqa: PLR0914
         results["min_value"][j] = min_value
         pulse_avg = pulse_sum / (nSamples - nPresamples + 1) - ptm
         results["pulse_average"][j] = pulse_avg
-        results["pulse_rms"][j] = np.sqrt(pulse_rms_sum / (nSamples - nPresamples + 1) - ptm * pulse_avg * 2 - ptm**2)
+        results["pulse_rms"][j] = np.sqrt(max(pulse_rms_sum / (nSamples - nPresamples + 1) - ptm * pulse_avg * 2 - ptm**2, 0.0))
 
-        low_th = int(0.1 * peak_value + ptm)
-        high_th = int(0.9 * peak_value + ptm)
+        low_th = 0.1 * peak_value + ptm
+        high_th = 0.9 * peak_value + ptm
 
         k = nPresamples
         low_value = high_value = pulse[k]
@@ -183,18 +199,21 @@ def pulse_2exp_with_tail(
     tt = np.asarray(t) - t0
     tau_fall = tau_rise * tau_fall_factor
     assert tau_fall_factor >= 1
+    ttp = np.maximum(tt, 0)
 
     if tau_fall_factor > 1:
         # location of peak
-        t_peak = (tau_rise * tau_fall) / (tau_fall - tau_rise) * np.log(tau_fall / tau_rise)
+        delta = (tau_fall_factor - 1) / tau_fall
+        t_peak = np.log1p(tau_fall_factor - 1) / delta
         # value at peak
-        max_val = np.exp(-t_peak / tau_fall) - np.exp(-t_peak / tau_rise)
+        max_val = -np.exp(-t_peak / tau_fall) * np.expm1(-t_peak * delta)
+        shape = -np.exp(-ttp / tau_fall) * np.expm1(-ttp * delta) / max_val
     else:  # tau_fall == tau_rise
-        max_val = np.exp(-1)
+        shape = (ttp / tau_rise) * np.exp(1 - ttp / tau_rise)
 
     return (
-        a_tail * np.exp(-tt / tau_tail) / np.exp(-tt[0] / tau_tail)  # normalized tail
-        + a * (np.exp(-tt / tau_fall) - np.exp(-tt / tau_rise)) * np.greater(tt, 0) / max_val
+        a_tail * np.exp(-(tt - tt[0]) / tau_tail)  # normalized tail
+        + a * shape * np.greater(tt, 0)
         + baseline
     )
 

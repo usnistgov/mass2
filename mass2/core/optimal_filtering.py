@@ -73,17 +73,17 @@ class ToeplitzWhitener:
     def __call__(self, v: ArrayLike) -> np.ndarray:
         "Return whitened vector (or matrix of column vectors) Wv"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be an array of dimension 1 or 2")
         elif v.ndim == 2:
-            w = np.zeros_like(v)
+            w = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 w[:, i] = self(v[:, i])
             return w
 
         # Multiply by the Toeplitz AR matrix to make the MA*w vector.
         N = len(v)
-        y = self.phi[0] * v
+        y = self.phi[0] * v.astype(float)
         for i in range(1, 1 + self.p):
             y[i:] += self.phi[i] * v[:-i]
 
@@ -96,7 +96,7 @@ class ToeplitzWhitener:
             for j in range(i):
                 y[i] -= y[j] * self.theta[i - j]
             y[i] /= self.theta[0]
-        for i in range(self.q, N):
+        for i in range(max(self.q, 1), N):
             for j in range(i - self.q, i):
                 y[i] -= y[j] * self.theta[i - j]
             y[i] /= self.theta[0]
@@ -105,17 +105,17 @@ class ToeplitzWhitener:
     def solveW(self, v: ArrayLike) -> np.ndarray:
         "Return unwhitened vector (or matrix of column vectors) inv(W)*v"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.solveW(v[:, i])
             return r
 
         # Multiply by the Toeplitz MA matrix to make the AR*w vector.
         N = len(v)
-        y = self.theta[0] * v
+        y = self.theta[0] * v.astype(float)
         for i in range(1, 1 + self.q):
             y[i:] += self.theta[i] * v[:-i]
 
@@ -128,7 +128,7 @@ class ToeplitzWhitener:
             for j in range(i):
                 y[i] -= y[j] * self.phi[i - j]
             y[i] /= self.phi[0]
-        for i in range(self.p, N):
+        for i in range(max(self.p, 1), N):
             for j in range(i - self.p, i):
                 y[i] -= y[j] * self.phi[i - j]
             y[i] /= self.phi[0]
@@ -137,16 +137,16 @@ class ToeplitzWhitener:
     def solveWT(self, v: ArrayLike) -> np.ndarray:
         "Return vector (or matrix of column vectors) inv(W')*v"
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.solveWT(v[:, i])
             return r
 
         N = len(v)
-        y = np.array(v)
+        y = np.array(v, dtype=float)
         y[N - 1] /= self.phi[0]
         for i in range(N - 2, -1, -1):
             f = min(self.p + 1, N - i)
@@ -157,16 +157,16 @@ class ToeplitzWhitener:
     def applyWT(self, v: ArrayLike) -> np.ndarray:
         """Return vector (or matrix of column vectors) W'v"""
         v = np.asarray(v)
-        if v.ndim > 3:
+        if v.ndim > 2:
             raise ValueError("v must be dimension 1 or 2")
         elif v.ndim == 2:
-            r = np.zeros_like(v)
+            r = np.zeros_like(v, dtype=float)
             for i in range(v.shape[1]):
                 r[:, i] = self.applyWT(v[:, i])
             return r
 
         N = len(v)
-        y = np.array(v)
+        y = np.array(v, dtype=float)
         y[N - 1] /= self.theta[0]
         for i in range(N - 2, -1, -1):
             f = min(self.q + 1, N - i)
@@ -453,7 +453,7 @@ class Filter1Lag(Filter):
         assert nsamp == len(self.values)
         dotproduct = x @ self.values
 
-        peak_x = np.zeros_like(x)
+        peak_x = np.zeros_like(dotproduct)
         peak_y = dotproduct
         return peak_y, peak_x
 
@@ -636,23 +636,30 @@ class FilterMaker:
         avg_signal, peak, _ = self._normalize_signal(cut_pre, cut_post)
 
         n = len(avg_signal)
-        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
         pulse_model = np.vstack((avg_signal, np.ones_like(avg_signal)))
         if constraints is not None:
             pulse_model = np.vstack((pulse_model, constraints))
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
-        Rinv_model = NoiseR.solve(pulse_model.T)
-        A = pulse_model @ Rinv_model
-        all_filters = np.linalg.solve(A, Rinv_model.T)
+        if self.whitener is not None:
+            WM = self.whitener(pulse_model.T)
+            all_filters = np.linalg.solve(WM.T @ WM, self.whitener.applyWT(WM).T)
+        else:
+            assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(pulse_model.T)
+            A = pulse_model @ Rinv_model
+            all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
 
         self._normalize_filter(filt_noconst, avg_signal)
-        variance = bracketR(filt_noconst, noise_corr)
+        if self.whitener is not None and self.noise_autocorr is None:
+            variance = np.sum(self.whitener.solveWT(filt_noconst) ** 2)
+        else:
+            variance = bracketR(filt_noconst, noise_corr)
 
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
@@ -661,7 +668,7 @@ class FilterMaker:
         if variance <= 0:
             vdv = np.inf
         else:
-            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+            vdv = abs(peak) / (8 * np.log(2) * variance) ** 0.5
         return Filter1Lag(
             filt_noconst,
             peak,
@@ -761,23 +768,30 @@ class FilterMaker:
         shorten = 2  # for 5-lag convolution
         truncated_signal = avg_signal[shorten:-shorten]
         n = len(truncated_signal)
-        assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
         pulse_model = np.vstack((truncated_signal, np.ones_like(truncated_signal)))
         if constraints is not None:
             pulse_model = np.vstack((pulse_model, constraints))
         assert pulse_model.shape[1] == n
 
         noise_corr = noise_autocorr[:n]
-        NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
-        Rinv_model = NoiseR.solve(pulse_model.T)
-        A = pulse_model @ Rinv_model
-        all_filters = np.linalg.solve(A, Rinv_model.T)
+        if self.whitener is not None:
+            WM = self.whitener(pulse_model.T)
+            all_filters = np.linalg.solve(WM.T @ WM, self.whitener.applyWT(WM).T)
+        else:
+            assert len(noise_autocorr) >= n, "Noise autocorrelation vector is too short for signal size"
+            NoiseR = SymmetricToeplitz.fromFirstCol(noise_corr)
+            Rinv_model = NoiseR.solve(pulse_model.T)
+            A = pulse_model @ Rinv_model
+            all_filters = np.linalg.solve(A, Rinv_model.T)
         filt_noconst = all_filters[0]
 
         band_limit(filt_noconst, self.sample_time_sec, fmax, f_3db)
 
         self._normalize_5lag_filter(filt_noconst, avg_signal)
-        variance = bracketR(filt_noconst, noise_corr)
+        if self.whitener is not None and self.noise_autocorr is None:
+            variance = np.sum(self.whitener.solveWT(filt_noconst) ** 2)
+        else:
+            variance = bracketR(filt_noconst, noise_corr)
 
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
@@ -786,7 +800,7 @@ class FilterMaker:
         if variance <= 0:
             vdv = np.inf
         else:
-            vdv = peak / (8 * np.log(2) * variance) ** 0.5
+            vdv = abs(peak) / (8 * np.log(2) * variance) ** 0.5
         return Filter5Lag(
             filt_noconst,
             peak,
@@ -901,6 +915,10 @@ class FilterMaker:
         # Make sure we have either a noise PSD or an autocorrelation or a whitener
         if self.noise_psd is None:
             raise ValueError("FilterMaker must have noise_psd to generate a Fourier filter")
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
+            raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
+        if self.sample_time_sec <= 0 and self.noise_autocorr is None:
+            raise ValueError("FilterMaker must have a sample_time_sec to compute the variance from noise_psd")
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
 
@@ -915,32 +933,26 @@ class FilterMaker:
         reduction = 2 * shorten + (cut_pre + cut_post)
 
         truncated_avg_signal = avg_signal[shorten:-shorten]
-        len_reduced_psd = len(noise_psd) - (reduction + 1) // 2
         window = 1.0
         sig_ft = np.fft.rfft(truncated_avg_signal * window)
 
-        if len(sig_ft) != len_reduced_psd:
-            raise ValueError(f"signal real DFT and noise PSD are not the same length ({len(sig_ft)} and {len_reduced_psd})")
+        if len(noise_psd) != len(self.signal_model) // 2 + 1:
+            raise ValueError(f"noise PSD has length {len(noise_psd)}, but records have length {len(self.signal_model)}")
 
-        # Careful with PSD: "shorten" it by converting into a real space autocorrelation,
-        # truncating the middle, and going back to Fourier space
         if reduction > 0:
-            noise_autocorr = np.fft.irfft(noise_psd)
-            noise_autocorr = np.hstack((noise_autocorr[: len_reduced_psd - 1], noise_autocorr[-len_reduced_psd:]))
-            noise_psd = np.abs(np.fft.rfft(noise_autocorr))
+            noise_psd = np.interp(np.fft.rfftfreq(len(truncated_avg_signal)), np.fft.rfftfreq(len(self.signal_model)), noise_psd)
         sig_ft_weighted = sig_ft / noise_psd
 
         # Band-limit
         if fmax is not None or f_3db is not None:
-            f_nyquist = 0.5 / self.sample_time_sec
-            freq = np.linspace(0, f_nyquist, len_reduced_psd, dtype=float)
+            freq = np.fft.rfftfreq(len(truncated_avg_signal), d=self.sample_time_sec)
             if fmax is not None:
                 sig_ft_weighted[freq > fmax] = 0.0
             if f_3db is not None:
                 sig_ft_weighted /= 1 + (freq * 1.0 / f_3db) ** 2
 
         sig_ft_weighted[0] = 0.0
-        filt_fourier = np.fft.irfft(sig_ft_weighted) / window
+        filt_fourier = np.fft.irfft(sig_ft_weighted, n=len(truncated_avg_signal)) / window
         self._normalize_5lag_filter(filt_fourier, avg_signal)
         # Set weights in the cut_pre and cut_post windows to 0
         if cut_pre > 0 or cut_post > 0:
@@ -948,13 +960,17 @@ class FilterMaker:
 
         # How we compute the uncertainty depends on whether there's a noise autocorrelation result
         if self.noise_autocorr is None:
-            noise_ft_squared = (len(noise_psd) - 1) / self.sample_time_sec * noise_psd
-            kappa = (np.abs(sig_ft) ** 2 / noise_ft_squared)[1:].sum()
-            variance_fourier = 1.0 / float(kappa)
+            filt_ft = np.fft.rfft(filt_fourier[cut_pre : len(filt_fourier) - cut_post])
+            weight = np.full(len(noise_psd), 2.0)
+            weight[0] = 1.0
+            if len(truncated_avg_signal) % 2 == 0:
+                weight[-1] = 1.0
+            variance_fourier = float(np.sum(weight * np.abs(filt_ft) ** 2 * noise_psd))
+            variance_fourier /= 2 * len(truncated_avg_signal) * self.sample_time_sec
         else:
             ac = np.array(self.noise_autocorr)[: len(filt_fourier)]
             variance_fourier = bracketR(filt_fourier, ac)
-        vdv = peak / (8 * np.log(2) * variance_fourier) ** 0.5
+        vdv = abs(peak) / (8 * np.log(2) * variance_fourier) ** 0.5
         return Filter5Lag(
             filt_fourier,
             peak,
@@ -1003,7 +1019,7 @@ class FilterMaker:
             raise ValueError("FilterMaker must have noise_autocorr or whitener arguments to generate ATS filters")
         if self.dt_model is None:
             raise ValueError("FilterMaker must have dt_model to generate ATS filters")
-        if self.sample_time_sec is None and not (fmax is None and f_3db is None):
+        if self.sample_time_sec <= 0 and not (fmax is None and f_3db is None):
             raise ValueError("FilterMaker must have a sample_time_sec if it's to be smoothed with fmax or f_3db")
 
         noise_autocorr = self._compute_autocorr(cut_pre, cut_post)
@@ -1034,6 +1050,12 @@ class FilterMaker:
             filt = np.linalg.solve(A, Rinv_model.T)
 
         band_limit(filt.T, self.sample_time_sec, fmax, f_3db)
+        filt = np.linalg.solve(filt @ MT.T, filt)
+        if len(noise_autocorr) > 0:
+            variance = bracketR(filt[0], noise_autocorr)
+        else:
+            assert self.whitener is not None
+            variance = np.sum(self.whitener.solveWT(filt[0]) ** 2)
 
         if cut_pre > 0 or cut_post > 0:
             nfilt = filt.shape[0]
@@ -1043,8 +1065,7 @@ class FilterMaker:
         filt_dt = filt[1]
         filt_baseline = filt[2]
 
-        variance = bracketR(filt_noconst, noise_autocorr)
-        vdv = peak / (np.log(2) * 8 * variance) ** 0.5
+        vdv = abs(peak) / (np.log(2) * 8 * variance) ** 0.5
         return FilterATS(
             filt_noconst,
             peak,
@@ -1105,9 +1126,10 @@ class FilterMaker:
         ValueError
             If negative numbers of samples are to be cut, or the entire record is to be cut.
         """
-        avg_signal = np.array(self.signal_model)
+        avg_signal = np.array(self.signal_model, dtype=float)
         ns = len(avg_signal)
-        pre_avg = avg_signal[cut_pre : self.n_pretrigger - 1].mean()
+        pre_start = cut_pre if cut_pre < self.n_pretrigger - 1 else 0
+        pre_avg = avg_signal[pre_start : max(self.n_pretrigger - 1, 1)].mean()
 
         if cut_pre < 0 or cut_post < 0:
             raise ValueError(f"(cut_pre,cut_post)=({cut_pre},{cut_post}), but neither can be negative")
@@ -1130,7 +1152,8 @@ class FilterMaker:
         # avg_signal: normalize to have unit peak
         avg_signal -= pre_avg
 
-        rescale = 1 / np.max(avg_signal)
+        lo, hi = np.min(avg_signal), np.max(avg_signal)
+        rescale = 1 / (lo if -lo > hi else hi)
         avg_signal *= rescale
         avg_signal[: self.n_pretrigger] = 0.0
         avg_signal = avg_signal[cut_pre : ns - cut_post]

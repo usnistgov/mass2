@@ -3,6 +3,7 @@ Tests for fit_kink_model
 """
 
 import mass2
+import pytest
 import numpy as np
 
 
@@ -47,3 +48,17 @@ class Test_fit_kink:
         assert abs(a - self.truek) < 0.3
         assert abs(b - 1) < 0.1
         assert abs(c) < 0.1
+
+    def test_kink_at_data_edges(self):
+        """k at either end of the x range must raise ValueError."""
+        for k in (self.x.min(), self.x.max()):
+            with pytest.raises(ValueError):
+                mass2.mathstat.fitting.kink_model(k, self.x, self.y)
+
+
+def test_kink_model_unsigned():
+    x = np.arange(10, dtype=np.uint16)
+    y = np.minimum(x, 4).astype(float)
+    _, abc, X2 = mass2.mathstat.fitting.kink_model(4, x, y)
+    assert np.allclose(abc, [4, 1, 0])
+    assert X2 < 1e-20
