@@ -4,13 +4,12 @@ common.py
 Stand-alone functions that can be used throughout MASS.
 """
 
-import six
 from typing import Any
 
 
 def isstr(s: Any) -> bool:
     """Is s a string or a bytes type? Make python 2 and 3 compatible."""
-    return isinstance(s, (six.string_types, bytes))
+    return isinstance(s, (str, bytes))
 
 
 def tostr(s: bytes | str) -> str:

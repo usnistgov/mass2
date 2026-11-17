@@ -5,7 +5,7 @@ import mass2
 def test_phase_correct(plot=False):
     # the final fit resolutions are quite sensitive to this, easily varying from 3 to 5 eV
     rng = np.random.default_rng(5632)
-    energies = np.arange(4000)
+    energies = np.zeros(4000)
     ph_peaks = []
     line_names = ["MnKAlpha", "FeKAlpha", "CuKAlpha", "CrKAlpha"]
     for i, name in enumerate(line_names):
