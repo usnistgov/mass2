@@ -1458,6 +1458,35 @@ addline(
 
 
 addline(
+    element="Sn",
+    material="metal",
+    linetype="KAlpha",
+    reference_short="Zschornack",
+    nominal_peak_energy=25271.36,
+    energies=np.array([25044.04, 25271.36]),
+    lorentzian_fwhm=np.array([10.89, 10.68]),
+    reference_amplitude=np.array([2.080, 3.89]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    ka12_energy_diff=25271.36 - 25044.04,
+    reference_plot_instrument_gaussian_fwhm=None,
+)
+
+
+addline(
+    element="Sn",
+    material="metal",
+    linetype="KBeta",
+    reference_short="Zschornack",
+    nominal_peak_energy=28486.26,
+    energies=np.array([28444.43, 28486.26]),
+    lorentzian_fwhm=np.array([12.49, 12.83]),
+    reference_amplitude=np.array([0.372, 0.722]),
+    reference_amplitude_type=AmplitudeType.LORENTZIAN_INTEGRAL_INTENSITY,
+    reference_plot_instrument_gaussian_fwhm=None,
+)
+
+
+addline(
     element="Pr",
     material="metal",
     linetype="KAlpha",
