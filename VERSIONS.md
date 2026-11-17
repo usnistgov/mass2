@@ -10,6 +10,7 @@
 * Add first draft of MASSASSIN, MAD-COW, and MAD-Dash for online analysis (issue 177).
 * Read `*_configuration.toml` file in the Arrow directory.
 * Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
+* Merge changes from v2.1.2 and 2.1.3 made while developing this version.
 
 **2.1.3** November 17, 2026
 * Very many bug fixes by Claude Code 5.5 and @unger-daniel.
