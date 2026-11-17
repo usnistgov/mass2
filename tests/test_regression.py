@@ -25,7 +25,8 @@ def test_analysis_regression():
     """Make sure that analysis results don't change without us noticing"""
     data = load_data()
     data = data.map(all_steps, allow_throw=True)
-    expected_df = pl.read_parquet(pathlib.Path(__file__).parent / "regression_test_data.parquet")
+    test_data_path = pathlib.Path(__file__).parent / "regression_test_data.parquet"
+    expected_df = pl.read_parquet(test_data_path)
     assert set(data.channels) == set(expected_df["ch_num"].unique())
     for ch_num, ch in data.channels.items():
         expect = expected_df.filter(pl.col("ch_num") == ch_num).drop("ch_num")
