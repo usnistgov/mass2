@@ -840,6 +840,7 @@ def test_plot_hists_without_groups():
     centers, counts = ch.plot_hists("x", edges, "state_label")
     assert np.allclose(centers, edges[:-1] + 0.5) and counts == {}
 
+
 def test_noise_psd_discontinuous_records_not_straddled():
     """Discontinuous records with different baselines must not leak steps into the PSD."""
     rng = np.random.default_rng(2)
@@ -847,7 +848,8 @@ def test_noise_psd_discontinuous_records_not_straddled():
     result = mass2.core.noise_algorithms.calc_noise_result(traces, continuous=False, dt=0.5)
     _, periodogram = scipy.signal.periodogram(traces, fs=2.0, axis=-1, detrend=False)
     assert np.allclose(result.psd[1:-1], periodogram.mean(axis=0)[1:-1])
-    
+
+
 def test_pretrig_mean_jump_fix_without_subframecount():
     ptm = np.arange(20.0) * 30 % 256 + 1000
     for col in ("framecount", "timestamp"):
