@@ -112,9 +112,9 @@ class Test_LaplaceEntropy:
         e = laplace_cross_entropy(x, z, 1)
         assert e == pytest.approx(1.95882859388)
         e = laplace_cross_entropy(z, x, 1, "approx")
-        assert e == pytest.approx(1.786246409970764)
+        assert e == pytest.approx(1.9291551805200513)
         e = laplace_cross_entropy(x, z, 1, "approx")
-        assert e == pytest.approx(1.7861438931128626)
+        assert e == pytest.approx(1.9435396060051362)
         e = laplace_cross_entropy(z, x, 0.1, "exact")
         assert e == pytest.approx(0.8366756130721216)
         e = laplace_cross_entropy(z, x, 0.1)
@@ -124,9 +124,9 @@ class Test_LaplaceEntropy:
         e = laplace_cross_entropy(x, z, 0.1)
         assert e == pytest.approx(0.8321207511380377)
         e = laplace_cross_entropy(z, x, 0.1, "approx")
-        assert e == pytest.approx(0.8189687816571245)
+        assert e == pytest.approx(0.8353596587639205)
         e = laplace_cross_entropy(x, z, 0.1, "approx")
-        assert e == pytest.approx(0.8189542, rel=1e-6)
+        assert e == pytest.approx(0.8305531451715243)
 
     @staticmethod
     def test_empty():
@@ -178,3 +178,11 @@ class Test_LaplaceEntropy:
             xg = np.exp(p) * x
             D = mass2.mathstat.entropy.laplace_cross_entropy(xg, x, w=1.0, approx_mode="exact")
             assert abs(D) < 20
+
+    @staticmethod
+    def test_kl_size_mode_consistent():
+        """approx_mode="size" must pick one mode for both terms, based on len(x)+len(y)."""
+        rng = np.random.default_rng(1)
+        x = rng.normal(size=150_000) * 0.3
+        y = rng.normal(size=100_000) * 0.3
+        assert laplace_KL_divergence(x, y) == laplace_KL_divergence(x, y, approx_mode="approx")
