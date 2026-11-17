@@ -318,7 +318,10 @@ def test_noise_psd():
     assert len(psd.frequencies) == 251
     assert np.allclose(psd_raw.frequencies[:5], psd.frequencies[:5])
     psd_discontinuous = mass2.core.noise_algorithms.calc_noise_result(noise_traces, continuous=False, dt=frametime_s)
-    assert np.allclose(psd_discontinuous.psd, psd.psd)
+    # These aren't identical, because continuous PSD assumes we can do 2npulses-1 overlapped segments of data,
+    # while continuous=False doesn't check the overlapped segments. Still, with ±10% tolerance they agree.
+    # Need 15% tolerance to agree with the strictly constant, expected PSD of 1.0.
+    assert np.allclose(psd_discontinuous.psd, psd.psd, rtol=0.1, atol=0.1)
     assert np.allclose(psd_discontinuous.psd[1:-1], expect[1:-1], atol=0.15)
 
 
