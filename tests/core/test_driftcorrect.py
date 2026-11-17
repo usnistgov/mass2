@@ -27,7 +27,7 @@ def channel_from_df(df, ch_num: int = 0, n_presamples: int = 1, n_samples: int =
     return ch
 
 
-def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
+def test_drift_correct(N=2e5, a0=100, b0=500, slope=0.01):
     N = int(N)
     rng = np.random.default_rng(42)
     a = rng.standard_normal(N) + a0
@@ -36,7 +36,17 @@ def test_drift_correct(N=2e5, a0=100, b0=100, slope=0.01):
     b_tilted = dc_perfect(a, b)
     dc = mass2.core.drift_correct(indicator=a, uncorrected=b_tilted)
     assert dc.slope == pytest.approx(slope, abs=1e-3)
-    assert dc.offset == pytest.approx(b0, abs=1e-2)
+    assert dc.offset == pytest.approx(a0, abs=1e-2)
+
+
+def test_drift_correct_integer_indicator(N=20000, slope=0.001):
+    rng = np.random.default_rng(0)
+    ind = rng.integers(990, 1011, N).astype(np.uint16)
+    ph = 1000 * (1 + slope * (ind - 1000.0)) + rng.normal(0, 1, N)
+    ch = channel_from_df(pl.DataFrame({"ind": ind, "ph": ph}))
+    dc = ch.driftcorrect(indicator_col="ind", uncorrected_col="ph").steps[-1].dc
+    assert dc.slope == pytest.approx(-slope, abs=1e-4)
+    assert dc.offset == 1000
 
 
 def test_time_drift_correct():

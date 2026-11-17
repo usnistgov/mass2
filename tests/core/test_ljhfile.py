@@ -1,16 +1,22 @@
+import copy
 import glob
 import numpy as np
 import os
+import pickle
 import struct
 from packaging.version import Version
 import tzlocal
+import pulsedata
 
 from mass2 import LJHFile
+
+EXAMPLE_HEADERS = sorted(glob.glob(os.path.join(os.path.dirname(__file__), "ljh_example_headers", "*.ljh")))
 
 
 def test_read_header():
     """Make sure the files in ljh_example_headers/ have headers that get parsed."""
-    for file in glob.glob("tests/core/ljh_example_headers/*.ljh"):
+    assert len(EXAMPLE_HEADERS) > 0
+    for file in EXAMPLE_HEADERS:
         header_d, _, _ = LJHFile.read_header(file)
         assert 200 == header_d["Total Samples"]
         assert 100 == header_d["Presamples"]
@@ -32,7 +38,7 @@ def test_ljh_all_versions(tmp_path):  # noqa: PLR0914
     v200 = Version("2.0.0")
     v210 = Version("2.1.0")
     v220 = Version("2.2.0")
-    for filename in glob.glob("tests/core/ljh_example_headers/*.ljh"):
+    for filename in EXAMPLE_HEADERS:
         template_file = LJHFile.open(filename)
         assert nsamples == template_file.nsamples
         npre = 100
@@ -84,3 +90,16 @@ def test_ljh_all_versions(tmp_path):  # noqa: PLR0914
         s0 = df["timestamp"]
         s1 = s0.dt.convert_time_zone(tzlocal.get_localzone_name())
         assert (s0 == s1).all()
+
+
+def test_pickle_ljh_2_0(tmp_path):
+    """Pickling an LJH 2.0 file object must give an equivalent object."""
+    src = pulsedata.pulse_noise_ljh_pairs["regression"].pulse_folder / "20150813_regression_pulse_chan1.ljh"
+    path = tmp_path / "v20_chan1.ljh"
+    path.write_bytes(src.read_bytes().replace(b"Save File Format Version: 2.1.0", b"Save File Format Version: 2.0.0"))
+    f = LJHFile.open(str(path))
+    assert f.ljh_version == Version("2.0.0")
+    for g in (pickle.loads(pickle.dumps(f)), copy.deepcopy(f)):
+        assert g.npulses == f.npulses
+        assert np.array_equal(g.datatimes_raw, f.datatimes_raw)
+        assert np.array_equal(g.read_trace(3), f.read_trace(3))
