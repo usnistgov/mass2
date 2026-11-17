@@ -2,6 +2,11 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.1.2** November 17, 2026-
+* Add Kα and Kβ line models for Sn based on Zschornack book (PR 197).
+* Fix missing dependency on `six` (PR 195).
+* Fix bug in misc function `midpoints_and_step_size`, which did not compute midpoints (PR 185).
+
 **2.1.1** October 10, 2026
 * Fix bug in drift correct algorithm when range of indicator is big (issue 176).
 * New stepwise calibration works from a sequence of heuristics (issue 178).
