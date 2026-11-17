@@ -158,7 +158,7 @@ If you want to multiply the line models by a model of the quantum efficiency, yo
 ```python
 # mkdocs: render
 raven_filters = mass2.materials.efficiency_models.filterstack_models["RAVEN1 2019"]
-eknots = np.linspace(100, 20000, 1991)
+eknots = np.linspace(1000, 20000, 1901)
 qevalues = raven_filters(eknots)
 qemodel = mass2.mathstat.interpolate.CubicSpline(eknots, qevalues)
 

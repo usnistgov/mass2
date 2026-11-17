@@ -89,7 +89,7 @@ Testing with energy range 100 to 20,000 eV, 1 eV steps.
 
 ```python
 # mkdocs: render
-xray_energies_eV = np.arange(100, 20000, 10)
+xray_energies_eV = np.arange(1000, 20000, 20)
 EBIT_model.plot_efficiency(xray_energies_eV)
 ```
 ```python
@@ -147,6 +147,6 @@ f3 = mass2.materials.LEX_HT(name="My LEX HT Filter")
 premade_filter_stack.add(f1)
 premade_filter_stack.add(f2)
 premade_filter_stack.add(f3)
-low_xray_energies_eV = np.arange(100, 3000, 5)
+low_xray_energies_eV = np.arange(1000, 3000, 5)
 premade_filter_stack.plot_efficiency(low_xray_energies_eV)
 ```
