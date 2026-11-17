@@ -649,10 +649,9 @@ def test_save_analysis_with_ljh(tmpdir):
     ch = data.channels[4109]
 
     dir = pathlib.Path(tmpdir)
-    savefile = dir / "test_save"
-    actual_savefile = savefile.with_suffix(".zip")
+    savefile = dir / "test_save.zip"
     data.save_analysis(savefile)
-    data2 = mass2.Channels.load_analysis(actual_savefile)
+    data2 = mass2.Channels.load_analysis(savefile)
 
     # Verify that the good channel's data is restored
     # It's an ljh-backed channel, so the raw pulse and timing data should be restored, too.

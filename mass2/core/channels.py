@@ -865,7 +865,8 @@ class Channels:
         Parameters
         ----------
         zip_path : Path | str
-            Directory to save work in. If it doesn't exist, its parent should.
+            File to save work in. If it doesn't exist, its parent should. If it is a directory, the filename defaults to
+            "analysis_savefile.zip". If its suffix is not ".zip", the suffix will be changed to ".zip".
         overwrite : bool, optional
             If `path` exists, whether to overwrite it, by default False
         trim_debug : bool, optional
@@ -874,7 +875,10 @@ class Channels:
             Whether to make the save file smaller at the cost of reduced information avaialble when the ljh files are
             not available, eg when loading on another computer.
         """
+        DEFAULT_ZIPNAME = "analysis_savefile.zip"
         zip_path = pathlib.Path(zip_path)
+        if zip_path.is_dir():
+            zip_path /= DEFAULT_ZIPNAME
         if zip_path.suffix != ".zip":
             zip_path = zip_path.with_suffix(".zip")
 
@@ -1018,9 +1022,9 @@ class Channels:
             if pulseframer is None and reloadable:
                 df = df_with_raw_location
             df_history = [df] * len(ch.steps)
-            noise = None
+            noise: mass2.NoiseResult | None = None
             if ch.header.noise_data_source is not None and os.path.exists(ch.header.noise_data_source):
-                noise = mass2.NoiseChannel.from_ljh(ch.header.noise_data_source)
+                noise = mass2.NoiseResult.from_parquet(ch.header.noise_data_source, ch.ch_num)
             return dataclasses.replace(ch, df=df, df_history=df_history, pulseframer=pulseframer, noise=noise)
 
         with ZipFile(path, "r") as zf:
