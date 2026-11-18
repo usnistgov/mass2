@@ -41,8 +41,8 @@ With raw pulse records and MASS, you can:
 As of this writing (September 18, 2025), Mass2 consists of 10,000 lines of Python (plus 3000 lines of test code and 5200 lines of examples in Marimo notebooks). It used to use extension modules in Cython, but we removed the last of these in early 2025.
 
 ### Versions
-* MASS version 2 was begun in August 2025. It is still in beta-testing status. Find it at https://github.com/usnistgov/mass2
-* MASS version 1 was begun in November 2010. Bug-fix development continues. Find it at https://github.com/usnistgov/mass
+* MASS version 2 was begun in August 2025. Find it at https://github.com/usnistgov/mass2
+* MASS version 1 was begun in November 2010. It is no longer under development. Find it at https://github.com/usnistgov/mass
 
 
 ### Version 2 versus Version 1
@@ -64,14 +64,14 @@ We expect that the major differences between Mass versions 1 and 2 will be disru
 
 
 ## Installation
-Mass requires Python version 3.11 or higher. (GitHub tests it automatically with Python versions 3.11 and 3.14.) We strongly recommend installation inside a virtual environment to help with dependencies and avoiding conflicts. Here are some ways to install Mass 2:
+Mass requires Python version 3.11.5 or higher. (GitHub tests it automatically with Python versions 3.11 and 3.14.) We strongly recommend installation inside a virtual environment to help with dependencies and avoiding conflicts. Here are some ways to install Mass 2:
 
 1. For a data-acquisition computer, install the whole software suite together: https://github.com/usnistgov/microcal-daq/. [Instructions](#1-install-the-microcal-daq-meta-package)
 2. For a personal workstation or other non-lab computer, install using the modern [uv](https://docs.astral.sh/uv/) package manager. [Instructions](#2-use-the-uv-package-manager)
 3. If you have conda installed already, you can install Mass 2 within conda. [Instructions](#3-in-a-conda-environment)
 4. If you have python installed already, you can install Mass system-wide. [Instructions](#4-no-virtual-environment)
 
-We recommend option #1 for a DAQ computer and #2 for a personal computer
+We recommend option #1 for a DAQ computer and #2 for a personal computer.
 
 
 ### 1. Install the `microcal-daq` meta-package
