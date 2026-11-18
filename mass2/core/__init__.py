@@ -16,6 +16,8 @@ from . import noise_algorithms
 from . import ljhutil
 from . import misc
 from . import safe_dill
+from . import rough_cal
+from . import phase_correct_steps
 
 from .ljhfiles import LJHFile
 from .offfiles import OffFile
@@ -32,9 +34,7 @@ from .multifit import (
 from .filter_steps import OptimalFilterStep
 from .optimal_filtering import FilterMaker, Filter, ToeplitzWhitener
 from .drift_correction import drift_correct, DriftCorrectStep, TimeDriftCorrectStep
-from . import rough_cal
 from .channel import Channel, ChannelHeader, BadChannel, ExtTriggerControl
 from .truebq_bin import TrueBqBin
 from .channels import Channels
 from .rough_cal import RoughCalibrationStep, StepwiseCalStep
-from . import phase_correct_steps

@@ -32,6 +32,7 @@ from .core import (
     NoiseChannel,
     NoiseResult,
     misc,
+    safe_dill,
     show,
     FilterMaker,
     ChannelHeader,

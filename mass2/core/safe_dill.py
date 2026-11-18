@@ -1,3 +1,12 @@
+"""
+Module to enable cryptographic hashing of pickle files or dill files.
+The idea is that in normal use, users can verify that a known key was used to
+sign the files. If not, user has to actively opt in to running code from an
+untrusted source.
+
+We want this security check on any recipes being unpickled.
+"""
+
 import hashlib
 import hmac
 import os
@@ -11,15 +20,6 @@ try:
     from platformdirs import user_config_path
 except ImportError:
     user_config_path = None  # type: ignore[assignment]
-
-"""
-Module to enable cryptographic hashing of pickle files or dill files.
-The idea is that in normal use, users can verify that a known key was used to
-sign the files. If not, user has to actively opt in to running code from an
-untrusted source.
-
-We want this security check on any recipes being unpickled.
-"""
 
 _MAGIC_HEADER = b"MASS2DL\x01"
 _DIGEST_SIZE = 32  # SHA-256 produces 32 raw bytes
