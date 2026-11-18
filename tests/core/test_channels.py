@@ -27,8 +27,12 @@ def test_transform_raw_applies_to_noise():
     pulse_path = p.pulse_folder / "20230626_run0001_chan4102.ljh"
     noise_path = p.noise_folder / "20230626_run0000_chan4102.ljh"
     v_over_dv = []
-    for transform in (None, lambda raw: 2.0 * np.asarray(raw, dtype=float)):
-        ch = mass2.Channel.from_ljh(pulse_path, noise_path, max_pulses=2000, transform_raw=transform)
+    savefile = p.noise_folder / "20230626_run0000_noise_analysis.parquet"
+    for transform in (lambda raw: 2.0 * np.asarray(raw, dtype=float), None):
+        nch = mass2.NoiseChannel.from_ljh(noise_path, transform_raw=transform)
+        spectrum = nch.spectrum()
+        mass2.core.noise_analysis.save_noise({4102: spectrum}, savefile)
+        ch = mass2.Channel.from_ljh(pulse_path, p.noise_folder, max_pulses=2000, transform_raw=transform)
         ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv().filter5lag(f_3db=10e3)
         v_over_dv.append(ch.last_v_over_dv)
     assert v_over_dv[1] == pytest.approx(v_over_dv[0], rel=1e-6)

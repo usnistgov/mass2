@@ -132,16 +132,16 @@ class NoiseChannel:
         return np.min(delta_sfc) == np.max(delta_sfc)
 
     @classmethod
-    def from_ljh(cls, path: str | Path) -> "NoiseChannel":
+    def from_ljh(cls, path: str | Path, transform_raw: Callable | None = None) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given LJH file path."""
         ljh = mass2.LJHFile.open(path)
         df, header_df = ljh.to_polars()
         header = mass2.ChannelHeader.from_ljh_header_df(header_df)
-        noise_channel = cls(df, header, header.frametime_s, pulseframer=ljh)
+        noise_channel = cls(df, header, header.frametime_s, pulseframer=ljh, transform_raw=transform_raw)
         return noise_channel
 
     @classmethod
-    def from_ipc(cls, path: str | Path, channum: int, header: ChannelHeader) -> "NoiseChannel":
+    def from_ipc(cls, path: str | Path, channum: int, header: ChannelHeader, transform_raw: Callable | None = None) -> "NoiseChannel":
         """Create a NoiseChannel by loading data from the given arrow IPC file path."""
 
         framer = PulseDataFromArrow.open(path)
@@ -151,6 +151,7 @@ class NoiseChannel:
             header=header,
             frametime_s=header.frametime_s,
             pulseframer=framer,
+            transform_raw=transform_raw,
         )
         return channel
 

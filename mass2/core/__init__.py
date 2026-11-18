@@ -17,6 +17,7 @@ from .ljhfiles import LJHFile
 from .offfiles import OffFile
 from . import pulse_algorithms
 from . import noise_algorithms
+from . import noise_analysis
 from . import ljhutil
 from . import misc
 from .chan_header import ChannelHeader
