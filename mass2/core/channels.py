@@ -619,7 +619,7 @@ class Channels:
         return self.map(load_recipes)
 
     def save_recipes(
-        self, filename: str, required_fields: str | Iterable[str] | None = None, drop_debug: bool = True
+        self, filename: str | Path, required_fields: str | Iterable[str] | None = None, drop_debug: bool = True
     ) -> dict[int, Recipe]:
         """Pickle a dictionary (one entry per channel) of Recipe objects.
 
@@ -629,7 +629,7 @@ class Channels:
 
         Parameters
         ----------
-        filename : str
+        filename : str | Path
             Filename to store recipe in, typically of the form "*.pkl"
         required_fields : str | Iterable[str] | None
             The field (str) or fields (Iterable[str]) that the recipe should be able to generate from a raw LJH file.
@@ -650,10 +650,27 @@ class Channels:
         mass2.safe_dill.dump_signed(steps, filename=filename)
         return steps
 
-    def load_recipes(self, filename: str) -> "Channels":
-        """Return a copy of this Channels object with Recipe objects loaded from the given pickle file
-        and applied to each Channel."""
-        steps = mass2.safe_dill.load_signed(filename)
+    def load_recipes(self, filename: str | Path, allow_untrusted: bool = False) -> "Channels":
+        """Return a copy of this Channels object with analysis recipes loaded from the indicated file
+        and applied to each Channel.
+
+        Parameters
+        ----------
+        filename : str | Path
+            The pickle file containing a dictionary of `RecipeSteps` objects.
+        allow_untrusted : bool, optional
+            Whether to use a pickle file that can't be validated, by default False.
+            Allowing recipe files without this integrity check will make you vulnerable to malicious recipe files that
+            execute arbitrary python code, if deliberately packed into a dictionary of `RecipeSteps` objects.
+            If True, allow a pickle file that lacks the crytographic hash header produced by `mass2.safe_dill.dump_signed()`
+            or a pickle file whose hash doesn't match any key known by the user.
+
+        Returns
+        -------
+        Channels
+            `self`, with each `Channel` updated by running the stored recipes.
+        """
+        steps = mass2.safe_dill.load_signed(filename, allow_untrusted=allow_untrusted)
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self) -> pathlib.Path:
