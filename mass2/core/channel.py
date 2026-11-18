@@ -321,6 +321,7 @@ class Channel:
         # Plot a histogram for each group
         counts_dict: dict[str, NDArray] = {}
         bin_centers, step_size = misc.midpoints_and_step_size(bin_edges)
+        made_plots = False
         for (group_name,), group_data in df_small.group_by(group_by_col, maintain_order=True):
             if group_name is None and skip_none:
                 continue
@@ -330,6 +331,8 @@ class Channel:
             group_name_str = str(group_name)
             counts_dict[group_name_str] = counts
             ax.step(bin_centers, counts, where="mid", label=group_name_str)
+            made_plots = True
+
         # Customize the plot
         ax.set_xlabel(str(col))
         if len(counts_dict) > 0:
@@ -337,7 +340,8 @@ class Channel:
         ax.set_title(f"Histogram of {col} grouped by {group_by_col}")
 
         # Add a legend to label the groups
-        ax.legend(title=group_by_col)
+        if made_plots:
+            ax.legend(title=group_by_col)
         plot_zoomable()
 
         return bin_centers, counts_dict
@@ -1598,11 +1602,12 @@ class Channel:
             ndata = load(noise_fname)
             _, nnoise = ndata.shape
             noise_df = pl.DataFrame({"index": range(nnoise)})
-            noise_header = pl.DataFrame({
+            header_df = pl.DataFrame({
                 "filename": noise_fname,
                 "continuous": noise_continuous,
                 "Presamples": npresamples,
             })
+            noise_header = mass2.ChannelHeader.from_ljh_header_df(header_df)
             framer = PulseDataFromNumpy(ndata.T)
             nch = mass2.NoiseChannel(noise_df, noise_header, frametime_s, pulseframer=framer)
 
