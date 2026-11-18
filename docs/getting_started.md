@@ -316,7 +316,7 @@ def do_filter(ch: mass2.Channel) -> mass2.Channel:
 data = data.map(do_filter)
 ```
 
-The operation above (or the application of any 5-lag filter) will add new fields `("5lagx", "5lagy")` to the channel data frame. It will also add a new, last "step" in each channel's analysis "recipe". See more in [Saving your results](#saving-your-results-and-the-recipe-system) below. Here's how you can look at the last step and make its built-in debug plot. For optimal filter construction, the debug plot is simply a plot of the filter created in the step.
+The operation above (or the application of any 5-lag filter) will add new fields `("5lagx", "5lagy")` to the channel data frame. It will also add a new, last "step" in each channel's analysis "recipe". See more in [Saving your results](#saving-results-and-the-recipe-system) below. Here's how you can look at the last step and make its built-in debug plot. For optimal filter construction, the debug plot is simply a plot of the filter created in the step.
 
 ```python
 # mkdocs: render

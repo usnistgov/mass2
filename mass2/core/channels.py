@@ -754,10 +754,10 @@ class Channels:
 
         Parameters
         ----------
-        path : Path | str
+        zip_path : Path | str
             Directory to save work in. If it doesn't exist, its parent should.
         overwrite : bool, optional
-            If `path` exists, whether to overwrite it, by default False
+            If `zip_path` exists, whether to overwrite it, by default False
         trim_debug : bool, optional
             Whether to make save file smaller (potentially) at the cost of breaking some debugging plots, by default False
         trim_timestamp_and_subframecount: bool, optional

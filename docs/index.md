@@ -34,3 +34,13 @@ Mass2 is built around a few core technologies:
 4. [LMFIT](https://lmfit.github.io/lmfit-py/). Convenient non-linear curve fitting.
 
 A particularly important change is that Mass 2 leverages Pola.rs for data organization. Therefore, for a critical portion of the code, the larger open-source software community provides the documentation, bug fixes, and testing.
+
+### Regenerating documentation
+
+```bash
+# To serve a local copy on port 8000 at `localhost:8000/mass2`
+mkdocs serve
+
+# To build and deploy a copy to https://usnistgov.github.io/mass2/
+mkdocs gh-deploy
+```
