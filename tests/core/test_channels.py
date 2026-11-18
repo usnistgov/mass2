@@ -46,6 +46,7 @@ def dummy_dataframe(npulses: int) -> pl.DataFrame:
 
 
 def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_num: int = 0):
+    assert npulses >= 15, "can't analyze noise with fewer than 15 records"
     rng = np.random.default_rng(seed)
     n = len(signal)
     noise_traces = np.asarray(rng.standard_normal((npulses, n)) * 20 + 5000, dtype=np.int16)
@@ -53,7 +54,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
     frametime_s = 1e-5
     df_noise = dummy_dataframe(len(noise_traces))
     header = mass2.ChannelHeader(
-        "dummy for test",
+        description="dummy for test",
         data_source=None,
         ch_num=ch_num,
         frametime_s=frametime_s,
@@ -61,6 +62,7 @@ def dummy_channel(npulses=100, seed=4, signal=np.zeros(50, dtype=np.int16), ch_n
         n_samples=n,
         df=pl.DataFrame(),
     )
+    print(f"{noise_traces.shape=}")
     noise_ch = mass2.NoiseChannel(df_noise, header, frametime_s, pulseframer=PulseDataFromNumpy(noise_traces))
     noise = noise_ch.spectrum()
     pulseframer = PulseDataFromNumpy(pulse_traces + noise_traces)
@@ -509,11 +511,12 @@ def test_categorize_step():
 
 
 def test_with_good_expr_true_keeps_cuts():
-    ch = dummy_channel(npulses=10).with_columns(a=np.arange(10))
+    npulses = 30
+    ch = dummy_channel(npulses=npulses).with_columns(a=np.arange(npulses))
     ch = ch.with_good_expr(pl.col("a") < 4)
     for extra in (pl.lit(True), True):
         assert len(ch.with_good_expr(extra).good_df(["a"])) == 4
-    assert len(ch.with_good_expr(pl.lit(True), replace=True).good_df(["a"])) == 10
+    assert len(ch.with_good_expr(pl.lit(True), replace=True).good_df(["a"])) == npulses
 
 
 def test_include_exclude():
@@ -596,21 +599,22 @@ def test_trim_dead_ends_keeps_good_expr_columns():
 
 
 def test_trim_dead_ends_keeps_change_time_zone():
-    start, end = pl.datetime(2025, 1, 1, 10, time_zone="UTC"), pl.datetime(2025, 1, 1, 10, 0, 9, time_zone="UTC")
+    npulses = 20
+    start, end = pl.datetime(2025, 1, 1, 10, time_zone="UTC"), pl.datetime(2025, 1, 1, 10, 0, npulses - 1, time_zone="UTC")
     t = pl.datetime_range(start, end, "1s", eager=True)
-    ch0 = dummy_channel(npulses=10).with_columns(timestamp=t)
+    ch0 = dummy_channel(npulses=npulses).with_columns(timestamp=t)
     ch = ch0.with_step(mass2.core.ChangeTimeZoneStep.new("Asia/Tokyo"))
     ch = ch.with_select_step({"hour": pl.col("timestamp").dt.hour()})
     trimmed = ch0.with_steps(ch.steps.trim_dead_ends("hour"))
-    assert trimmed.df["hour"].to_list() == ch.df["hour"].to_list() == [19] * 10
+    assert trimmed.df["hour"].to_list() == ch.df["hour"].to_list() == [19] * npulses
 
 
 def test_with_more_channels_new_overrule_good_and_bad():
-    a = mass2.Channels({n: dummy_channel(npulses=5, ch_num=n) for n in (1, 2)}, "A").set_bad(1, "dead")
-    b = mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "B")
+    a = mass2.Channels({n: dummy_channel(npulses=25, ch_num=n) for n in (1, 2)}, "A").set_bad(1, "dead")
+    b = mass2.Channels({1: dummy_channel(npulses=25, ch_num=1)}, "B")
     c = a.with_more_channels(b)
     assert sorted(c.channels) == [1, 2] and not c.bad_channels
-    d = b.with_more_channels(mass2.Channels({1: dummy_channel(npulses=5, ch_num=1)}, "D").set_bad(1, "dead"))
+    d = b.with_more_channels(mass2.Channels({1: dummy_channel(npulses=25, ch_num=1)}, "D").set_bad(1, "dead"))
     assert not d.channels and sorted(d.bad_channels) == [1]
 
 
@@ -708,33 +712,29 @@ def test_change_time_zone_keeps_good_expr():
 
 
 def test_replay_after_good_expr_replaced_by_true():
-    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_good_expr(pl.col("x") > 5)
+    npulses = 30
+    ch = dummy_channel(npulses=npulses).with_columns(x=np.arange(npulses)).with_good_expr(pl.col("x") > 5)
     ch = ch.with_column_map_step("x", "a", lambda v: 2 * v).with_good_expr(pl.lit(True), replace=True)
     ch = ch.with_column_map_step("x", "b", lambda v: 3 * v)
-    replayed = dummy_channel(npulses=10).with_columns(x=np.arange(10.0)).with_steps(ch.steps)
-    assert len(replayed.good_df()) == len(ch.good_df()) == 10
+    replayed = dummy_channel(npulses=npulses).with_columns(x=np.arange(npulses)).with_steps(ch.steps)
+    assert len(replayed.good_df()) == len(ch.good_df()) == npulses
 
 
 def test_experiment_state_naive_channel_timestamps():
-    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
-    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    npulses = 30
+    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, npulses - 1), "1s", eager=True)
+    ch = dummy_channel(npulses=npulses).with_columns(timestamp=t)
     t_es = pl.Series([t[0], t[5]]).dt.replace_time_zone("UTC").dt.convert_time_zone("Pacific/Fiji")
     df_es = pl.DataFrame({"timestamp": t_es, "state_label": ["A", "B"]})
     labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
-    assert labels == ["A"] * 5 + ["B"] * 5
+    assert labels == ["A"] * 5 + ["B"] * (npulses - 5)
 
-
-def test_experiment_state_ns_time_unit():
-    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
-    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    # test_experiment_state_ns_time_unit
     df_es = pl.DataFrame({"timestamp": pl.Series([t[0], t[5]]).dt.cast_time_unit("ns"), "state_label": ["A", "B"]})
     labels = ch.with_experiment_state_df(df_es).df["state_label"].to_list()
-    assert labels == ["A"] * 5 + ["B"] * 5
+    assert labels == ["A"] * 5 + ["B"] * (npulses - 5)
 
-
-def test_experiment_state_twice_raises():
-    t = pl.datetime_range(pl.datetime(2025, 1, 1), pl.datetime(2025, 1, 1, 0, 0, 9), "1s", eager=True)
-    ch = dummy_channel(npulses=10).with_columns(timestamp=t)
+    # test_experiment_state_twice_raises
     df_es = pl.DataFrame({"timestamp": [t[0], t[5]], "state_label": ["A", "B"]})
     ch = ch.with_experiment_state_df(df_es)
     with pytest.raises(ValueError, match="state_label"):
@@ -742,10 +742,10 @@ def test_experiment_state_twice_raises():
 
 
 def test_good_df_and_bad_df_partition_null_rows():
-    ch = dummy_channel(npulses=10).with_columns(label=pl.Series(["A"] * 4 + ["B"] * 3 + [None] * 3))
+    ch = dummy_channel(npulses=30).with_columns(label=pl.Series(["A"] * 12 + ["B"] * 10 + [None] * 8))
     ch = ch.with_good_expr(pl.col("label") == "A")
-    assert len(ch.good_df()) == 4
-    assert len(ch.bad_df()) == 6
+    assert len(ch.good_df()) == 12
+    assert len(ch.bad_df()) == 18
 
 
 def test_channel_mismatched_n_samples():
@@ -884,8 +884,8 @@ def test_pulses_in_dataframe():
 
 
 def test_plot_hists_without_groups():
-    ch = dummy_channel(npulses=10).with_columns(x=np.arange(10.0), state_label=pl.lit(None, dtype=pl.String))
-    edges = np.arange(11.0)
+    ch = dummy_channel(npulses=40).with_columns(x=np.arange(40.0), state_label=pl.lit(None, dtype=pl.String))
+    edges = np.arange(41.0)
     centers, counts = ch.plot_hists("x", edges, "state_label")
     assert np.allclose(centers, edges[:-1] + 0.5) and counts == {}
 
