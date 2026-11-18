@@ -28,7 +28,7 @@ def test_transform_raw_applies_to_noise():
     noise_path = p.noise_folder / "20230626_run0000_chan4102.ljh"
     v_over_dv = []
     savefile = p.noise_folder / "20230626_run0000_noise_analysis.parquet"
-    for transform in (lambda raw: 2.0 * np.asarray(raw, dtype=float), None):
+    for transform in (None, lambda raw: 2.0 * np.asarray(raw, dtype=float)):
         nch = mass2.NoiseChannel.from_ljh(noise_path, transform_raw=transform)
         spectrum = nch.spectrum()
         mass2.core.noise_analysis.save_noise({4102: spectrum}, savefile)
@@ -36,6 +36,8 @@ def test_transform_raw_applies_to_noise():
         ch = ch.summarize_pulses().with_good_expr_pretrig_rms_and_postpeak_deriv().filter5lag(f_3db=10e3)
         v_over_dv.append(ch.last_v_over_dv)
     assert v_over_dv[1] == pytest.approx(v_over_dv[0], rel=1e-6)
+    # Leave noise in good state
+    mass2.core.noise_analysis.analyze_noise_directory(p.noise_folder)
 
 
 def dummy_dataframe(npulses: int) -> pl.DataFrame:
@@ -515,7 +517,7 @@ def test_with_good_expr_true_keeps_cuts():
     ch = dummy_channel(npulses=npulses).with_columns(a=np.arange(npulses))
     ch = ch.with_good_expr(pl.col("a") < 4)
     for extra in (pl.lit(True), True):
-        assert len(ch.with_good_expr(extra).good_df(["a"])) == 4
+        assert len(ch.with_good_expr(extra).good_df(["a"])) == 4  # type: ignore so we can be sure that the API accepts True
     assert len(ch.with_good_expr(pl.lit(True), replace=True).good_df(["a"])) == npulses
 
 
