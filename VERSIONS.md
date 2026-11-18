@@ -12,7 +12,7 @@
 * Bugs in robust statistics, splines and generalized column subset selection (PR 189).
 * Bugs in Channel, Channels, recipes, and external triggers (PR 188).
 
-**2.1.2** November 17, 2026-
+**2.1.2** November 17, 2026
 * Add Kα and Kβ line models for Sn based on Zschornack book (PR 197).
 * Fix missing dependency on `six` (PR 195).
 * Fix bug in misc function `midpoints_and_step_size`, which did not compute midpoints (PR 185).
