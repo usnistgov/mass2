@@ -64,7 +64,7 @@ def test_filter():
     m = mass2.materials.filterstack_models["Horton 2018"]
     e = np.linspace(4000, 9000, 6)
     qe = m(e, uncertain=True)
-    maxQE = qe.max()
+    maxQE = unp.nominal_values(qe).max()
     assert maxQE > 0.21, r"Horton filter model QE < 21% everywhere"
     assert maxQE < 0.25, r"Horton filter model QE > 25% somewhere"
 
