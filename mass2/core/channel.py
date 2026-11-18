@@ -1613,6 +1613,10 @@ class Channel:
                 "filename": noise_fname,
                 "continuous": noise_continuous,
                 "Presamples": npresamples,
+                "Channel": ch_num,
+                "Timebase": frametime_s,
+                "Total Samples": nsamples,
+                "Subframe divisions": 64,
             })
             noise_header = mass2.ChannelHeader.from_ljh_header_df(header_df)
             framer = PulseDataFromNumpy(ndata.T)
