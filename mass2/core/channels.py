@@ -647,13 +647,13 @@ class Channels:
         steps = {}
         for channum, ch in self.channels.items():
             steps[channum] = ch.steps.trim_dead_ends(required_fields=required_fields, drop_debug=drop_debug)
-        mass2.misc.pickle_object(steps, filename)
+        mass2.safe_dill.dump_signed(steps, filename=filename)
         return steps
 
     def load_recipes(self, filename: str) -> "Channels":
         """Return a copy of this Channels object with Recipe objects loaded from the given pickle file
         and applied to each Channel."""
-        steps = mass2.misc.unpickle_object(filename)
+        steps = mass2.safe_dill.load_signed(filename)
         return self.with_steps_dict(steps)
 
     def parent_folder_path(self) -> pathlib.Path:

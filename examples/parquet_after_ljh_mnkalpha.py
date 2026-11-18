@@ -33,7 +33,7 @@ def _(mass2, pl):
 
     pulse_folder = pulsedata.pulse_noise_ljh_pairs["20230626"].pulse_folder
     data = mass2.Channels.from_ljh_folder(pulse_folder=pulse_folder)
-    steps_dict = mass2.misc.unpickle_object("example_steps_dict.pkl")
+    steps_dict = mass2.safe_dill.load_signed("example_steps_dict.pkl")
     truth_dfg = pl.read_parquet("example_result.parquet")
     return data, steps_dict, truth_dfg
 

@@ -153,22 +153,22 @@ def loads_signed(
     )
 
 
-def dump_signed(obj: Any, path: str | Path, *, key_path: str | Path | None = None, **dill_kwargs: Any) -> None:
-    """Write a signed dill payload to `path`."""
-    Path(path).write_bytes(dumps_signed(obj, key_path=key_path, **dill_kwargs))
+def dump_signed(obj: Any, filename: str | Path, *, key_path: str | Path | None = None, **dill_kwargs: Any) -> None:
+    """Write a signed dill payload to `filename`."""
+    Path(filename).write_bytes(dumps_signed(obj, key_path=key_path, **dill_kwargs))
 
 
 def load_signed(
-    path: str | Path,
+    filename: str | Path,
     *,
     allow_untrusted: bool = False,
     key_path: str | Path | None = None,
     trusted_keys_dir: str | Path | None = None,
     **dill_kwargs: Any,
 ) -> Any:
-    """Read and verify a signed dill payload from `path`."""
+    """Read and verify a signed dill payload from `filename`."""
     return loads_signed(
-        Path(path).read_bytes(),
+        Path(filename).read_bytes(),
         allow_untrusted=allow_untrusted,
         key_path=key_path,
         trusted_keys_dir=trusted_keys_dir,

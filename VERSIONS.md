@@ -3,8 +3,8 @@
 ## Mass Version 2 (2025-present)
 
 **2.1.4** November 18, 2026-
-* Change saved analysis recipe use: they must be self-signed, or user explicitly opts in to
-  loading an untrusted dill pickle file (issue 184).
+* Change saved analysis recipe use: pickled recipes must be self-signed, or user explicitly
+  opts in to loading and running code from an untrusted dill pickle file (issue 184).
 
 **2.1.3** November 18, 2026
 * Very many bug fixes by Claude Code 5.5 and @unger-daniel.
