@@ -2,6 +2,9 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.1.4** November 18, 2026-
+* Faster autocorrelation by using scipy FFT functions; remove an old FFT speed heuristic (issue 196).
+
 **2.1.3** November 18, 2026
 * Very many bug fixes by Claude Code 5.5 and @unger-daniel.
 * Fix line models, energy cal, and `MultiFit` (PR 194).
