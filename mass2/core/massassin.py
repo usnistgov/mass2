@@ -15,7 +15,7 @@ import mass2
 from .misc import str2channum, chanfile_prefix
 
 
-ARROW_EOS_MARKER = b"\xff\xff\xff\xff\x00\x00\x00\x00"  # End-of-stream marker (8 bytes long)
+# ARROW_EOS_MARKER = b"\xff\xff\xff\xff\x00\x00\x00\x00"  # End-of-stream marker (8 bytes long)
 
 
 def run_recipe(recipe: mass2.core.Recipe, raw_df: pl.DataFrame) -> pl.DataFrame:
@@ -394,47 +394,32 @@ class MassassinDirectory:
         while True:
             fp.seek(last_good_position)
 
-            # Peek to see if the 8-byte-long EOS (end-of-stream) marker is next.
-            header = fp.read(8)
-
-            if len(header) < 8:
-                # Physical EOF (len=0): DAQ hasn't written the next batch or EOF yet, or
-                # Torn Write (0<len<8): DAQ is not finished writing the batch or EOF.
-                # Wait for watchdog to signal new data, then clear the flag
-                # Here and below, the 1-second timeout is a failsafe in case watchdog misses an event.
+            try:
+                msg = ipc.read_message(fp)
+            except pa.ArrowInvalid:
+                # Torn Write: Partial header (< 8 bytes) or incomplete message body
                 modified_event.wait(timeout=1.0)
                 modified_event.clear()
                 continue
 
-            if header == ARROW_EOS_MARKER:
-                # FOUND THE EOS MARKER! The DAQ closed the file cleanly.
-                print("Received EOS marker. Stream finalized.")
-                break
-
-            # If the next 8 bytes are not the EOS marker, it's a real batch (either complete or partial).
-            # Rewind the pointer so PyArrow can parse as a normal batch.
-            fp.seek(last_good_position)
-
-            try:
-                # Let PyArrow read the full message, parse it, and update the bookmark
-                msg = ipc.read_message(fp)
+            if msg is None:
                 batch = ipc.read_record_batch(msg, reader_schema)
-                last_good_position = fp.tell()
-
-                df = self.run_recipe(batch).to_arrow()
-                if len(df) == 0:
-                    continue
-                if not writer:
-                    writer = ipc.new_stream(outp, df.schema)
-                writer.write_table(df)
-                outp.flush()  # force new data out of Python into OS page cache
-
-            except pa.ArrowInvalid:
-                # Torn Write: The header was complete, but the payload data
-                # hasn't finished flushing to the disk yet.
-                # Wait for payload to finish flushing to disk
+                # Either clean EOF (DAQ hasn't written next message yet) OR 8-byte EOS marker
+                if fp.tell() - last_good_position >= 8:
+                    print("Received EOS marker. Stream finalized.")
+                    break
                 modified_event.wait(timeout=1.0)
                 modified_event.clear()
+                continue
+
+            last_good_position = fp.tell()
+            df = self.run_recipe(batch).to_arrow()
+            if len(df) == 0:
+                continue
+            if not writer:
+                writer = ipc.new_stream(outp, df.schema)
+            writer.write_table(df)
+            outp.flush()  # force new data out of Python into OS page cache
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""

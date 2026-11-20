@@ -13,7 +13,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 from .massassin import FileModifiedHandler
 
-from .massassin import load_expt_state_df, attach_tz_to_naive_column, ARROW_EOS_MARKER
+from .massassin import load_expt_state_df, attach_tz_to_naive_column
 from .misc import str2channum, chanfile_prefix
 
 
@@ -371,54 +371,49 @@ class MadCowDirectory:
                 states = self.expt_state_df.sort("timestamp")
                 self._state_dirty = False
 
-            # Peek to see if the 8-byte-long EOS (end-of-stream) marker is next.
-            fp.seek(last_good_position)
-            header = fp.read(8)
-
-            if len(header) < 8:
-                # Check if the file was renamed by the DAQ (stream finalized abruptly)
-                if not wal_path.exists():
-                    print("WAL file no longer exists. Assuming DAQ renamed it; stream finalized.")
-                    break
-                # Torn Write or EOF: Wait for DAQ to write more data
-                modified_event.wait(timeout=1.0)
-                modified_event.clear()
-                continue
-
-            if header == ARROW_EOS_MARKER:
-                print("Received EOS marker. Stream finalized.")
-                break
-
             fp.seek(last_good_position)
 
             try:
                 msg = ipc.read_message(fp)
+
                 batch = ipc.read_record_batch(msg, reader_schema)
-                last_good_position = fp.tell()
-
-                # Convert zero-copy to Polars
-                df_batch = pl.DataFrame(batch)
-
-                # Apply the same filtering and joining logic used in process_one_allchan_file
-                df_batch = attach_tz_to_naive_column(df_batch, "timestamp", "UTC")
-                df_joined = (
-                    df_batch.filter(pl.col("good"))
-                    .select(["channel_number", "timestamp", "energy1"])
-                    .with_columns(pl.col("timestamp").sort())
-                    .join_asof(states, on="timestamp", strategy="backward")
-                    .drop("timestamp")
-                )
-
-                # Update the running histogram dictionaries
-                self.update_histograms(df_joined)
-                if time.time() - last_write_time > 1:
-                    last_write_time = time.time()
-                    self.write_histograms()
-
             except pa.ArrowInvalid:
-                # Torn Write: Header is complete but payload hasn't flushed yet
+                # Torn Write: Partial header (< 8 bytes) or incomplete message body
                 modified_event.wait(timeout=1.0)
                 modified_event.clear()
+                continue
+
+            if msg is None:
+                # Either clean EOF (DAQ hasn't written next message yet) OR 8-byte EOS marker
+                if fp.tell() - last_good_position >= 8:
+                    print("Received EOS marker. Stream finalized.")
+                    break
+                if not wal_path.exists():
+                    print("WAL file no longer exists. Assuming DAQ renamed it; stream finalized.")
+                    break
+                modified_event.wait(timeout=1.0)
+                modified_event.clear()
+                continue
+            last_good_position = fp.tell()
+
+            # Convert zero-copy to Polars
+            df_batch = pl.DataFrame(batch)
+
+            # Apply the same filtering and joining logic used in process_one_allchan_file
+            df_batch = attach_tz_to_naive_column(df_batch, "timestamp", "UTC")
+            df_joined = (
+                df_batch.filter(pl.col("good"))
+                .select(["channel_number", "timestamp", "energy1"])
+                .with_columns(pl.col("timestamp").sort())
+                .join_asof(states, on="timestamp", strategy="backward")
+                .drop("timestamp")
+            )
+
+            # Update the running histogram dictionaries
+            self.update_histograms(df_joined)
+            if time.time() - last_write_time > 1:
+                last_write_time = time.time()
+                self.write_histograms()
 
     def run(self) -> None:
         """Run analysis recipe on live-streaming data, including a cold-start phase."""
