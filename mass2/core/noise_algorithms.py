@@ -99,7 +99,7 @@ def _unbiased_autocorrelation(lag_sums: NDArray, n_lags: int) -> NDArray:
     return lag_sums[:n_lags] / len(lag_sums)
 
 
-def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion: int = 1000) -> NDArray:
+def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion: int = 1000, block_starts: ArrayLike = ()) -> NDArray:
     """Calculate the autocorrelation of the input data, assuming the entire array is continuous.
 
     Parameters
@@ -110,6 +110,9 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
         Compute the autocorrelation for lags in the range `[0, n_lags-1]`.
     max_excursion : int, optional
         Chunks of data with max absolute excursion from the mean this large will be excluded from the calculation, by default 1000
+    block_starts : ArrayLike, optional
+        Indices into the raveled `data` where a new continuous block starts; no chunk spans two blocks,
+        by default () (all data are one continuous block)
 
     Returns
     -------
@@ -131,14 +134,16 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     # in memory.  Instead, compute it on chunks twice the length of the desired
     # correlation, and average.
     CHUNK_MULTIPLE = 2
-    if n_data < CHUNK_MULTIPLE * n_lags:
+    chunksize = CHUNK_MULTIPLE * n_lags
+    blocks = np.split(data, np.asarray(block_starts, dtype=int))
+    datachunks = np.concatenate([b[: len(b) // chunksize * chunksize].reshape(-1, chunksize) for b in blocks])
+    if len(datachunks) == 0:
         msg = f"There are too few data values ({n_data=}) to compute at least {n_lags} lags."
         raise ValueError(msg)
 
     # Be sure to pad chunksize samples by AT LEAST chunksize - 1 zeros, to prevent
     # unwanted wraparound in the autocorrelation.
     # padded_data is what we do DFT/InvDFT on; ac is the unnormalized output.
-    chunksize = CHUNK_MULTIPLE * n_lags
     nfft = sp.fft.next_fast_len(2 * chunksize - 1)
     padded_data = np.zeros(nfft, dtype=float)
 
@@ -146,10 +151,8 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
 
     entries = 0
 
-    Nchunks = n_data // chunksize
-    datachunks = data[: Nchunks * chunksize].reshape(Nchunks, chunksize)
-    for data in datachunks:
-        padded_data[:chunksize] = data - np.asarray(data).mean()
+    for chunk in datachunks:
+        padded_data[:chunksize] = chunk - chunk.mean()
         if np.abs(padded_data).max() > max_excursion:
             continue
 
@@ -200,7 +203,12 @@ def noise_psd_periodogram(
 
 
 def calc_noise_result(
-    data: ArrayLike, dt: float, continuous: bool, window: Callable | None = None, skip_autocorr_if_length_over: int = 100_000
+    data: ArrayLike,
+    dt: float,
+    continuous: bool,
+    window: Callable | None = None,
+    skip_autocorr_if_length_over: int = 100_000,
+    block_starts: ArrayLike = (),
 ) -> "NoiseResult":
     """Analyze the noise as Mass has always done.
 
@@ -217,6 +225,9 @@ def calc_noise_result(
         Whether the "pulses" in the `data` array are continuous in time
     window : callable, optional
         A function to compute a data window (or if None, no windowing), by default None
+    block_starts : ArrayLike, optional
+        Indices of the records that start a new continuous block (e.g. after dropped records); when `continuous`,
+        records of different blocks are never joined, by default () (all records are one continuous block)
 
     Returns
     -------
@@ -226,18 +237,23 @@ def calc_noise_result(
     data = np.asarray(data)
     data_zeromean = data - np.mean(data)
     (n_pulses, nsamples) = data_zeromean.shape
+    blocks = np.split(data_zeromean, np.asarray(block_starts, dtype=int))
     if continuous:
-        f_mass, psd_mass = mass2.mathstat.power_spectrum.computeSpectrum(
-            data_zeromean.ravel(), segfactor=n_pulses, dt=dt, window=window
-        )
+        m = nsamples // 2
+        spec = mass2.mathstat.power_spectrum.PowerSpectrum(m, dt=dt)
+        for block in blocks:
+            for i in range(2 * len(block) - 1):
+                spec.addDataSegment(block.ravel()[i * m : (i + 2) * m], window=window)
+        f_mass, psd_mass = spec.frequencies(), spec.spectrum()
     else:
         spec = mass2.mathstat.power_spectrum.PowerSpectrum(nsamples // 2, dt=dt)
         for record in data_zeromean:
             spec.addDataSegment(record[: 2 * (nsamples // 2)], window=window)
         f_mass, psd_mass = spec.frequencies(), spec.spectrum()
     if nsamples <= skip_autocorr_if_length_over:
-        if continuous:
-            autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples)
+        if continuous and max(len(block) for block in blocks) >= 2:
+            starts = np.asarray(block_starts, dtype=int) * nsamples
+            autocorr_vec = calc_continuous_autocorrelation(data_zeromean.ravel(), n_lags=nsamples, block_starts=starts)
         else:
             autocorr_vec = calc_discontinuous_autocorrelation(data_zeromean)
     else:

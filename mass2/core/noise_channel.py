@@ -77,9 +77,15 @@ class NoiseChannel:
 
             Shape: (n_pulses, len(pulse))
         """
+        return self._records_2d_and_rows(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)[0]
+
+    def _records_2d_and_rows(
+        self, trace_col_name: str, n_limit: int, excursion_nsigma: float, trunc_front: int, trunc_back: int
+    ) -> tuple[NDArray, NDArray]:
         assert self.pulseframer is not None
         df_noise2, max_excursion = self.calc_max_excursion(trace_col_name, n_limit, excursion_nsigma)
-        noise_traces_clean = df_noise2.filter(pl.col("excursion") <= max_excursion)[trace_col_name].to_numpy()
+        rows = np.flatnonzero(df_noise2["excursion"].to_numpy() <= max_excursion)
+        noise_traces_clean = df_noise2[trace_col_name].to_numpy()[rows]
         if trunc_back == 0:
             noise_traces_clean2 = noise_traces_clean[:, trunc_front:]
         elif trunc_back > 0:
@@ -87,7 +93,7 @@ class NoiseChannel:
         else:
             raise ValueError("trunc_back must be >= 0")
         assert noise_traces_clean2.shape[0] > 0
-        return noise_traces_clean2
+        return noise_traces_clean2, rows
 
     # @functools.cache
     def spectrum(
@@ -100,10 +106,14 @@ class NoiseChannel:
         skip_autocorr_if_length_over: int = 100_000,
     ) -> NoiseResult:
         """Compute and return the noise result from the noise traces."""
-        records = self.get_records_2d(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
+        records, rows = self._records_2d_and_rows(trace_col_name, n_limit, excursion_nsigma, trunc_front, trunc_back)
         continuous = self.is_continuous and trunc_front == 0 and trunc_back == 0
         spectrum = mass2.core.noise_algorithms.calc_noise_result(
-            records, continuous=continuous, dt=self.frametime_s, skip_autocorr_if_length_over=skip_autocorr_if_length_over
+            records,
+            continuous=continuous,
+            dt=self.frametime_s,
+            skip_autocorr_if_length_over=skip_autocorr_if_length_over,
+            block_starts=np.flatnonzero(np.diff(rows) != 1) + 1,
         )
         return spectrum
 
