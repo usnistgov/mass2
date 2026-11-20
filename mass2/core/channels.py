@@ -15,9 +15,11 @@ import joblib
 import traceback
 import lmfit
 import dill
+import hashlib
 import io
 import os
 import pathlib
+import platform
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -28,6 +30,45 @@ from ..calibration.line_models import GenericLineModel, LineModelResult
 from .recipe import Recipe
 from .misc import plot_zoomable
 from . import ljhutil
+
+
+class VersionMismatchError(RuntimeError):
+    """Raised when a saved analysis can't be unpickled and was saved with other package versions than those running now."""
+
+
+def package_versions() -> dict[str, str]:
+    """Return the versions of the packages that a pickled analysis depends on."""
+    return {
+        "mass2": mass2.__version__,
+        "polars": pl.__version__,
+        "dill": dill.__version__,
+        "numpy": np.__version__,
+        "python": platform.python_version(),
+    }
+
+
+def _release(version: str) -> str:
+    """Return `version` without its development and local parts, e.g. "2.1.4" for "2.1.4.dev3+g9553bedc"."""
+    return version.partition("+")[0].partition(".dev")[0]
+
+
+def _unpickle_analysis(pickled: bytes, saved_versions: dict[str, str], path: Path) -> "Channels":
+    """Unpickle a saved `Channels`; if that fails and the package versions differ, say so."""
+    try:
+        return dill.loads(pickled)
+    except Exception as error:
+        now = package_versions()
+        differ = [name for name in now if _release(saved_versions[name]) != _release(now[name])]
+        if not differ:
+            raise
+        saved = ", ".join(f"{name} {saved_versions[name]}" for name in differ)
+        current = ", ".join(f"{name} {now[name]}" for name in differ)
+        raise VersionMismatchError(
+            f"Could not unpickle the analysis in {path}: it was saved with {saved}; this is {current}. "
+            "Pickled objects, in particular polars expressions (such as `good_expr`), often load only with the versions "
+            "that wrote them: install the saved versions to load it. The data frames are the parquet files in the zip "
+            f"file, readable with `polars.read_parquet`. Original error: {type(error).__name__}: {error}"
+        ) from error
 
 
 @dataclass(frozen=True)  # noqa: PLR0904
@@ -836,12 +877,14 @@ class Channels:
             buffer = io.BytesIO()
             df.write_parquet(buffer)
             zf.writestr(parquet_path, buffer.getvalue())
+            sha256[parquet_path] = hashlib.sha256(buffer.getvalue()).hexdigest()
             if trim_debug:
                 steps = ch.steps.trim_debug_info()
             else:
                 steps = ch.steps
             return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
+        sha256: dict[str, str] = {}
         with ZipFile(str(zip_path), "w") as zf:
             channels = {}
             bad_channels = {}
@@ -856,16 +899,19 @@ class Channels:
                 bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
-            zf.writestr(pickle_file, dill.dumps(data))
+            zf.writestr(pickle_file, mass2.safe_dill.dumps_signed((package_versions(), sha256, dill.dumps(data))))
 
     @staticmethod
-    def load_analysis(path: Path | str) -> "Channels":
+    def load_analysis(path: Path | str, allow_untrusted: bool = False) -> "Channels":
         """Load an analysis-in-progress from a zipfile
 
         Parameters
         ----------
         path : Path | str
             Zipfile that work was saved in.
+        allow_untrusted : bool, optional
+            Whether to load an archive whose `data_all.pkl` is unsigned or signed by an unknown key, by default False.
+            As for `load_recipes`, this makes you vulnerable to malicious files that execute arbitrary python code.
         """
         path = pathlib.Path(path)
         assert path.exists() and path.is_file()
@@ -930,19 +976,30 @@ class Channels:
 
         with ZipFile(path, "r") as zf:
             pickle_file = "data_all.pkl"
-            pickle_bytes = zf.read(pickle_file)
-            data: Channels = dill.loads(pickle_bytes)
+            loaded = mass2.safe_dill.loads_signed(zf.read(pickle_file), allow_untrusted=allow_untrusted)
+            if isinstance(loaded, Channels):
+                data, sha256 = loaded, None
+            else:
+                saved_versions, sha256, pickled = loaded
+                data = _unpickle_analysis(pickled, saved_versions, path)
+
+            def read_parquet(parquet_file: str) -> pl.DataFrame:
+                """Read one parquet member, after checking it against its SHA-256 hash in the signed pickle."""
+                parquet_bytes = zf.read(parquet_file)
+                if sha256 is not None and hashlib.sha256(parquet_bytes).hexdigest() != sha256[parquet_file]:
+                    raise mass2.safe_dill.UntrustedPayloadError(f"{parquet_file} in {path} was changed after it was saved.")
+                return pl.read_parquet(parquet_bytes)
 
             restored_channels = {}
             for ch_num, ch in data.channels.items():
                 parquet_file = f"data_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(parquet_file))
+                df = read_parquet(parquet_file)
                 restored_channels[ch_num] = _restore_dataframe(ch, df)
 
             restored_bad_channels = {}
             for ch_num, badch in data.bad_channels.items():
                 parquet_file = f"data_bad_chan{ch_num:04d}.parquet"
-                df = pl.read_parquet(zf.read(parquet_file))
+                df = read_parquet(parquet_file)
                 ch = _restore_dataframe(badch.ch, df)
                 restored_bad_channels[ch_num] = dataclasses.replace(badch, ch=ch)
 
