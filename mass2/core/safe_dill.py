@@ -55,20 +55,25 @@ def _default_trusted_keys_dir(app_name: str = "mass2") -> Path:
 def get_or_create_signing_key(key_path: str | Path | None = None) -> bytes:
     """Load the local 32-byte HMAC key, creating it with 0600 permissions if absent."""
     path = Path(key_path) if key_path is not None else _default_signing_key_path()
+    # Normal case: key_path already exists. Read it and return result.
     if path.exists():
         return path.read_bytes()
 
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Key file didn't exist. Create key and key file (testing for a race condition).
     key = secrets.token_bytes(32)
-
+    path.parent.mkdir(parents=True, exist_ok=True)
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        try:
-            os.write(fd, key)
-        finally:
-            os.close(fd)
     except FileExistsError:
+        # This exception catches a race condition, where another Mass instance created the key file
+        # after the path.exists() check above.
         return path.read_bytes()
+
+    # Write the key to the new key file.
+    try:
+        os.write(fd, key)
+    finally:
+        os.close(fd)
     return key
 
 
