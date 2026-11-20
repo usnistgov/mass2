@@ -433,7 +433,7 @@ def test_pretrig_mean_jump_fix_step():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
         ch2.save_recipes(tmpfilename)
-        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        steps2 = mass2.safe_dill.load_signed(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.PretrigMeanJumpFixStep)
 
@@ -458,7 +458,7 @@ def test_select_step():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
         ch2.save_recipes(tmpfilename)
-        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        steps2 = mass2.safe_dill.load_signed(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.SelectStep)
 
@@ -507,7 +507,7 @@ def test_categorize_step():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpfilename = os.path.join(tmpdir, "steps.pkl")
         ch2.save_recipes(tmpfilename)
-        steps2 = mass2.misc.unpickle_object(tmpfilename)
+        steps2 = mass2.safe_dill.load_signed(tmpfilename)
         assert len(steps2) == 1
         assert isinstance(steps2[0][0], mass2.core.recipe.CategorizeStep)
 

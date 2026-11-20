@@ -78,23 +78,6 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     n_data = len(data)
     assert n_lags < n_data
 
-    def padded_length(n: int) -> int:
-        """Return a sensible number in the range [n, 2n] which is not too
-        much larger than n, yet is good for FFTs.
-
-        Returns:
-            A number: (1, 3, or 5)*(a power of two), whichever is smallest.
-        """
-        pow2 = np.round(1 << (int(n).bit_length()))
-        if n == pow2:
-            return int(n)
-        elif n > 0.75 * pow2:
-            return int(pow2)
-        elif n > 0.625 * pow2:
-            return int(np.round(0.75 * pow2))
-        else:
-            return int(np.round(0.625 * pow2))
-
     # When there are 10 million data points and only 10,000 lags wanted,
     # it's hugely inefficient to compute the full autocorrelation, especially
     # in memory.  Instead, compute it on chunks several times the length of the desired
@@ -108,8 +91,8 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     # unwanted wraparound in the autocorrelation.
     # padded_data is what we do DFT/InvDFT on; ac is the unnormalized output.
     chunksize = CHUNK_MULTIPLE * n_lags
-    padsize = n_lags
-    padded_data = np.zeros(padded_length(padsize + chunksize), dtype=float)
+    nfft = sp.fft.next_fast_len(chunksize + n_lags)
+    padded_data = np.zeros(nfft, dtype=float)
 
     ac = np.zeros(n_lags, dtype=float)
 
@@ -122,10 +105,10 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
         if np.abs(padded_data).max() > max_excursion:
             continue
 
-        ft = np.fft.rfft(padded_data)
+        ft = sp.fft.rfft(padded_data, n=nfft)
         ft[0] = 0  # this redundantly removes the mean of the data set
         power = (ft * ft.conj()).real
-        acsum = np.fft.irfft(power)
+        acsum = sp.fft.irfft(power, n=nfft)
         ac += acsum[:n_lags]
         entries += 1
 

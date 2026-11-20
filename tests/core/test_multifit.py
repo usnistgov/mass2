@@ -56,8 +56,7 @@ def generate_and_fit_fake_data(
 
     # Set up MultiFit
     multifit = (
-        mass2
-        .MultiFit(default_fit_width=80, default_bin_size=1)
+        mass2.MultiFit(default_fit_width=80, default_bin_size=1)
         .with_line("MnKAlpha")
         .with_line(gaussian_centers_ev[0])
         .with_line(gaussian_centers_ev[1])
@@ -87,7 +86,7 @@ def test_multifit_and_saving_and_loading_steps_in_channel(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:  # cleaned up on exit
         filename = os.path.join(tmpdir, "steps.pkl")  # just a string path
         ch.save_recipes(filename)
-        steps_loaded = mass2.misc.unpickle_object(filename)
+        steps_loaded = mass2.safe_dill.load_signed(filename)
     steps_loaded[ch.header.ch_num][-1].dbg_plot(ch.df)
 
     plt.close()
@@ -104,7 +103,7 @@ def test_multifit_and_saving_and_loading_steps_in_channels(monkeypatch):
         _ = data.load_recipes(filename)  # it would be better to start with a data that doesn't have the output of the steps...
         # and maybe throw an error for writing over existing columns?
         # fow now, I'm happy this is tested at all
-        steps = mass2.misc.unpickle_object(filename)
+        steps = mass2.safe_dill.load_signed(filename)
     _ = data.with_steps_dict(steps)  # pretty much the blow by blow version of load_recipes
 
 

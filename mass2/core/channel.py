@@ -25,6 +25,7 @@ import mass2
 from ..calibration.fluorescence_lines import SpectralLine
 from ..calibration.line_models import GenericLineModel, LineModelResult
 from . import misc
+from . import safe_dill
 from .apache_files import PulseDataFromArrow
 from .chan_header import ChannelHeader
 from .offfiles import OffFile
@@ -1894,7 +1895,7 @@ class Channel:
     def save_recipes(self, filename: str) -> dict[int, Recipe]:
         """Save the recipe steps to a pickle file, keyed by channel number."""
         steps = {self.ch_num: self.steps}
-        misc.pickle_object(steps, filename)
+        safe_dill.dump_signed(steps, filename)
         return steps
 
     def plot_summaries(self, use_expr_in: pl.Expr | None = None, downsample: int | None = None, log: bool = False) -> None:

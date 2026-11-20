@@ -71,12 +71,15 @@ def readJsonString(f: io.BufferedReader) -> str:
 class OffFile:
     """
     Working with an OFF file:
+
+    ```python
     off = OffFile("filename")
     print off.dtype # show the fields available
     off[0] # get record 0
     off[0]["coefs"] # get the model coefs for record 0
     x,y = off.recordXY(0)
     plot(x,y) # plot record 0
+    ```
     """
 
     def __init__(self, filename: str):

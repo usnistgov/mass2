@@ -523,7 +523,7 @@ def _(data4):
 
 @app.cell
 def _(mass2, steps_dict):
-    mass2.misc.pickle_object(steps_dict, filename="example_steps_dict.pkl")
+    mass2.safe_dill.dump_signed(steps_dict, filename="example_steps_dict.pkl")
     return
 
 

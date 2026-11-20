@@ -12,6 +12,11 @@
 * Require Python 3.11+ to use `tomllib`. CI testing on Python 3.11 and 3.14.
 * Merge changes from v2.1.2 and 2.1.3 made while developing this version.
 
+**2.1.4** November 18, 2026-
+* Change saved analysis recipe use: pickled recipes must be self-signed, or user explicitly
+  opts in to loading and running code from an untrusted dill pickle file (issue 184).
+* Faster autocorrelation by using scipy FFT functions; remove an old FFT speed heuristic (issue 196).
+
 **2.1.3** November 18, 2026
 * Very many bug fixes by Claude Code 5.5 and @unger-daniel.
 * Fix line models, energy cal, and `MultiFit` (PR 194).

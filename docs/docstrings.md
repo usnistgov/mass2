@@ -44,6 +44,8 @@ This page is auto-generated from the docstrings of functions, methods, classes, 
 
 ::: mass2.core.rough_cal
 
+::: mass2.core.safe_dill
+
 ::: mass2.core.truebq_bin
 
 ::: mass2.core.utilities
