@@ -2,6 +2,7 @@
 Algorithms to analyze noise data.
 """
 
+import warnings
 import numpy as np
 import scipy as sp
 import pylab as plt  # type: ignore
@@ -26,7 +27,10 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
     Returns
     -------
     NDArray
-        The mean autocorrelation of the rows ("traces") in the input `data`, from lags `[0, nsamples-1]`.
+        The mean autocorrelation of the rows ("traces") in the input `data`, from lags `[0, nsamples-1]`,
+        corrected for the bias of removing each trace's mean. It is fixed only up to a constant on all lags,
+        chosen to make it positive definite. If no constant does that, a warning is issued and the biased
+        estimate is returned.
     """
     data = np.asarray(data)
     ntraces, nsamples = data.shape
@@ -42,10 +46,57 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
 
     if traces_used == 0:
         raise ValueError("Apparently all noise traces had large excursions from baseline, so no autocorrelation was computed")
-    ac /= traces_used * nsamples
-    # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
-    # ac /= nsamples - np.arange(nsamples, dtype=float)
-    return ac
+    return _unbiased_autocorrelation(ac / traces_used)
+
+
+def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
+    n = len(lag_sums)
+    npairs = n - np.arange(n)
+    weights = np.where(npairs == n, 1.0, 2.0)
+
+    def expected_lag_sums(r: NDArray) -> NDArray:
+        r = np.ravel(r)
+        cumsum_r = np.concatenate(([0.0], np.cumsum(r)))
+        cumsum_u = np.concatenate(([0.0], np.cumsum((cumsum_r[1:] + cumsum_r[n:0:-1] - r[0]) / n)))
+        return npairs * (r + cumsum_u[-1] / n) - 2 * cumsum_u[npairs] + weights * r.sum()
+
+    operator = sp.sparse.linalg.LinearOperator((n, n), matvec=expected_lag_sums, dtype=float)
+    preconditioner = sp.sparse.linalg.LinearOperator((n, n), matvec=lambda x: np.ravel(x) / npairs, dtype=float)
+    r, info = sp.sparse.linalg.gmres(
+        operator, lag_sums, x0=lag_sums / npairs, M=preconditioner, rtol=1e-12, atol=0.0, restart=100, maxiter=20
+    )
+    if info != 0 or not np.linalg.norm(expected_lag_sums(r) - lag_sums) <= 1e-11 * np.linalg.norm(lag_sums):
+        raise RuntimeError(f"Unbiasing the noise autocorrelation did not converge ({info=})")
+    return r
+
+
+def _toeplitz_is_positive_definite(r: NDArray) -> bool:
+    if not r[0] > 0:
+        return False
+    a = np.zeros(len(r))
+    error = r[0]
+    for k in range(1, len(r)):
+        reflection = -(r[k] + a[1:k] @ r[k - 1 : 0 : -1]) / error
+        a[1:k] += reflection * a[k - 1 : 0 : -1]
+        a[k] = reflection
+        error *= 1 - reflection**2
+        if not error > 0:
+            return False
+    return True
+
+
+def _unbiased_autocorrelation(lag_sums: NDArray) -> NDArray:
+    r = _unbias_mean_removed_lag_sums(lag_sums)
+    if _toeplitz_is_positive_definite(r):
+        return r
+    try:
+        inv_r_sum = sp.linalg.solve_toeplitz(r, np.ones(len(r))).sum()
+    except np.linalg.LinAlgError:
+        inv_r_sum = 0.0
+    if inv_r_sum < 0 and _toeplitz_is_positive_definite(r - 2 / inv_r_sum):
+        return r - 2 / inv_r_sum
+    warnings.warn("The unbiased noise autocorrelation is not positive definite; using the biased estimate", stacklevel=3)
+    return lag_sums / len(lag_sums)
 
 
 def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion: int = 1000) -> NDArray:
