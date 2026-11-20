@@ -46,7 +46,7 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
 
     if traces_used == 0:
         raise ValueError("Apparently all noise traces had large excursions from baseline, so no autocorrelation was computed")
-    return _unbiased_autocorrelation(ac / traces_used)
+    return _unbiased_autocorrelation(ac / traces_used, nsamples)
 
 
 def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
@@ -85,18 +85,18 @@ def _toeplitz_is_positive_definite(r: NDArray) -> bool:
     return True
 
 
-def _unbiased_autocorrelation(lag_sums: NDArray) -> NDArray:
-    r = _unbias_mean_removed_lag_sums(lag_sums)
+def _unbiased_autocorrelation(lag_sums: NDArray, n_lags: int) -> NDArray:
+    r = _unbias_mean_removed_lag_sums(lag_sums)[:n_lags]
     if _toeplitz_is_positive_definite(r):
         return r
     try:
-        inv_r_sum = sp.linalg.solve_toeplitz(r, np.ones(len(r))).sum()
+        inv_r_sum = sp.linalg.solve_toeplitz(r, np.ones(n_lags)).sum()
     except np.linalg.LinAlgError:
         inv_r_sum = 0.0
     if inv_r_sum < 0 and _toeplitz_is_positive_definite(r - 2 / inv_r_sum):
         return r - 2 / inv_r_sum
     warnings.warn("The unbiased noise autocorrelation is not positive definite; using the biased estimate", stacklevel=3)
-    return lag_sums / len(lag_sums)
+    return lag_sums[:n_lags] / len(lag_sums)
 
 
 def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion: int = 1000) -> NDArray:
@@ -114,7 +114,8 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
     Returns
     -------
     NDArray
-        The autocorrelation array
+        The autocorrelation array, corrected for the bias of removing each chunk's mean, as in
+        `calc_discontinuous_autocorrelation`.
 
     Raises
     ------
@@ -127,21 +128,21 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
 
     # When there are 10 million data points and only 10,000 lags wanted,
     # it's hugely inefficient to compute the full autocorrelation, especially
-    # in memory.  Instead, compute it on chunks several times the length of the desired
+    # in memory.  Instead, compute it on chunks twice the length of the desired
     # correlation, and average.
-    CHUNK_MULTIPLE = 15
+    CHUNK_MULTIPLE = 2
     if n_data < CHUNK_MULTIPLE * n_lags:
         msg = f"There are too few data values ({n_data=}) to compute at least {n_lags} lags."
         raise ValueError(msg)
 
-    # Be sure to pad chunksize samples by AT LEAST n_lags zeros, to prevent
+    # Be sure to pad chunksize samples by AT LEAST chunksize - 1 zeros, to prevent
     # unwanted wraparound in the autocorrelation.
     # padded_data is what we do DFT/InvDFT on; ac is the unnormalized output.
     chunksize = CHUNK_MULTIPLE * n_lags
-    nfft = sp.fft.next_fast_len(chunksize + n_lags)
+    nfft = sp.fft.next_fast_len(2 * chunksize - 1)
     padded_data = np.zeros(nfft, dtype=float)
 
-    ac = np.zeros(n_lags, dtype=float)
+    ac = np.zeros(chunksize, dtype=float)
 
     entries = 0
 
@@ -156,16 +157,13 @@ def calc_continuous_autocorrelation(data: ArrayLike, n_lags: int, max_excursion:
         ft[0] = 0  # this redundantly removes the mean of the data set
         power = (ft * ft.conj()).real
         acsum = sp.fft.irfft(power, n=nfft)
-        ac += acsum[:n_lags]
+        ac += acsum[:chunksize]
         entries += 1
 
     if entries == 0:
         raise ValueError("Apparently all 'noise' chunks had large excursions from baseline, so no autocorrelation was computed")
 
-    ac /= entries * chunksize
-    # The following is an unbiased estimator, but it produces noise matrices that are potentially not positive definite. Sad.
-    # ac /= np.arange(chunksize, chunksize - n_lags + 0.5, -1.0, dtype=float)
-    return ac
+    return _unbiased_autocorrelation(ac / entries, n_lags)
 
 
 def calc_autocorrelation_times(n: int, dt: float) -> NDArray:
