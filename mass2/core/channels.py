@@ -114,7 +114,7 @@ class Channels:
         # the more common call should be to wrap this in a convenient plotter
         dfs = []
         for ch_num, channel in self.channels.items():
-            df = channel.df.select(pl.exclude(exclude)).filter(channel.good_expr)
+            df = channel.df.filter(channel.good_expr).select(pl.exclude(exclude))
             # key_series = pl.Series("key", dtype=pl.Int64).extend_constant(key, len(df))
             assert ch_num == channel.header.ch_num
             ch_series = pl.Series("ch_num", dtype=pl.Int64).extend_constant(channel.header.ch_num, len(df))
