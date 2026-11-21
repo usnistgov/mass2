@@ -1850,6 +1850,9 @@ class Channel:
     def concat_ch(self, ch: "Channel") -> "Channel":
         """Concat the given channel's dataframe (and raw-pulse source) to this one's, keeping all other
         attributes the same. If the new channel `ch` has a history and/or steps, those will be lost"""
+        assert ch.frametime_s == self.frametime_s
+        assert ch.n_presamples == self.n_presamples
+        assert ch.n_samples == self.n_samples
         result = self.concat_df(ch.df, pulseframer=ch.pulseframer)
         sources = self.header.leaf_data_sources() + ch.header.leaf_data_sources()
         header = replace(result.header, data_source=None, pulse_data_sources=sources)
