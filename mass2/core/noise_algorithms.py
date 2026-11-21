@@ -35,19 +35,19 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
     """
     data = np.asarray(data)
     ntraces, nsamples = data.shape
-    ac = np.zeros(nsamples, dtype=float)
+    nfft = sp.fft.next_fast_len(2 * nsamples - 1, real=True)
+    power = np.zeros(nfft // 2 + 1, dtype=float)
 
     traces_used = 0
-    for i in range(ntraces):
-        pulse = data[i, :] - data[i, :].mean()
-        if np.abs(pulse).max() > max_excursion:
-            continue
-        ac += np.correlate(pulse, pulse, "full")[nsamples - 1 :]
-        traces_used += 1
+    for i in range(0, ntraces, 100):
+        pulses = data[i : i + 100] - data[i : i + 100].mean(axis=1, keepdims=True)
+        pulses = pulses[~(np.abs(pulses).max(axis=1) > max_excursion)]
+        power += (np.abs(sp.fft.rfft(pulses, n=nfft)) ** 2).sum(axis=0)
+        traces_used += len(pulses)
 
     if traces_used == 0:
         raise ValueError("Apparently all noise traces had large excursions from baseline, so no autocorrelation was computed")
-    return _unbiased_autocorrelation(ac / traces_used, nsamples)
+    return _unbiased_autocorrelation(sp.fft.irfft(power, n=nfft)[:nsamples] / traces_used, nsamples)
 
 
 def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
