@@ -77,7 +77,8 @@ def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
         operator, lag_sums, x0=lag_sums / npairs, M=preconditioner, rtol=1e-12, atol=0.0, restart=100, maxiter=20
     )
     if info != 0 or not np.linalg.norm(expected_lag_sums(r) - lag_sums) <= 1e-11 * np.linalg.norm(lag_sums):
-        raise RuntimeError(f"Unbiasing the noise autocorrelation did not converge ({info=})")
+        warnings.warn(f"Unbiasing the noise autocorrelation did not converge ({info=}); using the biased estimate", stacklevel=4)
+        return lag_sums / n
     return r
 
 
