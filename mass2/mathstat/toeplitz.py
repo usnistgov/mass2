@@ -214,14 +214,12 @@ class UpperTriangularToeplitz:
 
 
 @overload
-def levinson_durbin(r: NDArray, generate_whitener: Literal[False], *, check_pd: Literal[False] = False) -> np.ndarray:
+def levinson_durbin(r: NDArray, generate_whitener: Literal[False]) -> np.ndarray:
     pass
 
 
 @overload
-def levinson_durbin(
-    r: NDArray, generate_whitener: Literal[True], *, check_pd: Literal[False] = False
-) -> tuple[np.ndarray, np.ndarray]:
+def levinson_durbin(r: NDArray, generate_whitener: Literal[True]) -> tuple[np.ndarray, np.ndarray]:
     pass
 
 
@@ -249,15 +247,13 @@ def levinson_durbin(
         Whether to compute and return the exact whitening transformation (an `n`x`n` matrix), by default False.
         The whitener uses `n^2` space, so it should not be created and returned unless the user actually wants it
     check_pd : bool, optional
-        Whether to also return if R is positive definite (r[0] > 0 and every reflection coefficient |error_k| < 1),
-        by default False. If a leading minor of R is singular, `f` is all NaN.
+        Whether to return `(f, is_pd)`, with `is_pd` whether R is positive definite, by default False.
 
     Returns
     -------
     np.ndarray | tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, bool]
         Either the final forward vector `f`, or (if `generate_whitener` is True) the
-        tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix, or (if `check_pd` is True)
-        the tuple `(f, is_pd)`.
+        tuple `(f, W)` where `W` is the `n`x`n` exact whitening matrix.
     """
     n = len(r)
     f = np.zeros(n, dtype=float)
