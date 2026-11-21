@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from numpy import ndarray
 from numpy.typing import NDArray, ArrayLike
 from collections.abc import Callable
+from mass2.mathstat.toeplitz import levinson_durbin
 
 
 def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 1000) -> NDArray:
@@ -70,30 +71,14 @@ def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
     return r
 
 
-def _toeplitz_is_positive_definite(r: NDArray) -> bool:
-    if not r[0] > 0:
-        return False
-    a = np.zeros(len(r))
-    error = r[0]
-    for k in range(1, len(r)):
-        reflection = -(r[k] + a[1:k] @ r[k - 1 : 0 : -1]) / error
-        a[1:k] += reflection * a[k - 1 : 0 : -1]
-        a[k] = reflection
-        error *= 1 - reflection**2
-        if not error > 0:
-            return False
-    return True
-
-
 def _unbiased_autocorrelation(lag_sums: NDArray, n_lags: int) -> NDArray:
     r = _unbias_mean_removed_lag_sums(lag_sums)[:n_lags]
-    if _toeplitz_is_positive_definite(r):
+    f, is_pd = levinson_durbin(r, check_pd=True)
+    if is_pd:
         return r
-    try:
-        inv_r_sum = sp.linalg.solve_toeplitz(r, np.ones(n_lags)).sum()
-    except np.linalg.LinAlgError:
-        inv_r_sum = 0.0
-    if inv_r_sum < 0 and _toeplitz_is_positive_definite(r - 2 / inv_r_sum):
+    s = np.cumsum(f)
+    inv_r_sum = (s @ s - (s[-1] - s) @ (s[-1] - s)) / f[0]
+    if inv_r_sum < 0 and levinson_durbin(r - 2 / inv_r_sum, check_pd=True)[1]:
         return r - 2 / inv_r_sum
     warnings.warn("The unbiased noise autocorrelation is not positive definite; using the biased estimate", stacklevel=3)
     return lag_sums[:n_lags] / len(lag_sums)
