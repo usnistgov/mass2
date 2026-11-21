@@ -51,6 +51,14 @@ def calc_discontinuous_autocorrelation(data: ArrayLike, max_excursion: int = 100
 
 
 def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
+    """Return the autocorrelation r whose expected lag sums, with each record's mean removed, are `lag_sums`.
+
+    E[lag sum k] = sum_{i<N-k} (r_k - u_i - u_{i+k} + m), with u_i = (1/N) sum_j r_|i-j| and m = mean(u).
+    This is linear in r and is solved for r by GMRES, each product costing O(N) with cumulative sums
+    (u is symmetric, so both u sums are cumsum(u)[N-k]). A constant on all lags drops out, so r is fixed only
+    up to a constant, which mass2's filters ignore (they fit a constant baseline). The term `weights * sum(r)`
+    selects sum(r) = 0; `_unbiased_autocorrelation` then chooses the constant to make R positive definite.
+    """
     n = len(lag_sums)
     npairs = n - np.arange(n)
     weights = np.where(npairs == n, 1.0, 2.0)
@@ -58,8 +66,10 @@ def _unbias_mean_removed_lag_sums(lag_sums: NDArray) -> NDArray:
     def expected_lag_sums(r: NDArray) -> NDArray:
         r = np.ravel(r)
         cumsum_r = np.concatenate(([0.0], np.cumsum(r)))
-        cumsum_u = np.concatenate(([0.0], np.cumsum((cumsum_r[1:] + cumsum_r[n:0:-1] - r[0]) / n)))
-        return npairs * (r + cumsum_u[-1] / n) - 2 * cumsum_u[npairs] + weights * r.sum()
+        u = (cumsum_r[1:] + cumsum_r[n:0:-1] - r[0]) / n
+        cumsum_u = np.concatenate(([0.0], np.cumsum(u)))
+        m = cumsum_u[-1] / n
+        return npairs * (r + m) - 2 * cumsum_u[npairs] + weights * r.sum()
 
     operator = sp.sparse.linalg.LinearOperator((n, n), matvec=expected_lag_sums, dtype=float)
     preconditioner = sp.sparse.linalg.LinearOperator((n, n), matvec=lambda x: np.ravel(x) / npairs, dtype=float)
