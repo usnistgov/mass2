@@ -357,4 +357,5 @@ def concat_pulseframers(framers: Iterable["PulseDataFramer | None"]) -> "PulseDa
         return None
     if len(parts) == 1:
         return parts[0]
+    parts = [q for p in parts for q in (p.parts if isinstance(p, ConcatPulseDataFramer) else (p,))]
     return ConcatPulseDataFramer(tuple(parts))  # type: ignore[arg-type]
