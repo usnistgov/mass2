@@ -823,8 +823,8 @@ class Channels:
             not available, eg when loading on another computer.
         """
         zip_path = pathlib.Path(zip_path)
-        if zip_path.suffix != ".zip":
-            zip_path = zip_path.with_suffix(".zip")
+        if zip_path.suffix.lower() != ".zip":
+            zip_path = zip_path.with_name(zip_path.name + ".zip")
 
         if os.path.exists(zip_path) and not overwrite:
             raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")
