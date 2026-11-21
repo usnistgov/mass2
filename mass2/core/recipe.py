@@ -296,7 +296,7 @@ class SelectStep(RecipeStep):
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Select the given columns and return a new DataFrame."""
-        df2 = df.select(**self.col_expr_dict).with_columns(df)
+        df2 = df.with_columns(**self.col_expr_dict)
         return df2
 
 
