@@ -288,19 +288,19 @@ class LJHFile(PulseDataFramer):
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
         s = slice(start, stop, step)
-        return self._load_raw(s)
+        return self._load_raw(s, extra_fields)
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self._load_raw([id])
+        return self._load_raw([id], extra_fields)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self._load_raw(list(ids))
+        return self._load_raw(list(ids), extra_fields)
 
-    def _load_raw(self, selection: slice | int | list[int]) -> pl.DataFrame:
+    def _load_raw(self, selection: slice | int | list[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
         data = {"pulse": self._mmap["pulse"][selection]}
         schema = pl.Schema({"pulse": pl.Array(pl.UInt16, self.nsamples)})
         df = pl.DataFrame(data, schema=schema)
-        return df
+        return df.with_columns(pl.Series(field, self._mmap[field][selection]) for field in extra_fields)
 
     def to_polars(
         self,
@@ -387,6 +387,20 @@ class LJHFile(PulseDataFramer):
             Whether every record is strictly continuous with the ones before and after
         """
         return False
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("_mmap", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
+        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(self.npulses,))
+        object.__setattr__(self, "_mmap", mmap)
 
 
 class LJHFile_2_2(LJHFile):
@@ -556,17 +570,3 @@ class LJHFile_2_0(LJHFile):
             first_pulse, keep_posix_usec, force_continuous=force_continuous, keep_raw_pulses=keep_raw_pulses
         )
         return df.select(pl.exclude("subframecount")), df_header
-
-    def __getstate__(self) -> dict[str, Any]:
-        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
-        state = self.__dict__.copy()
-        state.pop("_mmap", None)
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
-        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
-        for key, value in state.items():
-            object.__setattr__(self, key, value)
-        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(self.npulses,))
-        object.__setattr__(self, "_mmap", mmap)

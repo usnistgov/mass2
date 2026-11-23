@@ -22,6 +22,7 @@ import pathlib
 import re
 import tomllib
 import platform
+import warnings
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -122,7 +123,7 @@ class Channels:
         # the more common call should be to wrap this in a convenient plotter
         dfs = []
         for ch_num, channel in self.channels.items():
-            df = channel.df.select(pl.exclude(exclude)).filter(channel.good_expr)
+            df = channel.df.filter(channel.good_expr).select(pl.exclude(exclude))
             # key_series = pl.Series("key", dtype=pl.Int64).extend_constant(key, len(df))
             assert ch_num == channel.header.ch_num
             ch_series = pl.Series("ch_num", dtype=pl.Int64).extend_constant(channel.header.ch_num, len(df))
@@ -257,14 +258,13 @@ class Channels:
         n_expected = len(plot_these_chan)
         for i, ch_num in enumerate(plot_these_chan):
             ch = self.channels[ch_num]
-            # The next line _assumes_ a 5-lag filter. Fix as needed.
-            x = np.arange(ch.header.n_samples - 4) - ch.header.n_presamples + 2
             y = ch.last_filter
             if y is not None:
-                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.xlabel("Samples after trigger")
-        plt.title("Optimal filters")
+                x = np.arange(len(y)) - ch.header.n_presamples + (ch.header.n_samples - len(y)) // 2
+                axis.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.set_xlabel("Samples after trigger")
+        axis.set_title("Optimal filters")
         plot_zoomable()
 
     def plot_avg_pulses(
@@ -309,10 +309,10 @@ class Channels:
             x = np.arange(ch.header.n_samples) - ch.header.n_presamples
             y = ch.last_avg_pulse
             if y is not None:
-                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.xlabel("Samples after trigger")
-        plt.title("Average pulses")
+                axis.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.set_xlabel("Samples after trigger")
+        axis.set_title("Average pulses")
         plot_zoomable()
 
     def plot_noise_spectrum(
@@ -346,11 +346,11 @@ class Channels:
             freqpsd = ch.last_noise_psd
             if freqpsd is not None:
                 freq, psd = freqpsd
-                plt.plot(freq, psd, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.loglog()
-        plt.xlabel("Frequency (Hz)")
-        plt.title("Noise power spectral density")
+                axis.plot(freq, psd, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.loglog()
+        axis.set_xlabel("Frequency (Hz)")
+        axis.set_title("Noise power spectral density")
         plot_zoomable()
 
     def plot_noise_autocorr(
@@ -384,11 +384,11 @@ class Channels:
             ac = ch.last_noise_autocorrelation
             if ac is not None:
                 color = colormap(i / n_expected)
-                plt.plot(ac, color=color, label=f"Chan {ch_num}")
-                plt.plot(0, ac[0], "o", color=color)
-        plt.legend()
-        plt.xlabel("Lags")
-        plt.title("Noise autocorrelation")
+                axis.plot(ac, color=color, label=f"Chan {ch_num}")
+                axis.plot(0, ac[0], "o", color=color)
+        axis.legend()
+        axis.set_xlabel("Lags")
+        axis.set_title("Noise autocorrelation")
         plot_zoomable()
 
     def analyze_noise(
@@ -500,6 +500,8 @@ class Channels:
         channels = {}
         for path in off_paths:
             ch = Channel.from_off(mass2.core.OffFile(str(path)))
+            if ch.header.ch_num in channels:
+                raise ValueError(f"more than one OFF file has channel number {ch.header.ch_num} (latest: {path})")
             channels[ch.header.ch_num] = ch
         return cls(channels, description)
 
@@ -841,6 +843,9 @@ class Channels:
         for ch_num in ch_nums:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
+            assert other_ch.frametime_s == ch.frametime_s
+            assert other_ch.n_presamples == ch.n_presamples
+            assert other_ch.n_samples == ch.n_samples
             combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
             combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
             sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
@@ -900,6 +905,12 @@ class Channels:
         dfs: dict[int, pl.DataFrame] = {keys[0]: df for (keys, df) in keys_df.items()}
         channels: dict[int, Channel] = {}
         for ch_num, df in dfs.items():
+            header_df = pl.DataFrame({
+                "Channel": [ch_num],
+                "Timebase": [frametime_s],
+                "Presamples": [n_presamples],
+                "Total Samples": [n_samples],
+            })
             channels[ch_num] = Channel(
                 df,
                 header=ChannelHeader(
@@ -909,7 +920,7 @@ class Channels:
                     frametime_s=frametime_s,
                     n_presamples=n_presamples,
                     n_samples=n_samples,
-                    df=df,
+                    df=header_df,
                 ),
                 npulses=len(df),
             )
@@ -937,8 +948,8 @@ class Channels:
         zip_path = pathlib.Path(zip_path)
         if zip_path.is_dir():
             zip_path /= DEFAULT_ZIPNAME
-        if zip_path.suffix != ".zip":
-            zip_path = zip_path.with_suffix(".zip")
+        if zip_path.suffix.lower() != ".zip":
+            zip_path = zip_path.with_name(zip_path.name + ".zip")
 
         if os.path.exists(zip_path) and not overwrite:
             raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")
@@ -985,7 +996,10 @@ class Channels:
                 df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
             else:
                 df = ch.df.drop("pulse", strict=False)
-            if ch.pulseframer is not None and "_raw_row" not in df.columns:
+            if ch.pulseframer is not None and ch.pulseframer.npulses != len(df):
+                warnings.warn(f"channel {ch.header.ch_num}: rows and raw records differ; no raw-data mapping saved", stacklevel=2)
+                df = df.drop("_raw_source", "_raw_row", strict=False)
+            elif ch.pulseframer is not None and "_raw_row" not in df.columns:
                 source, raw, _ = raw_location(ch.pulseframer, np.arange(len(df)))
                 df = df.with_columns(_raw_source=source, _raw_row=raw)
             buffer = io.BytesIO()
@@ -999,7 +1013,8 @@ class Channels:
             return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
         sha256: dict[str, str] = {}
-        with ZipFile(str(zip_path), "w") as zf:
+        partial_path = zip_path.with_name(zip_path.name + ".partial")
+        with ZipFile(str(partial_path), "w") as zf:
             channels = {}
             bad_channels = {}
             for ch_num, ch in self.channels.items():
@@ -1014,6 +1029,7 @@ class Channels:
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
             zf.writestr(pickle_file, mass2.safe_dill.dumps_signed((package_versions(), sha256, dill.dumps(data))))
+        os.replace(partial_path, zip_path)
 
     @staticmethod
     def load_analysis(path: Path | str, allow_untrusted: bool = False) -> "Channels":

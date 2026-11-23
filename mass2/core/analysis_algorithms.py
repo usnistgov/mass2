@@ -266,6 +266,8 @@ def drift_correct(
     """
     uncorrected = np.asarray(uncorrected)
     indicator = np.asarray(indicator)
+    finite = np.isfinite(indicator) & np.isfinite(uncorrected)
+    indicator, uncorrected = indicator[finite], uncorrected[finite]
     ptm_offset = np.median(indicator)
     indicatorA: NDArray = indicator - ptm_offset
     # Require that the slope never be so positive or so negative as to make the gain go negative when the indicator
@@ -478,6 +480,8 @@ def time_drift_correct(  # noqa: PLR0914
     """
     time = np.asarray(time)
     uncorrected = np.asarray(uncorrected)
+    finite = np.isfinite(time) & np.isfinite(uncorrected)
+    time, uncorrected = time[finite], uncorrected[finite]
     if limit is None:
         pct99 = float(np.percentile(uncorrected, 99))
         limit = (0.0, 1.25 * pct99)

@@ -139,7 +139,7 @@ def _summarize_data(  # noqa: PLR0914
             k += 1
 
         high_value = low_value
-        high_idx = low_idx
+        high_idx = -1
 
         while k < nSamples:
             signal = pulse[k]
@@ -149,10 +149,14 @@ def _summarize_data(  # noqa: PLR0914
                 break
             k += 1
 
-        if high_value > low_value:
-            results["rise_time"][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
+        if peak_value <= 0 or high_idx < 0 or high_value <= low_value:
+            results["rise_time"][j] = np.nan
         else:
-            results["rise_time"][j] = timebase
+            results["rise_time"][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
+
+        if not 0 <= peak_samplenumber <= nSamples - 7:
+            results["postpeak_deriv"][j] = np.nan
+            continue
 
         # The following is quite confusing, but it appears to be equivalent to
         # slope = -2 * pulse[peak_samplenumber:-4]

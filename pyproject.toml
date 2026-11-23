@@ -96,6 +96,7 @@ exclude = ["site*", "build*", "docs*"]
 
 [tool.setuptools.package-data]
 mass2 = [
+    "py.typed",
     "calibration/nist_xray_data.dat",
     "calibration/low_z_xray_data.dat",
     "calibration/nist_asd_2023.pickle.gz",

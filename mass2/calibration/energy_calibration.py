@@ -344,7 +344,7 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_gain
             x = self.ph
             y = self.ph / self.energy
-            dx = dph
+            dx = None
             if self.npts == 1:
                 dy = y * dph / x
             else:
@@ -357,7 +357,7 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_invgain
             x = self.ph
             y = self.energy / self.ph
-            dx = dph
+            dx = None
             if self.npts == 1:
                 dy = y * dph / x
             else:
@@ -385,7 +385,7 @@ class EnergyCalibrationMaker:
             output_transform = EnergyCalibration._ecal_output_loggain
             x = self.ph
             y = np.log(self.ph / self.energy)
-            dx = dph
+            dx = None
             if self.npts == 1:
                 dy = y * dph / x
             else:
@@ -542,7 +542,7 @@ class EnergyCalibration:
             False,
             donothing,
             donothing,
-            donothing,
+            np.zeros_like,
             donothing,
         )
 

@@ -58,7 +58,7 @@ def good_series(df: pl.DataFrame, col: str, good_expr: pl.Expr, use_expr: bool |
 def median_absolute_deviation(x: ArrayLike) -> float:
     """Return the median absolute deviation of the input, unnormalized."""
     x = np.asarray(x)
-    return float(np.median(np.abs(x - np.median(x))))
+    return float(np.nanmedian(np.abs(x - np.nanmedian(x))))
 
 
 def sigma_mad(x: ArrayLike) -> float:
@@ -70,14 +70,14 @@ def sigma_mad(x: ArrayLike) -> float:
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
     """Return the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
-    mid = float(np.median(x))
+    mid = float(np.nanmedian(x))
     return mid + nsigma * sigma_mad(x)
 
 
 def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
     """Return the values that are `nsigma` median absolute deviations (MADs) below and above the median of the input"""
     x = np.asarray(x)
-    mid = float(np.median(x))
+    mid = float(np.nanmedian(x))
     smad = sigma_mad(x)
     return mid - nsigma * smad, mid + nsigma * smad
 
@@ -285,6 +285,11 @@ class PulseDataFramer(ABC):
         row-reordering operations such as `head`, `tail`, or `sample`."""
         return ReindexedPulseDataFramer(self, np.asarray(indices, dtype=np.int64))
 
+    def check_rows(self, nrows: int) -> None:
+        """Raise ValueError unless `nrows` equals the number of raw pulse records."""
+        if nrows != self.npulses:
+            raise ValueError(f"Dataframe has {nrows} rows but the raw pulse source has {self.npulses} records")
+
 
 @dataclass(frozen=True)
 class DataFramerPolars(PulseDataFramer):
@@ -403,13 +408,14 @@ class PulseDataFromNumpy(PulseDataFramer):
 
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
-        s = slice(start, stop, step)
-        return pl.DataFrame({"pulse": self.pulses[s]})
+        return self.load_raw_pulses(range(start, stop, step), extra_fields)
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return pl.DataFrame({"pulse": self.pulses[[id]]})
+        return self.load_raw_pulses([id], extra_fields)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        if list(extra_fields):
+            raise ValueError(f"PulseDataFromNumpy has no extra_fields: {list(extra_fields)}")
         return pl.DataFrame({"pulse": self.pulses[list(ids)]})
 
 
@@ -421,4 +427,5 @@ def concat_pulseframers(framers: Iterable["PulseDataFramer | None"]) -> "PulseDa
         return None
     if len(parts) == 1:
         return parts[0]
+    parts = [q for p in parts for q in (p.parts if isinstance(p, ConcatPulseDataFramer) else (p,))]
     return ConcatPulseDataFramer(tuple(parts))  # type: ignore[arg-type]

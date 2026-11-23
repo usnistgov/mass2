@@ -352,6 +352,8 @@ def main_ljh_truncate() -> None:
 
 def ljh_merge(out_path: str, filenames: list[str], overwrite: bool) -> None:
     """Merge a set of LJH files to a single output file."""
+    if os.path.exists(out_path) and any(os.path.samefile(f, out_path) for f in filenames):
+        raise ValueError(f"output file {out_path} is also one of the input files")
     if not overwrite and os.path.isfile(out_path):
         raise OSError(f"To overwrite destination {out_path}, use the --force flag")
     shutil.copy(filenames[0], out_path)
@@ -423,6 +425,9 @@ def main_ljh_merge() -> None:
     if not out_dir:
         out_dir = os.path.split(filenames[0])[0]
     out_path = os.path.join(out_dir, f"merged_chan{channum}.ljh")
+
+    if os.path.exists(out_path):
+        filenames = [f for f in filenames if not os.path.samefile(f, out_path)]
 
     overwrite: bool = args.force
     ljh_merge(out_path, filenames, overwrite=overwrite)

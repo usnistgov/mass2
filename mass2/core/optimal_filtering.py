@@ -205,7 +205,8 @@ def band_limit(modelmatrix: np.ndarray, sample_time_sec: float, fmax: float | No
     fmax : Optional[float]
         The hard maximum frequency (units are inverse of `sample_time_sec` units, or Hz)
     f_3db : Optional[float]
-        The 1-pole low-pass filter's 3 dB point (same units as `fmax`)
+        The low-pass filter's corner frequency (same units as `fmax`): amplitudes are scaled by
+        1/(1 + (f/f_3db)^2), which is -6 dB at `f_3db` (the power response of a 1-pole filter)
     """
     if fmax is None and f_3db is None:
         return
