@@ -388,6 +388,20 @@ class LJHFile(PulseDataFramer):
         """
         return False
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
+        state = self.__dict__.copy()
+        state.pop("_mmap", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
+        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(self.npulses,))
+        object.__setattr__(self, "_mmap", mmap)
+
 
 class LJHFile_2_2(LJHFile):
     """LJH files version 2.2 and later, which have subframecount and posix_usec fields."""
@@ -556,17 +570,3 @@ class LJHFile_2_0(LJHFile):
             first_pulse, keep_posix_usec, force_continuous=force_continuous, keep_raw_pulses=keep_raw_pulses
         )
         return df.select(pl.exclude("subframecount")), df_header
-
-    def __getstate__(self) -> dict[str, Any]:
-        """Define what gets pickled (ignore the live mmap in self.pulseframer)."""
-        state = self.__dict__.copy()
-        state.pop("_mmap", None)
-        return state
-
-    def __setstate__(self, state: dict[str, Any]) -> None:
-        """Define what gets unpickled (you have to re-open the file, or attempt to)."""
-        # Because it is frozen, you must use object.__setattr__ to restore the file handlers
-        for key, value in state.items():
-            object.__setattr__(self, key, value)
-        mmap = np.memmap(self.filename, self.dtype, mode="r", offset=self.header_size, shape=(self.npulses,))
-        object.__setattr__(self, "_mmap", mmap)
