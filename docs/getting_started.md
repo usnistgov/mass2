@@ -364,7 +364,7 @@ def dc_and_rough_cal2(ch: mass2.Channel) -> mass2.Channel:
 
     use_cal = pl.col("state_label") == "CAL2"
     use_dc = pl.lit(True)
-    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "FeLBeta", "NiLAlpha", "NiLBeta", "CuLAlpha", "CuLBeta", 980]
+    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "FeLBeta", "NiLAlpha", "NiLBeta", "CuLAlpha", "CuLBeta"]
     return (
         ch
         .rough_cal_combinatoric(
@@ -414,15 +414,15 @@ def do_multifit(ch: mass2.Channel) -> mass2.Channel:
         default_use_expr=(pl.col("state_label") == "CAL2"),
         default_bin_size=0.3,
     )
-    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "NiLAlpha", "CuLAlpha", 980.0]
+    line_names = ["CKAlpha", "NKAlpha", "OKAlpha", "FeLl", "FeLAlpha", "NiLAlpha", "CuLAlpha"]
     dhigh = {"CuLAlpha": 12, "NiLAlpha": 12}
-    dlow = {980.0: 20}
     for line in line_names:
-        multifit = multifit.with_line(line, dlo=dlow.get(line, None), dhi=dhigh.get(line, None))
+        multifit = multifit.with_line(line, dhi=dhigh.get(line, None))
     return ch.multifit_mass_cal(multifit, STEP_WITH_ROUGH_CAL, "energy_5lagy_best")
 
 
 data = data.map(do_multifit)
+assert len(data.bad_channels) == 0
 ch = data.ch0
 plt.clf()
 ax1 = plt.subplot(211)
