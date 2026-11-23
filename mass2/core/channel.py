@@ -1165,7 +1165,7 @@ class Channel:
             ets = time_constant_s_of_exp_to_be_orthogonal_to
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
@@ -1249,7 +1249,7 @@ class Channel:
         else:
             filter1lag = filter_maker.compute_1lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
@@ -1308,7 +1308,7 @@ class Channel:
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         idx = df["Record #"]
-        pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
+        pulse = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         if self.transform_raw is not None:
             pulse = self.transform_raw(pulse)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
@@ -1363,7 +1363,7 @@ class Channel:
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
