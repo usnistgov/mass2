@@ -114,7 +114,7 @@ class Channels:
         # the more common call should be to wrap this in a convenient plotter
         dfs = []
         for ch_num, channel in self.channels.items():
-            df = channel.df.select(pl.exclude(exclude)).filter(channel.good_expr)
+            df = channel.df.filter(channel.good_expr).select(pl.exclude(exclude))
             # key_series = pl.Series("key", dtype=pl.Int64).extend_constant(key, len(df))
             assert ch_num == channel.header.ch_num
             ch_series = pl.Series("ch_num", dtype=pl.Int64).extend_constant(channel.header.ch_num, len(df))
@@ -731,6 +731,9 @@ class Channels:
         for ch_num in ch_nums:
             ch = self.channels[ch_num]
             other_ch = other_data.channels[ch_num]
+            assert other_ch.frametime_s == ch.frametime_s
+            assert other_ch.n_presamples == ch.n_presamples
+            assert other_ch.n_samples == ch.n_samples
             combined_df = mass2.core.misc.concat_dfs_with_concat_state(ch.df, other_ch.df)
             combined_pulseframer = mass2.core.misc.concat_pulseframers([ch.pulseframer, other_ch.pulseframer])
             sources = ch.header.leaf_data_sources() + other_ch.header.leaf_data_sources()
@@ -823,8 +826,8 @@ class Channels:
             not available, eg when loading on another computer.
         """
         zip_path = pathlib.Path(zip_path)
-        if zip_path.suffix != ".zip":
-            zip_path = zip_path.with_suffix(".zip")
+        if zip_path.suffix.lower() != ".zip":
+            zip_path = zip_path.with_name(zip_path.name + ".zip")
 
         if os.path.exists(zip_path) and not overwrite:
             raise ValueError(f"File exists; use `save_analysis(...overwrite=True)` to overwrite the existing {zip_path=}")

@@ -296,7 +296,7 @@ class SelectStep(RecipeStep):
 
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Select the given columns and return a new DataFrame."""
-        df2 = df.select(**self.col_expr_dict).with_columns(df)
+        df2 = df.with_columns(**self.col_expr_dict)
         return df2
 
 
@@ -411,7 +411,7 @@ class Recipe(Sequence[RecipeStep]):
                     if any(e.meta.has_multiple_outputs() for e in step_exprs):
                         keep_all_earlier = True
 
-        if not np.any(required):
+        if required_fields is not None and not np.any(required):
             # If this error ever because a problem, where user _acutally_ wants an empty series of steps
             # to be a non-err, then add argument `error_on_empty_output=True` to this method.
             raise ValueError("trim_dead_ends found no steps to be preserved")
