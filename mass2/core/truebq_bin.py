@@ -143,7 +143,7 @@ class TriggerResult:
         pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=inds)
         assert pulses.shape[0] == len(inds), "pulses and trig_inds must have the same length"
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            df = pl.DataFrame({"pulse": -np.maximum(pulses, -32767), "framecount": inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
@@ -183,7 +183,7 @@ class TriggerResult:
             verbose=verbose,
         )
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            df = pl.DataFrame({"pulse": -np.maximum(pulses, -32767), "framecount": inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
