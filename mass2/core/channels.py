@@ -488,6 +488,8 @@ class Channels:
         channels = {}
         for path in off_paths:
             ch = Channel.from_off(mass2.core.OffFile(str(path)))
+            if ch.header.ch_num in channels:
+                raise ValueError(f"more than one OFF file has channel number {ch.header.ch_num} (latest: {path})")
             channels[ch.header.ch_num] = ch
         return cls(channels, description)
 
