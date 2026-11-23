@@ -186,6 +186,7 @@ class MLEModel(lmfit.Model):
         if "weights" in kwargs and kwargs["weights"] is not None:
             msg = "MLEModel assumes Poisson-distributed data; cannot use weights other than None"
             raise Exception(msg)
+        kwargs.setdefault("scale_covar", False)
         result = self._fit(*args, **kwargs)
         result.__class__ = LineModelResult
         result._validate_bins_per_fwhm(minimum_bins_per_fwhm)
