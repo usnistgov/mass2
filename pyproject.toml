@@ -109,6 +109,9 @@ exclude = [
     ]
 disallow_untyped_defs = true
 
+[tool.pytest.ini_options]
+addopts = "-p no:dash"
+
 [tool.interrogate]
 exclude = [
     "mass2/_version.py", "setup.py", "mass2/data/notebook_starter_template.py",
