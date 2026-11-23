@@ -792,6 +792,12 @@ class Channels:
         dfs: dict[int, pl.DataFrame] = {keys[0]: df for (keys, df) in keys_df.items()}
         channels: dict[int, Channel] = {}
         for ch_num, df in dfs.items():
+            header_df = pl.DataFrame({
+                "Channel": [ch_num],
+                "Timebase": [frametime_s],
+                "Presamples": [n_presamples],
+                "Total Samples": [n_samples],
+            })
             channels[ch_num] = Channel(
                 df,
                 header=ChannelHeader(
@@ -801,7 +807,7 @@ class Channels:
                     frametime_s=frametime_s,
                     n_presamples=n_presamples,
                     n_samples=n_samples,
-                    df=df,
+                    df=header_df,
                 ),
                 npulses=len(df),
             )
