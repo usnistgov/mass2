@@ -889,7 +889,8 @@ class Channels:
             return dataclasses.replace(ch, df=pl.DataFrame(), df_history=[], noise=None, steps=steps, pulseframer=None)
 
         sha256: dict[str, str] = {}
-        with ZipFile(str(zip_path), "w") as zf:
+        partial_path = zip_path.with_name(zip_path.name + ".partial")
+        with ZipFile(str(partial_path), "w") as zf:
             channels = {}
             bad_channels = {}
             for ch_num, ch in self.channels.items():
@@ -904,6 +905,7 @@ class Channels:
             data = dataclasses.replace(self, channels=channels, bad_channels=bad_channels)
             pickle_file = "data_all.pkl"
             zf.writestr(pickle_file, mass2.safe_dill.dumps_signed((package_versions(), sha256, dill.dumps(data))))
+        os.replace(partial_path, zip_path)
 
     @staticmethod
     def load_analysis(path: Path | str, allow_untrusted: bool = False) -> "Channels":
