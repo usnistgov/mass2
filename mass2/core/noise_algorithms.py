@@ -230,10 +230,10 @@ class NoiseResult:
             axis.plot(freq, psd, **plotkwarg)
             axis.set_ylabel(f"Power Spectral Density ({unit_label}$^2$ Hz$^{{-1}}$)")
         if loglog:
-            plt.loglog()
+            axis.loglog()
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
-        plt.title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
+        axis.set_title(f"noise from records of length {len(self.frequencies) * 2 - 2}")
 
     def plot_log_rebinned(
         self,

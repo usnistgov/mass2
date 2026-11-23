@@ -635,7 +635,7 @@ class Channel:
         else:
             title = f"Pulses #{record_numbers}"
             lf = lf.filter(pl.col("Record #").is_in(record_numbers))
-        plt.title(f"{title} from Chan {self.ch_num}")
+        axis.set_title(f"{title} from Chan {self.ch_num}")
         if summarize:
             # Preferred data info to print to terminal.
             if summary_columns is None:
@@ -665,7 +665,7 @@ class Channel:
 
         upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
         upper_axis.set_xlabel("Time after trigger (ms)")
-        plt.xlabel("Samples after trigger")
+        axis.set_xlabel("Samples after trigger")
 
         df = lf.select(("Record #", "pretrig_mean")).collect()
         idx = df["Record #"]

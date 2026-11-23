@@ -254,10 +254,10 @@ class Channels:
             x = np.arange(ch.header.n_samples - 4) - ch.header.n_presamples + 2
             y = ch.last_filter
             if y is not None:
-                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.xlabel("Samples after trigger")
-        plt.title("Optimal filters")
+                axis.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.set_xlabel("Samples after trigger")
+        axis.set_title("Optimal filters")
         plot_zoomable()
 
     def plot_avg_pulses(
@@ -302,10 +302,10 @@ class Channels:
             x = np.arange(ch.header.n_samples) - ch.header.n_presamples
             y = ch.last_avg_pulse
             if y is not None:
-                plt.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.xlabel("Samples after trigger")
-        plt.title("Average pulses")
+                axis.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.set_xlabel("Samples after trigger")
+        axis.set_title("Average pulses")
         plot_zoomable()
 
     def plot_noise_spectrum(
@@ -339,11 +339,11 @@ class Channels:
             freqpsd = ch.last_noise_psd
             if freqpsd is not None:
                 freq, psd = freqpsd
-                plt.plot(freq, psd, color=colormap(i / n_expected), label=f"Chan {ch_num}")
-        plt.legend()
-        plt.loglog()
-        plt.xlabel("Frequency (Hz)")
-        plt.title("Noise power spectral density")
+                axis.plot(freq, psd, color=colormap(i / n_expected), label=f"Chan {ch_num}")
+        axis.legend()
+        axis.loglog()
+        axis.set_xlabel("Frequency (Hz)")
+        axis.set_title("Noise power spectral density")
         plot_zoomable()
 
     def plot_noise_autocorr(
@@ -377,11 +377,11 @@ class Channels:
             ac = ch.last_noise_autocorrelation
             if ac is not None:
                 color = colormap(i / n_expected)
-                plt.plot(ac, color=color, label=f"Chan {ch_num}")
-                plt.plot(0, ac[0], "o", color=color)
-        plt.legend()
-        plt.xlabel("Lags")
-        plt.title("Noise autocorrelation")
+                axis.plot(ac, color=color, label=f"Chan {ch_num}")
+                axis.plot(0, ac[0], "o", color=color)
+        axis.legend()
+        axis.set_xlabel("Lags")
+        axis.set_title("Noise autocorrelation")
         plot_zoomable()
 
     def map(self, f: Callable, allow_throw: bool = False) -> "Channels":

@@ -424,7 +424,7 @@ class LineModelResult(lmfit.model.ModelResult):
             ax = plt.gca()
         ax = lmfit.model.ModelResult.plot_fit(self, ax=ax, xlabel=xlabel, ylabel=ylabel)
         if title is not None:
-            plt.title(title)
+            ax.set_title(title)
         ax.text(
             0.05,
             0.95,
