@@ -5,7 +5,14 @@
 **2.1.4** November 18, 2026-
 * Change saved analysis recipe use: pickled recipes must be self-signed, or user explicitly
   opts in to loading and running code from an untrusted dill pickle file (issue 184).
+* Also sign saved analyses, as they contain executable pickle files for recipe steps.
 * Faster autocorrelation by using scipy FFT functions; remove an old FFT speed heuristic (issue 196).
+* Add empty `py.typed` file to indicate that Mass2 has type hints to importing packages (PR 205).
+* Fix some bugs that apply to virtually concatenating LJH files (PR 206).
+* Fix bug in Poisson fit χ^2 calc; make drift correction and outlier-resistant cuts ignore NaNs;
+  make `save_analysis` be atomic; correct f_3dB docstring; disallow raw reads from a pulse framer
+  when its file length differs from DataFrame; NaN rise time on fail; other bug fixes (issue 207).
+
 
 **2.1.3** November 18, 2026
 * Very many bug fixes by Claude Code 5.5 and @unger-daniel.
