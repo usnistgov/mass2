@@ -147,12 +147,16 @@ class Channel:
 
     def head(self, n: int) -> "Channel":
         "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         df = self.df.head(n)
         framer = self.pulseframer.select_rows(np.arange(len(df))) if self.pulseframer is not None else None
         return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def tail(self, n: int) -> "Channel":
         "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         orig_len = len(self.df)
         df = self.df.tail(n)
         start = orig_len - len(df)
@@ -161,6 +165,8 @@ class Channel:
 
     def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
         "Return a new Channel, using only a random selection of `n` pulse records."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         df_indexed = self.df.with_row_index("__sample_idx__")
         sampled = df_indexed.sample(n=n, fraction=fraction, with_replacement=False)
         row_indices = sampled["__sample_idx__"].to_numpy()
@@ -596,6 +602,7 @@ class Channel:
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         test_df = self.pulseframer.load_raw_pulses([0])
         pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
@@ -1065,6 +1072,7 @@ class Channel:
             _description_
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         if self.transform_raw is not None:
@@ -1271,6 +1279,7 @@ class Channel:
             _description_
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         # idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         # pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         df = (
@@ -1958,6 +1967,7 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         pulse = self.pulseframer.load_raw_pulses([index])[col].to_numpy()
         if self.transform_raw is not None:
             pulse = self.transform_raw(pulse)

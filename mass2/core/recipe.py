@@ -123,6 +123,7 @@ class SummarizeStep(RecipeStep):
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
         assert pulseframer is not None
+        pulseframer.check_rows(len(df))
         rawcol = self.inputs[0]
         summaries = []
         for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):

@@ -243,6 +243,11 @@ class PulseDataFramer(ABC):
         row-reordering operations such as `head`, `tail`, or `sample`."""
         return ReindexedPulseDataFramer(self, np.asarray(indices, dtype=np.int64))
 
+    def check_rows(self, nrows: int) -> None:
+        """Raise ValueError unless `nrows` equals the number of raw pulse records."""
+        if nrows != self.npulses:
+            raise ValueError(f"Dataframe has {nrows} rows but the raw pulse source has {self.npulses} records")
+
 
 @dataclass(frozen=True)
 class ReindexedPulseDataFramer(PulseDataFramer):

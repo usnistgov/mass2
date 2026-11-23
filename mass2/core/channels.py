@@ -20,6 +20,7 @@ import io
 import os
 import pathlib
 import platform
+import warnings
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -871,7 +872,10 @@ class Channels:
                 df = ch.df.drop("pulse", "timestamp", "subframecount", strict=False)
             else:
                 df = ch.df.drop("pulse", strict=False)
-            if ch.pulseframer is not None and "_raw_row" not in df.columns:
+            if ch.pulseframer is not None and ch.pulseframer.npulses != len(df):
+                warnings.warn(f"channel {ch.header.ch_num}: rows and raw records differ; no raw-data mapping saved", stacklevel=2)
+                df = df.drop("_raw_source", "_raw_row", strict=False)
+            elif ch.pulseframer is not None and "_raw_row" not in df.columns:
                 source, raw, _ = raw_location(ch.pulseframer, np.arange(len(df)))
                 df = df.with_columns(_raw_source=source, _raw_row=raw)
             buffer = io.BytesIO()
