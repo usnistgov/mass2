@@ -1727,6 +1727,7 @@ class Channel:
 
         assert output_control.require_last or output_control.require_next
         subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
+        df_ext = df_ext.with_columns(pl.col("subframecount").cast(pl.Int64))
 
         df_subframe = df.select("subframecount").with_row_index("_record").sort("subframecount")
         if output_control.require_last:
