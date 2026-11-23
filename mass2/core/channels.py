@@ -250,10 +250,9 @@ class Channels:
         n_expected = len(plot_these_chan)
         for i, ch_num in enumerate(plot_these_chan):
             ch = self.channels[ch_num]
-            # The next line _assumes_ a 5-lag filter. Fix as needed.
-            x = np.arange(ch.header.n_samples - 4) - ch.header.n_presamples + 2
             y = ch.last_filter
             if y is not None:
+                x = np.arange(len(y)) - ch.header.n_presamples + (ch.header.n_samples - len(y)) // 2
                 axis.plot(x, y, color=colormap(i / n_expected), label=f"Chan {ch_num}")
         axis.legend()
         axis.set_xlabel("Samples after trigger")
