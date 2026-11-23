@@ -183,7 +183,7 @@ class PowerSpectrum:
         else:
             axis.plot(freq, psd, **plotkwarg)
             axis.set_ylabel(f"Power Spectral Density ({unit_label}$^2$ Hz$^{{-1}}$)")
-        plt.loglog()
+        axis.loglog()
         axis.grid()
         axis.set_xlabel("Frequency (Hz)")
 

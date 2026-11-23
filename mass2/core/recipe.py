@@ -123,6 +123,7 @@ class SummarizeStep(RecipeStep):
     def calc_from_df(self, df: pl.DataFrame, pulseframer: PulseDataFramer | None = None) -> pl.DataFrame:
         """Calculate the summary statistics and return a new DataFrame."""
         assert pulseframer is not None
+        pulseframer.check_rows(len(df))
         rawcol = self.inputs[0]
         summaries = []
         for raw_df in pulseframer.iterate_raw_pulses(chunksize=4096):
@@ -224,7 +225,8 @@ class ColumnAsNumpyMapStep(RecipeStep):
         """Calculate the new column by applying `f` to the input column, returning a new DataFrame."""
         output_col = self.output[0]
         output_segments = []
-        for df_iter in df.select(self.inputs).iter_slices():
+        slices = df.select(self.inputs).iter_slices() if df[self.inputs[0]].dtype.base_type() is pl.Array else [df.select(self.inputs)]
+        for df_iter in slices:
             series1 = df_iter[self.inputs[0]]
             # Have to apply the function differently when series elements are arrays vs scalars
             if series1.dtype.base_type() is pl.Array:

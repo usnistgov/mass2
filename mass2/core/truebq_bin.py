@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 import pylab as plt
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
@@ -142,7 +143,7 @@ class TriggerResult:
         pulses = gather_pulses_from_inds_numpy_contiguous(self.data_source.data, npre=npre, nsamples=npre + npost, inds=inds)
         assert pulses.shape[0] == len(inds), "pulses and trig_inds must have the same length"
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            df = pl.DataFrame({"pulse": -np.maximum(pulses, -32767), "framecount": inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
@@ -182,7 +183,7 @@ class TriggerResult:
             verbose=verbose,
         )
         if invert:
-            df = pl.DataFrame({"pulse": pulses * -1, "framecount": inds})
+            df = pl.DataFrame({"pulse": -np.maximum(pulses, -32767), "framecount": inds})
         else:
             df = pl.DataFrame({"pulse": pulses, "framecount": inds})
         ch_header = ChannelHeader(
@@ -458,12 +459,14 @@ def gather_pulses_from_inds_numpy_contiguous_mmap(
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
-    pulses = np.memmap(filename, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
+    partial = str(filename) + ".partial"
+    pulses = np.memmap(partial, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
     for i, offset in enumerate(offsets):
         pulses[i, :] = data[offset : offset + nsamples]
     pulses.flush()
     # re-open the mmap to ensure it is read-only
     del pulses
+    os.replace(partial, filename)
     pulses = np.memmap(filename, dtype=np.int16, mode="r", shape=(len(offsets), nsamples))
     return pulses
 
@@ -569,7 +572,15 @@ def _fasttrig_filter_trigger_with_cache(
     bin_full_path = Path(bin_path).absolute()
     actual_n_samples = min(len(data), limit_samples)
     filter_hash = hashlib.sha256(np.asarray(filter_in, dtype=np.float64).tobytes()).hexdigest()
-    to_hash_str = "|".join([filter_hash, repr(float(threshold)), str(actual_n_samples), str(bin_full_path)])
+    st = bin_full_path.stat()
+    to_hash_str = "|".join([
+        filter_hash,
+        repr(float(threshold)),
+        str(actual_n_samples),
+        str(bin_full_path),
+        str(st.st_size),
+        str(st.st_mtime_ns),
+    ])
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_trigger_cache.npy"
     cache_dir_path = bin_full_path.parent / "_truebq_bin_cache"
@@ -596,7 +607,8 @@ def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
     inds = inds[inds > npre]  # ensure all inds inbounds
     inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
     inds_hash = hashlib.sha256(inds.tobytes()).hexdigest()
-    to_hash_str = str(npre) + str(nsamples) + str(bin_full_path) + inds_hash
+    st = bin_full_path.stat()
+    to_hash_str = str(npre) + str(nsamples) + str(bin_full_path) + inds_hash + str(st.st_size) + str(st.st_mtime_ns)
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_pulse_cache.npy"
     cache_dir_path = bin_full_path.parent / "_truebq_bin_cache"

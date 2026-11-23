@@ -147,12 +147,16 @@ class Channel:
 
     def head(self, n: int) -> "Channel":
         "Return a new Channel, using only the first `n` pulse records (or if n<0, then all but the last abs(n))."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         df = self.df.head(n)
         framer = self.pulseframer.select_rows(np.arange(len(df))) if self.pulseframer is not None else None
         return replace(self, df=df, npulses=len(df), pulseframer=framer)
 
     def tail(self, n: int) -> "Channel":
         "Return a new Channel, using only the last `n` pulse records (or if n<0, then all but the first abs(n))."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         orig_len = len(self.df)
         df = self.df.tail(n)
         start = orig_len - len(df)
@@ -161,6 +165,8 @@ class Channel:
 
     def sample(self, n: int | None, fraction: float | None = None) -> "Channel":
         "Return a new Channel, using only a random selection of `n` pulse records."
+        if self.pulseframer is not None:
+            self.pulseframer.check_rows(len(self.df))
         df_indexed = self.df.with_row_index("__sample_idx__")
         sampled = df_indexed.sample(n=n, fraction=fraction, with_replacement=False)
         row_indices = sampled["__sample_idx__"].to_numpy()
@@ -596,6 +602,7 @@ class Channel:
             The colormap to use for distinguishing pulses, by default "viridis_r"
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         test_df = self.pulseframer.load_raw_pulses([0])
         pulse_type = test_df[pulse_field].dtype
         assert pulse_type in (pl.Array, pl.List), (  # noqa: PLR6201
@@ -628,7 +635,7 @@ class Channel:
         else:
             title = f"Pulses #{record_numbers}"
             lf = lf.filter(pl.col("Record #").is_in(record_numbers))
-        plt.title(f"{title} from Chan {self.ch_num}")
+        axis.set_title(f"{title} from Chan {self.ch_num}")
         if summarize:
             # Preferred data info to print to terminal.
             if summary_columns is None:
@@ -658,7 +665,7 @@ class Channel:
 
         upper_axis = axis.secondary_xaxis("top", functions=(samples2ms, ms2samples))
         upper_axis.set_xlabel("Time after trigger (ms)")
-        plt.xlabel("Samples after trigger")
+        axis.set_xlabel("Samples after trigger")
 
         df = lf.select(("Record #", "pretrig_mean")).collect()
         idx = df["Record #"]
@@ -927,7 +934,7 @@ class Channel:
 
     def with_range_around_median(self, col: str, range_up: float, range_down: float) -> "Channel":
         """Set good_expr to exclude pulses with `col` outside the given range around its median."""
-        med = np.median(self.df[col].to_numpy())
+        med = np.nanmedian(self.df[col].to_numpy())
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
     def with_good_expr_below_nsigma_outlier_resistant(
@@ -1065,6 +1072,7 @@ class Channel:
             _description_
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         if self.transform_raw is not None:
@@ -1157,7 +1165,7 @@ class Channel:
             ets = time_constant_s_of_exp_to_be_orthogonal_to
             filter5lag = filter_maker.compute_5lag_noexp(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post, exp_time_seconds=ets)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
@@ -1241,7 +1249,7 @@ class Channel:
         else:
             filter1lag = filter_maker.compute_1lag(f_3db=f_3db, cut_pre=cut_pre, cut_post=cut_post)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
@@ -1271,6 +1279,7 @@ class Channel:
             _description_
         """
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         # idx = (self.df.lazy().with_row_index("Record #").filter(self.good_expr).filter(use_expr).limit(limit).collect())["Record #"]
         # pulses = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         df = (
@@ -1299,7 +1308,7 @@ class Channel:
 
         # Compute mean pulse and dt model as the offset and slope of a linear fit to each pulse sample vs ATime
         idx = df["Record #"]
-        pulse = self.pulseframer.load_raw_pulses(idx)["pulse"].to_numpy()
+        pulse = self.pulseframer.load_raw_pulses(idx)[pulse_col].to_numpy()
         if self.transform_raw is not None:
             pulse = self.transform_raw(pulse)
         avg_pulse = np.zeros(self.n_samples, dtype=float)
@@ -1354,7 +1363,7 @@ class Channel:
         )
         filter_ats = filter_maker.compute_ats(f_3db=f_3db)
         step = OptimalFilterStep(
-            inputs=["pulse"],
+            inputs=[pulse_col],
             output=[peak_x_col, peak_y_col],
             good_expr=self.good_expr,
             use_expr=use_expr,
@@ -1710,7 +1719,7 @@ class Channel:
         df = self.df
         _subframediv = self.subframediv
         if _subframediv is None:
-            _subframediv = 64
+            raise ValueError(f"channel {self.header.ch_num} has unknown subframe divisions")
 
         # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
         if "subframecount" not in df:
@@ -1718,6 +1727,7 @@ class Channel:
 
         assert output_control.require_last or output_control.require_next
         subframe_time_ms = self.frametime_s * 1000.0 / _subframediv
+        df_ext = df_ext.with_columns(pl.col("subframecount").cast(pl.Int64))
 
         df_subframe = df.select("subframecount").with_row_index("_record").sort("subframecount")
         if output_control.require_last:
@@ -1961,6 +1971,7 @@ class Channel:
     def fit_pulse(self, index: int = 0, col: str = "pulse", verbose: bool = True) -> LineModelResult:
         """Fit a single pulse to a 2-exponential-with-tail model, returning the fit result."""
         assert self.pulseframer is not None
+        self.pulseframer.check_rows(len(self.df))
         pulse = self.pulseframer.load_raw_pulses([index])[col].to_numpy()
         if self.transform_raw is not None:
             pulse = self.transform_raw(pulse)
