@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 import pylab as plt
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from numba import njit
@@ -458,12 +459,14 @@ def gather_pulses_from_inds_numpy_contiguous_mmap(
     assert all(inds > npre), "all inds must be greater than npre"
     assert all(inds < (len(data) - nsamples)), "all inds must be less than len(data) - nsamples"
     offsets = inds - npre  # shift by npre to start at correct offset
-    pulses = np.memmap(filename, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
+    partial = str(filename) + ".partial"
+    pulses = np.memmap(partial, dtype=np.int16, mode="w+", shape=(len(offsets), nsamples))
     for i, offset in enumerate(offsets):
         pulses[i, :] = data[offset : offset + nsamples]
     pulses.flush()
     # re-open the mmap to ensure it is read-only
     del pulses
+    os.replace(partial, filename)
     pulses = np.memmap(filename, dtype=np.int16, mode="r", shape=(len(offsets), nsamples))
     return pulses
 
