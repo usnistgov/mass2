@@ -572,7 +572,15 @@ def _fasttrig_filter_trigger_with_cache(
     bin_full_path = Path(bin_path).absolute()
     actual_n_samples = min(len(data), limit_samples)
     filter_hash = hashlib.sha256(np.asarray(filter_in, dtype=np.float64).tobytes()).hexdigest()
-    to_hash_str = "|".join([filter_hash, repr(float(threshold)), str(actual_n_samples), str(bin_full_path)])
+    st = bin_full_path.stat()
+    to_hash_str = "|".join([
+        filter_hash,
+        repr(float(threshold)),
+        str(actual_n_samples),
+        str(bin_full_path),
+        str(st.st_size),
+        str(st.st_mtime_ns),
+    ])
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_trigger_cache.npy"
     cache_dir_path = bin_full_path.parent / "_truebq_bin_cache"
@@ -599,7 +607,8 @@ def gather_pulses_from_inds_numpy_contiguous_mmap_with_cache(
     inds = inds[inds > npre]  # ensure all inds inbounds
     inds = inds[inds < (len(data) - nsamples)]  # ensure all inds inbounds
     inds_hash = hashlib.sha256(inds.tobytes()).hexdigest()
-    to_hash_str = str(npre) + str(nsamples) + str(bin_full_path) + inds_hash
+    st = bin_full_path.stat()
+    to_hash_str = str(npre) + str(nsamples) + str(bin_full_path) + inds_hash + str(st.st_size) + str(st.st_mtime_ns)
     key = hashlib.sha256(to_hash_str.encode()).hexdigest()
     fname = f".{key}.truebq_pulse_cache.npy"
     cache_dir_path = bin_full_path.parent / "_truebq_bin_cache"
