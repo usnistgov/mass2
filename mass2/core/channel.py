@@ -1719,7 +1719,7 @@ class Channel:
         df = self.df
         _subframediv = self.subframediv
         if _subframediv is None:
-            _subframediv = 64
+            raise ValueError(f"channel {self.header.ch_num} has unknown subframe divisions")
 
         # Expect "subframecount" will be in the dataframe for LJH 2.2 files, but have to add it for OFF files:
         if "subframecount" not in df:
