@@ -542,7 +542,7 @@ class EnergyCalibration:
             False,
             donothing,
             donothing,
-            donothing,
+            np.zeros_like,
             donothing,
         )
 
