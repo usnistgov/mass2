@@ -224,7 +224,8 @@ class ColumnAsNumpyMapStep(RecipeStep):
         """Calculate the new column by applying `f` to the input column, returning a new DataFrame."""
         output_col = self.output[0]
         output_segments = []
-        for df_iter in df.select(self.inputs).iter_slices():
+        slices = df.select(self.inputs).iter_slices() if df[self.inputs[0]].dtype.base_type() is pl.Array else [df.select(self.inputs)]
+        for df_iter in slices:
             series1 = df_iter[self.inputs[0]]
             # Have to apply the function differently when series elements are arrays vs scalars
             if series1.dtype.base_type() is pl.Array:
