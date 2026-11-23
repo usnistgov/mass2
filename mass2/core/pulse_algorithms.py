@@ -149,12 +149,10 @@ def _summarize_data(  # noqa: PLR0914
                 break
             k += 1
 
-        if peak_value <= 0 or high_idx < 0:
+        if peak_value <= 0 or high_idx < 0 or high_value <= low_value:
             results["rise_time"][j] = np.nan
-        elif high_value > low_value:
-            results["rise_time"][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
         else:
-            results["rise_time"][j] = timebase
+            results["rise_time"][j] = timebase * (high_idx - low_idx) * peak_value / (high_value - low_value)
 
         if not 0 <= peak_samplenumber <= nSamples - 7:
             results["postpeak_deriv"][j] = np.nan
