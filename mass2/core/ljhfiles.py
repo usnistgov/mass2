@@ -288,19 +288,19 @@ class LJHFile(PulseDataFramer):
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
         s = slice(start, stop, step)
-        return self._load_raw(s)
+        return self._load_raw(s, extra_fields)
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self._load_raw([id])
+        return self._load_raw([id], extra_fields)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return self._load_raw(list(ids))
+        return self._load_raw(list(ids), extra_fields)
 
-    def _load_raw(self, selection: slice | int | list[int]) -> pl.DataFrame:
+    def _load_raw(self, selection: slice | int | list[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
         data = {"pulse": self._mmap["pulse"][selection]}
         schema = pl.Schema({"pulse": pl.Array(pl.UInt16, self.nsamples)})
         df = pl.DataFrame(data, schema=schema)
-        return df
+        return df.with_columns(pl.Series(field, self._mmap[field][selection]) for field in extra_fields)
 
     def to_polars(
         self,

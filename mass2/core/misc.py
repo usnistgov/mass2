@@ -344,13 +344,14 @@ class PulseDataFromNumpy(PulseDataFramer):
 
     def load_raw_chunk(self, start: int, stop: int, step: int = 1, extra_fields: Iterable[str] = []) -> pl.DataFrame:
         stop = min(stop, self.npulses)
-        s = slice(start, stop, step)
-        return pl.DataFrame({"pulse": self.pulses[s]})
+        return self.load_raw_pulses(range(start, stop, step), extra_fields)
 
     def load_raw_pulse(self, id: int, extra_fields: Iterable[str] = []) -> pl.DataFrame:
-        return pl.DataFrame({"pulse": self.pulses[[id]]})
+        return self.load_raw_pulses([id], extra_fields)
 
     def load_raw_pulses(self, ids: Iterable[int], extra_fields: Iterable[str] = []) -> pl.DataFrame:
+        if list(extra_fields):
+            raise ValueError(f"PulseDataFromNumpy has no extra_fields: {list(extra_fields)}")
         return pl.DataFrame({"pulse": self.pulses[list(ids)]})
 
 
