@@ -927,7 +927,7 @@ class Channel:
 
     def with_range_around_median(self, col: str, range_up: float, range_down: float) -> "Channel":
         """Set good_expr to exclude pulses with `col` outside the given range around its median."""
-        med = np.median(self.df[col].to_numpy())
+        med = np.nanmedian(self.df[col].to_numpy())
         return self.with_good_expr(pl.col(col).is_between(med - range_down, med + range_up))
 
     def with_good_expr_below_nsigma_outlier_resistant(

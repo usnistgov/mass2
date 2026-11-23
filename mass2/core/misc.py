@@ -56,7 +56,7 @@ def good_series(df: pl.DataFrame, col: str, good_expr: pl.Expr, use_expr: bool |
 def median_absolute_deviation(x: ArrayLike) -> float:
     """Return the median absolute deviation of the input, unnormalized."""
     x = np.asarray(x)
-    return float(np.median(np.abs(x - np.median(x))))
+    return float(np.nanmedian(np.abs(x - np.nanmedian(x))))
 
 
 def sigma_mad(x: ArrayLike) -> float:
@@ -68,14 +68,14 @@ def sigma_mad(x: ArrayLike) -> float:
 def outlier_resistant_nsigma_above_mid(x: ArrayLike, nsigma: float = 5) -> float:
     """Return the value that is `nsigma` median absolute deviations (MADs) above the median of the input."""
     x = np.asarray(x)
-    mid = float(np.median(x))
+    mid = float(np.nanmedian(x))
     return mid + nsigma * sigma_mad(x)
 
 
 def outlier_resistant_nsigma_range_from_mid(x: ArrayLike, nsigma: float = 5) -> tuple[float, float]:
     """Return the values that are `nsigma` median absolute deviations (MADs) below and above the median of the input"""
     x = np.asarray(x)
-    mid = float(np.median(x))
+    mid = float(np.nanmedian(x))
     smad = sigma_mad(x)
     return mid - nsigma * smad, mid + nsigma * smad
 
