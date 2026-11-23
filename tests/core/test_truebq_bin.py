@@ -33,6 +33,7 @@ def test_trigger_cache_key_separates_threshold_and_length(tmp_path):
     data = np.random.default_rng(3).normal(0, 4, 200_000).astype(np.int16)
     filt = np.r_[-np.ones(5), np.ones(5)] / 5
     bin_path = tmp_path / "x.bin"
+    truebq_bin.write_truebq_bin_file(bin_path, data, sample_rate_hz=1e5)
     truebq_bin._fasttrig_filter_trigger_with_cache(data, filt, 2.0, 123456, bin_path, verbose=False)
     cached = truebq_bin._fasttrig_filter_trigger_with_cache(data, filt, 2.01, 23456, bin_path, verbose=False)
     direct = truebq_bin.fasttrig_filter_trigger(data[:23456].copy(), filt, 2.01, False)
