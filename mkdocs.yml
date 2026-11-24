@@ -5,11 +5,13 @@ nav:
   - Home: index.md
   - Getting started: getting_started.md
   - Demo plot: demo_plot.md
-  - Optimal filtering: filtering.md
+  - Optimal filtering and related topics:
+    - Optimal filtering: filtering.md
+    - Noise modeling: noise_modeling.md
   - Fluorescence lines:
     - Atomic fluorescence: fluorescence.md
     - Line fitting: line_fitting.md
-    - Highly-charge ion lines: hci_lines_from_asd.md
+    - Highly-charged ion lines: hci_lines_from_asd.md
   - X-ray efficiency models: xray_efficiency_models.md
   - Digging deeper:
     - LJH file format: LJHfiles.md
@@ -29,3 +31,15 @@ plugins:
       python:
         options:
           docstring_style: numpy
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+  - javascripts/katex.js
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css
