@@ -2,6 +2,10 @@
 
 ## Mass Version 2 (2025-present)
 
+**2.1.5** November 23, 2026-
+* Add analysis of noise as a moderate-order AR(q) process, with digest, Apache persistence,
+  plottable diagnostics, and automatic order selection based on the noise floor.
+
 **2.1.4** November 23, 2026
 * Change saved analysis recipe use: pickled recipes must be self-signed, or user explicitly
   opts in to loading and running code from an untrusted dill pickle file (issue 184).
