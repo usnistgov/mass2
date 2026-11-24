@@ -317,7 +317,7 @@ class NoiseResult:
         axis: plt.Axes | None = None,
         arb_to_unit_scale_and_label: tuple[int, str] = (1, "arb"),
         sqrt_psd: bool = True,
-        **plotkwarg: dict,
+        **plotkwarg: Any,
     ) -> None:
         """Plot PSD rebinned into logarithmically spaced frequency bins."""
         if axis is None:
@@ -557,7 +557,7 @@ class ARNoiseWhitener:
         build the steady-state causal FIR filter h_fir, and precompute w_hat.
         """
         q = self.selected_order
-        self._startup_filters: list[np.ndarray | None] = [None] * (q + 1)
+        self._startup_filters: list[np.ndarray] = [np.empty(0, dtype=np.float64) for _ in range(q + 1)]
         self._startup_errs = np.zeros(q + 1, dtype=np.float64)
 
         a_cur = self.ar_coeffs.copy()
@@ -593,7 +593,9 @@ class ARNoiseWhitener:
             Z[:, m] = (Y[:, m] + Y[:, :m] @ self._startup_filters[m][::-1]) / np.sqrt(self._startup_errs[m])
 
         if L > q + 1:
-            Z[:, q + 1 :] = signal.lfilter(self._h_fir_uncal, [1.0], Y, axis=1)[:, q + 1 :]
+            filtered = signal.lfilter(self._h_fir_uncal, [1.0], Y, axis=1)
+            assert isinstance(filtered, np.ndarray)
+            Z[:, q + 1 :] = filtered[:, q + 1 :]
         return Z
 
     def _cross_validate(self, demeaned: np.ndarray, n_folds: int) -> tuple[float, np.ndarray, float]:  # noqa: PLR0914
@@ -741,6 +743,7 @@ class ARNoiseWhitener:
         if mode == "toeplitz":
             work = Y_2d - Y_2d[:, :1] if (anchor_first and self.project_offset) else Y_2d
             Z = signal.lfilter(self.toeplitz_fir_taps, [1.0], work, axis=1)
+            assert isinstance(Z, np.ndarray)
         elif mode == "exact_ar":
             Z0 = self._apply_uncal_L_inv(Y_2d)
             if self.project_offset:

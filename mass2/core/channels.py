@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike
 from typing import Any
 import polars as pl
 import pylab as plt
-import matplotlib
+import matplotlib.colors as mplcolors
 import numpy as np
 import joblib
 import traceback
@@ -226,7 +226,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: mplcolors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the optimal filters for the channels in this Channels object.
@@ -237,7 +237,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : mplcolors.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -263,7 +263,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: mplcolors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the average pulses (the signal model) for the channels in this Channels object.
@@ -274,7 +274,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : mplcolors.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -311,7 +311,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: mplcolors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the noise power spectrum for the channels in this Channels object.
@@ -322,7 +322,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : mplcolors.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
@@ -349,7 +349,7 @@ class Channels:
         self,
         limit: int | None = 20,
         channels: list[int] | None = None,
-        colormap: matplotlib.colors.Colormap = plt.cm.viridis,
+        colormap: mplcolors.Colormap = plt.cm.viridis,
         axis: plt.Axes | None = None,
     ) -> None:
         """Plot the noise power autocorrelation for the channels in this Channels object.
@@ -360,7 +360,7 @@ class Channels:
             Plot at most this many filters if not None, by default 20
         channels : list[int] | None, optional
             Plot only channels with numbers in this list if not None, by default None
-        colormap : matplotlib.colors.Colormap, optional
+        colormap : mplcolors.Colormap, optional
             The color scale to use, by default plt.cm.viridis
         axis : plt.Axes | None, optional
             A `plt.Axes` to plot on, or if None a new one, by default None
