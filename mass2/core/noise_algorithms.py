@@ -361,19 +361,60 @@ class NoiseResult:
 
 
 class ARNoiseWhitener:
-    """
-    Data-driven AR(q) noise modeler and matrix-free whitener for pulses of length p >> q.
+    """Data-driven AR(q) noise modeler and matrix-free whitener for pulses of length `p >> q`.
 
-    Features:
-      - De-means N training sequences (each of length >= p) and fits a pooled Burg AR model
-        in O(N_seq * L_seq * log(q_max) + N_seq * q_max^2 + q_max^3) time.
-      - Automatically selects order q <= max_order (<= 256) where higher orders only fit noise.
-      - Exact O(p * q) matrix-free Cholesky + offset-invariant GLS whitening for length-p pulses,
-        plus calibrated parameter uncertainty prediction.
-      - Causal lower-triangular Toeplitz FIR whitening for vectors of length > p.
-      - Stores a full noise digest (autocorrelation to lag p-1, AR(q) PSD, Welch PSD, and
-        held-out whitened residual ACF) and plots diagnostic figures.
-      - Serializes/deserializes single or multiple models as rows in Parquet or Arrow IPC files.
+    * De-means `n_sequences` training sequences (each of length `>= p`) and fits a pooled Burg AR model
+      in `O(n_sequences * seq_length * log(max_order) + n_sequences * max_order^2 + max_order^3)` time.
+    * Automatically selects model order `q <= max_order` (`<= 256`) where higher orders only fit noise.
+    * Provides exact `O(p * q)` matrix-free Cholesky + offset-invariant GLS whitening for length-`p`
+      pulses, as well as calibrated linear parameter uncertainty predictions.
+    * Provides causal lower-triangular Toeplitz FIR (and exact AR) whitening for vectors of length `> p`.
+    * Builds a comprehensive noise digest (autocorrelation to lag `p - 1`, AR(q) PSD, direct Welch PSD,
+      and out-of-sample whitened residual autocorrelation) with 4-panel Matplotlib diagnostics.
+    * Supports atomic single-row and multi-row persistence in Parquet and Apache Arrow IPC files.
+
+    Attributes
+    ----------
+    pulse_length : int
+        Target pulse record length `p`.
+    selected_order : int
+        Automatically chosen AR model order `q` (`1 <= q <= max_order`).
+    max_order : int
+        Maximum candidate AR model order evaluated during Burg fitting.
+    sample_rate : float
+        Sampling frequency in Hz.
+    project_offset : bool
+        Whether length-`p` whitening projects out the constant-offset subspace.
+    n_sequences : int
+        Number of training noise sequences passed to the constructor.
+    sequence_length : int
+        Sample length of each training noise sequence.
+    label : str
+        Optional human-readable identifier for this noise model.
+    model_id : str
+        Unique string identifier (UUID4 by default) for archiving and lookup.
+    created_at : str
+        ISO-8601 UTC timestamp recorded when the model was constructed.
+    metadata : dict[str, Any]
+        Arbitrary JSON-serializable metadata dictionary associated with this model.
+    reflection_coeffs : np.ndarray
+        Pooled Burg reflection coefficients `kappa[0 .. max_order]` (`kappa[0] == 0.0`).
+    innovation_vars_by_order : np.ndarray
+        One-step prediction error variance `E[0 .. max_order]` across candidate orders.
+    noise_floor_kappa : float
+        Theoretical white-noise standard deviation `1 / sqrt(N_eff)` of the reflection coefficients.
+    ar_coeffs : np.ndarray
+        Fitted AR(q) polynomial coefficients `[1.0, a_1, ..., a_q]` of shape `(q + 1,)`.
+    innovation_var : float
+        Uncalibrated one-step innovation variance `E_q` at the selected order `q`.
+    calibration_alpha : float
+        Out-of-sample cross-validated scale calibration factor applied during whitening.
+    w_hat : np.ndarray | None
+        Unit-norm whitened constant vector `L^-1 1 / ||L^-1 1||` of shape `(p,)` when
+        `project_offset=True`, or `None` when `project_offset=False`.
+    digest : dict[str, Any]
+        Summary statistics, calibrated autocovariance/autocorrelation out to lag `p - 1`,
+        one-sided AR(q) and Welch PSD arrays, and whitened residual autocorrelation diagnostics.
     """
 
     def __init__(  # noqa: PLR0917
@@ -390,6 +431,43 @@ class ARNoiseWhitener:
         model_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
+        """Fit an AR(q) noise model from de-meaned training sequences and build whitening operators.
+
+        Parameters
+        ----------
+        sequences : np.ndarray
+            Noise training data of shape `(n_sequences, seq_length)` or 1D `(seq_length,)`, where
+            `seq_length >= pulse_length`. Each sequence is de-meaned individually before fitting.
+        pulse_length : int
+            Target pulse record length `p` (`p >= 16` and `p > max_order`).
+        max_order : int, optional
+            Maximum candidate AR order `q_max` (`1 <= max_order <= 256`), by default 256
+        sample_rate : float, optional
+            Sampling frequency in Hz used for PSD frequency axes and scaling, by default 1.0
+        project_offset : bool, optional
+            If `True`, project out the constant-offset direction in whitened space so pulse
+            whitening and parameter estimates are invariant to additive DC shifts, by default True
+        calibrate : bool, optional
+            If `True` and `n_sequences >= 2`, run K-fold cross-validation across sequences to
+            calibrate the global variance scale `calibration_alpha`, by default True
+        n_folds : int, optional
+            Number of cross-validation folds used when `calibrate=True`, by default 5
+        n_psd_bins : int, optional
+            FFT length used to evaluate the one-sided AR(q) PSD in `self.digest`, by default 8192
+        label : str, optional
+            Optional human-readable label stored with the model and shown in plots, by default ""
+        model_id : str | None, optional
+            Explicit unique identifier for persistence; auto-generated UUID4 if `None`, by default None
+        metadata : dict[str, Any] | None, optional
+            Optional JSON-serializable metadata dictionary stored alongside the model, by default None
+
+        Raises
+        ------
+        ValueError
+            If `sequences` is not 1D or 2D, `pulse_length < 16`, `seq_length < pulse_length`,
+            `max_order` is outside `[1, 256]`, `pulse_length <= max_order`, or input sequences have
+            zero variance after de-meaning.
+        """
         seqs = np.asarray(sequences, dtype=np.float64)
         if seqs.ndim == 1:
             seqs = seqs[None, :]
@@ -456,9 +534,33 @@ class ARNoiseWhitener:
 
     @staticmethod
     def _fit_pooled_burg_all_orders(demeaned: np.ndarray, max_order: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:  # noqa: PLR0914
-        """
-        Pool Burg reflection coefficient updates across all de-meaned sequences in
-        O(N_seq * L_seq * log(max_order) + N_seq * max_order^2 + max_order^3) time.
+        """Fit pooled Burg reflection coefficients and AR polynomials for orders `1 .. max_order`.
+
+        Combines overlap-save block-FFT autocorrelation with exact boundary Gram matrix
+        corrections so the result matches standard sample-domain Burg recursion to machine
+        precision in `O(S * N * log(q_max) + S * q_max^2 + q_max^3)` time.
+
+        Parameters
+        ----------
+        demeaned : np.ndarray
+            Zero-mean training noise array of shape `(n_sequences, seq_length)`.
+        max_order : int
+            Maximum AR model order `q_max` to compute.
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray, np.ndarray, float]
+            - `a_hist`: Lower-triangular array of shape `(q_max + 1, q_max + 1)` where row `m`
+              holds `[1.0, a_1^(m), ..., a_m^(m), 0, ...]`.
+            - `errs`: One-step prediction error variances `E[0 .. q_max]` of shape `(q_max + 1,)`.
+            - `kappas`: Pooled reflection coefficients `kappa[0 .. q_max]` of shape `(q_max + 1,)`.
+            - `noise_floor_kappa`: Expected white-noise standard deviation `1 / sqrt(N_eff)` of
+              individual reflection coefficients.
+
+        Raises
+        ------
+        ValueError
+            If the pooled zero-lag variance `errs[0]` is not strictly positive.
         """
         S, N = demeaned.shape
         q_max = min(max_order, N - 1)
@@ -535,9 +637,26 @@ class ARNoiseWhitener:
         window: int = 16,
         single_lag_z: float = 3.6,
     ) -> int:
-        """
-        Choose q <= max_order by finding the last lag where reflection coefficients
-        exceed white-noise fluctuations (via isolated spike check or forward-block RMS).
+        """Select the AR order `q <= max_order` where higher-order reflection coefficients only fit noise.
+
+        Finds the largest lag `m` where either `|kappa[m]|` exceeds `single_lag_z * noise_floor_kappa`
+        or the forward `window`-lag block RMS of `kappa` exceeds its white-noise fluctuation threshold.
+
+        Parameters
+        ----------
+        kappas : np.ndarray
+            Reflection coefficients `kappa[0 .. q_max]` of shape `(q_max + 1,)`.
+        noise_floor_kappa : float
+            Asymptotic white-noise standard deviation `1 / sqrt(N_eff)` of `kappa[m]`.
+        window : int, optional
+            Forward lookahead block length used to detect sustained exponential tails, by default 16
+        single_lag_z : float, optional
+            Z-score threshold for isolated reflection coefficient spikes, by default 3.6
+
+        Returns
+        -------
+        int
+            Selected model order `q` (`1 <= q <= len(kappas) - 1`).
         """
         q_max = len(kappas) - 1
         selected_q = 1
@@ -552,10 +671,7 @@ class ARNoiseWhitener:
         return selected_q
 
     def _build_operator_state(self) -> None:
-        """
-        Recover exact Levinson-Durbin step-down startup filters (orders 0 .. q),
-        build the steady-state causal FIR filter h_fir, and precompute w_hat.
-        """
+        """Reconstruct Levinson-Durbin step-down startup filters, steady-state FIR taps, and `w_hat`."""
         q = self.selected_order
         self._startup_filters: list[np.ndarray] = [np.empty(0, dtype=np.float64) for _ in range(q + 1)]
         self._startup_errs = np.zeros(q + 1, dtype=np.float64)
@@ -580,9 +696,17 @@ class ARNoiseWhitener:
             self.w_hat = None
 
     def _apply_uncal_L_inv(self, Y: np.ndarray) -> np.ndarray:
-        """
-        Apply exact inverse Cholesky L_inv of the AR(q) Toeplitz covariance to
-        batch Y of shape (M, L) (where L >= q + 1) in O(M * L * q) time.
+        """Apply the uncalibrated lower-triangular inverse Cholesky factor `L^-1` to a 2D batch.
+
+        Parameters
+        ----------
+        Y : np.ndarray
+            2D array of shape `(batch_size, length)` with `length >= selected_order + 1`.
+
+        Returns
+        -------
+        np.ndarray
+            Uncalibrated whitened array `Z0 = Y @ L^-T` of shape `(batch_size, length)`.
         """
         _, L = Y.shape
         q = self.selected_order
@@ -599,9 +723,21 @@ class ARNoiseWhitener:
         return Z
 
     def _cross_validate(self, demeaned: np.ndarray, n_folds: int) -> tuple[float, np.ndarray, float]:  # noqa: PLR0914
-        """
-        Out-of-sample K-fold cross-validation to calibrate global scale alpha
-        and measure whitened residual autocorrelation on unseen length-p windows.
+        """Run K-fold cross-validation across sequences to calibrate scale and check residual whiteness.
+
+        Parameters
+        ----------
+        demeaned : np.ndarray
+            Zero-mean training noise array of shape `(n_sequences, seq_length)`.
+        n_folds : int
+            Number of folds (`2 <= n_folds <= n_sequences`) to split sequences across.
+
+        Returns
+        -------
+        tuple[float, np.ndarray, float]
+            - `alpha`: Empirical out-of-sample variance scale factor `E[||z||^2] / dof`.
+            - `acf`: Sample autocorrelation of whitened validation windows up to `min(p - 1, 512)`.
+            - `bound`: Approximate 95% white-noise confidence bound `2 / sqrt(M * (p - 1))`.
         """
         p = self.pulse_length
         folds = np.array_split(demeaned, n_folds, axis=0)
@@ -641,6 +777,19 @@ class ARNoiseWhitener:
         return alpha, acf, bound
 
     def _evaluate_whitened_acf(self, demeaned: np.ndarray) -> tuple[np.ndarray, float]:
+        """Compute in-sample whitened residual autocorrelation when cross-validation is skipped.
+
+        Parameters
+        ----------
+        demeaned : np.ndarray
+            Zero-mean training noise array of shape `(n_sequences, seq_length)`.
+
+        Returns
+        -------
+        tuple[np.ndarray, float]
+            - `acf`: Sample autocorrelation of whitened length-`p` windows.
+            - `bound`: Approximate 95% white-noise confidence bound `2 / sqrt(M * (p - 1))`.
+        """
         p = self.pulse_length
         n_win = demeaned.shape[1] // p
         wins = demeaned[:, : n_win * p].reshape(-1, p)
@@ -649,6 +798,21 @@ class ARNoiseWhitener:
 
     @staticmethod
     def _compute_batch_acf(Z: np.ndarray, max_lag: int) -> tuple[np.ndarray, float]:
+        """Compute the pooled sample autocorrelation across rows of a whitened batch `Z`.
+
+        Parameters
+        ----------
+        Z : np.ndarray
+            2D array of whitened windows of shape `(n_windows, pulse_length)`.
+        max_lag : int
+            Maximum lag `k` to evaluate (`0 <= k <= pulse_length - 1`).
+
+        Returns
+        -------
+        tuple[np.ndarray, float]
+            - `acf`: Normalized sample autocorrelation vector of shape `(max_lag + 1,)`.
+            - `bound`: Approximate 95% white-noise confidence bound `2 / sqrt(M * (p - 1))`.
+        """
         M, p = Z.shape
         Z_c = Z - np.mean(Z, axis=1, keepdims=True)
         var0 = float(np.mean(Z_c * Z_c))
@@ -663,9 +827,25 @@ class ARNoiseWhitener:
     # ------------------------------------------------------------------
 
     def whiten(self, y: np.ndarray) -> np.ndarray:
-        """
-        (a) Apply calibrated, offset-invariant AR(q) Cholesky whitening to vectors
-        of length p (shape (p,) or (batch, p)) in O(p * q) operations.
+        """Apply calibrated, offset-invariant AR(q) Cholesky whitening to vectors of length `p`.
+
+        Executes in `O(p * q)` time per record without materializing a `p x p` matrix.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Input pulse or noise record(s) of shape `(pulse_length,)` or
+            `(batch_size, pulse_length)`.
+
+        Returns
+        -------
+        np.ndarray
+            Whitened array with the exact same shape as `y`.
+
+        Raises
+        ------
+        ValueError
+            If `y` is not 1D or 2D, or its trailing dimension does not equal `self.pulse_length`.
         """
         arr = np.asarray(y, dtype=np.float64)
         is_1d = arr.ndim == 1
@@ -680,10 +860,31 @@ class ARNoiseWhitener:
         return Z[0] if is_1d else Z
 
     def fit_linear_model(self, y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Generalized Least Squares (GLS) estimation of linear parameters beta and
-        calibrated parameter covariance Cov(beta) for a length-p pulse y and
-        design matrix X of shape (p, n_params).
+        """Estimate linear model parameters and calibrated covariance via Generalized Least Squares.
+
+        Solves `min_beta ||W (y - X beta)||_2^2` where `W` is the calibrated, offset-invariant
+        AR(q) whitening operator.
+
+        Parameters
+        ----------
+        y : np.ndarray
+            Observed record of shape `(pulse_length,)`.
+        X : np.ndarray
+            Linear design matrix of shape `(pulse_length, n_params)` whose columns are model
+            templates (e.g., pulse shapes or sinusoids).
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            - `beta_hat`: Optimal GLS parameter estimates of shape `(n_params,)`.
+            - `cov_beta`: Predicted calibrated parameter covariance `(W_X^T W_X)^-1` of shape
+              `(n_params, n_params)`.
+
+        Raises
+        ------
+        ValueError
+            If `X` is not 2D with first dimension equal to `self.pulse_length`, or `y` does not
+            have length `self.pulse_length`.
         """
         X_arr = np.asarray(X, dtype=np.float64)
         if X_arr.ndim != 2 or X_arr.shape[0] != self.pulse_length:
@@ -695,7 +896,23 @@ class ARNoiseWhitener:
         return beta_hat, cov_beta
 
     def predict_parameter_cov(self, X: np.ndarray) -> np.ndarray:
-        """Predict calibrated parameter error covariance Cov(beta_hat) = (W_X^T W_X)^-1."""
+        """Predict the calibrated GLS parameter error covariance matrix for design matrix `X`.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Linear design matrix of shape `(pulse_length, n_params)`.
+
+        Returns
+        -------
+        np.ndarray
+            Predicted parameter covariance matrix `(W_X^T W_X)^-1` of shape `(n_params, n_params)`.
+
+        Raises
+        ------
+        ValueError
+            If `X` is not 2D with first dimension equal to `self.pulse_length`.
+        """
         X_arr = np.asarray(X, dtype=np.float64)
         if X_arr.ndim != 2 or X_arr.shape[0] != self.pulse_length:
             raise ValueError(f"Design matrix X must have shape ({self.pulse_length}, n_params).")
@@ -708,9 +925,13 @@ class ARNoiseWhitener:
 
     @property
     def toeplitz_fir_taps(self) -> np.ndarray:
-        """
-        Calibrated causal FIR tap vector h (length q + 1) defining the lower-triangular
-        Toeplitz approximate whitening operator (T_h y)_t = sum_{k=0}^q h_k y_{t-k}.
+        """Return the calibrated causal FIR tap vector defining the lower-triangular Toeplitz whitener.
+
+        Returns
+        -------
+        np.ndarray
+            1D tap array `h = [1, a_1, ..., a_q] / sqrt(alpha * E_q)` of shape `(selected_order + 1,)`
+            such that `(T_h y)_t = sum_{k=0}^q h_k y_{t-k}`.
         """
         return self._h_fir_uncal / np.sqrt(self.calibration_alpha)
 
@@ -720,19 +941,33 @@ class ARNoiseWhitener:
         mode: Literal["toeplitz", "exact_ar"] = "toeplitz",
         anchor_first: bool = True,
     ) -> np.ndarray:
-        """
-        (b) Whiten vectors of arbitrary length M >= p (shape (M,) or (batch, M)).
+        """Whiten vectors of arbitrary length `M >= p` using Toeplitz FIR or exact AR Cholesky filtering.
 
         Parameters
         ----------
-        mode : {"toeplitz", "exact_ar"}
-            - "toeplitz": Applies the calibrated lower-triangular Toeplitz causal FIR
-              whitener T_h in O(M * q) time. When `anchor_first=True` and
-              `self.project_offset=True`, subtracts y[..., 0] first so constant offsets
-              do not trigger a t=0 step-jump transient.
-            - "exact_ar": Applies the exact AR(q) startup Cholesky rows for t <= q and
-              continues with the causal FIR filter for t > q, followed by rank-1 offset
-              projection if `self.project_offset=True`.
+        y : np.ndarray
+            Input record(s) of shape `(M,)` or `(batch_size, M)` with `M >= self.pulse_length`.
+        mode : {"toeplitz", "exact_ar"}, optional
+            Whitening operator mode, by default "toeplitz":
+            - `"toeplitz"`: Applies the calibrated lower-triangular Toeplitz causal FIR filter
+              `T_h` in `O(M * q)` time.
+            - `"exact_ar"`: Applies the exact AR(q) startup Cholesky rows for `t <= q`, continues
+              with the causal FIR filter for `t > q`, and applies a rank-1 constant-offset
+              projection over length `M` when `self.project_offset=True`.
+        anchor_first : bool, optional
+            When `mode="toeplitz"` and `self.project_offset=True`, subtract `y[..., 0]` from each
+            record before filtering so large constant pedestals do not trigger a `t = 0` step-jump
+            transient, by default True
+
+        Returns
+        -------
+        np.ndarray
+            Whitened array with the exact same shape as `y`.
+
+        Raises
+        ------
+        ValueError
+            If `y` has length `< self.pulse_length`, is not 1D or 2D, or `mode` is unrecognized.
         """
         arr = np.asarray(y, dtype=np.float64)
         is_1d = arr.ndim == 1
@@ -767,7 +1002,26 @@ class ARNoiseWhitener:
         whitened_acf: np.ndarray,
         whitened_acf_bound: float,
     ) -> dict[str, Any]:
-        """Compute autocorrelation to length p, AR(q) PSD, and Welch-windowed direct PSD."""
+        """Compute the noise analysis digest (autocorrelation to length `p`, AR(q) PSD, and Welch PSD).
+
+        Parameters
+        ----------
+        demeaned : np.ndarray
+            Zero-mean training noise array of shape `(n_sequences, seq_length)`.
+        n_psd_bins : int
+            FFT length used to evaluate the parametric AR(q) PSD.
+        whitened_acf : np.ndarray
+            Whitened residual autocorrelation array from cross-validation or training evaluation.
+        whitened_acf_bound : float
+            Approximate 95% white-noise confidence bound for `whitened_acf`.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary containing scalar summary metrics (`rms_noise`, `innovation_std`,
+            `spectral_dynamic_range_db`, etc.) and 1D arrays (`lags`, `autocov`, `autocorr`,
+            `freqs_ar`, `psd_ar`, `freqs_welch`, `psd_welch`, `whitened_acf`).
+        """
         p = self.pulse_length
         q = self.selected_order
         fs = self.sample_rate
@@ -846,12 +1100,27 @@ class ARNoiseWhitener:
         figsize: tuple[float, float] = (13.0, 8.5),
         max_acf_lag: int | None = None,
     ) -> tuple[matplotlib.figure.Figure, np.ndarray]:
-        """
-        (d) Plot a 4-panel diagnostic summary from `self.digest`:
-          1. Direct Welch PSD vs. AR(q) model PSD
-          2. Model autocorrelation rho[k] out to length p
-          3. Burg reflection coefficients |kappa_m| & automatic order cutoff q
-          4. Out-of-sample whitened residual autocorrelation with 95% confidence bounds
+        """Generate a 4-panel Matplotlib diagnostic figure from `self.digest`.
+
+        Panels:
+          1. Direct Welch PSD vs. parametric AR(q) model PSD.
+          2. Model autocorrelation `rho[k]` out to `max_acf_lag` (or `pulse_length`).
+          3. Burg reflection coefficient magnitudes `|kappa_m|` and automatic order cutoff `q`.
+          4. Out-of-sample whitened residual autocorrelation with 95% confidence bounds.
+
+        Parameters
+        ----------
+        figsize : tuple[float, float], optional
+            Figure width and height in inches, by default (13.0, 8.5)
+        max_acf_lag : int | None, optional
+            Maximum lag shown in the model autocorrelation panel; defaults to `self.pulse_length`
+            when `None`, by default None
+
+        Returns
+        -------
+        tuple[matplotlib.figure.Figure, np.ndarray]
+            - `fig`: Created Matplotlib `Figure` instance.
+            - `axes`: 2x2 NumPy object array of Matplotlib `Axes`.
         """
         d = self.digest
         q = d["selected_order"]
@@ -946,6 +1215,14 @@ class ARNoiseWhitener:
 
     @staticmethod
     def _arrow_schema() -> pa.Schema:
+        """Return the Apache Arrow schema used for Parquet and IPC multi-row serialization.
+
+        Returns
+        -------
+        pa.Schema
+            Arrow schema containing scalar metadata/summary columns and `list<float64>` /
+            `list<int64>` array columns for model parameters and digest curves.
+        """
         return pa.schema([
             ("model_id", pa.string()),
             ("label", pa.string()),
@@ -980,7 +1257,14 @@ class ARNoiseWhitener:
         ])
 
     def to_row_dict(self) -> dict[str, Any]:
-        """Serialize this model and its complete digest into a single Arrow-compatible row."""
+        """Serialize this whitener and its full digest into a single Arrow-compatible row dict.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary mapping each column name in `_arrow_schema()` to Python primitives or
+            lists ready for `pa.Table.from_pylist`.
+        """
         d = self.digest
         return {
             "model_id": self.model_id,
@@ -1017,7 +1301,18 @@ class ARNoiseWhitener:
 
     @classmethod
     def from_row_dict(cls, row: dict[str, Any]) -> ARNoiseWhitener:
-        """Reconstruct an `ARNoiseWhitener` instance from a deserialized row dictionary."""
+        """Reconstruct an `ARNoiseWhitener` instance from a deserialized row dictionary.
+
+        Parameters
+        ----------
+        row : dict[str, Any]
+            Row dictionary matching the schema returned by `to_row_dict()`.
+
+        Returns
+        -------
+        ARNoiseWhitener
+            Reconstructed whitener with operator filters and `digest` restored.
+        """
         obj = object.__new__(cls)
         obj.model_id = str(row["model_id"])
         obj.label = str(row["label"])
@@ -1067,6 +1362,20 @@ class ARNoiseWhitener:
 
     @staticmethod
     def _infer_format(path: Path, fmt: Literal["parquet", "ipc"] | None) -> Literal["parquet", "ipc"]:
+        """Resolve the storage format (`"parquet"` or `"ipc"`) from an explicit flag or file suffix.
+
+        Parameters
+        ----------
+        path : Path
+            Target file path.
+        fmt : {"parquet", "ipc"} | None
+            Explicit format override, or `None` to infer from `path.suffix`.
+
+        Returns
+        -------
+        Literal["parquet", "ipc"]
+            Resolved serialization format.
+        """
         if fmt is not None:
             return fmt
         suffix = path.suffix.lower()
@@ -1076,6 +1385,20 @@ class ARNoiseWhitener:
 
     @classmethod
     def _read_table(cls, path: Path, fmt: Literal["parquet", "ipc"]) -> pa.Table:
+        """Read a `pyarrow.Table` from a Parquet or Arrow IPC file on disk.
+
+        Parameters
+        ----------
+        path : Path
+            Path to the existing archive file.
+        fmt : {"parquet", "ipc"}
+            Storage format of the file.
+
+        Returns
+        -------
+        pa.Table
+            Loaded Arrow table containing one or more serialized model rows.
+        """
         if fmt == "parquet":
             return pq.read_table(path)
         with pa.OSFile(str(path), "rb") as source:
@@ -1084,6 +1407,17 @@ class ARNoiseWhitener:
 
     @classmethod
     def _write_table_atomic(cls, table: pa.Table, path: Path, fmt: Literal["parquet", "ipc"]) -> None:
+        """Atomically write a `pyarrow.Table` to `path` via a temporary file and `os.replace`.
+
+        Parameters
+        ----------
+        table : pa.Table
+            Arrow table to persist.
+        path : Path
+            Destination file path.
+        fmt : {"parquet", "ipc"}
+            Target serialization format (`"parquet"` with zstd compression or `"ipc"`).
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
         os.close(fd)
@@ -1107,9 +1441,18 @@ class ARNoiseWhitener:
         fmt: Literal["parquet", "ipc"] | None = None,
         append: bool = True,
     ) -> None:
-        """
-        (e, f) Store this model as a row in a Parquet or Arrow IPC file.
-        When `append=True` and the file already exists, appends a new row atomically.
+        """Store this model as a row in a Parquet or Arrow IPC file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Destination file path.
+        fmt : {"parquet", "ipc"} | None, optional
+            Storage format (`"parquet"` or `"ipc"`), or `None` to infer from the file extension
+            (`.arrow`, `.ipc`, `.feather` -> `"ipc"`; otherwise `"parquet"`), by default None
+        append : bool, optional
+            If `True` and `path` already exists, concatenate this row onto existing rows; if
+            `False`, overwrite `path`, by default True
         """
         self.save_many([self], path=path, fmt=fmt, append=append)
 
@@ -1121,11 +1464,20 @@ class ARNoiseWhitener:
         fmt: Literal["parquet", "ipc"] | None = None,
         append: bool = False,
     ) -> None:
-        """
-        (f) Store multiple `ARNoiseWhitener` instances as rows in a single Parquet
-        or Arrow IPC file (optionally appending to existing rows).
-        """
+        """Store multiple `ARNoiseWhitener` instances as rows in a single Parquet or Arrow IPC file.
 
+        Parameters
+        ----------
+        models : Iterable[ARNoiseWhitener]
+            Iterable of `ARNoiseWhitener` objects to serialize. If empty, no file is written.
+        path : str | Path
+            Destination file path.
+        fmt : {"parquet", "ipc"} | None, optional
+            Storage format (`"parquet"` or `"ipc"`), or `None` to infer from `path`, by default None
+        append : bool, optional
+            If `True` and `path` already exists, append new rows to existing rows; if `False`,
+            overwrite `path`, by default False
+        """
         target = Path(path)
         resolved_fmt = cls._infer_format(target, fmt)
         rows = [m.to_row_dict() for m in models]
@@ -1150,11 +1502,37 @@ class ARNoiseWhitener:
         label: str | None = None,
         fmt: Literal["parquet", "ipc"] | None = None,
     ) -> ARNoiseWhitener:
-        """
-        (e) Recover a single `ARNoiseWhitener` from a Parquet or Arrow IPC file
-        by row index (default `-1`, the most recently appended row), `model_id`, or `label`.
-        """
+        """Recover a single `ARNoiseWhitener` from a Parquet or Arrow IPC file.
 
+        Lookup precedence: `model_id` (exact match) -> `label` (most recent match) -> `row` index.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the Parquet or Arrow IPC file.
+        row : int, optional
+            Zero-based row index (supports negative indexing) used when neither `model_id` nor
+            `label` is given, by default -1
+        model_id : str | None, optional
+            Exact `model_id` UUID string to select, by default None
+        label : str | None, optional
+            Exact `label` string to select (returns the last matching row if multiple rows share
+            the same label), by default None
+        fmt : {"parquet", "ipc"} | None, optional
+            Storage format override, or `None` to infer from `path`, by default None
+
+        Returns
+        -------
+        ARNoiseWhitener
+            Reconstructed `ARNoiseWhitener` instance.
+
+        Raises
+        ------
+        KeyError
+            If `model_id` or `label` is specified and no matching row exists in the file.
+        IndexError
+            If `row` is out of bounds for the number of rows in the file.
+        """
         target = Path(path)
         resolved_fmt = cls._infer_format(target, fmt)
         table = cls._read_table(target, resolved_fmt)
@@ -1187,7 +1565,20 @@ class ARNoiseWhitener:
         path: str | Path,
         fmt: Literal["parquet", "ipc"] | None = None,
     ) -> list[ARNoiseWhitener]:
-        """(f) Recover all stored `ARNoiseWhitener` rows from a Parquet or Arrow IPC file."""
+        """Recover all stored `ARNoiseWhitener` rows from a Parquet or Arrow IPC file.
+
+        Parameters
+        ----------
+        path : str | Path
+            Path to the Parquet or Arrow IPC file.
+        fmt : {"parquet", "ipc"} | None, optional
+            Storage format override, or `None` to infer from `path`, by default None
+
+        Returns
+        -------
+        list[ARNoiseWhitener]
+            List of reconstructed `ARNoiseWhitener` instances in row order.
+        """
         target = Path(path)
         resolved_fmt = cls._infer_format(target, fmt)
         table = cls._read_table(target, resolved_fmt)
