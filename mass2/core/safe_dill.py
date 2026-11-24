@@ -61,7 +61,7 @@ def get_or_create_signing_key(key_path: str | Path | None = None) -> bytes:
     path.parent.mkdir(parents=True, exist_ok=True)
     key = secrets.token_bytes(32)
 
-    try:
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:
             os.write(fd, key)
