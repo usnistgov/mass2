@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 import pytest
-from scipy import signal
+from scipy import linalg, signal
 
 from mass2.core.noise_algorithms import ARNoiseWhitener
 
@@ -349,6 +349,89 @@ def test_shape_mismatch_errors(arma22_noise_setup: dict[str, object]) -> None:
 
     with pytest.raises(ValueError, match="Design matrix X"):
         model.fit_linear_model(np.zeros(p), np.zeros((p + 1, 2)))
+
+
+def test_optimal_fitter_matches_explicit_pinv_and_gls(  # ruff: ignore[too-many-locals]
+    arma22_noise_setup: dict[str, object],
+) -> None:
+    model: ARNoiseWhitener = arma22_noise_setup["model"]  # type: ignore[assignment]
+    sigma_w: float = arma22_noise_setup["sigma_w"]  # type: ignore[assignment]
+    fs: float = arma22_noise_setup["fs"]  # type: ignore[assignment]
+    p: int = arma22_noise_setup["p"]  # type: ignore[assignment]
+
+    # 3-component linear model matrix M of shape (p, 3)
+    t = np.arange(p) / fs
+    dt = np.maximum(0.0, t - 200 / fs)
+    active = (t >= 200 / fs).astype(np.float64)
+    comp1 = active * (np.exp(-dt / 200e-6) - np.exp(-dt / 12e-6))
+    comp2 = active * (np.exp(-dt / 75e-6) - np.exp(-dt / 12e-6))
+    comp3 = np.sin(2.0 * np.pi * 6_000.0 * t)
+    M = np.column_stack([comp1, comp2, comp3])
+    n_comp = M.shape[1]
+
+    F = model.optimal_fitter(M)
+    assert F.shape == (n_comp, p)
+
+    # 1. Exact agreement with explicit p x p matrix product pinv(W @ M) @ W
+    W_explicit = model.whiten(np.eye(p))
+    F_explicit = np.linalg.pinv(W_explicit @ M) @ W_explicit
+    assert np.allclose(F, F_explicit, atol=1e-12)
+
+    # 2. Left-inverse property on noiseless signals and annihilation of constant offsets
+    assert np.allclose(F @ M, np.eye(n_comp), atol=1e-11)
+    assert np.allclose(F @ np.ones(p), np.zeros(n_comp), atol=1e-11)
+
+    # 3. Exact agreement with fit_linear_model on 1D pulse and 2D batch of column pulses
+    rng = np.random.default_rng(707)
+    noise_batch, _, _ = simulate_arma22_lowpass_noise(rng, n_seqs=25, seq_len=p, fs=fs, sigma_w=sigma_w, add_dc_offsets=True)
+    beta_true = np.array([3.2, -1.1, 0.45])
+    Y_cols = noise_batch.T + (M @ beta_true)[:, None]  # shape (p, 25)
+
+    betas_batch = F @ Y_cols
+    assert betas_batch.shape == (n_comp, 25)
+    assert np.allclose(F @ Y_cols[:, 0], betas_batch[:, 0])
+    assert np.allclose(F @ (Y_cols + 15_000.0), betas_batch, atol=1e-9)
+
+    for i in range(5):
+        beta_gls, _ = model.fit_linear_model(Y_cols[:, i], M)
+        assert np.allclose(betas_batch[:, i], beta_gls, atol=1e-11)
+
+    # 4. Covariance propagation F @ Gamma_cal @ F.T == predict_parameter_cov(M)
+    Gamma_cal = linalg.toeplitz(model.digest["autocov"])
+    cov_propagated = F @ Gamma_cal @ F.T
+    cov_predicted = model.predict_parameter_cov(M)
+    assert np.allclose(cov_propagated, cov_predicted, atol=1e-11)
+
+
+def test_optimal_fitter_rank_deficient_and_no_offset_projection() -> None:
+    rng = np.random.default_rng(808)
+    p = 512
+    fs = 250_000.0
+    seqs, _, _ = simulate_arma22_lowpass_noise(rng, n_seqs=12, seq_len=4 * p, fs=fs)
+
+    # Without offset projection: verify exact match vs explicit pinv(W @ M) @ W
+    model_no_proj = ARNoiseWhitener(sequences=seqs, pulse_length=p, max_order=64, sample_rate=fs, project_offset=False)
+    t = np.arange(p) / fs
+    M_with_dc = np.column_stack([np.exp(-t / 100e-6), np.ones(p)])
+    F_no_proj = model_no_proj.optimal_fitter(M_with_dc)
+    W_no_proj = model_no_proj.whiten(np.eye(p))
+    assert np.allclose(F_no_proj, np.linalg.pinv(W_no_proj @ M_with_dc) @ W_no_proj, atol=1e-12)
+    assert np.allclose(F_no_proj @ M_with_dc, np.eye(2), atol=1e-11)
+
+    # With offset projection: constant column is in nullspace of W, pseudoinverse handles it cleanly
+    model_proj = ARNoiseWhitener(sequences=seqs, pulse_length=p, max_order=64, sample_rate=fs, project_offset=True)
+    F_proj = model_proj.optimal_fitter(M_with_dc)
+    assert F_proj.shape == (2, p)
+    assert np.allclose(F_proj[1], np.zeros(p), atol=1e-11)
+    assert np.isclose(F_proj[0] @ M_with_dc[:, 0], 1.0, atol=1e-11)
+
+    # Input shape validation
+    with pytest.raises(ValueError, match="Model matrix M"):
+        model_proj.optimal_fitter(np.ones(p))
+    with pytest.raises(ValueError, match="Model matrix M"):
+        model_proj.optimal_fitter(np.ones((p + 1, 2)))
+    with pytest.raises(ValueError, match="Model matrix M"):
+        model_proj.optimal_fitter(np.empty((p, 0)))
 
 
 # ----------------------------------------------------------------------

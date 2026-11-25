@@ -928,6 +928,77 @@ class ARNoiseWhitener:
         WX = self.whiten(X_arr)
         return np.linalg.inv(WX.T @ WX)
 
+    def _apply_W_transpose(self, V: np.ndarray) -> np.ndarray:
+        """Apply the transpose of the calibrated whitening operator `W^T = L^-T P_perp / sqrt(alpha)`
+        to a 2D array of column vectors in `O(n_cols * p * q)` time.
+
+        Parameters
+        ----------
+        V : np.ndarray
+            2D array of column vectors of shape `(pulse_length, n_cols)`.
+
+        Returns
+        -------
+        np.ndarray
+            Transformed array `W^T V` of shape `(pulse_length, n_cols)`.
+        """
+        q = self.selected_order
+        V_work = V - np.outer(self.w_hat, self.w_hat @ V) if (self.project_offset and self.w_hat is not None) else V
+
+        # Rows t >= q + 1 of L^-1 act via anti-causal FIR filtering with _h_fir_uncal
+        V_tail = V_work.copy()
+        V_tail[: q + 1, :] = 0.0
+        rev_filtered = signal.lfilter(self._h_fir_uncal, [1.0], np.ascontiguousarray(V_tail[::-1, :]), axis=0)
+        assert isinstance(rev_filtered, np.ndarray)
+        out = rev_filtered[::-1, :].copy()
+
+        # Rows 0 .. q of L^-1 act via the transpose of the (q + 1) x (q + 1) startup block
+        L_head_inv = np.zeros((q + 1, q + 1), dtype=np.float64)
+        L_head_inv[0, 0] = 1.0 / np.sqrt(self._startup_errs[0])
+        for m in range(1, q + 1):
+            L_head_inv[m, :m] = self._startup_filters[m][::-1] / np.sqrt(self._startup_errs[m])
+            L_head_inv[m, m] = 1.0 / np.sqrt(self._startup_errs[m])
+        out[: q + 1, :] += L_head_inv.T @ V_work[: q + 1, :]
+
+        return out / np.sqrt(self.calibration_alpha)
+
+    def optimal_fitter(self, M: np.ndarray, rcond: float | None = None) -> np.ndarray:
+        """Compute the matrix-free optimal linear fitter `F = pinv(W M) @ W`.
+
+        Multiplying `F @ y` yields the Generalized Least Squares (GLS) parameter estimates
+        `beta_hat` for a single pulse vector `y` of shape `(pulse_length,)` or a 2D batch
+        of column vectors `Y` of shape `(pulse_length, n_pulses)`.
+
+        Parameters
+        ----------
+        M : np.ndarray
+            Linear model matrix of shape `(pulse_length, n_components)` whose columns are the
+            linear model components (`n_components >= 1`).
+        rcond : float | None, optional
+            Cutoff ratio for small singular values passed to `np.linalg.pinv(W M)`. When
+            `None`, defaults to `100.0 * max(WM.shape) * np.finfo(np.float64).eps` so `float64`
+            roundoff from constant-offset projection is cleanly truncated, by default None
+
+        Returns
+        -------
+        np.ndarray
+            Optimal fitter matrix `F` of shape `(n_components, pulse_length)`.
+
+        Raises
+        ------
+        ValueError
+            If `M` is not 2D, its first dimension does not equal `self.pulse_length`, or it
+            has zero columns.
+        """
+        M_arr = np.asarray(M, dtype=np.float64)
+        if M_arr.ndim != 2 or M_arr.shape[0] != self.pulse_length or M_arr.shape[1] < 1:
+            raise ValueError(f"Model matrix M must have shape ({self.pulse_length}, n_components) with n_components >= 1.")
+
+        WM = self.whiten(M_arr)
+        effective_rcond = 100.0 * max(WM.shape) * float(np.finfo(np.float64).eps) if rcond is None else rcond
+        pinv_WM = np.linalg.pinv(WM, rcond=effective_rcond)
+        return self._apply_W_transpose(pinv_WM.T).T
+
     # ------------------------------------------------------------------
     # (b) Approximate Toeplitz (and exact AR) whitening for length > p
     # ------------------------------------------------------------------
