@@ -30,7 +30,7 @@ class NoiseChannel:
     ) -> tuple[pl.DataFrame, float]:
         """Compute the maximum excursion from the median for each noise record, and store in dataframe."""
 
-        def excursion2d(noise_trace: NDArray) -> float:
+        def excursion2d(noise_trace: NDArray) -> NDArray:
             """Return the excursion (max - min) for each trace in a 2D array of traces."""
             return np.amax(noise_trace, axis=1) - np.amin(noise_trace, axis=1)
 
