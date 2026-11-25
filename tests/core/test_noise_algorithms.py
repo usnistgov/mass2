@@ -6,7 +6,7 @@ Covers:
   2. White noise modeling at fs = 250 kHz (PSD, ACF, reflection noise floor, whitening)
   3. ARMA(2,2) low-pass noise (2 kHz & 8 kHz poles at fs = 250 kHz):
      - Spectral & autocorrelation accuracy vs. analytical ground truth
-     - Offset-invariant length-p whitening
+     - Offset-invariant length-p whitening (1D and 2D column-vector batches)
      - GLS linear parameter recovery and predicted error-bar calibration
   4. Long-vector whitening (whiten_long in 'toeplitz' and 'exact_ar' modes)
   5. Digest contents and Matplotlib 4-panel plotting (plot_digest)
@@ -19,10 +19,10 @@ matplotlib.use("Agg")  # non-interactive backend for headless test runs
 import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import pytest
 from scipy import signal
 
-# Adjust import path if noise_algorithms lives inside a package (e.g., mass2.mathstat.noise_algorithms)
 from mass2.core.noise_algorithms import ARNoiseWhitener
 
 
@@ -129,11 +129,13 @@ def arma22_noise_setup() -> dict[str, object]:
     )
 
     # Exact theoretical one-sided PSD & autocovariance for ground-truth comparisons
-    n_psd_bins = 2 * (len(model.digest["freqs_ar"]) - 1)
+    freqs_true: NDArray[np.float64] = model.digest["freqs_ar"]
+    n_psd_bins = 2 * (len(freqs_true) - 1)
     h_freq = np.fft.rfft(b, n=n_psd_bins) / np.fft.rfft(a, n=n_psd_bins)
     psd_true = (2.0 * sigma_w**2 / FS_HZ) * (np.abs(h_freq) ** 2)
     psd_true[0] *= 0.5
     psd_true[-1] *= 0.5
+
     imp_len = 16_384
     impulse = np.zeros(imp_len)
     impulse[0] = 1.0
@@ -220,6 +222,7 @@ def test_white_noise_model_and_digest(white_noise_setup: dict[str, object]) -> N
     # Total RMS and innovation STD should both recover sigma = 2.5
     assert np.isclose(d["rms_noise"], sigma, rtol=0.03)
     assert np.isclose(d["innovation_std"], sigma, rtol=0.03)
+
     # One-sided PSD includes an exact 3.01 dB (2x) step between DC/Nyquist and interior bins
     assert d["spectral_dynamic_range_db"] < 4.5
     interior_dyn_range_db = float(10.0 * np.log10(np.max(d["psd_ar"][1:-1]) / np.min(d["psd_ar"][1:-1])))
@@ -241,20 +244,20 @@ def test_white_noise_whitening_and_offset_invariance(white_noise_setup: dict[str
     p: int = white_noise_setup["p"]  # type: ignore[assignment]
 
     rng = np.random.default_rng(303)
-    test_pulses = simulate_white_noise(rng, n_seqs=300, seq_len=p, sigma=sigma, add_dc_offsets=True)
-    Z = model.whiten(test_pulses)
+    # Column-oriented batch of shape (p, 300)
+    test_cols = simulate_white_noise(rng, n_seqs=300, seq_len=p, sigma=sigma, add_dc_offsets=True).T
+    Z = model.whiten(test_cols)
 
-    assert Z.shape == test_pulses.shape
+    assert Z.shape == test_cols.shape
     # Unit variance in the (p - 1)-dimensional offset-free subspace
-    mean_energy = float(np.mean(np.sum(Z**2, axis=1)))
+    mean_energy = float(np.mean(np.sum(Z**2, axis=0)))
     assert np.isclose(mean_energy, p - 1, rtol=0.04)
 
-    # Strict invariance to huge constant offsets
-    Z_shifted = model.whiten(test_pulses + 10_000.0)
+    # Strict invariance to huge constant offsets (float64 roundoff on ~500 DC leaves ~5e-11)
+    Z_shifted = model.whiten(test_cols + 10_000.0)
     assert np.allclose(Z, Z_shifted, atol=1e-10)
     assert model.w_hat is not None
-    # Float64 roundoff on ~500-amplitude DC offsets leaves ~5e-11 residual (>260 dB rejection)
-    assert np.max(np.abs(Z @ model.w_hat)) < 1e-9
+    assert np.max(np.abs(model.w_hat @ Z)) < 1e-9
 
 
 # ----------------------------------------------------------------------
@@ -296,11 +299,13 @@ def test_arma22_whitening_and_parameter_uncertainty_calibration(  # ruff: ignore
     rng = np.random.default_rng(404)
     n_trials = 400
     noise_pulses, _, _ = simulate_arma22_lowpass_noise(rng, n_seqs=n_trials, seq_len=p, fs=fs, sigma_w=sigma_w, add_dc_offsets=True)
+    noise_cols = noise_pulses.T  # shape (p, n_trials)
 
     # 1. Whitened noise energy & residual autocorrelation check
-    Z = model.whiten(noise_pulses)
-    assert np.isclose(np.mean(np.sum(Z**2, axis=1)), p - 1, rtol=0.05)
-    assert np.allclose(Z, model.whiten(noise_pulses + 25_000.0), atol=1e-10)
+    Z = model.whiten(noise_cols)
+    assert Z.shape == (p, n_trials)
+    assert np.isclose(np.mean(np.sum(Z**2, axis=0)), p - 1, rtol=0.05)
+    assert np.allclose(Z, model.whiten(noise_cols + 25_000.0), atol=1e-10)
 
     # Out-of-sample whitened residual ACF from digest should be near zero
     w_acf = model.digest["whitened_acf"][1:]
@@ -335,6 +340,10 @@ def test_shape_mismatch_errors(arma22_noise_setup: dict[str, object]) -> None:
     with pytest.raises(ValueError, match="length p="):
         model.whiten(np.zeros(p + 10))
 
+    # Row-oriented 2D array (n_vectors, p) must be rejected when n_vectors != p
+    with pytest.raises(ValueError, match="column vectors"):
+        model.whiten(np.zeros((5, p)))
+
     with pytest.raises(ValueError, match="length >= p="):
         model.whiten_long(np.zeros(p - 1))
 
@@ -368,6 +377,7 @@ def test_whiten_long_toeplitz_and_exact_ar(arma22_noise_setup: dict[str, object]
     # Verify steady-state variance (t >= q) is ~1 and matches direct lfilter with toeplitz_fir_taps
     assert np.isclose(np.var(z_toep_2d[:, q:]), 1.0, rtol=0.06)
     manual_lfilter = signal.lfilter(model.toeplitz_fir_taps, [1.0], long_batch[0] - long_batch[0, 0])
+    assert isinstance(manual_lfilter, np.ndarray)
     assert np.allclose(z_toep_1d, manual_lfilter)
 
     # Constant offset invariance with anchor_first=True
@@ -443,7 +453,7 @@ def test_multi_row_persistence_roundtrip(
 ) -> None:
     m_white: ARNoiseWhitener = white_noise_setup["model"]  # type: ignore[assignment]
     m_arma: ARNoiseWhitener = arma22_noise_setup["model"]  # type: ignore[assignment]
-    # p: int = arma22_noise_setup["p"]  # unused
+    p: int = arma22_noise_setup["p"]  # type: ignore[assignment]
 
     archive_path = tmp_path / f"noise_models{ext}"
 
@@ -460,7 +470,35 @@ def test_multi_row_persistence_roundtrip(
     # Load by label, model_id, and negative row index
     rec_by_label = ARNoiseWhitener.load(archive_path, label="white_250kHz")
     rec_by_id = ARNoiseWhitener.load(archive_path, model_id=m_arma.model_id)
-    # rec_last = ARNoiseWhitener.load(archive_path, row=-1)
+    rec_last = ARNoiseWhitener.load(archive_path, row=-1)
 
     assert rec_by_label.metadata == m_white.metadata
     assert rec_by_id.model_id == m_arma.model_id
+    assert rec_last.model_id == m_arma.model_id
+
+    # Verify exact numerical equivalence after round-trip
+    rng = np.random.default_rng(606)
+    test_pulse = rng.standard_normal(p) + 123.0
+    test_cols = rng.standard_normal((p, 5)) + 123.0
+    test_long = rng.standard_normal(2 * p) + 123.0
+    X = np.ones((p, 1))
+    X[:, 0] = np.sin(2.0 * np.pi * np.arange(p) / p)
+
+    assert np.allclose(m_arma.whiten(test_pulse), rec_by_id.whiten(test_pulse))
+    assert np.allclose(m_arma.whiten(test_cols), rec_by_id.whiten(test_cols))
+    assert np.allclose(m_arma.whiten_long(test_long), rec_by_id.whiten_long(test_long))
+    assert np.allclose(m_arma.predict_parameter_cov(X), rec_by_id.predict_parameter_cov(X))
+    assert np.allclose(m_arma.digest["psd_ar"], rec_by_id.digest["psd_ar"])
+    assert np.allclose(m_arma.digest["autocorr"], rec_by_id.digest["autocorr"])
+
+    # Test batch save_many overwrite + missing key/index errors
+    batch_path = tmp_path / f"batch_models{ext}"
+    ARNoiseWhitener.save_many([m_white, m_arma], batch_path, append=False)
+    assert len(ARNoiseWhitener.load_all(batch_path)) == 2
+
+    with pytest.raises(KeyError):
+        ARNoiseWhitener.load(batch_path, model_id="nonexistent-id")
+    with pytest.raises(KeyError):
+        ARNoiseWhitener.load(batch_path, label="nonexistent-label")
+    with pytest.raises(IndexError):
+        ARNoiseWhitener.load(batch_path, row=99)

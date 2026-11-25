@@ -765,7 +765,7 @@ class ARNoiseWhitener:
 
             n_win = va.shape[1] // p
             wins = va[:, : n_win * p].reshape(-1, p)
-            z = fold_model.whiten(wins)
+            z = fold_model.whiten(wins.T).T
             sq_norms.append(np.sum(z * z, axis=1))
             val_whitened.append(z)
 
@@ -793,7 +793,7 @@ class ARNoiseWhitener:
         p = self.pulse_length
         n_win = demeaned.shape[1] // p
         wins = demeaned[:, : n_win * p].reshape(-1, p)
-        Z = self.whiten(wins)
+        Z = self.whiten(wins.T).T
         return self._compute_batch_acf(Z, max_lag=min(p - 1, 512))
 
     @staticmethod
@@ -834,8 +834,8 @@ class ARNoiseWhitener:
         Parameters
         ----------
         y : np.ndarray
-            Input pulse or noise record(s) of shape `(pulse_length,)` or
-            `(batch_size, pulse_length)`.
+            Input pulse or noise record(s) of shape `(pulse_length,)` for a single vector
+            or `(pulse_length, n_vectors)` for a 2D matrix of column vectors.
 
         Returns
         -------
@@ -849,15 +849,24 @@ class ARNoiseWhitener:
         """
         arr = np.asarray(y, dtype=np.float64)
         is_1d = arr.ndim == 1
-        Y_2d = arr[None, :] if is_1d else arr
-        if Y_2d.ndim != 2 or Y_2d.shape[1] != self.pulse_length:
-            raise ValueError(f"Expected vectors of length p={self.pulse_length}, got shape {arr.shape}.")
+        if is_1d:
+            if arr.shape[0] != self.pulse_length:
+                raise ValueError(f"Expected vector of length p={self.pulse_length}, got shape {arr.shape}.")
+            Y_row = arr[None, :]
+        elif arr.ndim == 2:
+            if arr.shape[0] != self.pulse_length:
+                raise ValueError(
+                    f"Expected 2D array of column vectors with shape (p={self.pulse_length}, n_vectors), got {arr.shape}."
+                )
+            Y_row = np.ascontiguousarray(arr.T)
+        else:
+            raise ValueError(f"Expected 1D or 2D array with first dimension p={self.pulse_length}, got shape {arr.shape}.")
 
-        Z0 = self._apply_uncal_L_inv(Y_2d)
+        Z0 = self._apply_uncal_L_inv(Y_row)
         if self.project_offset and self.w_hat is not None:
             Z0 -= np.outer(Z0 @ self.w_hat, self.w_hat)
         Z = Z0 / np.sqrt(self.calibration_alpha)
-        return Z[0] if is_1d else Z
+        return Z[0] if is_1d else Z.T
 
     def fit_linear_model(self, y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Estimate linear model parameters and calibrated covariance via Generalized Least Squares.
@@ -890,7 +899,7 @@ class ARNoiseWhitener:
         if X_arr.ndim != 2 or X_arr.shape[0] != self.pulse_length:
             raise ValueError(f"Design matrix X must have shape ({self.pulse_length}, n_params).")
         z = self.whiten(y)
-        WX = self.whiten(X_arr.T).T
+        WX = self.whiten(X_arr)
         cov_beta = np.linalg.inv(WX.T @ WX)
         beta_hat = cov_beta @ (WX.T @ z)
         return beta_hat, cov_beta
@@ -916,7 +925,7 @@ class ARNoiseWhitener:
         X_arr = np.asarray(X, dtype=np.float64)
         if X_arr.ndim != 2 or X_arr.shape[0] != self.pulse_length:
             raise ValueError(f"Design matrix X must have shape ({self.pulse_length}, n_params).")
-        WX = self.whiten(X_arr.T).T
+        WX = self.whiten(X_arr)
         return np.linalg.inv(WX.T @ WX)
 
     # ------------------------------------------------------------------
